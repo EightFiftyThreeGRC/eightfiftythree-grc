@@ -1,0 +1,584 @@
+// js/admin.js — users & roles, role picker, profile sync. Split from app.js (Step 8).
+// Globals only; load after reports.js (snapshots in app.js call applyRoleView from here).
+
+// ============================================================
+// USERS & ROLES
+// ============================================================
+
+const ROLE_META = {
+  'ciso':          { label:'Program Owner',          icon:'🏛️', color:'#6366f1', desc:'Owns the Tier 1 Information Security Policy. High-level program oversight across all domains.' },
+  'issm':          { label:'ISSM / Domain Policy Owner',    icon:'🛡️', color:'#0ea5e9', desc:'Drafts and maintains Tier 2 domain-level policies for assigned control families. Oversees ISSOs.' },
+  'control-owner': { label:'Control Owner',                 icon:'🔧', color:'#f59e0b', desc:'Implements and attests assigned controls. Writes Tier 3 procedures and produces evidence.' },
+  'asset-owner':   { label:'Asset Owner',                   icon:'🖥️', color:'#10b981', desc:'Completes and signs off System Security Plans (SSPs) for assigned assets.' },
+  'custodian':     { label:'Policy Custodian',              icon:'📂', color:'#8b5cf6', desc:'Read-only view of assigned policies. Reviews and downloads policy documents.' },
+  'approver':      { label:'Policy Approver (ISP)',         icon:'✅', color:'#059669', desc:'Signs off the Tier 1 Information Security Policy when routed for review. Uses Reports and the Policy Library — not the Domain policies workspace (Tier 2 ISSM drafting).' },
+};
+
+
+// Role-specific default workspaces
+const ROLE_DEFAULT_TAB = {
+  'ciso':          'ciso',
+  'issm':          'policy',
+  'control-owner': 'control',
+  'asset-owner':   'asset',
+  'custodian':     'policy',
+  'approver':      'reports',
+};
+
+function showRolePicker() {
+  const overlay = document.getElementById('rolePickerOverlay');
+  if (!overlay) return;
+  // Sync users from domain owners, control owners, etc. so the picker shows current data
+  syncUsersFromState();
+  // Update subtitle with org name if set
+  const sub = document.getElementById('rolePickerSubtitle');
+  if (sub) sub.textContent = 'Select your profile to continue';
+  renderRolePickerProfiles();
+  overlay.style.display = 'flex';
+}
+
+function renderRolePickerProfiles() {
+  const container = document.getElementById('rolePickerProfiles');
+  if (!container) return;
+  if (!state.users || state.users.length === 0) {
+    container.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:32px;color:rgba(255,255,255,0.35);font-size:14px;">'
+      + 'No users have been added yet.<br><span style="font-size:12px;margin-top:6px;display:block;">An admin can add users in the Users &amp; Roles section.</span></div>';
+    return;
+  }
+
+  // ── Group users by PERSON (name), merging roles ──
+  var roleOrder = ['ciso','issm','control-owner','asset-owner','custodian'];
+  var byPerson = {};
+  var personOrder = [];
+  state.users.forEach(function(u) {
+    var key = (u.name || '').trim().toLowerCase();
+    if (!key) return;
+    if (!byPerson[key]) {
+      byPerson[key] = { name: u.name, records: [], roles: [], primaryId: u.id };
+      personOrder.push(key);
+    }
+    byPerson[key].records.push(u);
+    if (byPerson[key].roles.indexOf(u.role) === -1) byPerson[key].roles.push(u.role);
+  });
+
+  // Sort people: CISO first, then by role priority
+  personOrder.sort(function(a, b) {
+    var ra = 99, rb = 99;
+    byPerson[a].roles.forEach(function(r){ var i = roleOrder.indexOf(r); if (i !== -1 && i < ra) ra = i; });
+    byPerson[b].roles.forEach(function(r){ var i = roleOrder.indexOf(r); if (i !== -1 && i < rb) rb = i; });
+    return ra - rb;
+  });
+
+  // Build assignment text for a person across all their records
+  var buildAssignText = function(records) {
+    var parts = [];
+    records.forEach(function(u) {
+      if ((u.role === 'issm' || u.role === 'custodian') && u.families && u.families.length)
+        parts.push(u.families.join(', '));
+      else if (u.role === 'control-owner' && u.controls && u.controls.length)
+        parts.push(u.controls.length + ' control(s)');
+      else if (u.role === 'asset-owner' && u.assets && u.assets.length)
+        parts.push(u.assets.length + ' asset(s)');
+    });
+    return parts.join(' · ');
+  };
+
+  var html = '';
+  personOrder.forEach(function(key) {
+    var person = byPerson[key];
+    var primaryRole = person.roles[0] || 'custodian';
+    // Find highest-priority role for the primary color
+    for (var rp = 0; rp < roleOrder.length; rp++) {
+      if (person.roles.indexOf(roleOrder[rp]) !== -1) { primaryRole = roleOrder[rp]; break; }
+    }
+    var pm = ROLE_META[primaryRole] || { label: primaryRole, icon:'👤', color:'#64748b', desc:'' };
+    var assignText = buildAssignText(person.records);
+    // Use the first record's ID for login — applyRoleView will find all sibling records by name
+    var loginId = person.primaryId;
+
+    html += '<div onclick="selectUserProfile(\'' + loginId + '\')" '
+      + 'style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:20px;cursor:pointer;transition:all 0.15s;" '
+      + 'onmouseenter="this.style.background=\'rgba(255,255,255,0.12)\';this.style.borderColor=\'' + pm.color + '\';" '
+      + 'onmouseleave="this.style.background=\'rgba(255,255,255,0.06)\';this.style.borderColor=\'rgba(255,255,255,0.1)\';">'
+      + '<div style="font-size:24px;margin-bottom:10px;">' + pm.icon + '</div>'
+      + '<div style="color:white;font-weight:600;font-size:15px;margin-bottom:8px;">' + _esc(person.name) + '</div>'
+      + '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;">';
+    // Show a badge for each role this person holds
+    person.roles.forEach(function(role) {
+      var rm = ROLE_META[role] || { label: role, color:'#64748b' };
+      html += '<span style="display:inline-block;background:' + rm.color + '22;color:' + rm.color + ';font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;">' + rm.label + '</span>';
+    });
+    html += '</div>';
+    if (assignText) {
+      html += '<div style="color:rgba(255,255,255,0.4);font-size:12px;font-family:monospace;">' + _esc(assignText) + '</div>';
+    }
+    html += '</div>';
+  });
+
+  container.innerHTML = html;
+}
+
+function selectUserProfile(userId) {
+  if(typeof window !== 'undefined') {
+    window.selectedControl = null;
+    window.selectedDomain = null;
+    if(state) state._policyDomain = null;
+  }
+  const rightPanel = document.getElementById('right-panel-content');
+  if(rightPanel) rightPanel.innerHTML = '<div style="padding:40px;text-align:center;color:#64748b;">Loading user context...</div>';
+  const origText = document.body.style.opacity;
+  document.body.style.opacity = '0.7';
+  setTimeout(() => { document.body.style.opacity = origText; }, 300);
+
+  const overlay = document.getElementById('rolePickerOverlay');
+  if (overlay) overlay.style.display = 'none';
+  applyRoleView(userId);
+  if (userId === 'admin') {
+    showTab('ciso');
+    showToast('🔑 Admin mode');
+  } else {
+    const u = state.users.find(function(x){ return x.id === userId; });
+    if (u) showToast('👤 Signed in as ' + u.name);
+  }
+}
+
+function applyRoleView(userId) {
+  state.currentUserId = userId === 'admin' ? null : userId;
+  const user = state.currentUserId ? state.users.find(function(u){ return u.id === state.currentUserId; }) : null;
+
+  // Clear transient UI state to prevent stale selections from a different persona
+  state._selectedCtrl      = null;
+  state._policyDomain      = null;
+  state._policyOwnerFilter = '';
+  state._selectedAssetId   = null;
+  state._selectedProcessId = null;
+
+  // Update profile button label
+  const btn = document.getElementById('profileBtn');
+  if (btn) btn.textContent = user ? '👤 ' + user.name : '🔑 Admin';
+
+  // Admin: show all tabs (including users & roles)
+  if (!user) {
+    TAB_IDS.forEach(function(id) {
+      const nav = document.getElementById('nav-' + id);
+      if (nav) nav.style.display = '';
+    });
+    const adminSection = document.getElementById('sidebar-users-section');
+    if (adminSection) adminSection.style.display = '';
+    return;
+  }
+
+  // Non-admin: hide Users & Roles nav and admin sidebar section
+  const adminSection = document.getElementById('sidebar-users-section');
+  if (adminSection) adminSection.style.display = 'none';
+
+  // ── Merge tabs from ALL roles this person holds ──
+  // Find every user record with the same name (case-insensitive)
+  var nameKey = (user.name || '').trim().toLowerCase();
+  var allRecords = (state.users || []).filter(function(u) {
+    return u.name && u.name.trim().toLowerCase() === nameKey;
+  });
+  // Store sibling IDs so other code can check all roles for this person
+  state._currentPersonIds = allRecords.map(function(u){ return u.id; });
+
+  var allRoles = [];
+  allRecords.forEach(function(rec) {
+    var recRoles = (rec.roles && rec.roles.length) ? rec.roles : [rec.role];
+    recRoles.forEach(function(r) {
+      if (allRoles.indexOf(r) === -1) allRoles.push(r);
+    });
+  });
+
+  var visible = getPersonVisibleTabIds(user);
+
+  TAB_IDS.forEach(function(id) {
+    const nav = document.getElementById('nav-' + id);
+    if (nav) nav.style.display = visible.indexOf(id) !== -1 ? '' : 'none';
+  });
+
+  // Navigate to the highest-priority role's default tab (approver last — defaults to Reports)
+  var rolePriority = ['ciso','issm','control-owner','asset-owner','custodian','approver'];
+  var primaryRole = user.role;
+  for (var rp = 0; rp < rolePriority.length; rp++) {
+    if (allRoles.indexOf(rolePriority[rp]) !== -1) { primaryRole = rolePriority[rp]; break; }
+  }
+  var defaultTab = ROLE_DEFAULT_TAB[primaryRole] || visible[0] || 'reports';
+  if (visible.indexOf(defaultTab) === -1) {
+    defaultTab = visible.indexOf('reports') !== -1 ? 'reports' : (visible[0] || 'reports');
+  }
+  showTab(defaultTab);
+
+  // For policy-based roles: pre-select first assigned family from any ISSM/custodian record
+  var policyFams = [];
+  allRecords.forEach(function(rec) {
+    if ((rec.role === 'issm' || rec.role === 'custodian') && rec.families) {
+      rec.families.forEach(function(f){ if (policyFams.indexOf(f) === -1) policyFams.push(f); });
+    }
+  });
+  if (policyFams.length) {
+    state._policyDomain = policyFams[0];
+    state._policyOwnerFilter = '';
+  }
+
+  // For control owners: pre-select first assigned control from any control-owner record
+  var ctrlIds = [];
+  allRecords.forEach(function(rec) {
+    if (rec.role === 'control-owner' && rec.controls) {
+      rec.controls.forEach(function(c){ if (ctrlIds.indexOf(c) === -1) ctrlIds.push(c); });
+    }
+  });
+  if (ctrlIds.length) {
+    state._selectedCtrl = ctrlIds[0];
+    goToStep('control', 1);
+  }
+}
+
+// ---- User Sync ----
+
+// Upsert a user by name (case-insensitive). If the person already exists:
+//   - merges family/control assignments if the role matches
+//   - fills in missing email
+//   - marks as auto-generated
+// If they don't exist, creates a new record.
+function upsertUser(data) {
+  if (!state.users) state.users = [];
+  var nName = data.name.trim().toLowerCase();
+  
+  var existing = state.users.find(function(u) {
+    return u.name.trim().toLowerCase() === nName;
+  });
+
+  if (existing) {
+    if (data.email && !existing.email) existing.email = data.email;
+    if (!existing.families) existing.families = [];
+    if (!existing.controls) existing.controls = [];
+    if (!existing.assets)   existing.assets   = [];
+    
+    if(!existing.roles) existing.roles = [existing.role];
+    if(data.role && !existing.roles.includes(data.role)) existing.roles.push(data.role);
+    
+    (data.families || []).forEach(function(f) { if (!existing.families.includes(f)) existing.families.push(f); });
+    (data.controls || []).forEach(function(c) { if (!existing.controls.includes(c)) existing.controls.push(c); });
+    if (data.assets && data.assets.length>0) existing.assets = data.assets; 
+    
+    existing._autoGenerated = true;
+  } else {
+    state.users.push({
+      id: 'u_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
+      name: data.name.trim(),
+      email: data.email || '',
+      role: data.role,
+      roles: [data.role],
+      families: data.families || [],
+      controls: data.controls || [],
+      assets: data.assets || [],
+      note: data.note || '',
+      _autoGenerated: true,
+    });
+  }
+}
+
+// Reads all role assignments made throughout the wizard and syncs them
+// into state.users. Called every time the Users tab is rendered so it
+// is always up to date without needing explicit save hooks everywhere.
+function syncUsersFromState() {
+  // 1. Program Owner → CISO (include any domains they own directly)
+  if (state.programOwner && state.programOwner.trim()) {
+    var cisoFamilies = [];
+    var cisoNameKey = state.programOwner.trim().toLowerCase();
+    Object.keys(state.domainOwners || {}).forEach(function(fam) {
+      var o = state.domainOwners[fam];
+      if (o && o.name && o.name.trim().toLowerCase() === cisoNameKey) cisoFamilies.push(fam);
+    });
+    upsertUser({
+      name: state.programOwner,
+      email: state.programOwnerEmail || '',
+      role: 'ciso',
+      families: cisoFamilies,
+      note: state.programOwnerTitle || '',
+    });
+  }
+
+  // 2. Domain Owners → ISSM (aggregate multi-domain owners by name)
+  //    Skip if this person is already the CISO (same name) to avoid duplicates
+  //    First, clear auto-generated ISSM family assignments so reassignments take effect cleanly
+  var cisoKey = (state.programOwner || '').trim().toLowerCase();
+  if (state.users) {
+    state.users.forEach(function(u) {
+      if (u.role === 'issm' && u._autoGenerated) {
+        u.families = [];
+      }
+    });
+  }
+  var issmByName = {};
+  Object.keys(state.domainOwners || {}).forEach(function(fam) {
+    var o = state.domainOwners[fam];
+    if (!o || !o.name) return;
+    var key = o.name.trim().toLowerCase();
+    if (key === cisoKey) return;  // CISO already synced above — don't create a second entry
+    if (!issmByName[key]) issmByName[key] = { name: o.name.trim(), email: o.email || '', families: [] };
+    if (!issmByName[key].families.includes(fam)) issmByName[key].families.push(fam);
+  });
+  Object.keys(issmByName).forEach(function(k) {
+    var d = issmByName[k];
+    upsertUser({ name: d.name, email: d.email, role: 'issm', families: d.families });
+  });
+
+  // 3a. ISP Custodian (Tier 1 policy) → custodian
+  var ispCust = state.infoSecPolicy && state.infoSecPolicy.custodian;
+  if (ispCust && ispCust.name && ispCust.name.trim()) {
+    upsertUser({ name: ispCust.name.trim(), email: ispCust.email || '', role: 'custodian', families: ['ISP'] });
+  }
+
+  // 3. Domain Policy Custodians → custodian (aggregate by name)
+  var custByName = {};
+  Object.keys(state.policyCustodians || {}).forEach(function(fam) {
+    var entry = state.policyCustodians[fam];
+    // support both legacy string format and new object format
+    var name  = typeof entry === 'string' ? entry : (entry && entry.name) || '';
+    var email = typeof entry === 'string' ? '' : (entry && entry.email) || '';
+    var role  = typeof entry === 'string' ? '' : (entry && entry.role) || '';
+    if (!name || !name.trim()) return;
+    var key = name.trim().toLowerCase();
+    if (!custByName[key]) custByName[key] = { name: name.trim(), email: email, role: role, families: [] };
+    if (!custByName[key].families.includes(fam)) custByName[key].families.push(fam);
+    // fill in email/role if we see them later for same person
+    if (email && !custByName[key].email) custByName[key].email = email;
+    if (role && !custByName[key].role) custByName[key].role = role;
+  });
+  Object.keys(custByName).forEach(function(k) {
+    var d = custByName[k];
+    upsertUser({ name: d.name, email: d.email, role: 'custodian', families: d.families });
+  });
+
+  // 4. Control Owners → control-owner (aggregate by name)
+  var ctrlByName = {};
+  Object.keys(state.controlOwners || {}).forEach(function(ctrlId) {
+    var o = state.controlOwners[ctrlId];
+    if (!o || !o.name) return;
+    var key = o.name.trim().toLowerCase();
+    if (!ctrlByName[key]) ctrlByName[key] = { name: o.name.trim(), email: o.email || '', controls: [] };
+    if (!ctrlByName[key].controls.includes(ctrlId)) ctrlByName[key].controls.push(ctrlId);
+  });
+  Object.keys(ctrlByName).forEach(function(k) {
+    var d = ctrlByName[k];
+    upsertUser({ name: d.name, email: d.email, role: 'control-owner', controls: d.controls });
+  });
+
+  // 5. Policy Review Approvers (sync custom approvers different from default)
+  Object.keys(state.policyReviewCycle || {}).forEach(function(policyKey) {
+    var rc = state.policyReviewCycle[policyKey];
+    if (!rc || !rc.approvedBy || !rc.approvedBy.trim()) return;
+
+    // Default formal approver is the program owner (CISO) for both ISP and domain policies; ISSM is policy owner, not default approver.
+    var defaultApproverName = (state.programOwner || '').trim();
+
+    // Only create a user entry if the approver differs from the default
+    var currentApproverName = rc.approvedBy.trim();
+    var approverKey = currentApproverName.toLowerCase();
+    if (approverKey === defaultApproverName.toLowerCase() || approverKey === cisoKey) return;
+
+    upsertUser({ name: currentApproverName, email: rc.approverEmail || '', role: 'approver', families: [policyKey] });
+  });
+
+  // 6. Asset Owners → asset-owner (aggregate by name from state.assets)
+  var assetOwnerByName = {};
+  (state.assets || []).forEach(function(a) {
+    if (!a.owner || !a.owner.trim()) return;
+    var key = a.owner.trim().toLowerCase();
+    if (!assetOwnerByName[key]) assetOwnerByName[key] = { name: a.owner.trim(), email: a.ownerEmail || '', assets: [] };
+    assetOwnerByName[key].assets.push(a.id);
+    if (a.ownerEmail && !assetOwnerByName[key].email) assetOwnerByName[key].email = a.ownerEmail;
+  });
+  Object.keys(assetOwnerByName).forEach(function(k) {
+    var d = assetOwnerByName[k];
+    upsertUser({ name: d.name, email: d.email, role: 'asset-owner', assets: d.assets });
+  });
+}
+
+// ---- Users Tab Render ----
+
+function renderUsersTab() {
+  const body = document.getElementById('users-body');
+  if (!body) return;
+
+  // Pull in any roles assigned elsewhere in the wizard
+  syncUsersFromState();
+
+  const families = Object.keys(FAMILIES).sort();
+  const allControls = CONTROLS || [];
+
+  let html = '<div style="max-width:900px;">';
+
+  // Summary bar
+  const counts = {};
+  (state.users || []).forEach(function(u){ counts[u.role] = (counts[u.role]||0)+1; });
+  html += '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:28px;">';
+  Object.keys(ROLE_META).forEach(function(r) {
+    const m = ROLE_META[r];
+    html += '<div style="background:' + m.color + '18;border:1px solid ' + m.color + '44;border-radius:8px;padding:8px 16px;display:flex;align-items:center;gap:8px;">'
+      + '<span style="font-size:16px;">' + m.icon + '</span>'
+      + '<span style="font-size:13px;font-weight:600;color:' + m.color + ';">' + (counts[r]||0) + '</span>'
+      + '<span style="font-size:12px;color:#64748b;">' + m.label + '</span>'
+      + '</div>';
+  });
+  html += '</div>';
+
+  // Add user form (inline)
+  html += '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:24px;margin-bottom:28px;">'
+    + '<div style="font-size:14px;font-weight:700;color:#1e293b;margin-bottom:16px;">➕ Add New User</div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px;">'
+    + '<div><label style="font-size:12px;font-weight:600;color:#475569;display:block;margin-bottom:4px;">Full Name *</label>'
+    + '<input id="newUserName" placeholder="Jane Smith" style="width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;" /></div>'
+    + '<div><label style="font-size:12px;font-weight:600;color:#475569;display:block;margin-bottom:4px;">Email</label>'
+    + '<input id="newUserEmail" placeholder="jane@agency.gov" style="width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;" /></div>'
+    + '<div><label style="font-size:12px;font-weight:600;color:#475569;display:block;margin-bottom:4px;">Role *</label>'
+    + '<select id="newUserRole" onchange="renderNewUserAssignments()" style="width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;background:white;">'
+    + '<option value="">— select role —</option>'
+    + Object.keys(ROLE_META).map(function(r){ return '<option value="' + r + '">' + ROLE_META[r].icon + ' ' + ROLE_META[r].label + '</option>'; }).join('')
+    + '</select></div>'
+    + '</div>'
+    + '<div id="newUserAssignments" style="margin-bottom:12px;"></div>'
+    + '<div><label style="font-size:12px;font-weight:600;color:#475569;display:block;margin-bottom:4px;">Note (optional)</label>'
+    + '<input id="newUserNote" placeholder="e.g. Primary contact for AC/IA domain" style="width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;" /></div>'
+    + '<div style="margin-top:16px;">'
+    + '<button class="btn" onclick="saveNewUser()" style="padding:8px 20px;font-size:13px;">Add User</button>'
+    + '</div>'
+    + '</div>';
+
+  // User list
+  if (!state.users || state.users.length === 0) {
+    html += '<div style="text-align:center;padding:48px;color:#94a3b8;font-size:14px;background:#f8fafc;border:1px dashed #e2e8f0;border-radius:12px;">'
+      + '👥 No users added yet. Add your first user above.</div>';
+  } else {
+    html += '<div style="display:flex;flex-direction:column;gap:12px;">';
+    (state.users || []).forEach(function(u, idx) {
+      const m = ROLE_META[u.role] || { label:u.role, icon:'👤', color:'#64748b' };
+      const assignText = (u.role === 'issm' || u.role === 'custodian')
+        ? (u.families && u.families.length ? u.families.map(function(f){ return '<span style="font-family:monospace;font-weight:700;">' + f + '</span>'; }).join(' ') : '<span style="color:#94a3b8;">No domains assigned</span>')
+        : u.role === 'control-owner'
+          ? (u.controls && u.controls.length ? u.controls.slice(0,6).map(function(c){ return '<span style="font-family:monospace;font-size:11px;background:#f1f5f9;padding:1px 5px;border-radius:3px;">' + c + '</span>'; }).join(' ') + (u.controls.length > 6 ? ' <span style="color:#94a3b8;">+' + (u.controls.length-6) + ' more</span>' : '') : '<span style="color:#94a3b8;">No controls assigned</span>')
+          : '';
+      html += '<div style="background:white;border:1px solid #e2e8f0;border-radius:10px;padding:16px 20px;display:flex;align-items:center;gap:16px;">'
+        + '<div style="font-size:28px;">' + m.icon + '</div>'
+        + '<div style="flex:1;min-width:0;">'
+        + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
+        + '<span style="font-weight:700;font-size:15px;color:#1e293b;">' + _esc(u.name) + '</span>'
+        + '<span style="background:' + m.color + '18;color:' + m.color + ';font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;">' + m.label + '</span>'
+        + (u._autoGenerated ? '<span style="background:#f0fdf4;color:#16a34a;font-size:10px;font-weight:600;padding:2px 7px;border-radius:20px;border:1px solid #bbf7d0;" title="Automatically synced from wizard">⚙ synced</span>' : '<span style="background:#fafafa;color:#94a3b8;font-size:10px;font-weight:500;padding:2px 7px;border-radius:20px;border:1px solid #e2e8f0;">manual</span>')
+        + (u.email ? '<span style="color:#94a3b8;font-size:12px;">' + _esc(u.email) + '</span>' : '')
+        + '</div>'
+        + (assignText ? '<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;align-items:center;">' + assignText + '</div>' : '')
+        + (u.note ? '<div style="color:#94a3b8;font-size:12px;margin-top:4px;">' + _esc(u.note) + '</div>' : '')
+        + '</div>'
+        + '<div style="display:flex;gap:8px;">'
+        + '<button onclick="previewAsUser(\'' + u.id + '\')" title="Preview as this user" style="background:#f0f9ff;color:#0369a1;border:1px solid #bae6fd;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;">👁 Preview</button>'
+        + '<button onclick="openEditUserModal(\'' + u.id + '\')" title="Edit user" style="background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;">✏️ Edit</button>'
+        + '<button onclick="removeUser(\'' + u.id + '\')" title="Remove user" style="background:#fef2f2;color:#dc2626;border:1px solid #fca5a5;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;">✕</button>'
+        + '</div>'
+        + '</div>';
+    });
+    html += '</div>';
+  }
+
+  html += '</div>';
+  body.innerHTML = html;
+}
+
+function renderNewUserAssignments() {
+  const role = document.getElementById('newUserRole').value;
+  const container = document.getElementById('newUserAssignments');
+  if (!container) return;
+  if (!role || role === 'ciso') { container.innerHTML = ''; return; }
+
+  const families = getActiveFamilies ? getActiveFamilies() : Object.keys(FAMILIES);
+
+  if (role === 'issm' || role === 'custodian') {
+    container.innerHTML = '<label style="font-size:12px;font-weight:600;color:#475569;display:block;margin-bottom:6px;">Assigned Domains</label>'
+      + '<div style="display:flex;flex-wrap:wrap;gap:8px;">'
+      + families.filter(function(f){ return f !== 'PM'; }).map(function(f) {
+          return '<label style="display:flex;align-items:center;gap:5px;background:#f1f5f9;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:12px;">'
+            + '<input type="checkbox" value="' + f + '" name="newUserFam"> <span style="font-family:monospace;font-weight:700;">' + f + '</span> <span style="color:#64748b;">' + (FAMILIES[f]||f) + '</span></label>';
+        }).join('')
+      + '</div>';
+  } else if (role === 'control-owner') {
+    const ctrls = (CONTROLS || []).filter(function(c){ return families.includes(c.f); });
+    container.innerHTML = '<label style="font-size:12px;font-weight:600;color:#475569;display:block;margin-bottom:6px;">Assigned Controls</label>'
+      + '<div style="max-height:180px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:6px;padding:8px;display:flex;flex-wrap:wrap;gap:6px;">'
+      + ctrls.map(function(c) {
+          return '<label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer;">'
+            + '<input type="checkbox" value="' + c.id + '" name="newUserCtrl"> <span style="font-family:monospace;font-weight:600;">' + c.id + '</span></label>';
+        }).join('')
+      + '</div>';
+  }
+}
+
+function saveNewUser() {
+  const name = (document.getElementById('newUserName').value || '').trim();
+  const email = (document.getElementById('newUserEmail').value || '').trim();
+  const role = document.getElementById('newUserRole').value;
+  const note = (document.getElementById('newUserNote').value || '').trim();
+  if (!name) { showToast('⚠️ Name is required'); return; }
+  if (!role) { showToast('⚠️ Please select a role'); return; }
+
+  const families = Array.from(document.querySelectorAll('input[name="newUserFam"]:checked')).map(function(cb){ return cb.value; });
+  const controls = Array.from(document.querySelectorAll('input[name="newUserCtrl"]:checked')).map(function(cb){ return cb.value; });
+
+  const user = { id: 'u_' + Date.now(), name: name, email: email, role: role, families: families, controls: controls, note: note };
+  if (!state.users) state.users = [];
+  state.users.push(user);
+  showToast('✅ ' + name + ' added');
+  renderUsersTab();
+}
+
+function removeUser(id) {
+  state.users = (state.users || []).filter(function(u){ return u.id !== id; });
+  if (state.currentUserId === id) applyRoleView('admin');
+  renderUsersTab();
+  showToast('User removed');
+}
+
+function previewAsUser(id) {
+  selectUserProfile(id);
+  showToast('👁 Previewing as ' + (state.users.find(function(u){ return u.id===id; })||{}).name);
+}
+
+function openEditUserModal(id) {
+  var u = (state.users||[]).find(function(u){ return u.id === id; });
+  if (!u) return;
+  var overlay = document.createElement('div');
+  overlay.id = 'editUserOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
+  overlay.innerHTML = '<div style="background:white;border-radius:16px;padding:28px 32px;width:460px;max-width:92vw;box-shadow:0 20px 60px rgba(0,0,0,0.25);">'
+    + '<div style="font-size:18px;font-weight:800;color:var(--navy);margin-bottom:20px;">✏️ Edit User</div>'
+    + '<div style="display:flex;flex-direction:column;gap:14px;">'
+    + '<div><label style="font-size:12px;font-weight:600;color:#475569;display:block;margin-bottom:4px;">Full Name</label>'
+    + '<input id="_editUserName" class="form-input" value="' + _esc(u.name||'') + '" style="width:100%;box-sizing:border-box;font-size:13px;"></div>'
+    + '<div><label style="font-size:12px;font-weight:600;color:#475569;display:block;margin-bottom:4px;">Email</label>'
+    + '<input id="_editUserEmail" class="form-input" value="' + _esc(u.email||'') + '" style="width:100%;box-sizing:border-box;font-size:13px;"></div>'
+    + '<div><label style="font-size:12px;font-weight:600;color:#475569;display:block;margin-bottom:4px;">Title / Note</label>'
+    + '<input id="_editUserNote" class="form-input" value="' + _esc(u.note||'') + '" style="width:100%;box-sizing:border-box;font-size:13px;"></div>'
+    + '</div>'
+    + '<div style="display:flex;gap:12px;justify-content:flex-end;margin-top:24px;">'
+    + '<button class="btn btn-secondary" onclick="document.getElementById(\'editUserOverlay\').remove()">Cancel</button>'
+    + '<button class="btn btn-primary" onclick="saveEditUser(\'' + id + '\')">Save Changes</button>'
+    + '</div></div>';
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', function(e){ if (e.target === overlay) overlay.remove(); });
+}
+
+function saveEditUser(id) {
+  var u = (state.users||[]).find(function(u){ return u.id === id; });
+  if (!u) return;
+  var newName  = document.getElementById('_editUserName')?.value.trim();
+  var newEmail = document.getElementById('_editUserEmail')?.value.trim();
+  var newNote  = document.getElementById('_editUserNote')?.value.trim();
+  if (!newName) { showToast('Name cannot be empty.', true); return; }
+  u.name  = newName;
+  u.email = newEmail;
+  u.note  = newNote;
+  markDirty();
+  document.getElementById('editUserOverlay')?.remove();
+  renderUsersTab();
+  showToast('✅ User updated.');
+}
