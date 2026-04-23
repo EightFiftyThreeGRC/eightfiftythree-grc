@@ -1,0 +1,700 @@
+{
+  "baseline": "L",
+  "privacyOverlay": false,
+  "orgName": "Acme Corp",
+  "programOwner": "Sarah Johnson",
+  "programOwnerTitle": "Chief Information Security Officer",
+  "programOwnerEmail": "sarah@acme.com",
+  "cisoIsISSM": false,
+  "pmControls": {
+    "PM-1": true,
+    "PM-2": true,
+    "PM-3": true,
+    "PM-4": true,
+    "PM-8": true,
+    "PM-10": true,
+    "PM-11": true,
+    "PM-12": true,
+    "PM-13": true,
+    "PM-14": true,
+    "PM-15": true,
+    "PM-16": true,
+    "PM-17": true,
+    "PM-18": true,
+    "PM-19": true,
+    "PM-20": true,
+    "PM-23": true,
+    "PM-24": true,
+    "PM-25": true,
+    "PM-26": true,
+    "PM-27": true,
+    "PM-28": true,
+    "PM-29": true,
+    "PM-31": true
+  },
+  "domainOwners": {
+    "AC": {
+      "name": "Michael Chen",
+      "email": "michael.chen@acme.com",
+      "role": "Access Control Manager"
+    },
+    "AT": {
+      "name": "Lisa Rodriguez",
+      "email": "lisa.rodriguez@acme.com",
+      "role": "Security Awareness Officer"
+    },
+    "AU": {
+      "name": "David Park",
+      "email": "david.park@acme.com",
+      "role": "Audit & Compliance Lead"
+    },
+    "CA": {
+      "name": "Jennifer Williams",
+      "email": "jennifer.williams@acme.com",
+      "role": "Assessment Manager"
+    },
+    "CM": {
+      "name": "Robert Martinez",
+      "email": "robert.martinez@acme.com",
+      "role": "Configuration Manager"
+    },
+    "CP": {
+      "name": "Amanda Foster",
+      "email": "amanda.foster@acme.com",
+      "role": "Business Continuity Lead"
+    },
+    "IA": {
+      "name": "Chris Patel",
+      "email": "chris.patel@acme.com",
+      "role": "Identity Manager"
+    },
+    "IR": {
+      "name": "Nicole Johnson",
+      "email": "nicole.johnson@acme.com",
+      "role": "Incident Response Lead"
+    },
+    "PE": {
+      "name": "Marcus Thompson",
+      "email": "marcus.thompson@acme.com",
+      "role": "Facilities Manager"
+    },
+    "PL": {
+      "name": "Sarah Johnson",
+      "email": "sarah@acme.com",
+      "role": "Chief Information Security Officer"
+    }
+  },
+  "policyDeadlines": {},
+  "policyStatus": {},
+  "controlStatus": {
+    "AC-2": {
+      "status": "Implemented",
+      "evidence": "IAM system configured with user provisioning workflow",
+      "narrative": "All organizational users have unique accounts with appropriate access levels",
+      "owner": "Michael Chen"
+    },
+    "AC-3": {
+      "status": "Implemented",
+      "evidence": "IAM permissions matrix configured in Active Directory",
+      "narrative": "Access control enforcement through role-based access control (RBAC)",
+      "owner": "Michael Chen"
+    },
+    "AC-17": {
+      "status": "Implemented",
+      "evidence": "VPN configuration review completed",
+      "narrative": "Remote access controlled through VPN with MFA",
+      "owner": "Michael Chen"
+    },
+    "AT-1": {
+      "status": "In Progress",
+      "evidence": "Training curriculum documented",
+      "narrative": "Annual security awareness training required for all staff",
+      "owner": "Lisa Rodriguez"
+    },
+    "AU-2": {
+      "status": "Implemented",
+      "evidence": "SIEM event configuration completed",
+      "narrative": "Logs configured for all critical systems",
+      "owner": "David Park"
+    },
+    "AU-11": {
+      "status": "Implemented",
+      "evidence": "Log retention policy: 1 year",
+      "narrative": "Audit logs retained for 12 months for forensic analysis",
+      "owner": "David Park"
+    },
+    "CA-7": {
+      "status": "Planned",
+      "evidence": "Continuous monitoring strategy drafted",
+      "narrative": "Quarterly vulnerability scanning and annual risk assessment planned",
+      "owner": "Jennifer Williams"
+    },
+    "CM-2": {
+      "status": "Implemented",
+      "evidence": "Baseline configs documented",
+      "narrative": "Infrastructure as Code (IaC) baseline established",
+      "owner": "Robert Martinez"
+    },
+    "CM-6": {
+      "status": "Implemented",
+      "evidence": "Configuration standards applied",
+      "narrative": "Hardened templates enforced for all systems",
+      "owner": "Robert Martinez"
+    },
+    "CM-7": {
+      "status": "In Progress",
+      "evidence": "Unnecessary services audit in progress",
+      "narrative": "Principle of least functionality being enforced",
+      "owner": "Robert Martinez"
+    },
+    "CP-9": {
+      "status": "Implemented",
+      "evidence": "Daily incremental, weekly full backups",
+      "narrative": "Backup and restore procedures tested quarterly",
+      "owner": "Amanda Foster"
+    },
+    "IA-2": {
+      "status": "Implemented",
+      "evidence": "MFA enrollment 95% complete",
+      "narrative": "Multi-factor authentication required for all system access",
+      "owner": "Chris Patel"
+    },
+    "IA-5": {
+      "status": "Planned",
+      "evidence": "Password policy drafted",
+      "narrative": "Password management system (Vault) planned for Q2 2026",
+      "owner": "Chris Patel"
+    },
+    "IR-4": {
+      "status": "Planned",
+      "evidence": "IR playbook drafted",
+      "narrative": "Incident response procedures documented, tabletop exercise scheduled",
+      "owner": "Nicole Johnson"
+    },
+    "MP-6": {
+      "status": "In Progress",
+      "evidence": "Media sanitization procedure documented",
+      "narrative": "All decommissioned media destroyed per DoD 5220.22-M",
+      "owner": "Robert Martinez"
+    },
+    "PE-2": {
+      "status": "Implemented",
+      "evidence": "Badge access list reviewed monthly",
+      "narrative": "Physical access controlled through badge reader system",
+      "owner": "Marcus Thompson"
+    },
+    "PL-2": {
+      "status": "Implemented",
+      "evidence": "System Security Plan (SSP) completed",
+      "narrative": "Security requirements documented for each system",
+      "owner": "Sarah Johnson"
+    },
+    "RA-3": {
+      "status": "Implemented",
+      "evidence": "Annual risk assessment completed",
+      "narrative": "Risk register maintained with quarterly updates",
+      "owner": "Jennifer Williams"
+    },
+    "RA-5": {
+      "status": "Implemented",
+      "evidence": "Quarterly vulnerability scans",
+      "narrative": "Automated scanning and manual assessment",
+      "owner": "Jennifer Williams"
+    },
+    "SC-8": {
+      "status": "Implemented",
+      "evidence": "TLS 1.2+ enforced",
+      "narrative": "All data in transit encrypted with strong ciphers",
+      "owner": "Chris Patel"
+    },
+    "SC-28": {
+      "status": "Implemented",
+      "evidence": "AES-256 encryption at rest",
+      "narrative": "Encryption keys managed in AWS KMS",
+      "owner": "Chris Patel"
+    },
+    "SI-2": {
+      "status": "Implemented",
+      "evidence": "Monthly patch management report",
+      "narrative": "Critical patches applied within 30 days",
+      "owner": "Robert Martinez"
+    },
+    "SI-3": {
+      "status": "Implemented",
+      "evidence": "Anti-malware on all endpoints",
+      "narrative": "CrowdStrike deployed on all workstations",
+      "owner": "James Lee"
+    }
+  },
+  "controlTestResults": {},
+  "assets": [
+    {
+      "id": "ast1",
+      "name": "Production Database",
+      "type": "Database",
+      "owner": "Priya Gupta",
+      "controls": [
+        "AC-2",
+        "AU-11",
+        "SC-28",
+        "CM-6"
+      ],
+      "note": "MySQL cluster in AWS"
+    },
+    {
+      "id": "ast2",
+      "name": "API Server",
+      "type": "Application Server",
+      "owner": "Kevin O'Neill",
+      "controls": [
+        "AC-2",
+        "AU-2",
+        "SC-8",
+        "CM-6"
+      ],
+      "note": "Node.js microservice"
+    },
+    {
+      "id": "ast3",
+      "name": "Web Application",
+      "type": "Web Application",
+      "owner": "Kevin O'Neill",
+      "controls": [
+        "AC-2",
+        "AC-3",
+        "AT-1",
+        "IA-2",
+        "SC-8"
+      ],
+      "note": "React + Express stack"
+    },
+    {
+      "id": "ast4",
+      "name": "File Server",
+      "type": "File Server",
+      "owner": "James Lee",
+      "controls": [
+        "AC-2",
+        "MP-6",
+        "SC-28",
+        "CM-6"
+      ],
+      "note": "NAS storage array"
+    },
+    {
+      "id": "ast5",
+      "name": "VPN Gateway",
+      "type": "Network Device",
+      "owner": "James Lee",
+      "controls": [
+        "AC-17",
+        "SC-8",
+        "CM-6",
+        "AU-2"
+      ],
+      "note": "FortiGate 1000D"
+    },
+    {
+      "id": "ast6",
+      "name": "Email System",
+      "type": "Communication",
+      "owner": "James Lee",
+      "controls": [
+        "AC-2",
+        "AU-2",
+        "IA-2",
+        "SC-8"
+      ],
+      "note": "Office 365 Exchange"
+    },
+    {
+      "id": "ast7",
+      "name": "Workstations",
+      "type": "Endpoint",
+      "owner": "James Lee",
+      "controls": [
+        "AC-2",
+        "CM-6",
+        "SI-3",
+        "CM-7"
+      ],
+      "note": "Windows 10 + Mac fleet"
+    },
+    {
+      "id": "ast8",
+      "name": "Backup System",
+      "type": "Infrastructure",
+      "owner": "James Lee",
+      "controls": [
+        "CP-9",
+        "SC-28",
+        "CM-2"
+      ],
+      "note": "Veeam Backup & Replication"
+    }
+  ],
+  "attestations": {
+    "AC-2-ast1": {
+      "assetId": "ast1",
+      "attested": true,
+      "date": "2026-03-19T22:17:56.658319",
+      "owner": "Control Owner"
+    },
+    "AC-2-ast2": {
+      "assetId": "ast2",
+      "attested": true,
+      "date": "2026-03-19T22:17:56.658319",
+      "owner": "Control Owner"
+    },
+    "AC-2-ast3": {
+      "assetId": "ast3",
+      "attested": true,
+      "date": "2026-03-19T22:17:56.658319",
+      "owner": "Control Owner"
+    },
+    "AC-2-ast4": {
+      "assetId": "ast4",
+      "attested": true,
+      "date": "2026-03-19T22:17:56.658319",
+      "owner": "Control Owner"
+    },
+    "AC-3-ast1": {
+      "assetId": "ast1",
+      "attested": true,
+      "date": "2026-03-19T22:17:56.658319",
+      "owner": "Control Owner"
+    },
+    "AC-3-ast2": {
+      "assetId": "ast2",
+      "attested": true,
+      "date": "2026-03-19T22:17:56.658319",
+      "owner": "Control Owner"
+    },
+    "AC-3-ast3": {
+      "assetId": "ast3",
+      "attested": true,
+      "date": "2026-03-19T22:17:56.658319",
+      "owner": "Control Owner"
+    },
+    "AC-3-ast4": {
+      "assetId": "ast4",
+      "attested": true,
+      "date": "2026-03-19T22:17:56.658319",
+      "owner": "Control Owner"
+    },
+    "AU-2-ast1": {
+      "assetId": "ast1",
+      "attested": true,
+      "date": "2026-03-19T22:17:56.658319",
+      "owner": "Control Owner"
+    },
+    "AU-2-ast2": {
+      "assetId": "ast2",
+      "attested": true,
+      "date": "2026-03-19T22:17:56.658319",
+      "owner": "Control Owner"
+    },
+    "AU-2-ast3": {
+      "assetId": "ast3",
+      "attested": true,
+      "date": "2026-03-19T22:17:56.658319",
+      "owner": "Control Owner"
+    },
+    "AU-2-ast4": {
+      "assetId": "ast4",
+      "attested": true,
+      "date": "2026-03-19T22:17:56.658319",
+      "owner": "Control Owner"
+    },
+    "AU-11-ast1": {
+      "assetId": "ast1",
+      "attested": true,
+      "date": "2026-03-19T22:17:56.658319",
+      "owner": "Control Owner"
+    },
+    "AU-11-ast2": {
+      "assetId": "ast2",
+      "attested": true,
+      "date": "2026-03-19T22:17:56.658319",
+      "owner": "Control Owner"
+    },
+    "AU-11-ast3": {
+      "assetId": "ast3",
+      "attested": true,
+      "date": "2026-03-19T22:17:56.658319",
+      "owner": "Control Owner"
+    },
+    "AU-11-ast4": {
+      "assetId": "ast4",
+      "attested": true,
+      "date": "2026-03-19T22:17:56.658319",
+      "owner": "Control Owner"
+    },
+    "CM-2-ast1": {
+      "assetId": "ast1",
+      "attested": true,
+      "date": "2026-03-19T22:17:56.658319",
+      "owner": "Control Owner"
+    },
+    "CM-2-ast2": {
+      "assetId": "ast2",
+      "attested": true,
+      "date": "2026-03-19T22:17:56.658319",
+      "owner": "Control Owner"
+    },
+    "CM-2-ast3": {
+      "assetId": "ast3",
+      "attested": true,
+      "date": "2026-03-19T22:17:56.658319",
+      "owner": "Control Owner"
+    },
+    "CM-2-ast4": {
+      "assetId": "ast4",
+      "attested": true,
+      "date": "2026-03-19T22:17:56.658319",
+      "owner": "Control Owner"
+    },
+    "CM-6-ast1": {
+      "assetId": "ast1",
+      "attested": true,
+      "date": "2026-03-19T22:17:56.658319",
+      "owner": "Control Owner"
+    },
+    "CM-6-ast2": {
+      "assetId": "ast2",
+      "attested": true,
+      "date": "2026-03-19T22:17:56.658319",
+      "owner": "Control Owner"
+    },
+    "CM-6-ast3": {
+      "assetId": "ast3",
+      "attested": true,
+      "date": "2026-03-19T22:17:56.658319",
+      "owner": "Control Owner"
+    },
+    "CM-6-ast4": {
+      "assetId": "ast4",
+      "attested": true,
+      "date": "2026-03-19T22:17:56.658319",
+      "owner": "Control Owner"
+    },
+    "CP-9-ast1": {
+      "assetId": "ast1",
+      "attested": true,
+      "date": "2026-03-19T22:17:56.658319",
+      "owner": "Control Owner"
+    },
+    "CP-9-ast2": {
+      "assetId": "ast2",
+      "attested": true,
+      "date": "2026-03-19T22:17:56.658319",
+      "owner": "Control Owner"
+    },
+    "CP-9-ast3": {
+      "assetId": "ast3",
+      "attested": true,
+      "date": "2026-03-19T22:17:56.658319",
+      "owner": "Control Owner"
+    },
+    "CP-9-ast4": {
+      "assetId": "ast4",
+      "attested": true,
+      "date": "2026-03-19T22:17:56.658319",
+      "owner": "Control Owner"
+    },
+    "IA-2-ast1": {
+      "assetId": "ast1",
+      "attested": true,
+      "date": "2026-03-19T22:17:56.658319",
+      "owner": "Control Owner"
+    },
+    "IA-2-ast2": {
+      "assetId": "ast2",
+      "attested": true,
+      "date": "2026-03-19T22:17:56.658319",
+      "owner": "Control Owner"
+    },
+    "IA-2-ast3": {
+      "assetId": "ast3",
+      "attested": true,
+      "date": "2026-03-19T22:17:56.658319",
+      "owner": "Control Owner"
+    },
+    "IA-2-ast4": {
+      "assetId": "ast4",
+      "attested": true,
+      "date": "2026-03-19T22:17:56.658319",
+      "owner": "Control Owner"
+    },
+    "PE-2-ast1": {
+      "assetId": "ast1",
+      "attested": true,
+      "date": "2026-03-19T22:17:56.658319",
+      "owner": "Control Owner"
+    },
+    "PE-2-ast2": {
+      "assetId": "ast2",
+      "attested": true,
+      "date": "2026-03-19T22:17:56.658319",
+      "owner": "Control Owner"
+    },
+    "PE-2-ast3": {
+      "assetId": "ast3",
+      "attested": true,
+      "date": "2026-03-19T22:17:56.658319",
+      "owner": "Control Owner"
+    },
+    "PE-2-ast4": {
+      "assetId": "ast4",
+      "attested": true,
+      "date": "2026-03-19T22:17:56.658319",
+      "owner": "Control Owner"
+    },
+    "SC-28-ast1": {
+      "assetId": "ast1",
+      "attested": true,
+      "date": "2026-03-19T22:17:56.658319",
+      "owner": "Control Owner"
+    },
+    "SC-28-ast2": {
+      "assetId": "ast2",
+      "attested": true,
+      "date": "2026-03-19T22:17:56.658319",
+      "owner": "Control Owner"
+    },
+    "SC-28-ast3": {
+      "assetId": "ast3",
+      "attested": true,
+      "date": "2026-03-19T22:17:56.658319",
+      "owner": "Control Owner"
+    },
+    "SC-28-ast4": {
+      "assetId": "ast4",
+      "attested": true,
+      "date": "2026-03-19T22:17:56.658319",
+      "owner": "Control Owner"
+    }
+  },
+  "cisoComplete": true,
+  "infoSecPolicy": null,
+  "policySelectedControls": null,
+  "domainPolicies": null,
+  "controlOwners": null,
+  "policyMerges": {},
+  "policyPriorities": {},
+  "domainDeadlines": {},
+  "domainCustomNames": {},
+  "cisoStep4Sub": 1,
+  "_policyDomain": null,
+  "_policyWizardMode": false,
+  "_policyOwnerFilter": "",
+  "policyCustodians": {},
+  "controlOwnerAttested": false,
+  "_ctrlEvidenceFilter": "all",
+  "users": [
+    {
+      "id": "co1",
+      "name": "Michael Chen",
+      "email": "michael.chen@acme.com",
+      "role": "Access Control Manager",
+      "families": [
+        "AC"
+      ],
+      "controls": [],
+      "note": ""
+    },
+    {
+      "id": "co2",
+      "name": "Lisa Rodriguez",
+      "email": "lisa.rodriguez@acme.com",
+      "role": "Security Awareness Officer",
+      "families": [
+        "AT"
+      ],
+      "controls": [],
+      "note": ""
+    },
+    {
+      "id": "co3",
+      "name": "David Park",
+      "email": "david.park@acme.com",
+      "role": "Audit & Compliance Lead",
+      "families": [
+        "AU",
+        "CA"
+      ],
+      "controls": [],
+      "note": ""
+    },
+    {
+      "id": "co4",
+      "name": "Jennifer Williams",
+      "email": "jennifer.williams@acme.com",
+      "role": "Assessment Manager",
+      "families": [
+        "CA"
+      ],
+      "controls": [],
+      "note": ""
+    },
+    {
+      "id": "co5",
+      "name": "Robert Martinez",
+      "email": "robert.martinez@acme.com",
+      "role": "Configuration Manager",
+      "families": [
+        "CM"
+      ],
+      "controls": [],
+      "note": ""
+    },
+    {
+      "id": "co6",
+      "name": "Amanda Foster",
+      "email": "amanda.foster@acme.com",
+      "role": "Business Continuity Lead",
+      "families": [
+        "CP"
+      ],
+      "controls": [],
+      "note": ""
+    },
+    {
+      "id": "ao1",
+      "name": "James Lee",
+      "email": "james.lee@acme.com",
+      "role": "Infrastructure Lead",
+      "families": [],
+      "controls": [],
+      "note": ""
+    },
+    {
+      "id": "ao2",
+      "name": "Priya Gupta",
+      "email": "priya.gupta@acme.com",
+      "role": "Database Administrator",
+      "families": [],
+      "controls": [],
+      "note": ""
+    },
+    {
+      "id": "ao3",
+      "name": "Kevin O'Neill",
+      "email": "kevin.oneill@acme.com",
+      "role": "Application Owner",
+      "families": [],
+      "controls": [],
+      "note": ""
+    },
+    {
+      "id": "cust1",
+      "name": "Elena Kowalski",
+      "email": "elena.kowalski@acme.com",
+      "role": "Data Custodian",
+      "families": [],
+      "controls": [],
+      "note": ""
+    }
+  ],
+  "currentUserId": null
+}
