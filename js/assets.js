@@ -36,9 +36,100 @@ const ASSET_TYPES = [
     { key: 'devops_repo',        label: 'Code Repository' },
     { key: 'devops_container',   label: 'Container Orchestration (Kubernetes)' },
   ]},
+  { category: 'Process', types: [
+    { key: 'proc_risk_mgmt',     label: 'Risk Management' },
+    { key: 'proc_vuln_mgmt',     label: 'Vulnerability Management' },
+    { key: 'proc_iam',           label: 'Identity & Access Management' },
+    { key: 'proc_config_change', label: 'Configuration & Change Management' },
+    { key: 'proc_supply_chain',  label: 'Third-Party / Supply Chain Management' },
+    { key: 'proc_incident_resp', label: 'Incident Response' },
+    { key: 'proc_bcp',           label: 'Business Continuity & Contingency' },
+    { key: 'proc_awareness',     label: 'Security Awareness & Training' },
+  ]},
 ];
 const SSP_STATUSES = ['Complies','Partially Complies','Does Not Comply','Not Applicable','Inherited'];
 const SSP_STATUS_COLORS = {'Complies':'var(--green)','Partially Complies':'var(--amber)','Does Not Comply':'var(--red)','Not Applicable':'var(--slate)','Inherited':'var(--blue)'};
+
+// ─── NIST 800-60 INFORMATION TYPES (catalog) ─────────────────────────────────
+// CIA seeds are calibrated to NIST SP 800-60 Vol II provisional values — agencies
+// tailor up or down based on their context. Seeds here are deliberately moderate
+// so a single selection rarely forces High; PHI / regulated financial / mission-
+// critical land on High; generic ops data lands on Low; most other types land on
+// Moderate (matches real FedRAMP / FISMA practice).
+var INFO_TYPES_800_60 = [
+  { id: 'C.1',     label: 'C.1 Mission information',
+    desc: 'Core data that drives your primary mission or line of business — the master records your organization exists to manage. Tailor up to High if the mission is life-safety, national security, or critical infrastructure.',
+    examples: 'Case files for a legal firm, patient charts for a hospital, academic records for a university, customer transactions for a bank.',
+    cia: { c: 'M', i: 'M', a: 'M' } },
+  { id: 'C.2.1',   label: 'C.2.1 Security information',
+    desc: 'Data that protects the system itself: configurations, credentials, logs, vulnerability findings, incident records. Integrity matters most — tampered logs or configs do real harm.',
+    examples: 'Firewall rules, admin passwords, SIEM log archives, vuln scan results, incident tickets, audit reports.',
+    cia: { c: 'L', i: 'M', a: 'L' } },
+  { id: 'C.2.2',   label: 'C.2.2 Personal data (PII, non-health)',
+    desc: 'Information that identifies a specific person — anything that could be used for identity theft or privacy harm. Tailor up to High if the system holds SSNs, biometrics, or large-scale identity records.',
+    examples: 'Names, dates of birth, home addresses, driver license numbers, employee HR records, customer contact lists.',
+    cia: { c: 'M', i: 'M', a: 'L' } },
+  { id: 'C.2.5',   label: 'C.2.5 Health information (PHI)',
+    desc: 'Any health or medical record covered by HIPAA or equivalent privacy law. HIPAA confidentiality drives a High C; integrity / availability are typically Moderate unless clinical-care safety is at stake.',
+    examples: 'Patient medical records, insurance claims, prescriptions, lab results, mental health notes.',
+    cia: { c: 'H', i: 'M', a: 'M' } },
+  { id: 'C.2.6',   label: 'C.2.6 Regulated financial data (PCI, banking)',
+    desc: 'Payment card data, bank account numbers, or other regulated financial records subject to PCI DSS, GLBA, or similar regimes. Use C.2.8.9 instead for routine internal financial reporting.',
+    examples: 'Credit card PANs, ACH bank account numbers, payment processing data, regulated trading records.',
+    cia: { c: 'H', i: 'M', a: 'L' } },
+  { id: 'C.2.8.9', label: 'C.2.8.9 General operational data',
+    desc: 'Routine day-to-day operational data with no sensitive or regulated content. Most internal collaboration and back-office records live here.',
+    examples: 'Office floor plans, meeting agendas, internal communications, procurement catalogs, vendor lists, internal financial reporting.',
+    cia: { c: 'L', i: 'L', a: 'L' } }
+];
+
+// Plain-English scenario framing for each FIPS 199 impact dimension.
+// Used by renderAssetCIAGuidedPicker() so asset owners (who typically don't know FIPS 199)
+// can reason about their system through "what's the worst-case impact if …" questions.
+var FIPS199_GUIDANCE = {
+  confidentiality: {
+    scenario: 'If the data in this system were disclosed to unauthorized people, what would the worst-case impact be?',
+    levels: [
+      { v: 'L', label: 'Low',
+        hint: 'Limited impact. The data is already public, routine, or non-sensitive — disclosure would cause at most minor embarrassment or inconvenience.',
+        examples: 'Public marketing content, published research, meeting room bookings, office floor plans.' },
+      { v: 'M', label: 'Moderate',
+        hint: 'Serious harm. Non-public business data, internal records, or personal data that could be misused, embarrass individuals, or damage the organization.',
+        examples: 'Employee contact lists, internal strategy docs, customer lists, non-sensitive PII.' },
+      { v: 'H', label: 'High',
+        hint: 'Catastrophic harm. Regulated data or data whose loss would cause severe financial, legal, safety, or reputational damage.',
+        examples: 'PHI/HIPAA, SSNs, payment card (PCI) data, bank account numbers, trade secrets, national-security info.' }
+    ]
+  },
+  integrity: {
+    scenario: 'If the data in this system were altered or corrupted without detection, what would the worst-case impact be?',
+    levels: [
+      { v: 'L', label: 'Low',
+        hint: 'Limited impact. Errors cause at most minor inconvenience. Data can be easily verified or restored from another source.',
+        examples: 'Draft documents, internal wiki pages, non-authoritative reports.' },
+      { v: 'M', label: 'Moderate',
+        hint: 'Serious impact. Altered data could drive bad business decisions, cause financial loss, or breach a contract / SLA.',
+        examples: 'Customer order history, invoice records, HR records, configuration management data.' },
+      { v: 'H', label: 'High',
+        hint: 'Catastrophic impact. Altered data could cause loss of life, fraud at scale, major regulatory violations, or mission failure.',
+        examples: 'Financial ledgers, medical records, safety controls, audit logs, access-control records.' }
+    ]
+  },
+  availability: {
+    scenario: 'If this system were unavailable (down or inaccessible), what would the worst-case impact be?',
+    levels: [
+      { v: 'L', label: 'Low',
+        hint: 'Limited impact. Hours of downtime are tolerable. Workarounds exist; no customers or mission-critical processes depend on it.',
+        examples: 'Internal KB, non-critical reporting dashboards, dev/test environments.' },
+      { v: 'M', label: 'Moderate',
+        hint: 'Serious impact. Extended outage (roughly > 1 day) causes significant operational disruption or financial loss.',
+        examples: 'Customer-facing web app, payroll processing, internal collaboration platforms.' },
+      { v: 'H', label: 'High',
+        hint: 'Catastrophic impact. Any meaningful outage threatens life safety, critical operations, regulatory/SLA compliance, or primary mission function.',
+        examples: 'Emergency dispatch, clinical systems, trading platforms, industrial control systems.' }
+    ]
+  }
+};
 
 // Process categories — each maps to a set of control families for SSP coverage
 const PROCESS_CATEGORIES = [
@@ -349,12 +440,18 @@ function renderAssetTypeLibrary() {
         + activeTypeRows.map(function(row){
           var selected = row.group || 'Custom';
           var safeType = row.label.replace(/'/g,"\\'");
+          var isElev = typeof isElevatedCustomAssetTypeName === 'function' && isElevatedCustomAssetTypeName(row.label);
+          var sourceLabel = isElev ? 'ELEVATED' : row.source;
+          var typeCell = '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+            + '<span style="font-size:12px;color:var(--navy);font-weight:600;">' + escapeHTML(row.label) + '</span>'
+            + (isElev ? '<span style="font-size:9px;font-weight:800;letter-spacing:0.04em;padding:2px 7px;border-radius:6px;background:linear-gradient(135deg,#fff7ed,#fef2f2);color:#b45309;border:1px solid #fdba74;">ELEVATED · catalog subtype</span>' : '')
+            + '</div>';
           var groupCell = '<span style="font-size:12px;color:var(--text-muted);">' + escapeHTML(selected) + '</span>';
           if (row.isCustom && canApprove) {
             groupCell = '<select class="form-select" style="font-size:12px;" onchange="state.customAssetTypeGroups[\'' + safeType + '\']=this.value;markDirty();renderAssetTypeLibrary();">' + groups.map(function(g){ return '<option' + (selected===g?' selected':'') + '>' + escapeHTML(g) + '</option>'; }).join('') + '</select>';
           }
-          return '<tr><td style="font-size:12px;color:var(--navy);font-weight:600;">' + escapeHTML(row.label) + '</td>'
-            + '<td style="font-size:11px;color:#334155;font-weight:700;text-transform:uppercase;">' + escapeHTML(row.source) + '</td>'
+          return '<tr><td>' + typeCell + '</td>'
+            + '<td style="font-size:11px;color:#334155;font-weight:700;text-transform:uppercase;">' + escapeHTML(sourceLabel) + '</td>'
             + '<td>' + groupCell + '</td>'
             + '<td><button class="btn btn-sm" style="font-size:10px;padding:3px 8px;background:#fee2e2;color:#991b1b;border:1px solid #fecaca;" onclick="requestOrApplyAssetTypeChange(\'delete\',\'' + safeType + '\',\'' + selected.replace(/'/g,"\\'") + '\')">Delete</button></td></tr>';
         }).join('')
@@ -867,6 +964,275 @@ function renderAssetWizardChrome() {
     + '</div>';
 }
 
+// ─── FIPS 199 + program baseline (V2/V3 baseline elevation) ─────────────────
+function getProgramBaselineFipsLetter() {
+  if (typeof resolveProgramBaseline === 'function') {
+    var eff = resolveProgramBaseline();
+    if (eff === 'L' || eff === 'M' || eff === 'H') return eff;
+  }
+  var b = state.baseline;
+  if (b === 'L' || b === 'M' || b === 'H') return b;
+  return 'L';
+}
+
+function _fipsOrder(ch) {
+  return { L: 1, M: 2, H: 3 }[ch] || 0;
+}
+
+function _normFipsLetter(v) {
+  var s = String(v == null ? '' : v).trim().toUpperCase();
+  if (s === 'MODERATE' || s === 'M') return 'M';
+  if (s === 'HIGH' || s === 'H') return 'H';
+  return 'L';
+}
+
+/** High-water security impact from FIPS 199-style CIA triplet. */
+function computeAssetOverallFipsImpact(cat) {
+  if (!cat || typeof cat !== 'object') return 'L';
+  var c = _normFipsLetter(cat.confidentiality);
+  var i = _normFipsLetter(cat.integrity);
+  var a = _normFipsLetter(cat.availability);
+  var m = Math.max(_fipsOrder(c), _fipsOrder(i), _fipsOrder(a));
+  return m === 3 ? 'H' : m === 2 ? 'M' : 'L';
+}
+
+function ensureAssetCategorizationRow(assetId) {
+  if (!state.assetCategorization) state.assetCategorization = {};
+  if (!state.assetCategorization[assetId]) {
+    state.assetCategorization[assetId] = {
+      confidentiality: 'L',
+      integrity: 'L',
+      availability: 'L',
+      rationale: ''
+    };
+  }
+  return state.assetCategorization[assetId];
+}
+
+function setAssetCategorizationField(assetId, field, value) {
+  ensureAssetCategorizationRow(assetId);
+  if (field === 'rationale') {
+    state.assetCategorization[assetId].rationale = String(value || '');
+    markDirty();
+    return;
+  }
+  if (field === 'confidentiality' || field === 'integrity' || field === 'availability') {
+    state.assetCategorization[assetId][field] = _normFipsLetter(value);
+  }
+  markDirty();
+  renderAssetSSPStep1();
+}
+
+/** Three radio-card groups (C/I/A) with plain-English scenarios — used in non-FISMA mode. */
+function renderAssetCIAGuidedPicker(aid, cat) {
+  var fields = [
+    { key: 'confidentiality', data: FIPS199_GUIDANCE.confidentiality },
+    { key: 'integrity',       data: FIPS199_GUIDANCE.integrity },
+    { key: 'availability',    data: FIPS199_GUIDANCE.availability }
+  ];
+  var aidJson = JSON.stringify(aid);
+  return fields.map(function(f) {
+    var current = cat[f.key] || 'L';
+    var cards = f.data.levels.map(function(o) {
+      var sel = (current === o.v);
+      var borderColor = sel ? 'var(--teal)' : '#e5e7eb';
+      var bg = sel ? '#ecfdf5' : '#fff';
+      var badgeBg = sel ? 'var(--teal)' : '#94a3b8';
+      var firstSentence = String(o.hint).split('.')[0] + '.';
+      var rest = String(o.hint).split('.').slice(1).join('.').trim();
+      return '<label style="display:block;border:2px solid ' + borderColor + ';background:' + bg + ';border-radius:8px;padding:10px 12px;margin-bottom:6px;cursor:pointer;transition:border-color .15s, background .15s;">'
+        + '<div style="display:flex;gap:10px;align-items:flex-start;">'
+        + '<input type="radio" name="cia_' + f.key + '_' + escapeHTML(String(aid)) + '" value="' + o.v + '"' + (sel ? ' checked' : '')
+        + ' onchange="setAssetCategorizationField(' + aidJson + ',\'' + f.key + '\',\'' + o.v + '\');setTimeout(function(){ if (typeof renderAssetSSPStep1===\'function\') renderAssetSSPStep1(); },0)" style="margin-top:3px;">'
+        + '<div style="flex:1;">'
+        + '<div style="display:flex;gap:8px;align-items:center;margin-bottom:3px;">'
+        + '<span style="background:' + badgeBg + ';color:#fff;font-size:10px;font-weight:800;letter-spacing:0.5px;padding:2px 8px;border-radius:10px;">' + o.label.toUpperCase() + '</span>'
+        + '<span style="font-weight:700;font-size:13px;color:var(--navy);">' + _esc(firstSentence) + '</span>'
+        + '</div>'
+        + '<div style="font-size:12px;color:#475569;line-height:1.45;">' + _esc(rest) + '</div>'
+        + '<div style="font-size:11px;color:var(--text-muted);margin-top:4px;"><em>Examples: ' + _esc(o.examples) + '</em></div>'
+        + '</div></div></label>';
+    }).join('');
+    var labelMap = { confidentiality: 'Confidentiality', integrity: 'Integrity', availability: 'Availability' };
+    return '<div style="margin-bottom:18px;">'
+      + '<div style="font-weight:700;font-size:13px;color:var(--navy);margin-bottom:2px;">' + labelMap[f.key] + '</div>'
+      + '<div style="font-size:12px;color:#475569;margin-bottom:8px;line-height:1.45;">' + _esc(f.data.scenario) + '</div>'
+      + cards
+      + '</div>';
+  }).join('');
+}
+
+/** FISMA mode: recompute per-axis C/I/A as high-water mark of selected info types' CIA seeds. */
+function applyAssetCategorizationFromInfoTypes(aid) {
+  var cat = (state.assetCategorization || {})[aid];
+  if (!cat) return;
+  var idx = {};
+  if (typeof INFO_TYPES_800_60 !== 'undefined') {
+    INFO_TYPES_800_60.forEach(function(it) { idx[it.id] = it; });
+  }
+  var maxC = 1, maxI = 1, maxA = 1;
+  (cat.infoTypes || []).forEach(function(row) {
+    var it = idx[row.id] || row;
+    if (it && it.cia) {
+      maxC = Math.max(maxC, _fipsOrder(it.cia.c));
+      maxI = Math.max(maxI, _fipsOrder(it.cia.i));
+      maxA = Math.max(maxA, _fipsOrder(it.cia.a));
+    }
+  });
+  var letter = function(r) { return r === 3 ? 'H' : r === 2 ? 'M' : 'L'; };
+  cat.confidentiality = letter(maxC);
+  cat.integrity = letter(maxI);
+  cat.availability = letter(maxA);
+}
+
+/** FISMA mode: toggle one info type for this asset and recompute C/I/A. Dedup-safe. */
+function toggleAssetInfoType(aid, id) {
+  ensureAssetCategorizationRow(aid);
+  var cat = state.assetCategorization[aid];
+  if (!Array.isArray(cat.infoTypes)) cat.infoTypes = [];
+  var i = -1;
+  for (var k = 0; k < cat.infoTypes.length; k++) { if (cat.infoTypes[k].id === id) { i = k; break; } }
+  if (i >= 0) {
+    cat.infoTypes.splice(i, 1);
+  } else {
+    var meta = (typeof INFO_TYPES_800_60 !== 'undefined')
+      ? INFO_TYPES_800_60.find(function(x) { return x.id === id; })
+      : null;
+    if (!meta) return;
+    cat.infoTypes.push({ id: meta.id, label: meta.label, cia: Object.assign({}, meta.cia) });
+  }
+  applyAssetCategorizationFromInfoTypes(aid);
+  markDirty();
+  setTimeout(function() { try { renderAssetSSPStep1(); } catch (e) {} }, 0);
+}
+
+/** FISMA mode: checkbox-grid picker over the 800-60 catalog. */
+function renderAssetInfoTypesPicker(aid, cat) {
+  if (typeof INFO_TYPES_800_60 === 'undefined') return '';
+  var selected = {};
+  (cat.infoTypes || []).forEach(function(r) { selected[r.id] = true; });
+  var aidJson = JSON.stringify(aid);
+  var cards = INFO_TYPES_800_60.map(function(it) {
+    var on = !!selected[it.id];
+    var border = on ? '2px solid var(--teal)' : '2px solid #e5e7eb';
+    var bg = on ? '#ecfdf5' : '#fff';
+    var seed = 'C' + it.cia.c + ' / I' + it.cia.i + ' / A' + it.cia.a;
+    var seedHigh = Math.max(_fipsOrder(it.cia.c), _fipsOrder(it.cia.i), _fipsOrder(it.cia.a));
+    var seedColor = seedHigh === 3 ? '#dc2626' : seedHigh === 2 ? '#d97706' : '#059669';
+    return '<label style="display:block;border:' + border + ';background:' + bg + ';border-radius:10px;padding:12px 14px;cursor:pointer;transition:border-color .15s, background .15s;">'
+      + '<div style="display:flex;gap:10px;align-items:flex-start;">'
+      + '<input type="checkbox"' + (on ? ' checked' : '') + ' onchange="toggleAssetInfoType(' + aidJson + ',' + JSON.stringify(it.id) + ')" style="margin-top:3px;flex-shrink:0;">'
+      + '<div style="flex:1;min-width:0;">'
+      + '<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:4px;">'
+      + '<span style="font-weight:700;font-size:13px;color:var(--navy);">' + _esc(it.label) + '</span>'
+      + '<span style="background:' + seedColor + ';color:#fff;font-size:10px;font-weight:800;letter-spacing:0.4px;padding:2px 8px;border-radius:10px;">' + seed + '</span>'
+      + '</div>'
+      + '<div style="font-size:12px;color:#475569;line-height:1.45;">' + _esc(it.desc || '') + '</div>'
+      + (it.examples ? '<div style="font-size:11px;color:var(--text-muted);margin-top:3px;line-height:1.4;"><em>Examples: ' + _esc(it.examples) + '</em></div>' : '')
+      + '</div></div></label>';
+  }).join('');
+  return '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:10px;">' + cards + '</div>';
+}
+
+/** Build a starter rationale paragraph from the chosen CIA + info types — saves the asset owner from a blank box. */
+function buildAssetCategorizationRationale(asset, cat) {
+  var fipsLabels = { L: 'Low', M: 'Moderate', H: 'High' };
+  var overall = computeAssetOverallFipsImpact(cat);
+  var lines = [];
+  lines.push('System: ' + (asset.name || 'this system') + (asset.type ? ' (' + asset.type + ')' : '') + '.');
+  lines.push('FIPS 199 categorization: Confidentiality ' + fipsLabels[cat.confidentiality] + ', Integrity ' + fipsLabels[cat.integrity] + ', Availability ' + fipsLabels[cat.availability] + '. Overall high-water: ' + fipsLabels[overall] + '.');
+  if (Array.isArray(cat.infoTypes) && cat.infoTypes.length) {
+    var types = cat.infoTypes.map(function(t) { return t.label; }).join('; ');
+    lines.push('Information types handled: ' + types + '.');
+  }
+  lines.push('Rationale: select the impact level that reflects the worst-case business, regulatory, or operational consequence of compromise. Adjust this draft as needed.');
+  return lines.join(' ');
+}
+
+/** Inline button handler: prefill the rationale textarea from the user's current answers. */
+function prefillAssetCategorizationRationale(aid) {
+  var asset = (state.assets || []).find(function(a) { return String(a.id) === String(aid); });
+  if (!asset) return;
+  var cat = ensureAssetCategorizationRow(aid);
+  cat.rationale = buildAssetCategorizationRationale(asset, cat);
+  markDirty();
+  setTimeout(function() { try { renderAssetSSPStep1(); } catch (e) {} }, 0);
+}
+
+/**
+ * System Profile section — rendered inside renderAssetSSPStep1.
+ * FISMA-aware: when state.fismaMode is on, asset owners pick 800-60 info types
+ * (CIA derives from the selections); when off, they answer plain-English C/I/A
+ * scenario questions and pick Low/Moderate/High via radio cards.
+ */
+function renderAssetSSPStep2_SystemProfile(asset) {
+  if (!asset) return '';
+  var cat = ensureAssetCategorizationRow(asset.id);
+  if (!Array.isArray(cat.infoTypes)) cat.infoTypes = [];
+  var programBl = getProgramBaselineFipsLetter();
+  var assetImpact = computeAssetOverallFipsImpact(cat);
+  var fipsLabels = { L: 'Low', M: 'Moderate', H: 'High' };
+  var isFisma = !!state.fismaMode;
+  var aidJson = JSON.stringify(asset.id);
+
+  var explainer = isFisma
+    ? '<div style="background:#f5f3ff;border:1px solid #c4b5fd;border-radius:10px;padding:12px 16px;margin:14px 0 14px;font-size:12px;color:#3b0764;line-height:1.55;max-width:920px;">'
+      + '<div style="font-weight:800;margin-bottom:4px;color:#6d28d9;">FISMA / CUI categorization</div>'
+      + 'Pick all the NIST 800-60 information types this system creates, stores, or processes. Each type has a suggested C/I/A — the high-water mark across your selections sets this system\'s overall impact (FIPS 199). '
+      + 'You don\'t pick Low/Moderate/High directly here — categorization follows the data.'
+      + '</div>'
+    : '<div style="background:#eff6ff;border:1px solid #93c5fd;border-radius:10px;padding:12px 16px;margin:14px 0 14px;font-size:12px;color:#1e3a5f;line-height:1.55;max-width:920px;">'
+      + '<div style="font-weight:800;margin-bottom:4px;color:#1e40af;">Not sure how to categorize? Start here.</div>'
+      + 'FIPS 199 asks one question for each of three impact dimensions: <strong>what is the worst-case impact if this system\'s data is (a) disclosed, (b) altered, or (c) unavailable?</strong> '
+      + 'For each one, pick <strong>Low</strong>, <strong>Moderate</strong>, or <strong>High</strong> based on the examples below. The overall system impact is the highest of the three (the "high-water mark"). '
+      + 'If you\'re not sure, err on the side of higher impact — your CISO can review.'
+      + '</div>';
+
+  var pickerHeader = isFisma
+    ? '<div style="margin:6px 0 10px;"><div style="font-weight:700;font-size:13px;color:var(--navy);">Information types this system handles</div>'
+      + '<div style="font-size:12px;color:#475569;line-height:1.45;">Selecting types automatically sets this system\'s C/I/A as the high-water mark across all chosen types.</div></div>'
+    : '';
+  var pickerBlock = isFisma
+    ? renderAssetInfoTypesPicker(asset.id, cat)
+    : renderAssetCIAGuidedPicker(asset.id, cat);
+
+  var fipsBlock = ''
+    + '<div class="section-title" style="margin-top:8px;">Security categorization (FIPS 199)</div>'
+    + '<div class="section-subtitle">Categorize this system so the right controls apply. Overall impact is the high-water mark of C/I/A. Program baseline <strong>' + fipsLabels[programBl] + '</strong> sets organization-wide control coverage; it is not changed here.</div>'
+    + explainer
+    + '<div style="margin-bottom:8px;font-size:13px;font-weight:700;color:var(--navy);">Overall system impact: <span style="color:var(--teal);">' + fipsLabels[assetImpact] + '</span>'
+    + ' <span style="font-size:12px;font-weight:600;color:var(--text-muted);">· Program baseline: ' + fipsLabels[programBl] + '</span></div>'
+    + pickerHeader
+    + '<div style="' + (isFisma ? '' : 'max-width:720px;') + 'margin-bottom:18px;">' + pickerBlock + '</div>'
+    + '<div class="form-group" style="max-width:720px;margin-top:4px;">'
+      + '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:4px;">'
+        + '<label class="form-label" style="margin:0;">Categorization rationale <span style="color:var(--red)">*</span></label>'
+        + '<button type="button" class="btn btn-secondary btn-sm" style="font-size:11px;padding:4px 10px;" onclick="prefillAssetCategorizationRationale(' + aidJson + ')">✨ Generate from my answers</button>'
+      + '</div>'
+      + '<textarea class="form-input" rows="3" placeholder="Explain why the impact levels above are correct for this system. Use the Generate button to start from a template."'
+      + ' oninput="setAssetCategorizationField(' + aidJson + ',\'rationale\',this.value)">' + _esc(cat.rationale || '') + '</textarea>'
+      + '<div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Good rationales name the data (what it is), who\'s affected by loss, and what regulations apply.</div>'
+    + '</div>';
+
+  var elevationHtml = '';
+  if (typeof maybeAutoMigrateAssetToApprovedSubtype === 'function') {
+    maybeAutoMigrateAssetToApprovedSubtype(asset, assetImpact);
+  }
+  if (typeof processBaselineElevationOnSystemProfile === 'function') {
+    elevationHtml = processBaselineElevationOnSystemProfile(asset, assetImpact);
+  }
+
+  var mismatchBanner = '';
+  if (_fipsOrder(assetImpact) > _fipsOrder(programBl)) {
+    mismatchBanner = '<div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:10px;padding:12px 14px;margin-top:14px;margin-bottom:8px;font-size:12px;color:#92400e;line-height:1.55;max-width:920px;">'
+      + '<div style="font-weight:800;margin-bottom:4px;">Categorization above program baseline</div>'
+      + 'This asset\'s FIPS high-water mark (<strong>' + fipsLabels[assetImpact] + '</strong>) is above the organization\'s program baseline (<strong>' + fipsLabels[programBl] + '</strong>). '
+      + 'The program baseline is <em>not</em> auto-changed. The CISO may approve a tailored elevated asset subtype for this system class (NIST tailoring with additions). Details below.</div>';
+  }
+
+  return fipsBlock + mismatchBanner + elevationHtml;
+}
+
 // ─── STEP 1: ASSET PROFILE ───────────────────────────────────────────────────
 function renderAssetSSPStep1() {
   var body  = document.getElementById('asset-step-1-body');
@@ -897,7 +1263,8 @@ function renderAssetSSPStep1() {
       : '')
     + '<div class="form-group"><label class="form-label">Description <span style="font-weight:400;color:var(--text-muted);">(optional)</span></label>'
     + '<textarea class="form-input" rows="3" placeholder="Brief description of what this asset does and its sensitivity..." oninput="state.assets[' + idx + '].description=this.value; window.markDirty();">' + _esc(asset.description||'') + '</textarea></div>'
-    + '<div style="background:#eff6ff;border:1px solid #93c5fd;border-radius:8px;padding:12px 16px;font-size:12px;color:#1e40af;">'
+    + renderAssetSSPStep2_SystemProfile(asset)
+    + '<div style="background:#eff6ff;border:1px solid #93c5fd;border-radius:8px;padding:12px 16px;font-size:12px;color:#1e40af;margin-top:16px;">'
     + '<strong>What happens next:</strong> Step 2 lists every control that has been mapped to this asset by your control owners. For each one, you\'ll select an attestation status and provide a brief explanation.'
     + '</div>'
     + '</div>';

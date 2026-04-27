@@ -1057,6 +1057,8 @@ const ROLE_TABS = {
   'control-owner': ['control','reports'],
   'asset-owner':   ['asset','reports'],
   'custodian':     ['policy','reports'],
+  'assessor':      ['tester','reports'],
+  'ao':            ['tester','reports','users'],
   // ISP / Tier 1 approver: control catalog + reports; Tier 1 ISP is opened from sidebar "Policies" or the reports queue (no Domain policies / ISSM wizard tab)
   'approver':      ['control','reports'],
 };
@@ -1065,13 +1067,18 @@ const ROLE_TABS = {
 // APP STATE
 // ============================================================
 const state = {
-  baseline: null,           // 'L', 'M', or 'H'
+  baseline: null,           // 'L', 'M', or 'H' — the *effective* baseline applied to the program (after any FISMA tailoring)
   privacyOverlay: false,    // true = include P controls
+  fismaMode: false,         // true = program is FISMA / CUI / federal — baseline is derived from program info types instead of user-picked
+  programInfoTypes: [],     // [info-type id, ...] — 800-60 types selected by CISO when fismaMode is on; drives derived baseline
+  baselineOverride: null,   // 'L'|'M'|'H'|null — FISMA-mode tailoring override (NIST 800-37 / 800-60 allows raising or lowering the derived baseline with justification)
+  baselineOverrideRationale: '', // free-text justification for the tailoring decision (required if override differs from derived)
   orgName: '',              // organization / agency name
   programOwner: '',         // program owner full name (CISO / SAISO)
   programOwnerTitle: 'Chief Information Security Officer',  // title/role
   programOwnerEmail: '',    // program owner email
   cisoIsISSM: false,        // true = CISO wears both hats (common in small teams)
+  strictFismaMode: false,   // true = FISMA-aligned Step 1 checks (org, owner, title, email, baseline)
   pmControls: {},           // { 'PM-1': true, ... }
   domainOwners: {},         // { 'AC': { name, email, role }, ... }
   policyDeadlines: {},      // { 'AC': '2026-06-01', ... }
@@ -1080,7 +1087,13 @@ const state = {
   controlOwnerAttested: false,   // true = control owner has checked attestation
   _ctrlEvidenceFilter: 'all',    // 'all' | 'missing' | 'has'
   controlTestResults: {},   // { 'AC-1': { result, date, tester, findings } }
+  authBoundaries: [],       // [{ id, name, description, assetTypes, assetIds, aoUserId, assessorUserIds, atoStatus, atoGrantedDate, atoExpiresDate, conditions }]
+  assessmentPlans: {},      // { [boundaryId]: { scopeMode, inScopeControlIds[], controlPlans{} } }
+  atoDecisions: {},         // { [boundaryId]: { boundaryId, decision, decidedByUserId, decidedAt, conditions[], expiresAt, residualRiskNarrative, signature } }
+  _atoLibraryFilter: { families: [], assetTypes: [], assetIds: [], statuses: [], search: '' },
   assets: [],               // [{ id, name, type, description, owner, ownerId }]
+  assetCategorization: {},  // { [assetId]: { confidentiality:'L'|'M'|'H', integrity, availability, rationale } } — FIPS 199 high-water for SSP / V3 elevation
+  baselineElevationRecommendations: [], // V3 CISO workflow: elevated-baseline subtype proposals (never mutates state.baseline)
   processes: [],            // [{ id, name, category, description, owner }]
   attestations: {},         // legacy — superseded by sspAttestations
   sspAttestations: {},      // { assetId|procId: { controlId: { status, explanation, date } } }
@@ -1107,6 +1120,7 @@ const state = {
   _controlLibraryStatusFilter: '',
   _controlLibraryAssetTypeFilter: '',
   _controlLibrarySearch: '',
+  _controlLibraryColFilters: {},  // { control:'', name:'', owner:'', impl:'', asset:'', compliance:'', lifecycle:'' }
   _assetLibraryMode: false,    // true = show global asset library, false = asset workspace
   _assetTypeLibraryMode: false, // true = show asset type library, false = asset workspace
   assetTypeRequests: [],        // [{id, action, typeName, reason, requestedBy, requestedAt, status, reviewedBy, reviewedAt, reviewReason}]
@@ -1219,6 +1233,66 @@ function migrateLegacySingleLetterOwnerNames() {
   });
 }
 
+function migrateAtoStateShape() {
+  if (!Array.isArray(state.authBoundaries)) state.authBoundaries = [];
+  if (!state.assessmentPlans || typeof state.assessmentPlans !== 'object' || Array.isArray(state.assessmentPlans)) {
+    state.assessmentPlans = {};
+  }
+  if (!state.atoDecisions || typeof state.atoDecisions !== 'object' || Array.isArray(state.atoDecisions)) {
+    state.atoDecisions = {};
+  }
+  if (!state._atoLibraryFilter || typeof state._atoLibraryFilter !== 'object' || Array.isArray(state._atoLibraryFilter)) {
+    state._atoLibraryFilter = { families: [], assetTypes: [], assetIds: [], statuses: [], search: '' };
+  }
+  if (!Array.isArray(state._atoLibraryFilter.families)) state._atoLibraryFilter.families = [];
+  if (!Array.isArray(state._atoLibraryFilter.assetTypes)) state._atoLibraryFilter.assetTypes = [];
+  if (!Array.isArray(state._atoLibraryFilter.assetIds)) state._atoLibraryFilter.assetIds = [];
+  if (!Array.isArray(state._atoLibraryFilter.statuses)) state._atoLibraryFilter.statuses = [];
+  if (state._atoLibraryFilter.search == null) state._atoLibraryFilter.search = '';
+
+  state.authBoundaries = state.authBoundaries.map(function(b) {
+    if (!b || typeof b !== 'object') return null;
+    if (!Array.isArray(b.assetTypes)) b.assetTypes = [];
+    if (!Array.isArray(b.assetIds)) b.assetIds = [];
+    if (!Array.isArray(b.assessorUserIds)) b.assessorUserIds = [];
+    if (!Array.isArray(b.conditions)) b.conditions = [];
+    if (!b.atoStatus) b.atoStatus = 'not-started';
+    if (b.atoGrantedDate == null) b.atoGrantedDate = '';
+    if (b.atoExpiresDate == null) b.atoExpiresDate = '';
+    return b;
+  }).filter(Boolean);
+}
+
+function seedXmplAtoDemoDataIfMissing() {
+  var org = String(state.orgName || '').toLowerCase();
+  if (org.indexOf('xmpl') === -1) return;
+  if ((state.authBoundaries || []).length) return;
+  var firstAsset = (state.assets || [])[0] || null;
+  var firstAo = (state.users || []).find(function(u) { return u.role === 'ao' || u.role === 'approver'; });
+  var firstAssessor = (state.users || []).find(function(u) { return u.role === 'assessor' || u.role === 'issm'; });
+  var boundaryId = 'ato-b-xmpl-demo';
+  state.authBoundaries.push({
+    id: boundaryId,
+    name: 'XMPL Core Collaboration Boundary',
+    description: 'Demo boundary for RMF Assess + Authorize walkthrough.',
+    assetTypes: firstAsset ? [firstAsset.type] : [],
+    assetIds: firstAsset ? [firstAsset.id] : [],
+    aoUserId: firstAo ? firstAo.id : '',
+    assessorUserIds: firstAssessor ? [firstAssessor.id] : [],
+    atoStatus: 'in-assessment',
+    atoGrantedDate: '',
+    atoExpiresDate: '',
+    conditions: []
+  });
+  if (!state.assessmentPlans) state.assessmentPlans = {};
+  state.assessmentPlans[boundaryId] = {
+    boundaryId: boundaryId,
+    scopeMode: 'boundary',
+    inScopeControlIds: [],
+    controlPlans: {}
+  };
+}
+
 function applyLoadedState(saved) {
   if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return false;
   STATE_ALLOWED_KEYS.forEach(function(k) {
@@ -1228,6 +1302,8 @@ function applyLoadedState(saved) {
   // Migrate legacy custodian string formats to object format
   migrateCustodianFormats();
   migrateLegacySingleLetterOwnerNames();
+  migrateAtoStateShape();
+  seedXmplAtoDemoDataIfMissing();
   return true;
 }
 

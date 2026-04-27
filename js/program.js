@@ -240,9 +240,37 @@ function renderActiveCisoSetupStep() {
 function cisoNext(fromStep) {
   if (fromStep >= 5) return;
   if (fromStep===1) {
-    if (!state.baseline) { showToast('Please select a baseline impact level before continuing.', true); return; }
+    if (state.fismaMode) {
+      if (!Array.isArray(state.programInfoTypes) || state.programInfoTypes.length === 0) {
+        showToast('FISMA / CUI mode is on — pick at least one information type so a baseline can be derived.', true);
+        return;
+      }
+      var _derived = computeBaselineFromInfoTypes(state.programInfoTypes);
+      var _override = state.baselineOverride;
+      var _isTailored = (_override === 'L' || _override === 'M' || _override === 'H') && _override !== _derived;
+      if (_isTailored && !(state.baselineOverrideRationale || '').trim()) {
+        showToast('Tailoring rationale is required when the applied baseline differs from the derived one.', true);
+        return;
+      }
+    } else if (!state.baseline) {
+      showToast('Please select a baseline impact level before continuing.', true);
+      return;
+    }
     if (!state.orgName || !state.orgName.trim()) { showToast('Please enter your Organization / Agency Name before continuing.', true); document.getElementById('orgNameInput')?.focus(); return; }
     if (!state.programOwner || !state.programOwner.trim()) { showToast('Please enter the Security Program Owner name before continuing.', true); document.getElementById('programOwnerInput')?.focus(); return; }
+    if (state.strictFismaMode) {
+      if (!state.programOwnerTitle || !String(state.programOwnerTitle).trim()) {
+        showToast('Strict FISMA mode: enter the Program Owner title / role (required).', true);
+        document.getElementById('programOwnerTitleInput')?.focus();
+        return;
+      }
+      var em = (state.programOwnerEmail || '').trim();
+      if (!em || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) {
+        showToast('Strict FISMA mode: enter a valid program owner email (required for FISMA accountability).', true);
+        document.getElementById('programOwnerEmailInput')?.focus();
+        return;
+      }
+    }
   }
   if (fromStep===3) {
     // Finalize the ISP and submit to the selected approver for review.
@@ -336,6 +364,25 @@ function cisoFinish() {
     return;
   }
   clearScopedUndoStack('program finalization');
+
+  // Auto-assign PM control owners: ISP custodian if set, otherwise program owner.
+  // Only fills unassigned controls — never overwrites a name already set.
+  (function() {
+    var isp = state.infoSecPolicy || {};
+    var cust = isp.custodian || {};
+    var ownerName  = cust.name  || state.programOwner || '';
+    var ownerRole  = cust.role  || state.programOwnerTitle || '';
+    var ownerEmail = cust.email || state.programOwnerEmail || '';
+    if (!ownerName) return;
+    if (!state.controlOwners) state.controlOwners = {};
+    var pmControls = state.pmControls || {};
+    Object.keys(pmControls).forEach(function(cid) {
+      if (!pmControls[cid]) return;                          // not selected
+      if ((state.controlOwners[cid] || {}).name) return;    // already assigned
+      state.controlOwners[cid] = { name: ownerName, role: ownerRole, email: ownerEmail };
+    });
+  })();
+
   state.cisoComplete = true;
   addAuditEntry('program', null, 'Program setup completed by CISO');
   renderSidebarBadges();
@@ -651,33 +698,138 @@ function renderCISOStep1() {
   const mCount = baselineCount('M');
   const hCount = baselineCount('H');
   const privCount = BASELINE_COUNTS.P;
+  const isFisma = !!state.fismaMode;
+  const selectedTypes = Array.isArray(state.programInfoTypes) ? state.programInfoTypes : [];
+
+  // FISMA / CUI mode toggle — sits at the top of Step 1 because it changes how the rest of this step works.
+  const fismaToggleCard = `
+    <div class="privacy-toggle-card ${isFisma?'selected':''}" onclick="toggleProgramFismaMode()" style="margin-bottom:14px;border-color:${isFisma?'#7c3aed':'var(--border)'};${isFisma?'background:#f5f3ff;':''}">
+      <div class="pt-icon">🏛️</div>
+      <div class="pt-info">
+        <div class="pt-name">FISMA / CUI program (info-types-driven baseline)</div>
+        <div class="pt-desc">Turn on if this program is required to comply with FISMA, FedRAMP, DoD RMF, or handle Controlled Unclassified Information (CUI). Replaces baseline picking with a NIST 800-60 information-types catalog — the baseline is derived as the FIPS 199 high-water mark of the data your systems handle.</div>
+      </div>
+      <div class="toggle-switch ${isFisma?'on':''}"></div>
+    </div>`;
+
+  // Build the baseline-selection block — manual (non-FISMA) or info-types-driven (FISMA).
+  let baselineBlock = '';
+  if (!isFisma) {
+    baselineBlock = `
+      <div style="margin-bottom:8px;">
+        <div class="section-title" style="margin-bottom:2px;">Select Your NIST 800-53 Baseline</div>
+        <div class="section-subtitle">Choose the impact level for your information system. This determines which controls apply to your program.</div>
+      </div>
+
+      <div class="baseline-grid">
+        <div class="baseline-card bc-low ${state.baseline==='L'?'selected':''}" onclick="selectBaseline('L')">
+          <div class="bc-label">LOW IMPACT</div>
+          <div class="bc-name">Low Baseline</div>
+          <div class="bc-desc">For systems where compromise would have limited adverse effects on operations, assets, or individuals.</div>
+          <div class="bc-count">${lCount} controls incl. enhancements (NIST 800-53B)</div>
+        </div>
+        <div class="baseline-card bc-mod ${state.baseline==='M'?'selected':''}" onclick="selectBaseline('M')">
+          <div class="bc-label">MODERATE IMPACT <span style="background:#0d9488;color:white;font-size:10px;padding:2px 6px;border-radius:10px;margin-left:4px;font-weight:700;">RECOMMENDED</span></div>
+          <div class="bc-name">Moderate Baseline</div>
+          <div class="bc-desc">For systems where compromise would have serious adverse effects. The most commonly used baseline for federal systems.</div>
+          <div class="bc-count">${mCount} controls incl. enhancements (NIST 800-53B)</div>
+        </div>
+        <div class="baseline-card bc-high ${state.baseline==='H'?'selected':''}" onclick="selectBaseline('H')">
+          <div class="bc-label">HIGH IMPACT</div>
+          <div class="bc-name">High Baseline</div>
+          <div class="bc-desc">For systems where compromise would have severe or catastrophic effects. Used for national security and critical infrastructure.</div>
+          <div class="bc-count">${hCount} controls incl. enhancements (NIST 800-53B)</div>
+        </div>
+      </div>`;
+  } else {
+    // FISMA mode: derived baseline + tailoring controls + info-types catalog picker.
+    const derivedBaseline = computeBaselineFromInfoTypes(selectedTypes);
+    const override = (state.baselineOverride === 'L' || state.baselineOverride === 'M' || state.baselineOverride === 'H') ? state.baselineOverride : null;
+    const effectiveBaseline = override || derivedBaseline;
+    const effectiveCount = BASELINE_COUNTS[effectiveBaseline] || 0;
+    const labelOf = (b) => b === 'H' ? 'High' : b === 'M' ? 'Moderate' : 'Low';
+    const isTailored = !!override && override !== derivedBaseline;
+    const tailorDir = isTailored ? (_fipsRank(override) > _fipsRank(derivedBaseline) ? 'up' : 'down') : null;
+    const derivedPill = (b) => derivedBaseline === b
+      ? ' <span style="background:#7c3aed;color:white;font-size:10px;padding:2px 6px;border-radius:10px;margin-left:4px;font-weight:700;">DERIVED</span>'
+      : '';
+    // Cards remain clickable in FISMA mode — clicking any card tailors the baseline to that level.
+    baselineBlock = `
+      <div style="margin-bottom:8px;">
+        <div class="section-title" style="margin-bottom:2px;">Program baseline <span style="font-size:11px;font-weight:600;color:#7c3aed;background:#ede9fe;padding:2px 8px;border-radius:10px;margin-left:6px;letter-spacing:0.4px;">FISMA</span></div>
+        <div class="section-subtitle">FIPS 199 high-water mark across the information types below sets the derived baseline. NIST allows tailoring up (or down with justification) — click a card to tailor.</div>
+      </div>
+      <div class="baseline-grid">
+        <div class="baseline-card bc-low ${effectiveBaseline==='L'?'selected':''}" onclick="setProgramBaselineOverride('L')" style="cursor:pointer;">
+          <div class="bc-label">LOW IMPACT${derivedPill('L')}</div>
+          <div class="bc-name">Low Baseline</div>
+          <div class="bc-desc">${lCount} controls.</div>
+        </div>
+        <div class="baseline-card bc-mod ${effectiveBaseline==='M'?'selected':''}" onclick="setProgramBaselineOverride('M')" style="cursor:pointer;">
+          <div class="bc-label">MODERATE IMPACT${derivedPill('M')}</div>
+          <div class="bc-name">Moderate Baseline</div>
+          <div class="bc-desc">${mCount} controls.</div>
+        </div>
+        <div class="baseline-card bc-high ${effectiveBaseline==='H'?'selected':''}" onclick="setProgramBaselineOverride('H')" style="cursor:pointer;">
+          <div class="bc-label">HIGH IMPACT${derivedPill('H')}</div>
+          <div class="bc-name">High Baseline</div>
+          <div class="bc-desc">${hCount} controls.</div>
+        </div>
+      </div>
+      ${selectedTypes.length === 0
+        ? `<div style="background:#fef3c7;border:1px solid #fbbf24;border-radius:10px;padding:10px 14px;margin:10px 0 8px;font-size:13px;color:#92400e;line-height:1.5;">
+            <strong>No information types selected yet.</strong> Pick at least one type below — until you do, the derived baseline defaults to Low.
+          </div>`
+        : isTailored
+          ? `<div style="background:#fef9c3;border:1px solid #fde047;border-radius:10px;padding:12px 14px;margin:10px 0 8px;font-size:13px;color:#713f12;line-height:1.55;">
+              <div style="font-weight:800;margin-bottom:4px;">⚠️ Baseline tailored ${tailorDir} (${derivedBaseline} → ${override})</div>
+              Derived from your information types: <strong>${labelOf(derivedBaseline)} (${derivedBaseline})</strong>. You've tailored ${tailorDir} to <strong>${labelOf(effectiveBaseline)} (${effectiveBaseline})</strong> — ${effectiveCount} controls.
+              ${tailorDir === 'down'
+                ? ` Tailoring <em>down</em> reduces controls below what FIPS 199 would normally require — your rationale must explain compensating controls or risk acceptance.`
+                : ` Tailoring <em>up</em> is always permitted; capture why for the audit trail.`}
+              <button class="btn btn-secondary btn-sm" type="button" onclick="setProgramBaselineOverride(null)" style="margin-left:8px;font-size:11px;padding:3px 10px;">Revert to derived</button>
+            </div>
+            <div class="form-group" style="margin-top:8px;max-width:720px;">
+              <label class="form-label" style="font-size:12px;">Tailoring rationale <span style="color:var(--red)">*</span></label>
+              <textarea class="form-input" rows="2" placeholder="Why is this baseline appropriate? Reference threats, mission context, regulatory drivers, or compensating controls." oninput="setProgramBaselineOverrideRationale(this.value)">${escapeHTML(state.baselineOverrideRationale || '')}</textarea>
+            </div>`
+          : `<div style="background:#ecfdf5;border:1px solid #6ee7b7;border-radius:10px;padding:10px 14px;margin:10px 0 8px;font-size:13px;color:#065f46;line-height:1.5;">
+              <strong>Effective baseline: ${labelOf(effectiveBaseline)} (${effectiveBaseline}) — ${effectiveCount} controls.</strong> Matches the FIPS 199 high-water mark across your selected information types. Click a different card above to tailor up or down.
+            </div>`
+      }
+      <div style="margin:14px 0 8px;">
+        <div class="section-title" style="margin-bottom:2px;">Information types this program will handle</div>
+        <div class="section-subtitle">Select every category your systems will create, store, or process. Each one carries a NIST 800-60 suggested C/I/A — the highest across your selections sets the derived baseline.</div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:10px;margin-bottom:14px;">
+        ${(typeof INFO_TYPES_800_60 !== 'undefined' ? INFO_TYPES_800_60 : []).map(function(it) {
+          var on = selectedTypes.indexOf(it.id) >= 0;
+          var border = on ? '2px solid var(--teal)' : '2px solid #e5e7eb';
+          var bg = on ? '#ecfdf5' : '#fff';
+          var seed = 'C' + it.cia.c + ' / I' + it.cia.i + ' / A' + it.cia.a;
+          var seedHigh = _fipsLetterFromRank(Math.max(_fipsRank(it.cia.c), _fipsRank(it.cia.i), _fipsRank(it.cia.a)));
+          var seedColor = seedHigh === 'H' ? '#dc2626' : seedHigh === 'M' ? '#d97706' : '#059669';
+          var idEsc = escapeHTML(it.id).replace(/'/g, "\\'");
+          return `<label style="display:block;border:${border};background:${bg};border-radius:10px;padding:12px 14px;cursor:pointer;transition:border-color .15s, background .15s;">
+            <div style="display:flex;gap:10px;align-items:flex-start;">
+              <input type="checkbox" ${on?'checked':''} onchange="toggleProgramInfoType('${idEsc}')" style="margin-top:3px;flex-shrink:0;">
+              <div style="flex:1;min-width:0;">
+                <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:4px;">
+                  <span style="font-weight:700;font-size:13px;color:var(--navy);">${escapeHTML(it.label)}</span>
+                  <span style="background:${seedColor};color:#fff;font-size:10px;font-weight:800;letter-spacing:0.4px;padding:2px 8px;border-radius:10px;">${seed}</span>
+                </div>
+                <div style="font-size:12px;color:#475569;line-height:1.45;">${escapeHTML(it.desc || '')}</div>
+                ${it.examples ? `<div style="font-size:11px;color:var(--text-muted);margin-top:3px;line-height:1.4;"><em>Examples: ${escapeHTML(it.examples)}</em></div>` : ''}
+              </div>
+            </div>
+          </label>`;
+        }).join('')}
+      </div>`;
+  }
 
   body.innerHTML = `
-    <div style="margin-bottom:8px;">
-      <div class="section-title" style="margin-bottom:2px;">Select Your NIST 800-53 Baseline</div>
-      <div class="section-subtitle">Choose the impact level for your information system. This determines which controls apply to your program.</div>
-    </div>
-
-    <div class="baseline-grid">
-      <div class="baseline-card bc-low ${state.baseline==='L'?'selected':''}" onclick="selectBaseline('L')">
-        <div class="bc-label">LOW IMPACT</div>
-        <div class="bc-name">Low Baseline</div>
-        <div class="bc-desc">For systems where compromise would have limited adverse effects on operations, assets, or individuals.</div>
-        <div class="bc-count">${lCount} controls incl. enhancements (NIST 800-53B)</div>
-      </div>
-      <div class="baseline-card bc-mod ${state.baseline==='M'?'selected':''}" onclick="selectBaseline('M')">
-        <div class="bc-label">MODERATE IMPACT <span style="background:#0d9488;color:white;font-size:10px;padding:2px 6px;border-radius:10px;margin-left:4px;font-weight:700;">RECOMMENDED</span></div>
-        <div class="bc-name">Moderate Baseline</div>
-        <div class="bc-desc">For systems where compromise would have serious adverse effects. The most commonly used baseline for federal systems.</div>
-        <div class="bc-count">${mCount} controls incl. enhancements (NIST 800-53B)</div>
-      </div>
-      <div class="baseline-card bc-high ${state.baseline==='H'?'selected':''}" onclick="selectBaseline('H')">
-        <div class="bc-label">HIGH IMPACT</div>
-        <div class="bc-name">High Baseline</div>
-        <div class="bc-desc">For systems where compromise would have severe or catastrophic effects. Used for national security and critical infrastructure.</div>
-        <div class="bc-count">${hCount} controls incl. enhancements (NIST 800-53B)</div>
-      </div>
-    </div>
+    ${fismaToggleCard}
+    ${baselineBlock}
 
     <div class="privacy-toggle-card ${state.privacyOverlay?'selected':''}" onclick="togglePrivacy()" style="margin-top:8px;">
       <div class="pt-icon">🔒</div>
@@ -687,6 +839,16 @@ function renderCISOStep1() {
       </div>
       <div class="toggle-switch ${state.privacyOverlay?'on':''}"></div>
     </div>
+
+    <div class="privacy-toggle-card ${state.strictFismaMode?'selected':''}" onclick="setStrictFismaMode(!state.strictFismaMode)" style="margin-top:8px;border-color:${state.strictFismaMode?'#93c5fd':'var(--border)'};background:${state.strictFismaMode?'#eff6ff':'white'};">
+      <div class="pt-icon">🏛️</div>
+      <div class="pt-info">
+        <div class="pt-name">Strict FISMA mode (federal / agency programs)</div>
+        <div class="pt-desc">Tightens Step 1: requires organization name, program owner, <strong>title/role</strong>, and a <strong>valid work email</strong> before you can continue — aligned with FISMA program accountability and OMB A-123 reporting contact expectations.</div>
+      </div>
+      <div class="toggle-switch ${state.strictFismaMode?'on':''}"></div>
+    </div>
+    ${state.strictFismaMode ? `<div style="font-size:12px;line-height:1.55;color:var(--text-muted);background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-top:4px;">Federal systems under <strong>FISMA</strong> use NIST RMF; most operate at the <strong>Moderate</strong> baseline. Confirm the selected impact level and privacy overlay with your risk assessment. Low baseline is allowed when justified — coordinate with your Authorizing Official (AO) when in doubt.</div>` : ''}
 
     <div style="display:flex;flex-direction:column;gap:14px;margin-top:20px;">
       <div class="form-group" style="margin-bottom:0;">
@@ -703,12 +865,12 @@ function renderCISOStep1() {
         <div class="form-group" style="margin-bottom:0;">
           <label class="form-label">Title / Role <span class="required">*</span></label>
           <input class="form-input" id="programOwnerTitleInput" placeholder="e.g., Chief Information Security Officer" value="${escapeHTML(state.programOwnerTitle)}" oninput="state.programOwnerTitle=this.value;applyCisoIsISSM();; window.markDirty();">
-          <div class="form-hint">Official title — flows into policy documents as the accountable role.</div>
+          <div class="form-hint">Official title — flows into policy documents as the accountable role.${state.strictFismaMode ? ' <strong>Strict FISMA:</strong> must be non-empty to proceed.' : ''}</div>
         </div>
         <div class="form-group" style="margin-bottom:0;">
-          <label class="form-label">Email Address</label>
+          <label class="form-label">Email Address${state.strictFismaMode ? ' <span class="required">*</span>' : ''}</label>
           <input class="form-input" id="programOwnerEmailInput" type="email" placeholder="e.g., jsmith@agency.gov" value="${escapeHTML(state.programOwnerEmail)}" oninput="state.programOwnerEmail=this.value;applyCisoIsISSM();; window.markDirty();">
-          <div class="form-hint">Used to populate the Users &amp; Roles inventory automatically.</div>
+          <div class="form-hint">Used to populate the Users &amp; Roles inventory automatically.${state.strictFismaMode ? ' <strong>Strict FISMA:</strong> a valid work email is required.' : ''}</div>
         </div>
       </div>
       <label style="display:inline-flex;align-items:center;gap:10px;margin-top:14px;padding:10px 16px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;cursor:pointer;user-select:none;">
@@ -725,6 +887,7 @@ function renderCISOStep1() {
       <h3>📊 Selected Program Scope</h3>
       <div class="summary-kv"><span class="sk">Baseline:</span><span class="sv">${state.baseline==='L'?'Low Impact':state.baseline==='M'?'Moderate Impact':'High Impact'}</span></div>
       <div class="summary-kv"><span class="sk">Privacy Overlay:</span><span class="sv">${state.privacyOverlay?'Yes — PT (Privacy) family included':'No'}</span></div>
+      <div class="summary-kv"><span class="sk">Strict FISMA mode:</span><span class="sv">${state.strictFismaMode ? 'On — federal accountability fields enforced' : 'Off'}</span></div>
       <div class="summary-kv"><span class="sk">Total Controls in Scope:</span><span class="sv">${BASELINE_COUNTS[state.baseline] || 0} controls across ${getActiveFamilies().filter(f=>f!=='PM').length} families${Object.values(state.pmControls||{}).filter(Boolean).length ? ' + ' + Object.values(state.pmControls||{}).filter(Boolean).length + ' PM controls' : ''}</span></div>
       <div class="summary-kv"><span class="sk">Organization:</span><span class="sv">${state.orgName||'Not yet set'}</span></div>
       <div class="summary-kv"><span class="sk">Program Owner:</span><span class="sv">${state.programOwner ? state.programOwner + ' — ' + (state.programOwnerTitle||'') + (state.programOwnerEmail ? ' &lt;' + state.programOwnerEmail + '&gt;' : '') : 'Not yet assigned'}</span></div>
@@ -785,6 +948,15 @@ function togglePrivacy() {
   renderCISOStep1();
 }
 
+function setStrictFismaMode(on) {
+  var next = !!on;
+  if (state.strictFismaMode === next) return;
+  state.strictFismaMode = next;
+  try { addAuditEntry('program', 'ciso', 'Strict FISMA mode ' + (next ? 'enabled' : 'disabled')); } catch (e) { /* no-op */ }
+  markDirty();
+  renderCISOStep1();
+}
+
 const PM_PRIVACY_LOW_DEFAULTS = ['PM-18', 'PM-19', 'PM-20', 'PM-20(1)'];
 const PM_PRIVACY_MOD_DEFAULTS = ['PM-21', 'PM-22', 'PM-25'];
 const PM_PRIVACY_HIGH_DEFAULTS = ['PM-23', 'PM-24', 'PM-26', 'PM-27', 'PM-28'];
@@ -804,6 +976,111 @@ function resetPrivacyPMDefaults() {
   privacyPMIds.forEach(function(id) {
     state.pmControls[id] = undefined;
   });
+}
+
+// ─── FISMA / CUI MODE (info-types-driven baseline) ──────────────────────────
+// state.fismaMode reframes Step 1: instead of picking L/M/H directly, the CISO
+// picks the information types this program is expected to handle (NIST 800-60).
+// The program baseline is then derived as the high-water mark of those types'
+// CIA seeds. NIST 800-37 / 800-60 §3.4 explicitly allow tailoring this derived
+// baseline up (or down with documented justification) — see setProgramBaselineOverride.
+function _fipsRank(ch) { return { L: 1, M: 2, H: 3 }[ch] || 1; }
+function _fipsLetterFromRank(r) { return r === 3 ? 'H' : r === 2 ? 'M' : 'L'; }
+
+/** High-water mark of the C/I/A seeds across selected program info types (returns 'L' if none). */
+function computeBaselineFromInfoTypes(typeIds) {
+  if (!Array.isArray(typeIds) || !typeIds.length) return 'L';
+  if (typeof INFO_TYPES_800_60 === 'undefined') return 'L';
+  var idx = {};
+  INFO_TYPES_800_60.forEach(function(it) { idx[it.id] = it; });
+  var max = 1;
+  typeIds.forEach(function(id) {
+    var it = idx[id];
+    if (it && it.cia) {
+      max = Math.max(max, _fipsRank(it.cia.c), _fipsRank(it.cia.i), _fipsRank(it.cia.a));
+    }
+  });
+  return _fipsLetterFromRank(max);
+}
+
+/** Resolve the *effective* baseline (derived ∪ FISMA tailoring override). */
+function resolveProgramBaseline() {
+  if (!state.fismaMode) return state.baseline || null;
+  var derived = computeBaselineFromInfoTypes(state.programInfoTypes);
+  var ov = state.baselineOverride;
+  if (ov === 'L' || ov === 'M' || ov === 'H') return ov;
+  return derived;
+}
+
+/** Recompute state.baseline as the effective baseline. */
+function _refreshEffectiveProgramBaseline() {
+  state.baseline = resolveProgramBaseline();
+}
+
+/** Toggle FISMA / CUI mode. When turning on, derive baseline from current info-type selections. */
+function toggleProgramFismaMode() {
+  state.fismaMode = !state.fismaMode;
+  if (state.fismaMode) {
+    if (!Array.isArray(state.programInfoTypes)) state.programInfoTypes = [];
+    _refreshEffectiveProgramBaseline();
+    resetPrivacyPMDefaults();
+    if (typeof addAuditEntry === 'function') addAuditEntry('program', '', 'FISMA / CUI mode enabled — baseline now derived from selected information types.');
+  } else {
+    // Leaving FISMA mode: clear any tailoring override so the manual L/M/H pick is the source of truth again.
+    state.baselineOverride = null;
+    state.baselineOverrideRationale = '';
+    if (typeof addAuditEntry === 'function') addAuditEntry('program', '', 'FISMA / CUI mode disabled — baseline is now picked manually.');
+  }
+  if (typeof markDirty === 'function') markDirty();
+  renderCISOStep1();
+  if (typeof renderSidebarBadges === 'function') renderSidebarBadges();
+}
+
+/** Toggle one info type in or out of the program-level selection (FISMA mode only). */
+function toggleProgramInfoType(id) {
+  if (!Array.isArray(state.programInfoTypes)) state.programInfoTypes = [];
+  var i = state.programInfoTypes.indexOf(id);
+  if (i >= 0) state.programInfoTypes.splice(i, 1);
+  else state.programInfoTypes.push(id);
+  _refreshEffectiveProgramBaseline();
+  resetPrivacyPMDefaults();
+  if (typeof markDirty === 'function') markDirty();
+  renderCISOStep1();
+  if (typeof renderSidebarBadges === 'function') renderSidebarBadges();
+}
+
+/**
+ * Tailor the FISMA-derived baseline up or down. Pass 'L', 'M', 'H', or null
+ * (null clears the override and reverts to the derived value). Audit-logs
+ * the tailoring decision.
+ */
+function setProgramBaselineOverride(letter) {
+  var clear = letter == null;
+  var valid = letter === 'L' || letter === 'M' || letter === 'H';
+  if (!clear && !valid) return;
+  var derived = computeBaselineFromInfoTypes(state.programInfoTypes);
+  var prev = state.baselineOverride;
+  state.baselineOverride = clear ? null : letter;
+  if (clear) state.baselineOverrideRationale = '';
+  _refreshEffectiveProgramBaseline();
+  resetPrivacyPMDefaults();
+  if (typeof addAuditEntry === 'function') {
+    if (clear) {
+      addAuditEntry('program', '', 'Baseline tailoring cleared — reverted to derived baseline (' + derived + ').');
+    } else if (prev !== letter) {
+      var dir = _fipsRank(letter) > _fipsRank(derived) ? 'UP' : (_fipsRank(letter) < _fipsRank(derived) ? 'DOWN' : 'EQUAL');
+      addAuditEntry('program', '', 'Baseline tailored ' + dir + ' from derived ' + derived + ' to ' + letter + '.');
+    }
+  }
+  if (typeof markDirty === 'function') markDirty();
+  renderCISOStep1();
+  if (typeof renderSidebarBadges === 'function') renderSidebarBadges();
+}
+
+/** Persist the rationale for the baseline tailoring decision. */
+function setProgramBaselineOverrideRationale(text) {
+  state.baselineOverrideRationale = text || '';
+  if (typeof markDirty === 'function') markDirty();
 }
 
 
@@ -1773,6 +2050,8 @@ function renderCISOStep4b() {
   const merges = state.policyMerges || {};
   const masters = families.filter(f => !merges[f]);
   const controls = getActiveControls();
+  const hasAssessor = (state.users || []).some(function(u){ return u.role === 'assessor'; });
+  const hasAo = (state.users || []).some(function(u){ return u.role === 'ao'; });
 
   const assigned = masters.filter(f => {
     const o = state.domainOwners[f] || {};
@@ -1793,6 +2072,15 @@ function renderCISOStep4b() {
 
     <div class="section-title">Assign Owners &amp; Deadlines</div>
     <div class="section-subtitle">Name the ISSM responsible for each policy domain. Deadlines are pre-filled from your priority settings — override any individually.</div>
+    ${(!hasAssessor || !hasAo) ? `
+    <div style="margin-top:12px;margin-bottom:16px;background:#fffbeb;border:1px solid #fcd34d;border-radius:10px;padding:12px 14px;">
+      <div style="font-size:13px;font-weight:800;color:#92400e;">Program readiness nudge</div>
+      <div style="font-size:12px;color:#78350f;margin-top:4px;">${!hasAssessor ? 'No Assessor user exists. ' : ''}${!hasAo ? 'No Authorizing Official user exists. ' : ''}Add required authorization roles before running RMF Assess + Authorize.</div>
+      <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">
+        ${!hasAssessor ? '<button type="button" class="btn btn-secondary btn-sm" onclick="openUsersRolePreset(\'assessor\')">Add Assessor</button>' : ''}
+        ${!hasAo ? '<button type="button" class="btn btn-secondary btn-sm" onclick="openUsersRolePreset(\'ao\')">Add Authorizing Official</button>' : ''}
+      </div>
+    </div>` : ''}
 
     ${returnedFams.length ? `
     <div style="border:1px solid rgba(220,38,38,0.3);border-radius:10px;background:rgba(254,242,242,0.8);padding:14px 18px;margin-bottom:20px;">
