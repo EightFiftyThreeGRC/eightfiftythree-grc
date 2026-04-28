@@ -1,0 +1,12 @@
+.DS_Store
+Thumbs.db
+node_modules/
+*.log
+.fuse_hidden*
+
+# Local working backups and scratch files — not for deployment
+*.broken-backup
+err.tmp
+
+# Internal Cursor prompt drafts — keep local, do not deploy
+ASSET_OWNER_UPGRADE_PROMPT*.md

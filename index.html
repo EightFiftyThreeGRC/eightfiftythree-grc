@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="EightFiftyThree GRC — NIST SP 800-53 Rev. 5 program management">
+  <title>EightFiftyThree GRC</title>
+
+    <link rel="stylesheet" href="css/app.css">
+
+</head>
+<body>
+
+<a href="#main-content" class="skip-link">Skip to main content</a>
+
+<!-- SIDEBAR -->
+<nav class="sidebar" role="navigation" aria-label="Primary">
+  <div class="sidebar-logo">
+    <div class="brand">EightFiftyThree</div>
+    <div class="app-name">GRC</div>
+    <div class="app-sub">Cyber GRC</div>
+  </div>
+
+  <div class="profile-btn-wrap">
+    <button type="button" id="profileBtn" onclick="showRolePicker()" title="Switch role or impersonate another user profile" aria-label="Switch role or impersonate another user profile" class="profile-btn">
+      <span class="profile-btn-line">
+        <span>🔑</span>
+        <span>Admin mode</span>
+      </span>
+      <span class="profile-btn-sub">Switch role / impersonate</span>
+    </button>
+  </div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-section-label">Program overview</div>
+    <div class="sidebar-item active" onclick="showTab('ciso')" id="nav-ciso">
+      <span class="icon">🏛️</span> Program setup
+    </div>
+  </div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-section-label">Workspaces</div>
+    <div class="sidebar-item" onclick="goToPoliciesHome()" id="nav-policy">
+      <span class="icon">📋</span> Domain policies
+    </div>
+    <div class="sidebar-item" onclick="goToControlWorkspace()" id="nav-control">
+      <span class="icon">🔧</span> Control implementation
+    </div>
+    <div class="sidebar-item" onclick="goToAssetWorkspace()" id="nav-asset">
+      <span class="icon">🖥️</span> Assets &amp; SSP
+    </div>
+  </div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-section-label">Libraries</div>
+    <div class="sidebar-item" onclick="goToPolicyLibrary()" id="nav-policy-library">
+      <span class="icon">📚</span> Policy library
+    </div>
+    <div class="sidebar-item" onclick="goToControlLibrary()" id="nav-control-library">
+      <span class="icon">🧾</span> Control library
+    </div>
+    <div class="sidebar-item" onclick="goToAssetLibrary()" id="nav-asset-library">
+      <span class="icon">🖥️</span> Asset library
+    </div>
+    <div class="sidebar-item" onclick="goToAssetTypeLibrary()" id="nav-asset-type-library">
+      <span class="icon">🗂️</span> Asset type library
+    </div>
+  </div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-section-label">Reporting</div>
+    <div class="sidebar-item" onclick="showTab('reports')" id="nav-reports">
+      <span class="icon">📊</span> Reports &amp; Dashboard
+    </div>
+  </div>
+
+  <div class="sidebar-section" id="sidebar-users-section">
+    <div class="sidebar-section-label">Administration</div>
+    <div class="sidebar-item" onclick="showTab('users')" id="nav-users">
+      <span class="icon">👥</span> Users &amp; roles
+    </div>
+  </div>
+
+  <div class="sidebar-section" style="margin-top:auto; border-bottom:none; padding:16px;">
+    <div style="color:rgba(255,255,255,0.3); font-size:11px; line-height:1.6;">
+      NIST SP 800-53 Rev. 5<br>
+      © EightFiftyThree GRC
+    </div>
+  </div>
+</nav>
+
+<!-- Save / export / import (left of reset) — survives refresh via localStorage + file backup -->
+<div id="app-persist-toolbar" role="toolbar" aria-label="Program persistence">
+  <span id="saveIndicator" role="status" aria-live="polite">✓ Saved</span>
+  <button type="button" class="btn btn-secondary persist-btn" onclick="saveToStorage()" title="Write current program to this browser (auto-saves after edits)" aria-label="Save program to this browser">💾 Save now</button>
+  <button type="button" class="btn btn-secondary persist-btn" onclick="exportProgramJson()" title="Download all program data as JSON" aria-label="Export program as JSON">⬇ Export</button>
+  <button type="button" class="btn btn-secondary persist-btn" onclick="document.getElementById('importProgramInput').click()" title="Restore from a previously exported JSON file" aria-label="Import program JSON file">⬆ Import</button>
+  <input type="file" id="importProgramInput" accept="application/json,.json" style="display:none;" onchange="importProgramFromFile(event)" aria-hidden="true">
+  <button type="button" class="btn btn-secondary persist-btn" onclick="renderSnapshotsModal()" title="Save, load, or restore demo program snapshots" aria-label="Open snapshots modal">📸 Snapshots</button>
+</div>
+
+<!-- RESET BUTTON (top-right corner) -->
+<button id="resetBtn" type="button" onclick="confirmReset()" title="Reset all program data" aria-label="Reset all program data">↺ Reset</button>
+
+<!-- MAIN CONTENT -->
+<main class="main" id="main-content" role="main" aria-label="Main content">
+
+  <!-- ============================================================ -->
+  <!-- CISO TAB -->
+  <!-- ============================================================ -->
+  <div class="tab-panel active" id="tab-ciso">
+    <div class="page-header">
+      <h1>Information Security Program Setup</h1>
+      <p>Configure your NIST 800-53 baseline, assign program ownership, and set policy deadlines.</p>
+    </div>
+    <div class="wizard-container">
+      <div class="step-nav">
+        <div class="step-nav-title">Program Setup Steps</div>
+        <div class="step-item active" onclick="goToStep('ciso',1)" id="ciso-step-item-1">
+          <div class="step-circle active" id="ciso-circle-1">1</div>
+          <div class="step-info">
+            <div class="step-num">Step 1</div>
+            <div class="step-name">Select Baseline</div>
+          </div>
+        </div>
+        <div class="step-connector" id="ciso-conn-1"></div>
+        <div class="step-item" onclick="goToStep('ciso',2)" id="ciso-step-item-2">
+          <div class="step-circle pending" id="ciso-circle-2">2</div>
+          <div class="step-info">
+            <div class="step-num">Step 2</div>
+            <div class="step-name">PM Controls</div>
+          </div>
+        </div>
+        <div class="step-connector" id="ciso-conn-2"></div>
+        <div class="step-item" onclick="goToStep('ciso',3)" id="ciso-step-item-3">
+          <div class="step-circle pending" id="ciso-circle-3">3</div>
+          <div class="step-info">
+            <div class="step-num">Step 3</div>
+            <div class="step-name">InfoSec Policy</div>
+          </div>
+        </div>
+        <div class="step-connector" id="ciso-conn-3"></div>
+        <div class="step-item" onclick="goToStep('ciso',4)" id="ciso-step-item-4">
+          <div class="step-circle pending" id="ciso-circle-4">4</div>
+          <div class="step-info">
+            <div class="step-num">Step 4</div>
+            <div class="step-name">Consolidate</div>
+          </div>
+        </div>
+        <div class="step-connector" id="ciso-conn-4"></div>
+        <div class="step-item" onclick="goToStep('ciso',5)" id="ciso-step-item-5">
+          <div class="step-circle pending" id="ciso-circle-5">5</div>
+          <div class="step-info">
+            <div class="step-num">Step 5</div>
+            <div class="step-name">Assign Owners</div>
+          </div>
+        </div>
+
+      </div>
+      <div class="wizard-content">
+        <div class="wizard-step active" id="ciso-step-1">
+          <div class="wizard-step-body" id="ciso-step-1-body"></div>
+          <div class="wizard-step-footer">
+            <span></span>
+            <button class="btn btn-primary" onclick="cisoNext(1)">Next: PM Controls →</button>
+          </div>
+        </div>
+        <div class="wizard-step" id="ciso-step-2">
+          <div class="wizard-step-body" id="ciso-step-2-body"></div>
+          <div class="wizard-step-footer">
+            <button class="btn btn-secondary" onclick="goToStep('ciso',1)">← Back</button>
+            <button class="btn btn-primary" onclick="cisoNext(2)">Next: InfoSec Policy →</button>
+          </div>
+        </div>
+        <div class="wizard-step" id="ciso-step-3">
+          <div class="wizard-step-body" id="ciso-step-3-body"></div>
+          <div class="wizard-step-footer">
+            <button class="btn btn-secondary" onclick="goToStep('ciso',2)">← Back</button>
+            <button class="btn btn-primary" onclick="cisoNext(3)">Next: Consolidate &amp; Prioritize →</button>
+          </div>
+        </div>
+        <div class="wizard-step" id="ciso-step-4">
+          <div class="wizard-step-body" id="ciso-step-4-body"></div>
+          <div class="wizard-step-footer">
+            <button class="btn btn-secondary" onclick="goToStep('ciso',3)">← Back</button>
+            <button class="btn btn-primary" onclick="cisoNext(4)">Next: Assign Owners →</button>
+          </div>
+        </div>
+        <div class="wizard-step" id="ciso-step-5">
+          <div class="wizard-step-body" id="ciso-step-5-body"></div>
+          <div class="wizard-step-footer">
+            <button class="btn btn-secondary" onclick="goToStep('ciso',4)">← Back</button>
+            <button class="btn btn-navy" id="ciso-finalise-btn" onclick="cisoFinish()">✓ Finalize Program Setup</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- POLICY OWNER TAB -->
+  <!-- ============================================================ -->
+  <div class="tab-panel" id="tab-policy">
+    <!-- LIST VIEW: policy domain landing page -->
+    <div id="policy-list-panel" style="height:100%; overflow-y:auto;">
+      <div class="page-header">
+        <div class="role-badge">📋 Policy Owner</div>
+        <h1>Domain Policy Builder</h1>
+        <p>Select a policy domain below to begin building your domain-specific security policy.</p>
+      </div>
+      <div id="policy-list-body" style="padding:0 32px 32px;"></div>
+    </div>
+    <!-- WIZARD VIEW: 4-step flow (hidden until domain selected) — same side step-nav pattern as CISO / control -->
+    <div id="policy-wizard-panel" style="display:none; flex-direction:column; height:100%; overflow:hidden;">
+      <div id="policy-wizard-header" style="flex-shrink:0; background:white; border-bottom:1px solid var(--border); padding:12px 32px;"></div>
+      <div class="wizard-container" id="policy-wizard-main" style="flex:1; min-height:0; overflow:hidden;">
+        <div class="step-nav">
+          <div class="step-nav-title">Domain Policy Steps</div>
+          <div class="step-item active" onclick="goToStep('policy',1)" id="policy-step-item-1">
+            <div class="step-circle active" id="policy-circle-1">1</div>
+            <div class="step-info">
+              <div class="step-num">Step 1</div>
+              <div class="step-name">Policy Owner</div>
+            </div>
+          </div>
+          <div class="step-connector" id="policy-conn-1"></div>
+          <div class="step-item" onclick="goToStep('policy',2)" id="policy-step-item-2">
+            <div class="step-circle pending" id="policy-circle-2">2</div>
+            <div class="step-info">
+              <div class="step-num">Step 2</div>
+              <div class="step-name">Control Selection</div>
+            </div>
+          </div>
+          <div class="step-connector" id="policy-conn-2"></div>
+          <div class="step-item" onclick="goToStep('policy',3)" id="policy-step-item-3">
+            <div class="step-circle pending" id="policy-circle-3">3</div>
+            <div class="step-info">
+              <div class="step-num">Step 3</div>
+              <div class="step-name">Policy Content</div>
+            </div>
+          </div>
+          <div class="step-connector" id="policy-conn-3"></div>
+          <div class="step-item" onclick="goToStep('policy',4)" id="policy-step-item-4">
+            <div class="step-circle pending" id="policy-circle-4">4</div>
+            <div class="step-info">
+              <div class="step-num">Step 4</div>
+              <div class="step-name">Control Owners</div>
+            </div>
+          </div>
+        </div>
+        <div class="wizard-content">
+          <!-- Step 1: Review & Custodian -->
+          <div class="wizard-step active" id="policy-step-1" style="height:100%;">
+            <div style="display:flex; height:100%; overflow:hidden;">
+              <div id="policy-step-1-help" style="width:240px; flex-shrink:0; overflow-y:auto; background:#fafbfc; border-right:1px solid var(--border); padding:20px 16px;"></div>
+              <div style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
+                <div id="policy-step-1-body" style="flex:1; overflow-y:auto; padding:28px 32px;"></div>
+                <div class="wizard-step-footer">
+                  <button class="btn btn-secondary" onclick="exitPolicyWizard()">← All Domains</button>
+                  <button class="btn btn-primary" onclick="policyNext(1)">Control Selection →</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- Step 2: Control Selection -->
+          <div class="wizard-step" id="policy-step-2" style="height:100%;">
+            <div style="display:flex; height:100%; overflow:hidden;">
+              <div id="policy-step-2-help" style="width:240px; flex-shrink:0; overflow-y:auto; background:#fafbfc; border-right:1px solid var(--border); padding:20px 16px;"></div>
+              <div style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
+                <div id="policy-step-2-body" style="flex:1; overflow-y:auto; padding:24px 28px;"></div>
+                <div class="wizard-step-footer">
+                  <button class="btn btn-secondary" onclick="goToStep('policy',1)">← Back</button>
+                  <span id="policy-step-2-count" style="font-size:13px; color:var(--text-muted);"></span>
+                  <button class="btn btn-primary" onclick="policyNext(2)">Build Policy →</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- Step 3: Policy Content -->
+          <div class="wizard-step" id="policy-step-3" style="height:100%;">
+            <div style="display:flex; flex-direction:column; height:100%;">
+              <div class="wizard-step-body" id="policy-step-3-body" style="padding:0;"></div>
+              <div class="wizard-step-footer">
+                <button class="btn btn-secondary" onclick="goToStep('policy',2)">← Back</button>
+                <button class="btn btn-primary" onclick="policyNext(3)">Assign Control Owners →</button>
+              </div>
+            </div>
+          </div>
+          <!-- Step 4: Control Owners -->
+          <div class="wizard-step" id="policy-step-4" style="height:100%;">
+            <div style="display:flex; flex-direction:column; height:100%;">
+              <div class="wizard-step-body" id="policy-step-4-body" style="padding:0;"></div>
+              <div class="wizard-step-footer">
+                <button class="btn btn-secondary" onclick="goToStep('policy',3)">← Back</button>
+                <button class="btn btn-navy" onclick="showSubmitModal()">✓ Submit for CISO Approval</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- CONTROL OWNER TAB -->
+  <!-- ============================================================ -->
+  <div class="tab-panel" id="tab-control">
+    <div id="control-library-panel" style="display:none;height:100%;overflow-y:auto;">
+      <div class="page-header">
+        <h1>Control Library</h1>
+        <p>Full enterprise control catalog with ownership, implementation, applicability, and compliance posture.</p>
+      </div>
+      <div id="control-library-body" style="padding:0 32px 32px;"></div>
+    </div>
+    <div id="control-workspace-panel">
+      <div class="page-header">
+        <div class="role-badge">🔧 Control Owner</div>
+        <h1>Control Implementation Design</h1>
+        <p>Design how each assigned control is implemented, identify asset scope, and define what asset owners must do to comply.</p>
+      </div>
+      <div class="wizard-container">
+        <div class="step-nav">
+          <div class="step-nav-title">Design Workflow</div>
+          <div class="step-item active" onclick="goToStep('control',1)" id="control-step-item-1">
+            <div class="step-circle active" id="control-circle-1">1</div>
+            <div class="step-info"><div class="step-num">Step 1</div><div class="step-name">My Controls</div></div>
+          </div>
+          <div class="step-connector" id="control-conn-1"></div>
+          <div class="step-item" onclick="goToStep('control',2)" id="control-step-item-2">
+            <div class="step-circle pending" id="control-circle-2">2</div>
+            <div class="step-info"><div class="step-num">Step 2</div><div class="step-name">Design Controls</div></div>
+          </div>
+          <div class="step-connector" id="control-conn-2"></div>
+          <div class="step-item" onclick="goToStep('control',3)" id="control-step-item-3">
+            <div class="step-circle pending" id="control-circle-3">3</div>
+            <div class="step-info"><div class="step-num">Step 3</div><div class="step-name">Asset Requirements</div></div>
+          </div>
+          <div class="step-connector" id="control-conn-3"></div>
+          <div class="step-item" onclick="goToStep('control',4)" id="control-step-item-4">
+            <div class="step-circle pending" id="control-circle-4">4</div>
+            <div class="step-info"><div class="step-num">Step 4</div><div class="step-name">Review &amp; Submit</div></div>
+          </div>
+        </div>
+        <div class="wizard-content">
+          <div class="wizard-step active" id="control-step-1">
+            <div class="wizard-step-body" id="control-step-1-body"></div>
+            <div class="wizard-step-footer">
+              <span></span>
+              <button class="btn btn-primary" onclick="goToStep('control',2)">Design Controls →</button>
+            </div>
+          </div>
+          <div class="wizard-step" id="control-step-2">
+            <div class="wizard-step-body" id="control-step-2-body"></div>
+            <div class="wizard-step-footer">
+              <button class="btn btn-secondary" onclick="goToStep('control',1)">← Back</button>
+              <button class="btn btn-primary" onclick="goToStep('control',3)">Asset Requirements →</button>
+            </div>
+          </div>
+          <div class="wizard-step" id="control-step-3">
+            <div class="wizard-step-body" id="control-step-3-body"></div>
+            <div class="wizard-step-footer">
+              <button class="btn btn-secondary" onclick="goToStep('control',2)">← Back</button>
+              <button class="btn btn-primary" onclick="goToStep('control',4)">Review &amp; Submit →</button>
+            </div>
+          </div>
+          <div class="wizard-step" id="control-step-4">
+            <div class="wizard-step-body" id="control-step-4-body"></div>
+            <div class="wizard-step-footer">
+              <button class="btn btn-secondary" onclick="goToStep('control',3)">← Back</button>
+              <button class="btn btn-navy" id="ctrl-submit-btn" onclick="submitControlDesign()">✓ Submit Design to Policy Owner</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- ASSET OWNER TAB -->
+  <!-- ============================================================ -->
+  <div class="tab-panel" id="tab-asset">
+    <div id="asset-library-panel" style="display:none;height:100%;overflow-y:auto;">
+      <div class="page-header">
+        <h1>Asset Library</h1>
+        <p>Global catalog of assets. Create new assets and assign an owner and asset type before starting SSP attestations.</p>
+      </div>
+      <div id="asset-library-body" style="padding:0 32px 32px;"></div>
+    </div>
+    <div id="asset-type-library-panel" style="display:none;height:100%;overflow-y:auto;">
+      <div class="page-header">
+        <h1>Asset Type Library</h1>
+        <p>Manage the catalog of asset types used by control coverage and SSP mapping.</p>
+      </div>
+      <div id="asset-type-library-body" style="padding:0 32px 32px;"></div>
+    </div>
+    <div id="asset-workspace-panel">
+      <div class="page-header">
+        <div class="role-badge">🖥️ Asset Owner / Control Performer</div>
+        <h1>System Security Plan (SSP) — Asset Owner</h1>
+        <p>Register systems, document categorization, boundary, interconnections, and control attestations for a defensible SSP.</p>
+      </div>
+      <div class="wizard-container">
+        <div class="step-nav">
+          <div class="step-nav-title">SSP Workflow</div>
+          <div class="step-item active" onclick="goToStep('asset',1)" id="asset-step-item-1">
+            <div class="step-circle active" id="asset-circle-1">1</div>
+            <div class="step-info"><div class="step-num">Step 1</div><div class="step-name">Asset Inventory</div></div>
+          </div>
+          <div class="step-connector" id="asset-conn-1"></div>
+          <div class="step-item" onclick="goToStep('asset',2)" id="asset-step-item-2">
+            <div class="step-circle pending" id="asset-circle-2">2</div>
+            <div class="step-info"><div class="step-num">Step 2</div><div class="step-name">Attestations</div></div>
+          </div>
+          <div class="step-connector" id="asset-conn-2"></div>
+          <div class="step-item" onclick="goToStep('asset',3)" id="asset-step-item-3">
+            <div class="step-circle pending" id="asset-circle-3">3</div>
+            <div class="step-info"><div class="step-num">Step 3</div><div class="step-name">Interconnections</div></div>
+          </div>
+          <div class="step-connector" id="asset-conn-3"></div>
+          <div class="step-item" onclick="goToStep('asset',4)" id="asset-step-item-4">
+            <div class="step-circle pending" id="asset-circle-4">4</div>
+            <div class="step-info"><div class="step-num">Step 4</div><div class="step-name">Review &amp; Sign-Off</div></div>
+          </div>
+        </div>
+        <div class="wizard-content">
+          <div class="wizard-step active" id="asset-step-1">
+            <div class="wizard-step-body" id="asset-step-1-body"></div>
+            <div class="wizard-step-footer">
+              <span></span>
+              <button class="btn btn-primary" onclick="goToStep('asset',2)">Attestations →</button>
+            </div>
+          </div>
+          <div class="wizard-step" id="asset-step-2">
+            <div class="wizard-step-body" id="asset-step-2-body"></div>
+            <div class="wizard-step-footer">
+              <span id="asset-step-2-count" style="font-size:12px;color:var(--text-muted);align-self:center;"></span>
+              <div style="display:flex;gap:8px;align-items:center;">
+              <button class="btn btn-secondary" onclick="goToStep('asset',1)">← Back</button>
+              <button class="btn btn-primary" onclick="goToStep('asset',3)">Interconnections →</button>
+              </div>
+            </div>
+          </div>
+          <div class="wizard-step" id="asset-step-3">
+            <div class="wizard-step-body" id="asset-step-3-body"></div>
+            <div class="wizard-step-footer">
+              <button class="btn btn-secondary" onclick="goToStep('asset',2)">← Back</button>
+              <button class="btn btn-primary" onclick="goToStep('asset',4)">Review &amp; Sign-Off →</button>
+            </div>
+          </div>
+          <div class="wizard-step" id="asset-step-4">
+            <div class="wizard-step-body" id="asset-step-4-body"></div>
+            <div class="wizard-step-footer">
+              <button class="btn btn-secondary" onclick="goToStep('asset',3)">← Back</button>
+              <button class="btn btn-navy" id="asset-submit-btn" onclick="submitSSP()">✓ Sign &amp; Submit SSP</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- CONTROL TESTER TAB -->
+  <!-- ============================================================ -->
+  <!-- Control Assessment + Authorization workspaces removed (2026-04-27).
+       Authorization data (state.authBoundaries, state.assessmentPlans,
+       state.atoDecisions) is preserved; AOs can still record decisions via
+       openAtoDecisionModal() launched from the Reports dashboard. -->
+
+  <!-- ============================================================ -->
+  <!-- REPORTS TAB -->
+  <!-- ============================================================ -->
+  <div class="tab-panel" id="tab-reports">
+    <div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-start;">
+      <div>
+        <div class="role-badge">📊 Reports &amp; Dashboard</div>
+        <h1>Program Status Dashboard</h1>
+        <p>Overview of your NIST 800-53 program posture, policy status, and control coverage.</p>
+      </div>
+      <button id="reportsPrintBtn" class="btn btn-navy" onclick="printReport()" style="margin-top:8px;">🖨️ Print Report</button>
+    </div>
+    <div style="padding:24px 32px;" id="reports-body"></div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- USERS & ROLES TAB -->
+  <!-- ============================================================ -->
+  <div class="tab-panel" id="tab-users">
+    <div class="page-header">
+      <div class="role-badge">👥 Administration</div>
+      <h1>Users &amp; Roles</h1>
+      <p>Register people and assign role-based access to workspaces.</p>
+    </div>
+    <div style="padding:24px 32px;" id="users-body"></div>
+  </div>
+
+</main>
+
+<!-- ROLE PICKER OVERLAY -->
+<div id="rolePickerOverlay" role="dialog" aria-modal="true" aria-labelledby="rolePickerTitle">
+  <div class="role-picker-card">
+    <div class="role-picker-header">
+      <div>
+        <div class="role-picker-eyebrow">Select Profile</div>
+        <div class="role-picker-title" id="rolePickerTitle">Who are you working as?</div>
+        <div id="rolePickerSubtitle" class="role-picker-subtitle">Choose a profile to enter the right workspace.</div>
+      </div>
+      <div class="role-picker-actions">
+        <button type="button" class="btn btn-secondary btn-sm role-picker-action-btn" onclick="selectUserProfile('admin')">🔑 Admin mode</button>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('rolePickerOverlay').style.display='none'">Close</button>
+      </div>
+    </div>
+    <div id="rolePickerProfiles" class="role-picker-profiles"></div>
+  </div>
+</div>
+
+<script src="js/nist-control-text.js"></script>
+<script src="js/core.js"></script>
+<script src="js/program.js"></script>
+<script src="js/policies.js"></script>
+<script src="js/controls.js"></script>
+<script src="js/assets.js"></script>
+<script src="js/baseline-elevation.js"></script>
+<script src="js/authorization.js"></script>
+<script src="js/reports.js"></script>
+<script src="js/admin.js"></script>
+<script src="js/app.js"></script>
+
+</body>
+</html>
