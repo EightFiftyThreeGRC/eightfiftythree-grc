@@ -29,6 +29,28 @@
 
 <a href="#main-content" class="skip-link">Skip to main content</a>
 
+<!-- First-visit welcome (dismissed per browser via localStorage; see dismissWelcomeIntro in app.js) -->
+<div id="welcomeIntroOverlay" role="dialog" aria-modal="true" aria-labelledby="welcomeIntroTitle" aria-describedby="welcomeIntroDesc" aria-hidden="true">
+  <div class="welcome-intro-card">
+    <div class="welcome-intro-brand">EightFiftyThree <span class="welcome-intro-brand-sub">GRC</span></div>
+    <h1 id="welcomeIntroTitle" class="welcome-intro-title">Welcome</h1>
+    <p id="welcomeIntroDesc" class="welcome-intro-lead">
+      This tool helps you stand up a practical <strong>NIST SP 800-53 Rev. 5</strong> governance program in the browser.
+      Start by choosing your security <strong>baseline</strong> and shaping your organization’s <strong>information security program</strong> (policies, ownership, and priorities).
+      From there, the wizards guide you through domain policies, control implementation, assets and SSP-style attestations, reporting, and snapshots you can export.
+    </p>
+    <ul class="welcome-intro-list" aria-label="What you will do first">
+      <li><span class="welcome-intro-num">1</span> Program setup — baseline, PM controls, and ISP structure</li>
+      <li><span class="welcome-intro-num">2</span> Domain policies and control ownership</li>
+      <li><span class="welcome-intro-num">3</span> Implementation design, assets, dashboard, and export</li>
+    </ul>
+    <p class="welcome-intro-footnote">Your data stays in this browser (localStorage) unless you export it. Nothing is sent to a server.</p>
+    <div class="welcome-intro-actions">
+      <button type="button" class="btn btn-primary welcome-intro-proceed" onclick="dismissWelcomeIntro()">Proceed to program setup</button>
+    </div>
+  </div>
+</div>
+
 <!-- SIDEBAR -->
 <nav class="sidebar" role="navigation" aria-label="Primary">
   <div class="sidebar-logo">

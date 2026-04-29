@@ -1001,12 +1001,57 @@ function setupMobileNav() {
   });
 }
 
+/** localStorage key: once set, welcome intro is skipped on this browser. */
+var WELCOME_INTRO_STORAGE_KEY = 'eightfiftythree-grc-welcome-dismissed';
+
+function dismissWelcomeIntro() {
+  try {
+    localStorage.setItem(WELCOME_INTRO_STORAGE_KEY, '1');
+  } catch (e) {}
+  var ov = document.getElementById('welcomeIntroOverlay');
+  if (ov) {
+    ov.classList.remove('is-visible');
+    ov.setAttribute('aria-hidden', 'true');
+  }
+  try {
+    document.body.style.overflow = '';
+  } catch (e2) {}
+  setTimeout(function() {
+    try {
+      var pb = document.getElementById('profileBtn');
+      if (pb && typeof pb.focus === 'function') pb.focus();
+    } catch (e3) {}
+  }, 0);
+}
+
+function maybeShowWelcomeIntro() {
+  var dismissed = false;
+  try {
+    dismissed = localStorage.getItem(WELCOME_INTRO_STORAGE_KEY) === '1';
+  } catch (e) {}
+  if (dismissed) return;
+  var ov = document.getElementById('welcomeIntroOverlay');
+  if (!ov) return;
+  ov.classList.add('is-visible');
+  ov.removeAttribute('aria-hidden');
+  try {
+    document.body.style.overflow = 'hidden';
+  } catch (e2) {}
+  setTimeout(function() {
+    try {
+      var btn = ov.querySelector('.welcome-intro-proceed');
+      if (btn && typeof btn.focus === 'function') btn.focus();
+    } catch (e3) {}
+  }, 50);
+}
+
 document.addEventListener('DOMContentLoaded', function() {
   try { loadFromStorage(); } catch (e) { console.warn('loadFromStorage:', e); }
   try { applyRoleView('admin'); } catch (e) { console.warn('applyRoleView:', e); }
   try { showTab('ciso'); } catch (e) { console.warn('showTab:', e); }
   try { goToStep('ciso', 1); } catch (e) { console.warn('goToStep:', e); }
   try { setupMobileNav(); } catch (e) { console.warn('setupMobileNav:', e); }
+  try { maybeShowWelcomeIntro(); } catch (e) { console.warn('maybeShowWelcomeIntro:', e); }
   window.addEventListener('beforeunload', function(ev) {
     if (!window.isDirty) return;
     try { saveToStorage(); } catch (e2) {}
