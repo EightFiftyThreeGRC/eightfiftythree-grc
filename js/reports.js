@@ -276,10 +276,10 @@ function renderProgramDashboard(controls, families) {
   const privSuffix  = state.privacyOverlay ? ' + Privacy' : '';
   const policyFams  = families.filter(f => f !== 'PM');
 
-  // ── Authoritative count for banner (NIST 800-53B baseline, PM shown separately) ──
-  const pmSelected  = Object.values(state.pmControls||{}).filter(Boolean).length;
-  const authCount   = BASELINE_COUNTS[state.baseline] || controls.length;
-  const pmSuffix    = pmSelected ? ' + ' + pmSelected + ' PM' : '';
+  // ── Control count source of truth for this dashboard ──
+  // Use the same in-memory control set that drives the detailed reporting cards.
+  // This keeps top-level tallies and lower metrics in sync.
+  const authCount   = controls.length;
 
   // ── Policy stats ──
   const polApproved   = policyFams.filter(f => (state.policyStatus[f]||{}).status === 'Approved').length;
@@ -298,8 +298,8 @@ function renderProgramDashboard(controls, families) {
   const polPct        = policyFams.length ? Math.round((polApproved/policyFams.length)*100) : 0;
 
   // ── Control stats ──
-  // Use authoritative NIST count as the total (abbreviated CONTROLS array is a representative subset)
-  const ctrlTotal       = authCount + pmSelected;
+  // Use the same scoped control set used across the reports tab.
+  const ctrlTotal       = authCount;
   const ctrlImplemented = controls.filter(c => (state.controlStatus[c.id]||{}).status === 'Implemented').length;
   const ctrlInProgress  = controls.filter(c => (state.controlStatus[c.id]||{}).status === 'In Progress').length;
   const ctrlPlanned     = controls.filter(c => (state.controlStatus[c.id]||{}).status === 'Planned').length;
@@ -432,7 +432,7 @@ function renderProgramDashboard(controls, families) {
         </div>
         <div>
           <div style="font-size:13px;font-weight:600;color:#166534;">Establish Program Governance Setup Complete</div>
-          <div style="font-size:11px;color:#15803d;margin-top:3px;">Your governance program foundation is in place — ${baseline}${privSuffix} baseline · ${authCount}${pmSuffix} controls across ${policyFams.length} families · Cyber Program Owner: <strong>${escapeHTML(state.programOwner||'—')}</strong></div>
+          <div style="font-size:11px;color:#15803d;margin-top:3px;">Your governance program foundation is in place — ${baseline}${privSuffix} baseline · ${authCount} controls across ${policyFams.length} families · Cyber Program Owner: <strong>${escapeHTML(state.programOwner||'—')}</strong></div>
         </div>
       </div>
     </div>`}
