@@ -1796,6 +1796,17 @@
       padding: 8px 14px;
       border-radius: 8px;
       white-space: nowrap;
+      background-color: #f0f9ff;
+      color: #0369a1;
+      border: 1px solid #bae6fd;
+      box-shadow: 0 1px 2px rgba(14, 165, 233, 0.08);
+    }
+    .wizard-video-trigger:hover,
+    .wizard-video-trigger:focus {
+      background-color: #e0f2fe;
+      border-color: var(--teal);
+      color: #075985;
+      outline: none;
     }
     .page-header-row {
       display: flex;
