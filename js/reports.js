@@ -441,6 +441,7 @@ function renderProgramDashboard(controls, families) {
 
     ${typeof renderBaselineElevationReportsSummaryHtml === 'function' ? renderBaselineElevationReportsSummaryHtml() : ''}
     ${typeof renderBaselineElevationCisoCardsHtml === 'function' ? renderBaselineElevationCisoCardsHtml() : ''}
+    ${typeof renderFrameworkDashboardStripHtml === 'function' ? renderFrameworkDashboardStripHtml() : ''}
 
     <!-- ╔══ Executive Summary header ══╗ -->
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">

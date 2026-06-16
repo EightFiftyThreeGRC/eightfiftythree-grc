@@ -1353,8 +1353,20 @@ function buildEvidenceArtifactSectionHTML(ctrl) {
   var g = FAMILY_EVIDENCE_GUIDANCE[ctrl.f];
   var hint = g && g.evidence ? '<div style="font-size:11px;color:var(--text-muted);margin-bottom:10px;line-height:1.5;"><strong>Examples for ' + escapeHTML(g.label || ctrl.f) + ':</strong> ' + escapeHTML(g.evidence.slice(0, 3).join(' · ')) + '</div>' : '';
   var rows = ev.map(function(evRow, idx) {
-    var kind = evRow.kind === 'image' ? 'image' : 'ref';
-    var refPart = kind === 'ref'
+    var kind = evRow.kind === 'image' ? 'image' : (evRow.kind === 'sharepoint' ? 'sharepoint' : 'ref');
+    var refPart = kind === 'sharepoint'
+      ? '<div style="margin-top:8px;">'
+        + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">'
+        + '<span class="sp-evidence-badge">SharePoint</span>'
+        + '<button type="button" class="btn btn-secondary btn-sm" style="font-size:10px;padding:4px 10px;" onclick="openSharePointEvidenceFolder()">Browse folder</button>'
+        + '</div>'
+        + '<input class="form-input" style="font-size:12px;margin-bottom:8px;" placeholder="Document name (e.g., AC-2 Access Review Q1 2026)" value="' + escapeHTML(evRow.title || '') + '" oninput="setEvidenceField(\'' + cid + '\',' + idx + ',\'title\',this.value)">'
+        + '<input class="form-input" style="font-size:12px;margin-bottom:8px;" placeholder="Relative path in library (e.g., AC/AC-2/review-report.pdf)" value="' + escapeHTML(evRow.spPath || '') + '" oninput="applySharePointPathToEvidence(\'' + cid + '\',' + idx + ',this.value)">'
+        + '<input class="form-input" style="font-size:12px;margin-bottom:8px;" placeholder="Or paste full SharePoint link" value="' + escapeHTML(evRow.url || evRow.ref || '') + '" oninput="setEvidenceField(\'' + cid + '\',' + idx + ',\'url\',this.value)">'
+        + '<input class="form-input" style="font-size:12px;" placeholder="How this document proves the control" value="' + escapeHTML(evRow.description || '') + '" oninput="setEvidenceField(\'' + cid + '\',' + idx + ',\'description\',this.value)">'
+        + (evRow.url && isSharePointUrl(evRow.url) ? '<a href="' + escapeHTML(evRow.url) + '" target="_blank" rel="noopener noreferrer" class="sp-evidence-link">Open in SharePoint ↗</a>' : '')
+        + '</div>'
+      : kind === 'ref'
       ? '<div style="display:grid;grid-template-columns:130px 1fr;gap:8px;margin-top:8px;">'
         + '<select class="form-select" style="font-size:11px;" onchange="setEvidenceField(\'' + cid + '\',' + idx + ',\'type\',this.value)">'
         + ['Policy', 'Procedure', 'Screenshot', 'Log excerpt', 'Report', 'Ticket', 'Other'].map(function(tp) {
@@ -1380,6 +1392,7 @@ function buildEvidenceArtifactSectionHTML(ctrl) {
       + '<div style="display:flex;gap:6px;align-items:center;">'
       + '<select class="form-select" style="font-size:11px;padding:3px 8px;" onchange="setEvidenceKind(\'' + cid + '\',' + idx + ',this.value)">'
       + '<option value="ref"' + (kind === 'ref' ? ' selected' : '') + '>Document / reference</option>'
+      + (getSharePointConfig().enabled ? '<option value="sharepoint"' + (kind === 'sharepoint' ? ' selected' : '') + '>SharePoint link</option>' : '')
       + '<option value="image"' + (kind === 'image' ? ' selected' : '') + '>Screenshot (PNG/JPEG)</option>'
       + '</select>'
       + '<button type="button" class="btn btn-sm" style="font-size:10px;padding:2px 8px;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;" onclick="openBulkEvidenceRowModal(\'' + cid + '\',' + idx + ')">Apply to controls…</button>'
@@ -1388,12 +1401,20 @@ function buildEvidenceArtifactSectionHTML(ctrl) {
       + refPart
       + '</div>';
   }).join('');
-  return '<div style="background:white;border:1px solid var(--border);border-radius:10px;padding:18px 20px;margin-bottom:20px;">'
-    + '<div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--navy);margin-bottom:4px;">Evidence artifacts</div>'
-    + '<div style="font-size:11px;color:var(--text-muted);margin-bottom:10px;line-height:1.55;">Attach references or small screenshots (assessment aids). Images are stored in-browser only — keep each file at or under 100 KB.</div>'
+  var spEnabled = typeof getSharePointConfig === 'function' && getSharePointConfig().enabled;
+  var fwBadges = typeof renderFrameworkBadgesHtml === 'function' ? renderFrameworkBadgesHtml(ctrl.id, false) : '';
+  return '<div class="evidence-card">'
+    + '<div class="evidence-card-head">'
+    + '<div><div class="evidence-card-title">Evidence</div>'
+    + '<div class="evidence-card-sub">' + (spEnabled ? 'Link to SharePoint or attach small screenshots. Files live in your document library — we store pointers only.' : 'Attach references or small screenshots. Images stay in-browser only — max 100 KB each.') + '</div>'
+    + (fwBadges ? '<div class="evidence-fw-badges" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;">' + fwBadges + '</div>' : '')
+    + '</div></div>'
     + hint
-    + (rows || '<div style="font-size:11px;color:var(--text-muted);">No evidence rows yet.</div>')
-    + '<button type="button" class="btn btn-secondary btn-sm" style="margin-top:8px;font-size:11px;" onclick="addCtrlEvidence(\'' + cid + '\')">+ Add evidence row</button>'
+    + (rows || '<div class="evidence-empty">No evidence yet — add a link or screenshot below.</div>')
+    + '<div class="evidence-actions">'
+    + '<button type="button" class="btn btn-secondary btn-sm" onclick="addCtrlEvidence(\'' + cid + '\')">Add reference</button>'
+    + (spEnabled ? '<button type="button" class="btn btn-primary btn-sm" onclick="addSharePointEvidence(\'' + cid + '\')">Link from SharePoint</button>' : '')
+    + '</div>'
     + '</div>';
 }
 
@@ -1407,6 +1428,18 @@ function setEvidenceKind(ctrlId, idx, kind) {
     row.dataUrl = row.dataUrl || '';
     delete row.type;
     delete row.ref;
+    delete row.spPath;
+  } else if (kind === 'sharepoint') {
+    row.kind = 'sharepoint';
+    row.type = row.type || 'Document';
+    row.title = row.title != null ? row.title : '';
+    row.description = row.description != null ? row.description : '';
+    row.url = row.url != null ? row.url : '';
+    row.ref = row.ref != null ? row.ref : row.url;
+    row.spPath = row.spPath != null ? row.spPath : '';
+    delete row.dataUrl;
+    delete row.mime;
+    delete row.caption;
   } else {
     row.kind = 'ref';
     row.type = row.type || 'Policy';

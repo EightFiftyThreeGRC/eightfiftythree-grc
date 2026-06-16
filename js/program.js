@@ -847,6 +847,12 @@ function renderCISOStep1() {
       <div class="toggle-switch ${state.privacyOverlay?'on':''}"></div>
     </div>
 
+    ${typeof renderFrameworkSetupSectionHtml === 'function' ? renderFrameworkSetupSectionHtml() : ''}
+
+    ${typeof renderSharePointSetupCardHtml === 'function' ? renderSharePointSetupCardHtml() : ''}
+
+    ${typeof renderEntraSetupCardHtml === 'function' ? renderEntraSetupCardHtml() : ''}
+
     <div style="display:flex;flex-direction:column;gap:14px;margin-top:20px;">
       <div class="form-group" style="margin-bottom:0;">
         <label class="form-label">Organization / Agency Name <span class="required">*</span></label>

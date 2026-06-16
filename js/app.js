@@ -559,7 +559,7 @@ function resetApp() {
 // Tab IDs, showTab, role-view routing, CISO wizard shell
 // (step dispatch, toast, cisoFinish, sidebar badges).
 // ============================================================
-const TAB_IDS = ['ciso','policy','control','asset','reports','users'];
+const TAB_IDS = ['ciso','policy','control','asset','frameworks','reports','users'];
 
 
 function showProgramOverviewTab() {
@@ -683,6 +683,7 @@ function showTab(tabId) {
   if (tabId === 'policy')   renderPolicyTab();
   if (tabId === 'control')  renderControlTab();
   if (tabId === 'asset')    renderAssetTab();
+  if (tabId === 'frameworks') renderFrameworksTab();
   if (tabId === 'reports')    renderReports();
   if (tabId === 'users')    renderUsersTab();
   updateNotificationBadges();
@@ -1117,9 +1118,20 @@ function maybeShowWelcomeIntro() {
 
 document.addEventListener('DOMContentLoaded', function() {
   try { loadFromStorage(); } catch (e) { console.warn('loadFromStorage:', e); }
-  try { applyRoleView('admin'); } catch (e) { console.warn('applyRoleView:', e); }
-  try { showTab('ciso'); } catch (e) { console.warn('showTab:', e); }
-  try { goToStep('ciso', 1); } catch (e) { console.warn('goToStep:', e); }
+  var entraBoot = Promise.resolve(false);
+  if (typeof initEntraAuth === 'function') {
+    entraBoot = initEntraAuth().catch(function(e) {
+      console.warn('initEntraAuth:', e);
+      return false;
+    });
+  }
+  entraBoot.then(function(entraSignedIn) {
+    if (!entraSignedIn) {
+      try { applyRoleView('admin'); } catch (e) { console.warn('applyRoleView:', e); }
+    }
+    try { showTab('ciso'); } catch (e) { console.warn('showTab:', e); }
+    try { goToStep('ciso', 1); } catch (e) { console.warn('goToStep:', e); }
+  });
   try { setupMobileNav(); } catch (e) { console.warn('setupMobileNav:', e); }
   try { maybeShowWelcomeIntro(); } catch (e) { console.warn('maybeShowWelcomeIntro:', e); }
   try {

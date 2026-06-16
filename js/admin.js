@@ -83,23 +83,27 @@ const ROLE_DEFAULT_TAB = {
 
 function renderProfileButtonContent(user) {
   var displayName = user ? user.name : 'Admin mode';
-  var icon = user ? '👤' : '🔑';
+  var icon = user ? (state.entraSession ? '◆' : '👤') : '🔑';
+  var sub = state.entraSession ? 'Microsoft · Switch profile' : 'Switch role / impersonate';
   return ''
-    + '<span style="display:flex;align-items:center;justify-content:center;gap:8px;line-height:1.2;">'
+    + '<span class="profile-btn-line">'
     + '<span>' + icon + '</span>'
     + '<span>' + _esc(displayName) + '</span>'
     + '</span>'
-    + '<span style="display:block;font-size:11px;font-weight:500;color:rgba(255,255,255,0.72);margin-top:3px;">Switch role / impersonate</span>';
+    + '<span class="profile-btn-sub">' + sub + '</span>';
 }
 
 function showRolePicker() {
   const overlay = document.getElementById('rolePickerOverlay');
   if (!overlay) return;
-  // Sync users from domain owners, control owners, etc. so the picker shows current data
   syncUsersFromState();
-  // Update subtitle with org name if set
   const sub = document.getElementById('rolePickerSubtitle');
-  if (sub) sub.textContent = 'Select your profile to continue';
+  if (sub) {
+    sub.textContent = isEntraAuthEnabled()
+      ? 'Sign in with Microsoft, use Admin mode for demos, or pick a profile below.'
+      : 'Choose a profile to enter the right workspace.';
+  }
+  if (typeof renderEntraAuthPickerSection === 'function') renderEntraAuthPickerSection();
   renderRolePickerProfiles();
   overlay.style.display = 'flex';
 }
@@ -186,6 +190,7 @@ function renderRolePickerProfiles() {
 }
 
 function selectUserProfile(userId) {
+  if (userId === 'admin' && typeof clearEntraSessionLocal === 'function') clearEntraSessionLocal();
   // Block impersonation of demo placeholder users — any attestation made
   // while signed in as one of them would have no real signatory and would
   // be a non-repudiation violation in a real program.
@@ -545,6 +550,10 @@ function renderUsersTab() {
       + '</div>';
   });
   html += '</div>';
+
+  if (typeof renderEntraAdminSetupHtml === 'function') {
+    html += renderEntraAdminSetupHtml();
+  }
 
   html += '<div style="background:white;border:1px solid #e2e8f0;border-radius:12px;padding:20px;margin-bottom:24px;' + (readOnly ? 'opacity:0.7;' : '') + '">'
     + '<div style="font-size:14px;font-weight:700;color:#1e293b;margin-bottom:6px;">Custom program roles</div>'

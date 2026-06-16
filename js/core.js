@@ -1077,9 +1077,9 @@ const ROLE_TABS = {
   // AOs still record decisions through openAtoDecisionModal() launched from the
   // Reports dashboard. Asssessors no longer have a dedicated workspace —
   // assessment data persists in state but is not edited via UI.
-  'ciso':          ['ciso','policy','asset','reports'],
-  'issm':          ['policy','asset','reports'],
-  'control-owner': ['control','reports'],
+  'ciso':          ['ciso','policy','asset','frameworks','reports'],
+  'issm':          ['policy','asset','frameworks','reports'],
+  'control-owner': ['control','frameworks','reports'],
   'asset-owner':   ['asset','reports'],
   'custodian':     ['policy','reports'],
   'assessor':      ['reports'],
@@ -1190,10 +1190,18 @@ const state = {
   _reportsProgramReadinessHidden: false, // true = collapse Program Readiness panel in Reports
   _reportsMySummaryHidden: false, // true = collapse "My dashboard" summary card in Reports
   _reportsPhase1BannerHidden: false, // true = collapse Phase 1 completion banner in Reports
+  activeFrameworks: { iso27001: true, soc2: true, hipaa: true }, // which cross-framework lenses to track
+  sharePointConfig: { enabled: false, siteUrl: '', libraryName: 'Evidence', defaultFolder: 'GRC/Evidence' },
+  entraConfig: { enabled: false, clientId: '', tenantId: 'organizations', redirectUri: '' },
+  entraSession: null, // { email, name, oid, matchedUserId, signedInAt } when signed in via Entra
+  _frameworkFilter: '',   // UI: filter mapping table to one framework
+  _frameworkSearch: '',   // UI: search in framework mapping table
 };
 const STATE_DEFAULTS = JSON.parse(JSON.stringify(state));
 const STATE_ALLOWED_KEYS = Object.keys(STATE_DEFAULTS);
 const STORAGE_KEY = 'eightfiftythree-grc-v1';
+// Mirror onto window so Playwright / external scripts can access state directly.
+try { window.state = state; window.STATE_DEFAULTS = STATE_DEFAULTS; } catch (e) {}
 const SNAPSHOTS_KEY = 'eightfiftythree-grc-snapshots';
 // One-time migration from legacy storage keys. Runs at script parse time and
 // only copies forward if the new keys are empty. Legacy keys are removed after
@@ -1388,7 +1396,7 @@ function valuesEqualForChangeLog(a, b) {
 function logFieldChange(path, oldVal, newVal) {
   if (valuesEqualForChangeLog(oldVal, newVal)) return;
   if (!state.changeLog) state.changeLog = [];
-  var uid = state.currentUserId || 'admin';
+  var uid = state.currentUserId || (state.entraSession && state.entraSession.email) || 'admin';
   state.changeLog.push({
     t: new Date().toISOString(),
     u: uid,

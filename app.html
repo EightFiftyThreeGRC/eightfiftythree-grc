@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -7,8 +7,9 @@
   (function () {
     try {
       var p = String(location.pathname || '/');
-      if (/\/index\.html?$/i.test(p)) {
-        p = p.replace(/\/index\.html?$/i, '/');
+      // Strip any .html filename (index.html, app.html, etc.) so relative assets resolve to the directory.
+      if (/\/[^/]+\.html?$/i.test(p)) {
+        p = p.replace(/\/[^/]+\.html?$/i, '/');
       } else if (p !== '/' && !p.endsWith('/')) {
         p += '/';
       }
@@ -35,15 +36,10 @@
     <div class="welcome-intro-brand">EightFiftyThree <span class="welcome-intro-brand-sub">GRC</span></div>
     <h1 id="welcomeIntroTitle" class="welcome-intro-title">Welcome</h1>
     <p id="welcomeIntroDesc" class="welcome-intro-lead">
-      Stand up a practical <strong>NIST SP 800-53</strong> program — with crosswalks to <strong>ISO 27001</strong>, <strong>SOC 2</strong>, and <strong>HIPAA</strong> built in.
-      Choose your baseline, shape policies and ownership, link evidence from SharePoint, and export when you're ready.
+      This tool helps you stand up a practical <strong>NIST SP 800-53 Rev. 5</strong> governance program in the browser.
+      Start by choosing your security <strong>baseline</strong> and shaping your organization’s <strong>information security program</strong> (policies, ownership, and priorities).
+      From there, the wizards guide you through domain policies, control implementation, assets and SSP-style attestations, reporting, and snapshots you can export.
     </p>
-    <div class="welcome-intro-video" style="margin:14px 0;border-radius:10px;overflow:hidden;border:1px solid #e2e8f0;background:#0b1120;">
-      <video controls preload="metadata" playsinline style="display:block;width:100%;height:auto;" aria-label="Orientation video: NIST 800-53, RMF, and how this tool maps to both">
-        <source src="assets/videos/00-orientation.mp4" type="video/mp4">
-      </video>
-    </div>
-    <p class="welcome-intro-footnote" style="margin-top:-4px;font-style:italic;">New here? Watch the 4-minute orientation above — what NIST 800-53 is, how RMF wraps around it, and how this tool maps to both.</p>
     <ul class="welcome-intro-list" aria-label="What you will do first">
       <li><span class="welcome-intro-num">1</span> Program setup — baseline, PM controls, and ISP structure</li>
       <li><span class="welcome-intro-num">2</span> Domain policies and control ownership</li>
@@ -53,18 +49,6 @@
     <div class="welcome-intro-actions">
       <button type="button" class="btn btn-primary welcome-intro-proceed" onclick="dismissWelcomeIntro()">Proceed to program setup</button>
     </div>
-  </div>
-</div>
-
-<!-- Reusable wizard walkthrough modal — populated by openWizardVideo(src, title) in app.js -->
-<div id="wizardVideoOverlay" role="dialog" aria-modal="true" aria-labelledby="wizardVideoTitle" aria-hidden="true">
-  <div class="wizard-video-card">
-    <button type="button" class="wizard-video-close" aria-label="Close walkthrough" onclick="closeWizardVideo()">×</button>
-    <h2 id="wizardVideoTitle" class="wizard-video-title">Walkthrough</h2>
-    <div class="wizard-video-frame">
-      <video id="wizardVideoEl" controls preload="metadata" playsinline></video>
-    </div>
-    <p class="wizard-video-caption">What this wizard covers and why.</p>
   </div>
 </div>
 
@@ -145,6 +129,7 @@
 
   <div class="sidebar-section" style="margin-top:auto; border-bottom:none; padding:16px 18px;">
     <div class="sidebar-footer">
+      <a href="index.html" title="Return to the EightFiftyThree GRC overview page">← Back to overview</a><br>
       NIST SP 800-53 Rev. 5<br>
       © EightFiftyThree GRC<br>
       <a href="mailto:nistcsftool@gmail.com">Contact</a>
@@ -173,13 +158,7 @@
   <!-- ============================================================ -->
   <div class="tab-panel active" id="tab-ciso">
     <div class="page-header">
-      <div class="page-header-row">
-        <h1>Information Security Program Setup</h1>
-        <button type="button" class="btn btn-secondary wizard-video-trigger"
-          onclick="openWizardVideo('assets/videos/01-program-setup.mp4', 'Program Setup walkthrough')">
-          ▶ Watch 4-min walkthrough
-        </button>
-      </div>
+      <h1>Information Security Program Setup</h1>
       <p>Configure your NIST 800-53 baseline, assign program ownership, and set policy deadlines.</p>
     </div>
     <div class="wizard-container">
@@ -538,6 +517,7 @@
        openAtoDecisionModal() launched from the Reports dashboard. -->
 
   <!-- ============================================================ -->
+  <!-- ============================================================ -->
   <!-- FRAMEWORK ALIGNMENT TAB -->
   <!-- ============================================================ -->
   <div class="tab-panel" id="tab-frameworks">
@@ -549,7 +529,6 @@
     <div style="padding:24px 32px;" id="frameworks-body"></div>
   </div>
 
-  <!-- ============================================================ -->
   <!-- REPORTS TAB -->
   <!-- ============================================================ -->
   <div class="tab-panel" id="tab-reports">
