@@ -1439,6 +1439,29 @@ function userNeedsProfileSetup(user) {
   return name === 'Pending user';
 }
 
+function getMasterPolicyFamilies() {
+  var families = typeof getActiveFamilies === 'function'
+    ? getActiveFamilies().filter(function(f) { return f !== 'PM'; })
+    : [];
+  var merges = state.policyMerges || {};
+  return families.filter(function(f) { return !merges[f]; });
+}
+
+function countAssignedPolicyDomains() {
+  return getMasterPolicyFamilies().filter(function(fam) {
+    return isValidOwnerEmail((state.domainOwners[fam] || {}).email);
+  }).length;
+}
+
+function countUniquePolicyOwnerEmails() {
+  var seen = {};
+  getMasterPolicyFamilies().forEach(function(fam) {
+    var em = normalizeOwnerEmail((state.domainOwners[fam] || {}).email);
+    if (isValidOwnerEmail(em)) seen[em] = true;
+  });
+  return Object.keys(seen).length;
+}
+
 function getDemoPlaceholderNames() {
   var names = [];
   var seen = {};

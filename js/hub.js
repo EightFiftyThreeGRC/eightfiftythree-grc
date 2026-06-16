@@ -122,9 +122,9 @@ function renderHomeTab() {
     });
   }
   var implPct = ctrlTotal ? Math.round((implemented / ctrlTotal) * 100) : 0;
-  var polDone = Object.keys(state.domainOwners || {}).filter(function(f) {
-    return (state.domainOwners[f] || {}).name;
-  }).length;
+  var ownerCount = countUniquePolicyOwnerEmails();
+  var domainsAssigned = countAssignedPolicyDomains();
+  var domainTotal = getMasterPolicyFamilies().length;
   var actions = getNextActions();
 
   var actionHtml = actions.length
@@ -153,7 +153,7 @@ function renderHomeTab() {
     + '</div>'
     + '<div class="hub-kpi-grid">'
     + '<div class="hub-kpi"><div class="hub-kpi-val">' + implPct + '%</div><div class="hub-kpi-label">Controls implemented</div><div class="hub-kpi-sub">' + implemented + ' / ' + ctrlTotal + '</div></div>'
-    + '<div class="hub-kpi"><div class="hub-kpi-val">' + polDone + '</div><div class="hub-kpi-label">Policy owners assigned</div></div>'
+    + '<div class="hub-kpi"><div class="hub-kpi-val">' + ownerCount + '</div><div class="hub-kpi-label">Policy owners</div><div class="hub-kpi-sub">' + domainsAssigned + ' / ' + domainTotal + ' domains rostered</div></div>'
     + '<div class="hub-kpi"><div class="hub-kpi-val">' + (state.assets || []).length + '</div><div class="hub-kpi-label">Assets in inventory</div></div>'
     + '<div class="hub-kpi"><div class="hub-kpi-val">' + getPoamOpenCount() + '</div><div class="hub-kpi-label">Open POA&M items</div></div>'
     + '</div>'

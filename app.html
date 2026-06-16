@@ -76,11 +76,12 @@
 
   <div class="sidebar-section sidebar-advanced" id="sidebar-policies-section">
     <div class="sidebar-section-label">Policies</div>
-    <div class="sidebar-item" onclick="goToPoliciesHome()" id="nav-policy">
+    <div class="sidebar-item sidebar-item--expandable" onclick="goToPoliciesHome()" id="nav-policy">
+      <button type="button" class="sidebar-expand-btn" id="sidebar-policies-toggle" onclick="event.stopPropagation();toggleSidebarPoliciesList();" aria-expanded="false" aria-controls="sidebar-policies-list" title="Show domain list">▸</button>
       <span class="icon">📋</span> Domain policies
       <span class="sidebar-item-badge" id="badge-policy" style="display:none;"></span>
     </div>
-    <div id="sidebar-policies-list" class="sidebar-sub-list"></div>
+    <div id="sidebar-policies-list" class="sidebar-sub-list sidebar-sub-list--collapsed"></div>
   </div>
 
   <div class="sidebar-section sidebar-advanced" id="sidebar-controls-section">

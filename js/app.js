@@ -540,6 +540,11 @@ function resetApp() {
   // This avoids stale fields when new keys are added over time.
   resetStateToDefaults();
   delete state._cisoAutoOwnerName;
+  delete state._cisoAutoOwnerEmail;
+  state._currentPersonIds = null;
+  state._sidebarPoliciesExpanded = false;
+  state.currentUserId = null;
+  state.entraSession = null;
   // Reset step counters
   Object.keys(currentStep).forEach(function(k){ currentStep[k] = 1; });
   // Return to admin view and update profile button

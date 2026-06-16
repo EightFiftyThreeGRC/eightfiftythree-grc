@@ -377,7 +377,7 @@ function cisoFinish() {
   const unassigned = masters.filter(f => !isValidOwnerEmail((state.domainOwners[f] || {}).email));
 
   if (unassigned.length > 0) {
-    showToast('Assign an owner email for all ' + unassigned.length + ' domain(s) before finalizing. Use the program owner button in Step 7, or prefill demo data and replace placeholder emails.', true);
+    showToast('Assign an owner email for all ' + unassigned.length + ' domain(s) before finalizing. Use the program owner button in Step 7.', true);
     return;
   }
   clearScopedUndoStack('program finalization');
@@ -407,6 +407,20 @@ function cisoFinish() {
   if (typeof applySetupFocusMode === 'function') applySetupFocusMode();
   showTab('home');
   showToast('✅ Program setup complete! Command Center is your new home base.');
+}
+
+function toggleSidebarPoliciesList(forceOpen) {
+  if (typeof state._sidebarPoliciesExpanded !== 'boolean') state._sidebarPoliciesExpanded = false;
+  if (forceOpen === true) state._sidebarPoliciesExpanded = true;
+  else if (forceOpen === false) state._sidebarPoliciesExpanded = false;
+  else state._sidebarPoliciesExpanded = !state._sidebarPoliciesExpanded;
+  var list = document.getElementById('sidebar-policies-list');
+  var btn = document.getElementById('sidebar-policies-toggle');
+  if (list) list.classList.toggle('sidebar-sub-list--collapsed', !state._sidebarPoliciesExpanded);
+  if (btn) {
+    btn.textContent = state._sidebarPoliciesExpanded ? '▾' : '▸';
+    btn.setAttribute('aria-expanded', state._sidebarPoliciesExpanded ? 'true' : 'false');
+  }
 }
 
 function renderSidebarBadges() {
@@ -468,7 +482,7 @@ function renderSidebarBadges() {
     // Pure Tier-1 ISP approver: no Tier-2 domain shortcuts in the sidebar (ISSM/CUST/CISO see domains)
     var policyEntries = isTier1OnlyApprover ? '' : masterFams.map(fam => {
       const o = state.domainOwners[fam] || {};
-      const done = !!o.name;
+      const done = isValidOwnerEmail(o.email);
       const slaves = slavesOf[fam] || [];
       const mergedTitle = getPolicyMergedTitle(fam);
       const famGroup = [fam, ...slaves];
@@ -487,6 +501,14 @@ function renderSidebarBadges() {
     }).join('');
 
     pList.innerHTML = ispEntry + policyEntries;
+    if (typeof state._sidebarPoliciesExpanded !== 'boolean') state._sidebarPoliciesExpanded = false;
+    pList.classList.toggle('sidebar-sub-list--collapsed', !state._sidebarPoliciesExpanded);
+    var polToggle = document.getElementById('sidebar-policies-toggle');
+    if (polToggle) {
+      polToggle.textContent = state._sidebarPoliciesExpanded ? '▾' : '▸';
+      polToggle.setAttribute('aria-expanded', state._sidebarPoliciesExpanded ? 'true' : 'false');
+      polToggle.style.visibility = (ispEntry || policyEntries) ? 'visible' : 'hidden';
+    }
   }
 
   // Populate Controls sidebar — role-aware count (always visible, non-collapsible)
@@ -732,22 +754,22 @@ function renderCISOStep1() {
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
         <div class="form-group" style="margin-bottom:0;">
           <label class="form-label">Security Program Owner — Full Name <span class="required">*</span></label>
-          <input class="form-input" id="programOwnerInput" placeholder="e.g., Jane Smith" value="${escapeHTML(state.programOwner)}" oninput="state.programOwner=this.value;applyCisoIsISSM(); window.markDirty();">
+          <input class="form-input" id="programOwnerInput" placeholder="e.g., Jane Smith" value="${escapeHTML(state.programOwner)}" oninput="state.programOwner=this.value; window.markDirty();">
           <div class="form-hint">Senior official responsible for the security program (CISO, SAISO, or equivalent).</div>
         </div>
         <div class="form-group" style="margin-bottom:0;">
           <label class="form-label">Title / Role <span class="required">*</span></label>
-          <input class="form-input" id="programOwnerTitleInput" placeholder="${escapeHTML(getDefaultProgramOwnerTitle())}" value="${escapeHTML(state.programOwnerTitle)}" oninput="state.programOwnerTitle=this.value;applyCisoIsISSM(); window.markDirty();">
+          <input class="form-input" id="programOwnerTitleInput" placeholder="${escapeHTML(getDefaultProgramOwnerTitle())}" value="${escapeHTML(state.programOwnerTitle)}" oninput="state.programOwnerTitle=this.value; window.markDirty();">
           <div class="form-hint">Official title — flows into policy documents as the accountable role.</div>
         </div>
         <div class="form-group" style="margin-bottom:0;">
           <label class="form-label">Email Address <span class="required">*</span></label>
-          <input class="form-input" id="programOwnerEmailInput" type="email" placeholder="e.g., jsmith@agency.gov" value="${escapeHTML(state.programOwnerEmail)}" oninput="state.programOwnerEmail=this.value;applyCisoIsISSM(); window.markDirty();">
+          <input class="form-input" id="programOwnerEmailInput" type="email" placeholder="e.g., jsmith@agency.gov" value="${escapeHTML(state.programOwnerEmail)}" oninput="state.programOwnerEmail=this.value; window.markDirty();">
           <div class="form-hint">Used for the owner roster and sign-in. Domain owners only need email during setup — they add name and title on first login.</div>
         </div>
       </div>
       <label style="display:inline-flex;align-items:center;gap:10px;margin-top:4px;padding:10px 16px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;cursor:pointer;user-select:none;">
-        <input type="checkbox" ${state.cisoIsISSM ? 'checked' : ''} onchange="state.cisoIsISSM=this.checked;applyCisoIsISSM();renderCISOStep1();" style="width:16px;height:16px;accent-color:#0369a1;cursor:pointer;">
+        <input type="checkbox" ${state.cisoIsISSM ? 'checked' : ''} onchange="state.cisoIsISSM=this.checked;renderCISOStep1(); window.markDirty();" style="width:16px;height:16px;accent-color:#0369a1;cursor:pointer;">
         <div>
           <span style="font-size:13px;color:#0369a1;font-weight:600;">Program Owner also owns domain policies</span>
           <span style="font-size:12px;color:#64748b;"> — common in teams under ~100 people.</span>
@@ -941,35 +963,8 @@ function renderCISOStep3Integrations() {
   `;
 }
 
-// When "Program Owner also owns domain policies" is toggled, auto-populate domain owners
-// with the CISO's email for any unassigned domains.
-function applyCisoIsISSM() {
-  if (!state.cisoIsISSM) return;
-  var cisoEmail = (state.programOwnerEmail || '').trim();
-  var cisoName  = (state.programOwner || '').trim();
-  var cisoTitle = (state.programOwnerTitle || '').trim() || getDefaultProgramOwnerTitle();
-  if (!isValidOwnerEmail(cisoEmail)) return;
-  var prevAutoEmail = normalizeOwnerEmail(state._cisoAutoOwnerEmail || '');
-  var families = getActiveFamilies().filter(function(f){ return f !== 'PM'; });
-  var merges   = state.policyMerges || {};
-  var masters  = families.filter(function(f){ return !merges[f]; });
-  masters.forEach(function(fam) {
-    var o = state.domainOwners[fam] || {};
-    var oEmail = normalizeOwnerEmail(o.email);
-    if (!oEmail || oEmail === prevAutoEmail) {
-      state.domainOwners[fam] = { email: cisoEmail, name: cisoName, role: cisoTitle };
-    }
-    families.filter(function(mf){ return merges[mf] === fam; }).forEach(function(mf) {
-      var mo = state.domainOwners[mf] || {};
-      var moEmail = normalizeOwnerEmail(mo.email);
-      if (!moEmail || moEmail === prevAutoEmail) {
-        state.domainOwners[mf] = { email: cisoEmail, name: cisoName, role: cisoTitle };
-      }
-    });
-  });
-  state._cisoAutoOwnerEmail = cisoEmail;
-  markDirty();
-}
+// Checkbox only — domain owner emails are assigned explicitly in Step 7 (Apply button).
+function applyCisoIsISSM() {}
 
 function selectBaseline(bl) {
   state.baseline = bl;
@@ -2206,9 +2201,6 @@ function renderCISOStep4b() {
   const families = getActiveFamilies().filter(f => f !== 'PM');
   const merges = state.policyMerges || {};
   const masters = families.filter(f => !merges[f]);
-  const controls = getActiveControls();
-  const hasAssessor = (state.users || []).some(function(u){ return u.role === 'assessor'; });
-  const hasAo = (state.users || []).some(function(u){ return u.role === 'ao'; });
 
   const assigned = masters.filter(f => isValidOwnerEmail((state.domainOwners[f] || {}).email)).length;
   const pct = Math.round(assigned / masters.length * 100);
@@ -2220,129 +2212,80 @@ function renderCISOStep4b() {
   var canApplyOwner = isValidOwnerEmail(programOwnerEmail);
 
   body.innerHTML = `
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
-      <div style="font-size:12px;font-weight:700;color:var(--navy);">
-        <span style="opacity:0.55;margin-right:8px;">Step 7 of 7</span> Assign Owners &amp; Deadlines
+    ${cisoStepProgressHtml(7, 'Assign owners')}
+    <div class="section-title">Assign owners</div>
+    <div class="section-subtitle">Add people by email only. They enter name and title on first sign-in.</div>
+
+    <div class="owner-step-hero${pct === 100 ? ' owner-step-hero--complete' : ''}">
+      <div class="owner-step-hero-top">
+        <div>
+          <div class="owner-step-hero-label">Program owner email</div>
+          <div class="owner-step-hero-email">${canApplyOwner ? escapeHTML(programOwnerEmail) : '<span class="owner-step-hero-missing">Add email in Step 1</span>'}</div>
+        </div>
+        <div class="owner-step-hero-stat">
+          <div class="owner-step-hero-stat-num">${assigned}<span>/${masters.length}</span></div>
+          <div class="owner-step-hero-stat-label">domains assigned</div>
+        </div>
       </div>
-    </div>
-
-    <div class="section-title">Assign Owners &amp; Deadlines</div>
-    <div class="section-subtitle">Add people to the roster by <strong>email only</strong>. Each owner enters their name and title the first time they sign in — you do not need to collect that during setup.</div>
-
-    <div class="owner-email-panel">
-      <p>Most teams assign one program owner email across every policy domain. Deadlines were set from your priority choices in Step 6.</p>
-      <div class="owner-assign-quick">
+      <div class="owner-step-hero-bar" aria-hidden="true"><div class="owner-step-hero-bar-fill" style="width:${pct}%;"></div></div>
+      <div class="owner-step-hero-actions">
         ${canApplyOwner
-          ? '<button type="button" class="btn btn-primary owner-quick-btn" onclick="applyProgramOwnerToAllDomains()">Use ' + escapeHTML(programOwnerEmail) + ' for all domains</button>'
-          : '<button type="button" class="btn btn-secondary owner-quick-btn" onclick="goToStep(\'ciso\',1)">Add program owner email in Step 1 first</button>'}
-        ${state.cisoIsISSM && canApplyOwner ? '<span class="owner-quick-hint">You checked “Program Owner also owns domain policies” — one click fills every domain.</span>' : ''}
+          ? '<button type="button" class="btn btn-primary" onclick="applyProgramOwnerToAllDomains()">Assign all domains</button>'
+          : '<button type="button" class="btn btn-secondary" onclick="goToStep(\'ciso\',1)">Go to Step 1 — add email</button>'}
+        ${state.cisoIsISSM && canApplyOwner ? '<p class="owner-step-hero-note">Program owner also owns domain policies — click when ready.</p>' : ''}
       </div>
-      ${!state.currentUserId ? '<button type="button" class="btn btn-secondary btn-sm" style="margin-top:4px;" onclick="prefillDemoOwners()">Prefill demo roster</button>' : ''}
     </div>
     ${returnedFams.length ? `
-    <div style="border:1px solid rgba(220,38,38,0.3);border-radius:10px;background:rgba(254,242,242,0.8);padding:14px 18px;margin-bottom:20px;">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-        <span style="font-size:16px;">↩</span>
-        <span style="font-size:13px;font-weight:700;color:#991b1b;">Returned for Reassignment (${returnedFams.length})</span>
-      </div>
-      <div style="font-size:12px;color:#7f1d1d;margin-bottom:10px;">The following policies were returned by their owners. Reassign a new owner email below.</div>
+    <div class="owner-step-alert">
+      <div class="owner-step-alert-head"><span>↩</span> Returned for reassignment (${returnedFams.length})</div>
       ${returnedFams.map(f => `
-      <div style="display:flex;align-items:center;gap:10px;background:white;border:1px solid rgba(220,38,38,0.2);border-radius:8px;padding:10px 14px;margin-bottom:8px;">
-        <span class="family-badge" style="background:#fee2e2;color:#991b1b;border-color:rgba(220,38,38,0.3);">${f}</span>
-        <div style="flex:1;">
-          <div style="font-size:12px;font-weight:700;color:var(--navy);">${getPolicyMergedTitle(f)}</div>
-          <div style="font-size:11px;color:#b91c1c;">Returned ${(state.policyStatus[f]||{}).returnedAt||''}</div>
+      <div class="owner-step-alert-row">
+        <span class="family-badge owner-step-alert-badge">${f}</span>
+        <div class="owner-step-alert-meta">
+          <div class="owner-step-alert-title">${getPolicyMergedTitle(f)}</div>
+          <div class="owner-step-alert-sub">Returned ${(state.policyStatus[f]||{}).returnedAt||''}</div>
         </div>
-        <input class="form-input" id="reassign-input-${f}" type="email" style="width:220px;font-size:12px;font-weight:600;" placeholder="new.owner@company.com" value="">
-        <button class="btn btn-sm" style="background:#991b1b;color:white;border:none;white-space:nowrap;" onclick="reassignReturnedPolicy('${f}')">Save Reassignment</button>
+        <input class="form-input owner-step-alert-input" id="reassign-input-${f}" type="email" placeholder="new.owner@company.com" value="">
+        <button type="button" class="btn btn-sm owner-step-alert-btn" onclick="reassignReturnedPolicy('${f}')">Reassign</button>
       </div>`).join('')}
     </div>` : ''}
 
-    <!-- Progress bar -->
-    <div style="background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:14px 20px;margin-bottom:20px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-        <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);">Assignment Progress</div>
-        <div style="font-size:12px;font-weight:700;color:${pct===100?'#166534':'var(--navy)'};">${assigned} / ${masters.length} domains assigned</div>
-      </div>
-      <div style="background:#e2e8f0;border-radius:99px;height:6px;overflow:hidden;">
-        <div style="background:var(--teal);height:100%;width:${pct}%;border-radius:99px;transition:width 0.3s;"></div>
-      </div>
+    <div class="owner-step-list-head">
+      <span>Domain roster</span>
+      <span class="owner-step-list-hint">Override email or deadline per domain if needed</span>
+    </div>
+    <div class="owner-step-list">
+      ${masters.map(fam => {
+        const o = state.domainOwners[fam] || {};
+        const merged = families.filter(f => merges[f] === fam);
+        const isReturned = (state.policyStatus[fam]||{}).status === 'Returned';
+        const tier = getPriority(fam);
+        const pm = PRIORITY_META[tier];
+        const deadline = deadlineFromPriority(fam);
+        const isCustomDeadline = !!state.domainDeadlines[fam];
+        const hasOwner = isValidOwnerEmail(o.email);
+        const policyTitle = state.domainCustomNames[fam] || getPolicyMergedTitle(fam);
+        return `
+        <div class="owner-step-row${hasOwner ? ' owner-step-row--assigned' : ''}${isReturned ? ' owner-step-row--returned' : ''}">
+          <div class="owner-step-row-main">
+            <div class="owner-step-row-badges">
+              <span class="family-badge">${fam}</span>
+              <span class="owner-step-priority" style="background:${pm.bg};color:${pm.fg};">${pm.label}</span>
+              ${merged.map(mf => '<span class="family-badge owner-step-merge">+' + mf + '</span>').join('')}
+            </div>
+            <div class="owner-step-row-title">${escapeHTML(policyTitle)}</div>
+          </div>
+          <div class="owner-step-row-fields">
+            <input class="form-input owner-step-email${hasOwner ? ' owner-step-email--set' : ''}" type="email" placeholder="owner@company.com" value="${escapeHTML(o.email||'')}"
+              oninput="setDomainOwner('${fam}','email',this.value);${merged.map(mf=>`setDomainOwner('${mf}','email',this.value);`).join('')}">
+            <input type="date" class="owner-step-date${isCustomDeadline ? ' owner-step-date--custom' : ''}" value="${deadline}" onchange="setDomainDeadline('${fam}',this.value)" title="Draft deadline">
+          </div>
+          <div class="owner-step-row-status">${hasOwner ? '✓' : '—'}</div>
+        </div>`;
+      }).join('')}
     </div>
 
-    <!-- Optional deadline customization -->
-    <details class="owner-detail-table">
-      <summary>Customize draft deadlines (${masters.length} domains)</summary>
-    <div class="table-scroll" style="margin-top:14px;">
-      <table class="control-table" style="table-layout:auto;width:100%;">
-        <colgroup>
-          <col style="width:30%;">
-          <col style="width:34%;">
-          <col style="width:18%;">
-          <col style="width:18%;">
-        </colgroup>
-        <thead>
-          <tr>
-            <th>Policy Domain</th>
-            <th>Policy Name</th>
-            <th>Owner Email</th>
-            <th>Draft Deadline</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${masters.map(fam => {
-            const o = state.domainOwners[fam] || {};
-            const ctrl = controls.filter(c => c.f === fam);
-            const merged = families.filter(f => merges[f] === fam);
-            const isReturned = (state.policyStatus[fam]||{}).status === 'Returned';
-            const tier = getPriority(fam);
-            const pm = PRIORITY_META[tier];
-            const deadline = deadlineFromPriority(fam);
-            const isCustomDeadline = !!state.domainDeadlines[fam];
-            const hasOwner = isValidOwnerEmail(o.email);
-            return `
-            <tr style="${isReturned ? 'background:rgba(254,242,242,0.6);' : hasOwner ? 'background:rgba(13,148,136,0.03);' : ''}">
-              <td>
-                <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:3px;">
-                  <span class="family-badge" style="${isReturned ? 'background:#fee2e2;color:#991b1b;border-color:rgba(220,38,38,0.3);' : ''}">${fam}</span>
-                  <span style="font-size:10px;font-weight:700;background:${pm.bg};color:${pm.fg};border-radius:4px;padding:1px 6px;">${pm.label}</span>
-                  ${isReturned ? '<span style="font-size:10px;font-weight:700;color:#b91c1c;background:rgba(220,38,38,0.1);border:1px solid rgba(220,38,38,0.2);border-radius:4px;padding:1px 6px;">↩ Reassign</span>' : ''}
-                  ${merged.map(mf => `<span class="family-badge" style="font-size:11px;background:#e0f2f1;color:var(--teal);border-color:rgba(13,148,136,0.3);">+${mf}</span>`).join('')}
-                </div>
-                <div style="font-size:11px;color:var(--text-muted);">${ctrl.length + merged.reduce((s,mf)=>s+controls.filter(c=>c.f===mf).length,0)} controls</div>
-              </td>
-              <td>
-                <input class="form-input" style="font-size:12px;font-weight:600;${state.domainCustomNames[fam]?'border-color:#6366f1;background:rgba(99,102,241,0.04);':''}" placeholder="${escapeHTML(getPolicyMergedTitle(fam))}" value="${escapeHTML(state.domainCustomNames[fam]||'')}"
-                  oninput="setDomainCustomName('${fam}',this.value)">
-                <div style="font-size:10px;color:var(--text-muted);margin-top:3px;">${state.domainCustomNames[fam] ? '✏ Custom name' : 'Leave blank for default'}</div>
-              </td>
-              <td>
-                <input class="form-input" type="email" style="font-size:12px;font-weight:600;" placeholder="owner@company.com" value="${escapeHTML(o.email||'')}"
-                  oninput="setDomainOwner('${fam}','email',this.value);${merged.map(mf=>`setDomainOwner('${mf}','email',this.value);`).join('')}">
-                ${o.isDemoPlaceholder ? '<div class="demo-placeholder-badge" style="margin-top:6px;">Demo placeholder — replace before finalize</div>' : ''}
-                ${hasOwner && !o.name ? '<div style="font-size:10px;color:var(--text-muted);margin-top:4px;">Name/title on first sign-in</div>' : ''}
-              </td>
-              <td>
-                <div style="display:flex;flex-direction:column;gap:4px;">
-                  <input type="date" style="border:1px solid ${isCustomDeadline?'#f59e0b':'var(--border)'};border-radius:8px;padding:6px 10px;font-size:12px;font-weight:600;color:${isCustomDeadline?'#92400e':'var(--navy)'};background:${isCustomDeadline?'#fffbeb':'white'};width:100%;"
-                    value="${deadline}" onchange="setDomainDeadline('${fam}',this.value)">
-                  ${isCustomDeadline
-                    ? `<span style="font-size:10px;color:#92400e;">✏ Custom date</span>`
-                    : `<span style="font-size:10px;color:var(--text-muted);">From priority · ${pm.hint}</span>`}
-                </div>
-              </td>
-            </tr>`;
-          }).join('')}
-        </tbody>
-      </table>
-    </div>
-    </details>
-
-    <div class="info-alert" style="margin-top:16px;">
-      <div class="ia-icon">ℹ️</div>
-      <div class="ia-text"><strong>PM controls</strong> are organization-wide and owned by the program owner${programOwnerEmail ? ': <strong>' + escapeHTML(programOwnerEmail) + '</strong>' : ''}${state.programOwner ? ' (<strong>' + escapeHTML(state.programOwner) + '</strong>)' : ''}.</div>
-    </div>
-
-    ${ownerSummaryHTML(masters, families, merges)}
+    <p class="owner-step-footnote">PM controls stay with the program owner. Draft deadlines come from your Step 6 priorities.</p>
   `;
   updateCISOFinishBtn();
 }

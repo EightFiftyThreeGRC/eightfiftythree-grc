@@ -235,6 +235,10 @@ function selectUserProfile(userId) {
 
   const overlay = document.getElementById('rolePickerOverlay');
   if (overlay) overlay.style.display = 'none';
+  if (userId === 'admin') {
+    state._currentPersonIds = null;
+    if (typeof hideProfileSetupModal === 'function') hideProfileSetupModal();
+  }
   applyRoleView(userId);
   if (userId === 'admin') {
     showTab('ciso');
@@ -267,14 +271,18 @@ function applyRoleView(userId) {
     btn.setAttribute('aria-label', 'Switch role or impersonate another user profile');
   }
 
-  // Admin: show all tabs (including users & roles)
+  // Admin: show all tabs and clear any impersonation context
   if (!user) {
+    state._currentPersonIds = null;
+    if (typeof hideProfileSetupModal === 'function') hideProfileSetupModal();
     TAB_IDS.forEach(function(id) {
       const nav = document.getElementById('nav-' + id);
       if (nav) nav.style.display = '';
     });
     const adminSection = document.getElementById('sidebar-users-section');
     if (adminSection) adminSection.style.display = '';
+    if (typeof applySetupFocusMode === 'function') applySetupFocusMode();
+    if (typeof renderSidebarBadges === 'function') renderSidebarBadges();
     return;
   }
 
