@@ -1633,6 +1633,9 @@
       .step-num {
         font-size: 10px;
       }
+      .metrics-grid {
+        grid-template-columns: 1fr;
+      }
     }
 
     /* Tablet portrait (~600–900px) — keep the sidebar visible but narrow it,
@@ -2415,7 +2418,7 @@
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
       word-break: break-all;
     }
-    .owner-step-hero-missing { color: #94a3b8; font-style: italic; font-family: inherit; font-weight: 500; }
+    .owner-step-hero-missing { color: #78879b; font-style: italic; font-family: inherit; font-weight: 500; }
     .owner-step-hero-stat { text-align: right; flex-shrink: 0; }
     .owner-step-hero-stat-num {
       font-size: 28px;
@@ -2424,7 +2427,7 @@
       line-height: 1;
       letter-spacing: -0.03em;
     }
-    .owner-step-hero-stat-num span { font-size: 16px; font-weight: 600; color: #94a3b8; }
+    .owner-step-hero-stat-num span { font-size: 16px; font-weight: 600; color: #78879b; }
     .owner-step-hero-stat-label { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
     .owner-step-hero-bar {
       height: 4px;
@@ -2536,7 +2539,7 @@
       text-align: center;
       font-size: 14px;
       font-weight: 700;
-      color: #cbd5e1;
+      color: #78879b;
     }
     .owner-step-row--assigned .owner-step-row-status { color: var(--teal); }
     .owner-step-footnote {

@@ -1822,7 +1822,7 @@ function pruneAutoRestoreSnapshots() {
   var auto = [];
   var rest = [];
   snaps.forEach(function(s) {
-    if (s && s.name && String(s.name).indexOf('Auto-backup before restore') === 0) auto.push(s);
+    if (s && s.name && (String(s.name).indexOf('Auto-backup before restore') === 0 || String(s.name).indexOf('Pre-import backup') === 0)) auto.push(s);
     else rest.push(s);
   });
   auto.sort(function(a, b) { return String(b.saved).localeCompare(String(a.saved)); });

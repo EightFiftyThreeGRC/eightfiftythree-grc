@@ -2626,7 +2626,7 @@ function applySSPFieldBulkToSelected() {
 }
 
 function submitSSP() {
-  if (blockActionIfDemoPlaceholders()) return;
+  if (typeof blockActionIfDemoPlaceholders === 'function' && blockActionIfDemoPlaceholders()) return;
   clearScopedUndoStack('SSP submit');
   var asset = (state.assets||[]).find(function(a){ return String(a.id) === String(state._selectedAssetId); });
   if (!asset) return;
@@ -2672,8 +2672,8 @@ function submitSSP() {
   markDirty();
   showToast('✅ SSP submitted for ' + asset.name);
   renderAssetSSPStep5_SignOff();
-  updateNotificationBadges();
-  showTab('reports');
+  if (typeof updateNotificationBadges === 'function') updateNotificationBadges();
+  if (typeof showTab === 'function') showTab('reports');
 }
 
 // ─── ASSET MANAGEMENT ────────────────────────────────────────────────────────
@@ -3030,7 +3030,7 @@ function renderProcessSSPStep5_SignOff() {
 }
 
 function submitProcessSSP() {
-  if (blockActionIfDemoPlaceholders()) return;
+  if (typeof blockActionIfDemoPlaceholders === 'function' && blockActionIfDemoPlaceholders()) return;
   clearScopedUndoStack('Process SSP submit');
   var proc = (state.processes||[]).find(function(p){ return String(p.id)===String(state._selectedProcessId); });
   if (!proc) return;
@@ -3076,8 +3076,8 @@ function submitProcessSSP() {
   markDirty();
   showToast('✅ Process SSP submitted for ' + proc.name);
   renderProcessSSPStep5_SignOff();
-  updateNotificationBadges();
-  showTab('reports');
+  if (typeof updateNotificationBadges === 'function') updateNotificationBadges();
+  if (typeof showTab === 'function') showTab('reports');
 }
 
 // Legacy stubs (keep so old snapshots don't break)
