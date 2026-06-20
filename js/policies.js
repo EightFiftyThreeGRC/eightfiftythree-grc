@@ -1615,7 +1615,7 @@ function renderPolicyStep1() {
               <div style="font-size:12px; color:var(--text-muted); margin-bottom:10px;">No owner assigned yet. Suggest one for the CISO to approve:</div>
               <div style="display:flex; flex-direction:column; gap:8px;">
                 <input class="form-input" style="font-size:13px; font-weight:600;" placeholder="Suggested owner name" value="${escapeHTML((state._suggestedOwner||{})[fam]||'')}"
-                  oninput="if(!state._suggestedOwner)state._suggestedOwner={};state._suggestedOwner['${fam}']=this.value;; window.markDirty();">
+                  oninput="if(!state._suggestedOwner)state._suggestedOwner={};state._suggestedOwner['${fam}']=this.value; window.markDirty();">
                 <div style="font-size:11px; color:var(--text-muted);">This suggestion will be visible to the CISO on the dashboard.</div>
               </div>
             ` : `
@@ -2329,7 +2329,7 @@ function _renderDomainReferences(fam, dp) {
     const urlPart = ref.internal ? '' :
       '<div style="margin-top:6px;display:flex;align-items:center;gap:6px;">' +
         '<span style="font-size:11px;color:var(--text-muted);white-space:nowrap;">URL:</span>' +
-        '<input class="form-input" style="font-size:12px;padding:3px 8px;flex:1;" placeholder="https://…" value="'+escapeHTML(ref.url||'')+'" oninput="state.domainPolicies[\''+esc_fam+'\'].references['+ri+'].url=this.value;renderPolicyStep3();; window.markDirty();">' +
+        '<input class="form-input" style="font-size:12px;padding:3px 8px;flex:1;" placeholder="https://…" value="'+escapeHTML(ref.url||'')+'" oninput="state.domainPolicies[\''+esc_fam+'\'].references['+ri+'].url=this.value;renderPolicyStep3(); window.markDirty();">' +
         (ref.url ? '<a href="'+escapeHTML(ref.url)+'" target="_blank" style="font-size:11px;color:var(--primary);text-decoration:none;white-space:nowrap;padding:3px 8px;border:1px solid var(--primary);border-radius:4px;">🔗 Open</a>' : '') +
       '</div>';
     const internalBtn = ref.internal ?
@@ -2337,8 +2337,8 @@ function _renderDomainReferences(fam, dp) {
     return '<div style="background:var(--bg-alt);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px;display:flex;gap:10px;align-items:flex-start;">' +
       '<span style="font-size:18px;padding-top:2px;">📄</span>' +
       '<div style="flex:1;min-width:0;">' +
-        '<input class="form-input" style="font-size:13px;font-weight:600;border:none;border-bottom:1px solid var(--border);border-radius:0;padding:2px 0 5px;background:transparent;width:100%;" value="'+escapeHTML(ref.title||'')+'" oninput="state.domainPolicies[\''+esc_fam+'\'].references['+ri+'].title=this.value;; window.markDirty();" placeholder="Reference title">' +
-        '<textarea class="form-input" rows="1" style="font-size:12px;color:var(--text-muted);border:none;border-radius:0;padding:3px 0;background:transparent;width:100%;margin-top:3px;resize:none;overflow:hidden;line-height:1.5;" oninput="state.domainPolicies[\''+esc_fam+'\'].references['+ri+'].description=this.value;this.style.height=\'auto\';this.style.height=this.scrollHeight+\'px\';; window.markDirty();" onfocus="this.style.height=\'auto\';this.style.height=this.scrollHeight+\'px\';" placeholder="Description">'+escapeHTML(ref.description||'')+'</textarea>' +
+        '<input class="form-input" style="font-size:13px;font-weight:600;border:none;border-bottom:1px solid var(--border);border-radius:0;padding:2px 0 5px;background:transparent;width:100%;" value="'+escapeHTML(ref.title||'')+'" oninput="state.domainPolicies[\''+esc_fam+'\'].references['+ri+'].title=this.value; window.markDirty();" placeholder="Reference title">' +
+        '<textarea class="form-input" rows="1" style="font-size:12px;color:var(--text-muted);border:none;border-radius:0;padding:3px 0;background:transparent;width:100%;margin-top:3px;resize:none;overflow:hidden;line-height:1.5;" oninput="state.domainPolicies[\''+esc_fam+'\'].references['+ri+'].description=this.value;this.style.height=\'auto\';this.style.height=this.scrollHeight+\'px\'; window.markDirty();" onfocus="this.style.height=\'auto\';this.style.height=this.scrollHeight+\'px\';" placeholder="Description">'+escapeHTML(ref.description||'')+'</textarea>' +
         urlPart + internalBtn +
       '</div>' +
       '<button style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:18px;line-height:1;padding:0;opacity:0.5;" onclick="removeDomainRef(\''+esc_fam+'\','+ri+')" title="Remove">×</button>' +
@@ -3163,7 +3163,7 @@ function renderPolicyStep3() {
     } else if (sec.type === 'revision-history') {
       content = _renderDomainRevisionHistory(fam, dp);
     } else if (sec.type === 'custom') {
-      content = '<div style="margin-bottom:8px;"><input class="form-input" style="font-size:14px;font-weight:600;border:none;border-bottom:1px solid var(--border);border-radius:0;padding:4px 0;background:transparent;" value="'+escapeHTML(sec.title)+'" oninput="state.domainPolicies[\''+esc_fam+'\'].sections['+si+'].title=this.value;renderPolicyStep3();; window.markDirty();" placeholder="Section title"></div>' +
+      content = '<div style="margin-bottom:8px;"><input class="form-input" style="font-size:14px;font-weight:600;border:none;border-bottom:1px solid var(--border);border-radius:0;padding:4px 0;background:transparent;" value="'+escapeHTML(sec.title)+'" oninput="state.domainPolicies[\''+esc_fam+'\'].sections['+si+'].title=this.value;renderPolicyStep3(); window.markDirty();" placeholder="Section title"></div>' +
         '<textarea class="form-input" rows="5" style="font-size:13px;line-height:1.7;resize:vertical;" oninput="state.domainPolicies[\''+esc_fam+'\'].sections['+si+'].content=this.value; window.markDirty();" placeholder="Enter section content…">'+(sec.content||'')+'</textarea>';
     }
     return '<div class="isp-section" data-section-idx="'+si+'" '+dragAttr+' style="margin-bottom:28px;padding:4px 4px 4px 4px;border-radius:6px;transition:background 0.15s;">'+hdr+content+'</div>';
@@ -3264,7 +3264,7 @@ function _renderDomainRoles(fam, dp) {
     (role.responsibilities||[]).forEach(function(r, rsi) {
       html += '<div style="display:flex;align-items:flex-start;gap:6px;margin-bottom:4px;">' +
         '<span style="color:var(--text-muted);font-size:16px;line-height:1;margin-top:7px;">·</span>' +
-        '<textarea class="form-input" rows="1" style="font-size:12px;flex:1;resize:none;overflow:hidden;line-height:1.5;" placeholder="Responsibility…" oninput="state.domainPolicies[\''+esc_fam+'\'].roles['+ri+'].responsibilities['+rsi+']=this.value;this.style.height=\'auto\';this.style.height=this.scrollHeight+\'px\';; window.markDirty();" onfocus="this.style.height=\'auto\';this.style.height=this.scrollHeight+\'px\';">'+escapeHTML(r)+'</textarea>' +
+        '<textarea class="form-input" rows="1" style="font-size:12px;flex:1;resize:none;overflow:hidden;line-height:1.5;" placeholder="Responsibility…" oninput="state.domainPolicies[\''+esc_fam+'\'].roles['+ri+'].responsibilities['+rsi+']=this.value;this.style.height=\'auto\';this.style.height=this.scrollHeight+\'px\'; window.markDirty();" onfocus="this.style.height=\'auto\';this.style.height=this.scrollHeight+\'px\';">'+escapeHTML(r)+'</textarea>' +
         '<button style="background:none;border:none;color:var(--red);cursor:pointer;font-size:12px;margin-top:6px;" onclick="removeDomainResp(\''+esc_fam+'\','+ri+','+rsi+')">✕</button>' +
       '</div>';
     });

@@ -1710,7 +1710,7 @@ function renderRolesSection() {
           ${role.responsibilities.map((resp, rsi) => `
           <div style="display:flex;align-items:flex-start;gap:6px;margin-bottom:5px;">
             <span style="color:var(--text-muted);font-size:14px;margin-top:8px;">·</span>
-            <textarea class="form-input" rows="1" style="font-size:13px;flex:1;background:white;resize:none;overflow:hidden;line-height:1.5;" oninput="state.infoSecPolicy.roles[${ri}].responsibilities[${rsi}]=this.value;this.style.height='auto';this.style.height=this.scrollHeight+'px';; window.markDirty();" placeholder="Responsibility…" onfocus="this.style.height='auto';this.style.height=this.scrollHeight+'px';">${escapeHTML(resp)}</textarea>
+            <textarea class="form-input" rows="1" style="font-size:13px;flex:1;background:white;resize:none;overflow:hidden;line-height:1.5;" oninput="state.infoSecPolicy.roles[${ri}].responsibilities[${rsi}]=this.value;this.style.height='auto';this.style.height=this.scrollHeight+'px'; window.markDirty();" placeholder="Responsibility…" onfocus="this.style.height='auto';this.style.height=this.scrollHeight+'px';">${escapeHTML(resp)}</textarea>
             <button style="background:none;border:none;color:var(--red);cursor:pointer;font-size:12px;opacity:0.5;margin-top:6px;" onclick="removeResp(${ri},${rsi})">✕</button>
           </div>`).join('')}
         </div>
@@ -1777,7 +1777,7 @@ function renderDocumentsSection() {
       <span style="font-size:18px;margin-top:2px;">📄</span>
       <div style="flex:1;display:flex;flex-direction:column;gap:6px;">
         <input class="form-input" style="font-weight:600;font-size:13px;border:none;border-bottom:1px solid var(--border);border-radius:0;padding:2px 0;background:transparent;" value="${escapeHTML(d.title)}" oninput="state.infoSecPolicy.documents[${i}].title=this.value; window.markDirty();" placeholder="Document title">
-        <textarea class="form-input" rows="1" style="font-size:12px;color:var(--text-muted);border:none;border-bottom:1px solid #e9ecef;border-radius:0;padding:2px 0;background:transparent;resize:none;overflow:hidden;line-height:1.5;width:100%;" oninput="state.infoSecPolicy.documents[${i}].desc=this.value;this.style.height='auto';this.style.height=this.scrollHeight+'px';; window.markDirty();" onfocus="this.style.height='auto';this.style.height=this.scrollHeight+'px';" placeholder="Short description…">${escapeHTML(d.desc)}</textarea>
+        <textarea class="form-input" rows="1" style="font-size:12px;color:var(--text-muted);border:none;border-bottom:1px solid #e9ecef;border-radius:0;padding:2px 0;background:transparent;resize:none;overflow:hidden;line-height:1.5;width:100%;" oninput="state.infoSecPolicy.documents[${i}].desc=this.value;this.style.height='auto';this.style.height=this.scrollHeight+'px'; window.markDirty();" onfocus="this.style.height='auto';this.style.height=this.scrollHeight+'px';" placeholder="Short description…">${escapeHTML(d.desc)}</textarea>
         <div style="display:flex;align-items:center;gap:8px;margin-top:2px;padding:6px 8px;background:#fff;border:1px solid #e0eaff;border-radius:6px;">
           <span style="font-size:13px;flex-shrink:0;">🔗</span>
           <span style="font-size:11px;font-weight:600;color:#6b7280;white-space:nowrap;flex-shrink:0;">Link</span>
