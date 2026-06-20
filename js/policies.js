@@ -589,7 +589,7 @@ function renderISSMWorkspace(user) {
     + '<th style="padding:10px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);text-align:left;">Owner</th>'
     + '<th style="padding:10px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);text-align:left;">Status</th>'
     + '</tr></thead>'
-    + '<tbody id="tbod-${Math.random().toString(36).slice(2,8)}">' + libRows + '</tbody></table></div>';
+    + '<tbody id="tbod-' + Math.random().toString(36).slice(2,8) + '">' + libRows + '</tbody></table></div>';
 
   html += '</div>';
   body.innerHTML = html;
@@ -916,7 +916,7 @@ function renderPolicyList() {
     + '<th style="padding:10px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);text-align:left;">Owner</th>'
     + '<th style="padding:10px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);text-align:left;">Status</th>'
     + '</tr></thead>'
-    + '<tbody id="tbod-${Math.random().toString(36).slice(2,8)}">' + libRows + '</tbody>'
+    + '<tbody id="tbod-' + Math.random().toString(36).slice(2,8) + '">' + libRows + '</tbody>'
     + '</table>'
     + '</div>'
     + '</div>';
@@ -2581,7 +2581,7 @@ function goToCISOPolicyEditor() {
       ispHTML += '<div style="margin-bottom:20px;">'
         + '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:8px;">🕑 Revision History</div>'
         + '<table style="width:100%;border-collapse:collapse;font-size:13px;">'
-        + '<thead><tr style="border-bottom:2px solid var(--border);"><th style="text-align:left;padding:5px 8px;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Version</th><th style="text-align:left;padding:5px 8px;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Date</th><th style="text-align:left;padding:5px 8px;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Author</th><th style="text-align:left;padding:5px 8px;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Changes</th></tr></thead><tbody id="tbod-${Math.random().toString(36).slice(2,8)}">';
+        + '<thead><tr style="border-bottom:2px solid var(--border);"><th style="text-align:left;padding:5px 8px;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Version</th><th style="text-align:left;padding:5px 8px;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Date</th><th style="text-align:left;padding:5px 8px;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Author</th><th style="text-align:left;padding:5px 8px;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Changes</th></tr></thead><tbody id="tbod-' + Math.random().toString(36).slice(2,8) + '">';
       (isp.revisionHistory||[]).slice().reverse().forEach(function(r) {
         ispHTML += '<tr style="border-bottom:1px solid var(--border);">'
           + '<td style="padding:6px 8px;font-family:monospace;font-weight:700;color:var(--teal);">v' + _esc(r.version||'') + '</td>'
@@ -2631,7 +2631,7 @@ function goToCISOPolicyEditor() {
       + '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:8px;">✅ Review & Approval Log</div>';
     if (logRows.length) {
       ispHTML += '<table style="width:100%;border-collapse:collapse;font-size:13px;">'
-        + '<thead><tr style="border-bottom:2px solid var(--border);"><th style="text-align:left;padding:5px 8px;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Event</th><th style="text-align:left;padding:5px 8px;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Date</th><th style="text-align:left;padding:5px 8px;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);">By</th><th style="text-align:left;padding:5px 8px;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Notes</th></tr></thead><tbody id="tbod-${Math.random().toString(36).slice(2,8)}">';
+        + '<thead><tr style="border-bottom:2px solid var(--border);"><th style="text-align:left;padding:5px 8px;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Event</th><th style="text-align:left;padding:5px 8px;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Date</th><th style="text-align:left;padding:5px 8px;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);">By</th><th style="text-align:left;padding:5px 8px;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Notes</th></tr></thead><tbody id="tbod-' + Math.random().toString(36).slice(2,8) + '">';
       logRows.forEach(function(r) {
         ispHTML += '<tr style="border-bottom:1px solid var(--border);">'
           + '<td style="padding:6px 8px;font-weight:600;color:var(--navy);">' + _esc(r.event) + '</td>'
@@ -2698,7 +2698,7 @@ function goToCISOPolicyEditor() {
       ispHTML += '<table style="width:100%;border-collapse:collapse;font-size:13px;">'
         + '<thead><tr style="border-bottom:2px solid var(--border);"><th style="text-align:left;padding:5px 8px;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Date</th><th style="text-align:left;padding:5px 8px;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Suggested By</th><th style="text-align:left;padding:5px 8px;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Summary</th><th style="text-align:left;padding:5px 8px;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Status</th>'
         + (!state.currentUserId ? '<th style="text-align:left;padding:5px 8px;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Actions</th>' : '')
-        + '</tr></thead><tbody id="tbod-${Math.random().toString(36).slice(2,8)}">';
+        + '</tr></thead><tbody id="tbod-' + Math.random().toString(36).slice(2,8) + '">';
       state.infoSecPolicySuggestions.slice().reverse().forEach(function(s) {
         var sid = String(s.id || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
         var act = '';

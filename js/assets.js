@@ -854,7 +854,7 @@ function renderAssetHome() {
       return h;
     }
     h += '<div class="table-scroll"><table class="control-table" style="table-layout:fixed;">'
-      + '<thead><tr><th style="width:28%;">' + (isProc?'Process':'Asset') + '</th><th style="width:14%;">'+(isProc?'Category':'Type')+'</th><th style="width:14%;">Owner</th><th style="width:10%;">Controls</th><th style="width:18%;">Progress</th><th style="width:10%;">Status</th><th style="width:6%;"></th></tr></thead><tbody id="tbod-${Math.random().toString(36).slice(2,8)}">';
+      + '<thead><tr><th style="width:28%;">' + (isProc?'Process':'Asset') + '</th><th style="width:14%;">'+(isProc?'Category':'Type')+'</th><th style="width:14%;">Owner</th><th style="width:10%;">Controls</th><th style="width:18%;">Progress</th><th style="width:10%;">Status</th><th style="width:6%;"></th></tr></thead><tbody id="tbod-' + Math.random().toString(36).slice(2,8) + '">';
     items.forEach(function(item){ h += sspRow(item, isProc); });
     h += '</tbody></table></div>';
     return h;
