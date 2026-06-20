@@ -1122,7 +1122,12 @@ function closeWizardVideo() {
 document.addEventListener('keydown', function(ev) {
   if (ev.key !== 'Escape') return;
   var ov = document.getElementById('wizardVideoOverlay');
-  if (ov && ov.classList.contains('is-visible')) closeWizardVideo();
+  if (ov && ov.classList.contains('is-visible')) { closeWizardVideo(); return; }
+  var modalIds = ['poamModalOverlay', 'atoDecisionOverlay', 'returnCtrlOverlay', 'deselectCtrlOverlay', 'snapshotOverlay'];
+  for (var i = 0; i < modalIds.length; i++) {
+    var m = document.getElementById(modalIds[i]);
+    if (m) { m.remove(); return; }
+  }
 });
 
 function maybeShowWelcomeIntro() {
