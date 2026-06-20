@@ -84,7 +84,7 @@ function getNextActions() {
 
   (state.poamItems || []).forEach(function(p) {
     if (p.dueDate && p.dueDate < today && p.status !== 'Closed' && p.status !== 'Mitigated') {
-      actions.push({ priority: 0, icon: '⚠️', label: 'Overdue POA&M', desc: p.finding.slice(0, 60), action: "showTab('poam');" });
+      actions.push({ priority: 0, icon: '⚠️', label: 'Overdue POA&M', desc: (p.finding || '').slice(0, 60), action: "showTab('poam');" });
     }
   });
 
@@ -129,9 +129,9 @@ function renderHomeTab() {
     });
   }
   var implPct = ctrlTotal ? Math.round((implemented / ctrlTotal) * 100) : 0;
-  var ownerCount = countUniquePolicyOwnerEmails();
-  var domainsAssigned = countAssignedPolicyDomains();
-  var domainTotal = getMasterPolicyFamilies().length;
+  var ownerCount = typeof countUniquePolicyOwnerEmails === 'function' ? countUniquePolicyOwnerEmails() : 0;
+  var domainsAssigned = typeof countAssignedPolicyDomains === 'function' ? countAssignedPolicyDomains() : 0;
+  var domainTotal = typeof getMasterPolicyFamilies === 'function' ? getMasterPolicyFamilies().length : 0;
   var actions = getNextActions();
 
   var actionHtml = actions.length

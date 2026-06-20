@@ -323,6 +323,7 @@ function renderSharePointSetupCardHtml() {
 }
 
 function addSharePointEvidence(ctrlId) {
+  if (!state.controlStatus) state.controlStatus = {};
   if (!state.controlStatus[ctrlId]) state.controlStatus[ctrlId] = { status: 'Not Started', evidence: [] };
   if (!state.controlStatus[ctrlId].evidence) state.controlStatus[ctrlId].evidence = [];
   state.controlStatus[ctrlId].evidence.push({
