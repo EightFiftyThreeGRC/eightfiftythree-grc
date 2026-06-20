@@ -2689,6 +2689,7 @@ function removeAsset(assetId) {
   if (state.assetCategorization) delete state.assetCategorization[assetId];
   if (state.assetMappings)   Object.keys(state.assetMappings).forEach(function(cid){ state.assetMappings[cid] = (state.assetMappings[cid]||[]).filter(function(id){ return String(id)!==String(assetId); }); });
   if (state.controlReviewQueue) state.controlReviewQueue = state.controlReviewQueue.filter(function(r){ return r && String(r.assetId || r.scopeId || '') !== String(assetId); });
+  if (state.authBoundaries) state.authBoundaries.forEach(function(b){ if (b.assetIds) b.assetIds = b.assetIds.filter(function(id){ return String(id)!==String(assetId); }); });
   markDirty();
   renderAssetHome();
   renderSidebarAssets();
@@ -2702,6 +2703,7 @@ function removeProcess(procId) {
   if (state.sspAttestations) delete state.sspAttestations[procId];
   if (state.sspSignoffs)     delete state.sspSignoffs[procId];
   if (state.sspInterconnections) delete state.sspInterconnections[procId];
+  if (state.authBoundaries) state.authBoundaries.forEach(function(b){ if (b.processIds) b.processIds = b.processIds.filter(function(id){ return String(id)!==String(procId); }); });
   markDirty();
   renderAssetHome();
 }

@@ -349,3 +349,138 @@ function applySharePointPathToEvidence(ctrlId, idx, path) {
   markDirty();
   renderControlStep2();
 }
+
+// ─── Google Drive evidence helpers ────────────────────────────────────────────
+
+function getGoogleDriveConfig() {
+  var cfg = state.googleDriveConfig || {};
+  return {
+    enabled: !!cfg.enabled,
+    folderUrl: String(cfg.folderUrl || '').trim()
+  };
+}
+
+function isGoogleDriveUrl(url) {
+  return /drive\.google\.com/i.test(String(url || '')) || /docs\.google\.com/i.test(String(url || ''));
+}
+
+function openGoogleDriveFolder() {
+  var cfg = getGoogleDriveConfig();
+  if (!cfg.folderUrl) {
+    showToast('Set your Google Drive evidence folder URL in Program setup first.', true);
+    return;
+  }
+  window.open(cfg.folderUrl, '_blank', 'noopener,noreferrer');
+}
+
+function setGoogleDriveConfigField(field, value) {
+  if (!state.googleDriveConfig) state.googleDriveConfig = { enabled: false, folderUrl: '' };
+  var prev = state.googleDriveConfig[field];
+  state.googleDriveConfig[field] = value;
+  if (field === 'enabled') state.googleDriveConfig.enabled = !!value;
+  logFieldChange('googleDriveConfig.' + field, prev, value);
+  markDirty();
+}
+
+function renderGoogleDriveSetupCardHtml() {
+  var cfg = getGoogleDriveConfig();
+  return '<div class="sp-setup-card">'
+    + '<div class="sp-setup-head">'
+    + '<div><div class="sp-setup-title">Evidence in Google Drive</div>'
+    + '<div class="sp-setup-sub">Link control evidence to files in Google Drive — we store links, not copies.</div></div>'
+    + '<label class="fw-toggle" onclick="event.stopPropagation();"><input type="checkbox"' + (cfg.enabled ? ' checked' : '') + ' onchange="setGoogleDriveConfigField(\'enabled\',this.checked);if(typeof refreshCurrentCisoStep===\'function\')refreshCurrentCisoStep();"><span class="fw-toggle-track"></span></label>'
+    + '</div>'
+    + (cfg.enabled
+      ? '<div class="sp-setup-fields">'
+        + '<div class="form-group" style="margin-bottom:0;"><label class="form-label">Evidence folder URL</label>'
+        + '<input class="form-input" placeholder="https://drive.google.com/drive/folders/..." value="' + escapeHTML(state.googleDriveConfig.folderUrl || '') + '" oninput="setGoogleDriveConfigField(\'folderUrl\',this.value);">'
+        + '<div class="form-hint">Right-click your evidence folder in Google Drive → Get link → paste here.</div></div>'
+        + '<div class="sp-setup-actions">'
+        + '<button type="button" class="btn btn-secondary btn-sm" onclick="openGoogleDriveFolder()">Open folder</button>'
+        + '</div></div>'
+      : '<div class="sp-setup-off">Enable to link control evidence directly to Google Drive documents.</div>')
+    + '</div>';
+}
+
+function addGoogleDriveEvidence(ctrlId) {
+  if (!state.controlStatus) state.controlStatus = {};
+  if (!state.controlStatus[ctrlId]) state.controlStatus[ctrlId] = { status: 'Not Started', evidence: [] };
+  if (!state.controlStatus[ctrlId].evidence) state.controlStatus[ctrlId].evidence = [];
+  state.controlStatus[ctrlId].evidence.push({
+    kind: 'gdrive',
+    type: 'Document',
+    title: '',
+    description: '',
+    url: ''
+  });
+  markDirty();
+  renderControlStep2();
+}
+
+// ─── OneDrive evidence helpers ────────────────────────────────────────────────
+
+function getOneDriveConfig() {
+  var cfg = state.oneDriveConfig || {};
+  return {
+    enabled: !!cfg.enabled,
+    folderUrl: String(cfg.folderUrl || '').trim()
+  };
+}
+
+function isOneDriveUrl(url) {
+  var s = String(url || '');
+  return /onedrive\.live\.com/i.test(s) || /1drv\.ms/i.test(s) || /-my\.sharepoint\.com/i.test(s);
+}
+
+function openOneDriveFolder() {
+  var cfg = getOneDriveConfig();
+  if (!cfg.folderUrl) {
+    showToast('Set your OneDrive evidence folder URL in Program setup first.', true);
+    return;
+  }
+  window.open(cfg.folderUrl, '_blank', 'noopener,noreferrer');
+}
+
+function setOneDriveConfigField(field, value) {
+  if (!state.oneDriveConfig) state.oneDriveConfig = { enabled: false, folderUrl: '' };
+  var prev = state.oneDriveConfig[field];
+  state.oneDriveConfig[field] = value;
+  if (field === 'enabled') state.oneDriveConfig.enabled = !!value;
+  logFieldChange('oneDriveConfig.' + field, prev, value);
+  markDirty();
+}
+
+function renderOneDriveSetupCardHtml() {
+  var cfg = getOneDriveConfig();
+  return '<div class="sp-setup-card">'
+    + '<div class="sp-setup-head">'
+    + '<div><div class="sp-setup-title">Evidence in OneDrive</div>'
+    + '<div class="sp-setup-sub">Link control evidence to files in OneDrive — we store links, not copies.</div></div>'
+    + '<label class="fw-toggle" onclick="event.stopPropagation();"><input type="checkbox"' + (cfg.enabled ? ' checked' : '') + ' onchange="setOneDriveConfigField(\'enabled\',this.checked);if(typeof refreshCurrentCisoStep===\'function\')refreshCurrentCisoStep();"><span class="fw-toggle-track"></span></label>'
+    + '</div>'
+    + (cfg.enabled
+      ? '<div class="sp-setup-fields">'
+        + '<div class="form-group" style="margin-bottom:0;"><label class="form-label">Evidence folder URL</label>'
+        + '<input class="form-input" placeholder="https://onedrive.live.com/..." value="' + escapeHTML(state.oneDriveConfig.folderUrl || '') + '" oninput="setOneDriveConfigField(\'folderUrl\',this.value);">'
+        + '<div class="form-hint">Open your evidence folder in OneDrive → Share → Copy link → paste here.</div></div>'
+        + '<div class="sp-setup-actions">'
+        + '<button type="button" class="btn btn-secondary btn-sm" onclick="openOneDriveFolder()">Open folder</button>'
+        + '</div></div>'
+      : '<div class="sp-setup-off">Enable to link control evidence directly to OneDrive documents.</div>')
+    + '</div>';
+}
+
+function addOneDriveEvidence(ctrlId) {
+  if (!state.controlStatus) state.controlStatus = {};
+  if (!state.controlStatus[ctrlId]) state.controlStatus[ctrlId] = { status: 'Not Started', evidence: [] };
+  if (!state.controlStatus[ctrlId].evidence) state.controlStatus[ctrlId].evidence = [];
+  state.controlStatus[ctrlId].evidence.push({
+    kind: 'onedrive',
+    type: 'Document',
+    title: '',
+    description: '',
+    url: ''
+  });
+  markDirty();
+  renderControlStep2();
+}

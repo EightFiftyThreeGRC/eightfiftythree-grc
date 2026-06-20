@@ -1199,6 +1199,8 @@ const state = {
   _reportsPhase1BannerHidden: false, // true = collapse Phase 1 completion banner in Reports
   activeFrameworks: { iso27001: true, soc2: true, hipaa: true }, // which cross-framework lenses to track
   sharePointConfig: { enabled: false, siteUrl: '', libraryName: 'Evidence', defaultFolder: 'GRC/Evidence' },
+  googleDriveConfig: { enabled: false, folderUrl: '' },
+  oneDriveConfig: { enabled: false, folderUrl: '' },
   entraConfig: { enabled: false, clientId: '', tenantId: 'organizations', redirectUri: '' },
   entraSession: null, // { email, name, oid, matchedUserId, signedInAt } when signed in via Entra
   _frameworkFilter: '',
@@ -1399,6 +1401,7 @@ function addAuditEntry(category, refId, message) {
     msg: (message || '').toString()
   });
   if (state.auditTrail.length > 800) state.auditTrail = state.auditTrail.slice(-800);
+  markDirty();
 }
 
 // ── Field-level change log (NotebookLM Task 2) ─────────────────────────────
@@ -1574,6 +1577,7 @@ function validateProgramShape(parsed) {
     if (!(k in parsed)) return;
     var exp = valType(STATE_DEFAULTS[k]);
     var got = valType(parsed[k]);
+    if (exp === 'null' || got === 'null') return;
     if (exp !== got) {
       errors.push('Field "' + k + '" must be ' + exp + ', got ' + got);
     }

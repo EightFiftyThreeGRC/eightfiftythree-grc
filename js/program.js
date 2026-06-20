@@ -998,11 +998,15 @@ function renderCISOStep3Integrations() {
   body.innerHTML = `
     ${cisoStepProgressHtml(3, 'Integrations')}
     <div class="section-title">Connect your tools</div>
-    <div class="section-subtitle">All optional — enable multi-framework tracking, SharePoint evidence links, or Microsoft Entra ID sign-in now, or configure later under Users &amp; Program.</div>
+    <div class="section-subtitle">All optional — enable multi-framework tracking, evidence storage links, or Microsoft Entra ID sign-in now, or configure later under Users &amp; Program.</div>
 
     ${typeof renderFrameworkSetupSectionHtml === 'function' ? renderFrameworkSetupSectionHtml() : ''}
 
     ${typeof renderSharePointSetupCardHtml === 'function' ? renderSharePointSetupCardHtml() : ''}
+
+    ${typeof renderGoogleDriveSetupCardHtml === 'function' ? renderGoogleDriveSetupCardHtml() : ''}
+
+    ${typeof renderOneDriveSetupCardHtml === 'function' ? renderOneDriveSetupCardHtml() : ''}
 
     ${typeof renderEntraSetupCardHtml === 'function' ? renderEntraSetupCardHtml() : ''}
   `;

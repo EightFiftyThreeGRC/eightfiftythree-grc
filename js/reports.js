@@ -580,7 +580,7 @@ function renderProgramDashboard(controls, families) {
 
 function openReturnedPolicyReassignment(fam) {
   var user = state.currentUserId ? (state.users || []).find(function(u){ return u.id === state.currentUserId; }) : null;
-  var canReassign = !user || user.role === 'ciso' || user.role === 'admin';
+  var canReassign = !user || user.role === 'ciso';
   if (!canReassign) {
     showToast('Switch to CISO/Admin mode to reassign returned policies.', true);
     if (typeof showRolePicker === 'function') showRolePicker();
@@ -614,11 +614,11 @@ function getScopedFamilies() {
 // True when this login should see the org-level Reports executive block (domain policy approval queue, etc.).
 function userSeesProgramExecutiveDashboard(user) {
   if (!user) return false;
-  if (user.role === 'ciso' || user.role === 'admin') return true;
+  if (user.role === 'ciso') return true;
   var ids = state._currentPersonIds || [user.id];
   for (var i = 0; i < ids.length; i++) {
     var rec = (state.users || []).find(function(u) { return u.id === ids[i]; });
-    if (rec && (rec.role === 'ciso' || rec.role === 'admin')) return true;
+    if (rec && rec.role === 'ciso') return true;
   }
   return false;
 }
@@ -779,7 +779,7 @@ function shouldShowISPApprovalCallout(user) {
   if (p.status !== 'Under Review') return false;
   if (!state.currentUserId) return true;
   if (!user) return false;
-  if (user.role === 'ciso' || user.role === 'admin') return true;
+  if (user.role === 'ciso') return true;
   var sub = String(p.submittedTo || '').trim().toLowerCase();
   if (sub && String(user.name || '').trim().toLowerCase() === sub) return true;
   return false;
@@ -1191,7 +1191,7 @@ function renderReports() {
   var user = state.currentUserId ? (state.users||[]).find(function(u){ return u.id === state.currentUserId; }) : null;
   var printBtn = document.getElementById('reportsPrintBtn');
   if (printBtn) printBtn.style.display = (user && user.role === 'approver') ? 'none' : '';
-  var isScoped = !!user && user.role !== 'admin';
+  var isScoped = !!user;
   var showMyView = isScoped; // always scoped for non-admin, always full for admin
 
   const controls = showMyView ? getScopedControls() : getActiveControls();
