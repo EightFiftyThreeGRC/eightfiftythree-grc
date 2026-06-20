@@ -1197,7 +1197,7 @@ const state = {
   _reportsProgramReadinessHidden: false, // true = collapse Program Readiness panel in Reports
   _reportsMySummaryHidden: false, // true = collapse "My dashboard" summary card in Reports
   _reportsPhase1BannerHidden: false, // true = collapse Phase 1 completion banner in Reports
-  activeFrameworks: { iso27001: true, soc2: true, hipaa: true }, // which cross-framework lenses to track
+  activeFrameworks: { iso27001: true, soc2: true, cisv8: true }, // which cross-framework lenses to track
   sharePointConfig: { enabled: false, siteUrl: '', libraryName: 'Evidence', defaultFolder: 'GRC/Evidence' },
   googleDriveConfig: { enabled: false, folderUrl: '' },
   oneDriveConfig: { enabled: false, folderUrl: '' },
@@ -1377,6 +1377,14 @@ function seedXmplAtoDemoDataIfMissing() {
   };
 }
 
+function migrateHipaaToCisV8() {
+  var af = state.activeFrameworks;
+  if (af && typeof af === 'object' && ('hipaa' in af) && !('cisv8' in af)) {
+    af.cisv8 = af.hipaa;
+    delete af.hipaa;
+  }
+}
+
 function applyLoadedState(saved) {
   if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return false;
   STATE_ALLOWED_KEYS.forEach(function(k) {
@@ -1388,6 +1396,7 @@ function applyLoadedState(saved) {
   migrateLegacySingleLetterOwnerNames();
   migrateAtoStateShape();
   seedXmplAtoDemoDataIfMissing();
+  migrateHipaaToCisV8();
   return true;
 }
 
