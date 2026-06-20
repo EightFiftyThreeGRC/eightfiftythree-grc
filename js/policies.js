@@ -1705,6 +1705,7 @@ function setPolicyCustodian(fam, field, value) {
   var prev = state.policyCustodians[fam][field];
   state.policyCustodians[fam][field] = value;
   logFieldChange('policyCustodians.' + fam + '.' + field, prev, value);
+  markDirty();
 }
 
 function getCustodian(fam) {
@@ -3196,7 +3197,7 @@ function renderPolicyStep3() {
       '</div>' +
       '<div>' +
         '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:6px;">Review Cycle</div>' +
-        '<select class="form-select" style="font-size:12px;" onchange="state.domainPolicies[\''+fam+'\'].reviewCycle=this.value">' +
+        '<select class="form-select" style="font-size:12px;" onchange="state.domainPolicies[\''+fam+'\'].reviewCycle=this.value; markDirty();">' +
           '<option'+(dp.reviewCycle==='Annual'?' selected':'')+'>Annual</option>' +
           '<option'+(dp.reviewCycle==='Semi-Annual'?' selected':'')+'>Semi-Annual</option>' +
           '<option'+(dp.reviewCycle==='Quarterly'?' selected':'')+'>Quarterly</option>' +
@@ -3383,22 +3384,24 @@ function addDomainReqCtrl(fam, qi) {
   const req = state.domainPolicies[fam].requirements[qi];
   if (!req.controls) req.controls = [];
   if (!req.controls.includes(cid)) req.controls.push(cid);
+  markDirty();
   renderPolicyStep3();
 }
 function removeDomainReqCtrl(fam, qi, cid) {
   const req = state.domainPolicies[fam].requirements[qi];
   req.controls = (req.controls||[]).filter(function(c){ return c!==cid; });
+  markDirty();
   renderPolicyStep3();
 }
 function moveDomainReq(fam, i, dir) {
   const reqs = state.domainPolicies[fam].requirements;
   const j = i+dir;
-  if (j>=0 && j<reqs.length) { const tmp=reqs[i]; reqs[i]=reqs[j]; reqs[j]=tmp; renumberDomainReqs(fam); renderPolicyStep3(); }
+  if (j>=0 && j<reqs.length) { const tmp=reqs[i]; reqs[i]=reqs[j]; reqs[j]=tmp; renumberDomainReqs(fam); markDirty(); renderPolicyStep3(); }
 }
 function moveDomainSection(fam, i, dir) {
   const secs = state.domainPolicies[fam].sections;
   const j = i+dir;
-  if (j>=0 && j<secs.length) { const tmp=secs[i]; secs[i]=secs[j]; secs[j]=tmp; renderPolicyStep3(); }
+  if (j>=0 && j<secs.length) { const tmp=secs[i]; secs[i]=secs[j]; secs[j]=tmp; markDirty(); renderPolicyStep3(); }
 }
 function removeDomainSection(fam, i) {
   var sec = state.domainPolicies[fam].sections[i];

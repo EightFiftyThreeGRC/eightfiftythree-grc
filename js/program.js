@@ -814,7 +814,7 @@ function renderCISOStep1() {
         </div>
       </div>
       <label style="display:inline-flex;align-items:center;gap:10px;margin-top:4px;padding:10px 16px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;cursor:pointer;user-select:none;">
-        <input type="checkbox" ${state.cisoIsISSM ? 'checked' : ''} onchange="state.cisoIsISSM=this.checked;renderCISOStep1(); window.markDirty();" style="width:16px;height:16px;accent-color:#0369a1;cursor:pointer;">
+        <input type="checkbox" ${state.cisoIsISSM ? 'checked' : ''} onchange="state.cisoIsISSM=this.checked; window.markDirty(); setTimeout(function(){renderCISOStep1();},0);" style="width:16px;height:16px;accent-color:#0369a1;cursor:pointer;">
         <div>
           <span style="font-size:13px;color:#0369a1;font-weight:600;">Program Owner also owns domain policies</span>
           <span style="font-size:12px;color:#64748b;"> — common in teams under ~100 people.</span>
@@ -1254,7 +1254,7 @@ function renderCISOStep2() {
       <td style="vertical-align:top; padding-top:12px;">
         <label class="cb-label">
           <input type="checkbox" ${state.pmControls[c.id]?'checked':''}
-            onchange="state.pmControls['${c.id}']=this.checked"
+            onchange="state.pmControls['${c.id}']=this.checked; markDirty();"
             style="accent-color:var(--teal);">
           <span class="control-id">${c.id}</span>
           ${isRequired ? '<span style="font-size:10px;background:var(--teal);color:white;padding:1px 5px;border-radius:8px;margin-left:4px;font-weight:700;">CORE</span>' : ''}
@@ -2617,6 +2617,7 @@ function prefillDemoOwners() {
     // Auto-populate control owners from domain owner
     autoPopulateControlOwnersFromDomain(fam);
   });
+  markDirty();
   showToast('🧪 Demo data prefilled — replace names with real owners before finalizing.');
   renderActiveCisoSetupStep();
 }

@@ -1848,6 +1848,7 @@ function addCtrlEvidence(ctrlId) {
 }
 
 function removeCtrlEvidence(ctrlId, idx) {
+  if (!state.controlStatus[ctrlId] || !state.controlStatus[ctrlId].evidence) return;
   state.controlStatus[ctrlId].evidence.splice(idx, 1);
   markDirty();
   renderControlStep2();
@@ -3206,6 +3207,9 @@ function renderControlStep4() {
       <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#166534;">
         ✅ Last submitted: ${state.controlDesignSubmission.submittedAt} by ${escapeHTML(state.controlDesignSubmission.submitterName||'—')} — ${state.controlDesignSubmission.designedCount} of ${state.controlDesignSubmission.totalCount} controls designed.
       </div>` : ''}
+      <button class="btn btn-primary" onclick="submitControlDesign()" style="width:100%;padding:12px;font-size:14px;font-weight:700;" ${selectedForSubmit.length === 0 ? 'disabled title="Select at least one eligible control above"' : ''}>
+        📤 Submit ${selectedForSubmit.length} Control${selectedForSubmit.length === 1 ? '' : 's'} for Review
+      </button>
     </div>`;
 }
 

@@ -1784,7 +1784,7 @@ function renderAssetSSPStep1() {
     + '<input class="form-input" value="' + _esc(asset.name||'') + '" placeholder="e.g. HR Management System"'
     + ' oninput="state.assets[' + idx + '].name=this.value;renderAssetWizardChrome(); window.markDirty();"></div>'
     + '<div class="form-group"><label class="form-label">Asset Type <span style="color:var(--red);">*</span></label>'
-    + '<select class="form-select" onchange="state.assets[' + idx + '].type=this.value;">'
+    + '<select class="form-select" onchange="state.assets[' + idx + '].type=this.value; window.markDirty();">'
     + buildAssetTypeOptions(asset.type)
     + '</select>'
     + '<div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Asset type determines which controls appear in the SSP when no explicit control mappings are set.</div>'
@@ -2685,7 +2685,10 @@ function removeAsset(assetId) {
   state.assets = state.assets.filter(function(a){ return String(a.id)!==String(assetId); });
   if (state.sspAttestations) delete state.sspAttestations[assetId];
   if (state.sspSignoffs)     delete state.sspSignoffs[assetId];
+  if (state.sspInterconnections) delete state.sspInterconnections[assetId];
+  if (state.assetCategorization) delete state.assetCategorization[assetId];
   if (state.assetMappings)   Object.keys(state.assetMappings).forEach(function(cid){ state.assetMappings[cid] = (state.assetMappings[cid]||[]).filter(function(id){ return String(id)!==String(assetId); }); });
+  if (state.controlReviewQueue) state.controlReviewQueue = state.controlReviewQueue.filter(function(r){ return r && String(r.assetId || r.scopeId || '') !== String(assetId); });
   markDirty();
   renderAssetHome();
   renderSidebarAssets();
@@ -2698,6 +2701,7 @@ function removeProcess(procId) {
   state.processes = state.processes.filter(function(p){ return String(p.id)!==String(procId); });
   if (state.sspAttestations) delete state.sspAttestations[procId];
   if (state.sspSignoffs)     delete state.sspSignoffs[procId];
+  if (state.sspInterconnections) delete state.sspInterconnections[procId];
   markDirty();
   renderAssetHome();
 }
@@ -2813,7 +2817,7 @@ function renderProcessSSPStep1() {
     + '<input class="form-input" value="' + _esc(proc.name||'') + '" placeholder="e.g. Vulnerability Management Program"'
     + ' oninput="state.processes[' + idx + '].name=this.value;renderAssetWizardChrome(); window.markDirty();"></div>'
     + '<div class="form-group"><label class="form-label">Process Category <span style="color:var(--red);">*</span></label>'
-    + '<select class="form-select" onchange="state.processes[' + idx + '].category=this.value;">'
+    + '<select class="form-select" onchange="state.processes[' + idx + '].category=this.value; window.markDirty();">'
     + PROCESS_CATEGORIES.map(function(c){ return '<option value="' + c.id + '"' + (proc.category===c.id?' selected':'') + '>' + c.label + '</option>'; }).join('')
     + '</select>'
     + '<div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Category determines which control families appear in the process SSP attestations.'

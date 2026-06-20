@@ -549,7 +549,7 @@ function renderProgramDashboard(controls, families) {
           <div style="display:flex;flex-wrap:wrap;gap:10px 16px;">
             ${dot('var(--green)','Approved',sspApproved)}
             ${dot('var(--blue)','Submitted',sspSubmitted)}
-            ${dot('var(--amber)','In Progress',allAssets.length - sspApproved - sspSubmitted - (allAssets.length - sspApproved - sspSubmitted > 0 ? allAssets.filter(function(a){ var s=(sspSign[a.id]||{}).status; return !s||s==='Not Started'; }).length : 0))}
+            ${dot('var(--amber)','In Progress',allAssets.filter(function(a){ var s=(sspSign[a.id]||{}).status; return s && s!=='Submitted' && s!=='Approved' && s!=='Not Started'; }).length)}
             ${dot('var(--slate)','Not Started',allAssets.filter(function(a){ var s=(sspSign[a.id]||{}).status; return !s; }).length)}
           </div>
         </div>
@@ -741,7 +741,7 @@ function renderAssetOwnerReport(user) {
     + '<th style="padding:6px 8px;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Progress</th>'
     + '<th style="text-align:center;padding:6px 8px;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Status</th>'
     + '<th style="text-align:center;padding:6px 8px;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Action</th>'
-    + '</tr></thead><tbody id="tbod-${Math.random().toString(36).slice(2,8)}">';
+    + '</tr></thead><tbody id="tbod-' + Math.random().toString(36).slice(2,8) + '">';
 
   assetRows.forEach(function(r) {
     html += '<tr style="border-bottom:1px solid var(--border);">'
@@ -1470,7 +1470,7 @@ function renderPolicyRoadmap(families) {
       + '<span style="font-size:12px;font-weight:700;color:var(--navy);">' + label + '</span>'
       + '<span style="font-size:10px;color:var(--text-muted);">' + countLabel + '</span>'
       + '</div>'
-      + '<div style="font-size:10px;color:var(--text-muted);margin-bottom:3px);font-family:monospace;">' + escapeHTML(famsLabel) + '</div>'
+      + '<div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;font-family:monospace;">' + escapeHTML(famsLabel) + '</div>'
       + '<div style="height:20px;background:rgba(15,31,61,0.08);border-radius:4px;overflow:hidden;">'
       + '<div style="height:100%;background:' + barColor + ';width:' + barWidth + '%;border-radius:3px;transition:width 0.4s;"></div>'
       + '</div>'
@@ -1623,7 +1623,7 @@ function renderReviewQueuePanel() {
     + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:700;color:var(--text-muted);">Status</th>'
     + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:700;color:var(--text-muted);">Date</th>'
     + '<th style="padding:8px 10px;text-align:right;font-size:11px;font-weight:700;color:var(--text-muted);">Action</th>'
-    + '</tr></thead><tbody id="tbod-${Math.random().toString(36).slice(2,8)}">' + rows + '</tbody></table></div>';
+    + '</tr></thead><tbody id="tbod-' + Math.random().toString(36).slice(2,8) + '">' + rows + '</tbody></table></div>';
 
   // Insert at the top of reports body, before metrics
   body.insertBefore(panel, body.firstChild);

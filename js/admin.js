@@ -899,6 +899,7 @@ function removeUser(id) {
   if (isUsersReadOnlyForCurrentUser()) { showToast('Read-only: AO cannot modify users.', true); return; }
   state.users = (state.users || []).filter(function(u){ return u.id !== id; });
   if (state.currentUserId === id) applyRoleView('admin');
+  markDirty();
   renderUsersTab();
   showToast('User removed');
 }

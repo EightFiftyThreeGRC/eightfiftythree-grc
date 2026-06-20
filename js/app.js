@@ -1170,7 +1170,7 @@ document.addEventListener('DOMContentLoaded', function() {
     try { applySetupFocusMode(); } catch (e) { console.warn('applySetupFocusMode:', e); }
     try {
       if (state.cisoComplete) showTab('home');
-      else showTab('home');
+      else showTab('ciso');
     } catch (e) { console.warn('showTab:', e); }
   });
   try { setupMobileNav(); } catch (e) { console.warn('setupMobileNav:', e); }
