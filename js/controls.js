@@ -1487,7 +1487,7 @@ function setEvidenceKind(ctrlId, idx, kind) {
     delete row.caption;
   }
   markDirty();
-  renderControlStep2();
+  setTimeout(renderControlStep2, 0);
 }
 
 function handleEvidenceImageUpload(ctrlId, idx, input) {
@@ -1854,7 +1854,8 @@ function setCtrlStatus(ctrlId, status) {
   state.controlStatus[ctrlId].status = status;
   logFieldChange('controlStatus.' + ctrlId + '.status', oldStatus, status);
   if (oldStatus !== status) addAuditEntry('control', ctrlId, 'Status changed: ' + oldStatus + ' → ' + status);
-  renderControlStep2();
+  markDirty();
+  setTimeout(renderControlStep2, 0);
 }
 
 var __CTRL_FIELD_LOG_SKIP = { approach: 1, narrative: 1, notes: 1, naJustification: 1, externalDocSummary: 1 };
@@ -3349,4 +3350,5 @@ function saveAttestDraft() {}
 function setControlField(id, field, value) {
   if (!state.controlStatus[id]) state.controlStatus[id] = {};
   state.controlStatus[id][field] = value;
+  markDirty();
 }
