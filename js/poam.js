@@ -60,7 +60,7 @@ function updatePoamField(id, field, value) {
   if (!item) return;
   var prev = item[field];
   item[field] = value;
-  if (field === 'status' && (value === 'Closed' || value === 'Mitigated')) {
+  if (field === 'status' && (value === 'Closed' || value === 'Mitigated' || value === 'Risk Accepted')) {
     item.closedDate = new Date().toISOString().slice(0, 10);
   }
   logFieldChange('poamItems.' + id + '.' + field, prev, value);

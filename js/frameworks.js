@@ -1,4 +1,4 @@
-// js/frameworks.js — multi-framework alignment (ISO 27001, SOC 2, HIPAA) + SharePoint evidence helpers
+// js/frameworks.js — multi-framework alignment (ISO 27001, SOC 2, HIPAA) + evidence storage helpers (SharePoint, Google Drive, OneDrive)
 
 var FRAMEWORK_META = {
   iso27001: { id: 'iso27001', label: 'ISO 27001', subtitle: 'Annex A (2022)', color: '#5856D6', bg: '#f5f3ff' },

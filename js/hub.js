@@ -50,11 +50,11 @@ function renderOnboardingHome() {
     + '</div>'
     + (hasStarted
       ? '<p class="onboard-resume">You\'re on step ' + progress.step + ' — <strong>' + escapeHTML(progress.label) + '</strong>. Pick up where you left off.</p>'
-      : '<p class="onboard-resume">Most teams finish setup in 15–20 minutes. Integrations (SharePoint, Entra, ISO/SOC 2/HIPAA) are optional.</p>')
+      : '<p class="onboard-resume">Most teams finish setup in 15–20 minutes. Integrations (evidence storage, Entra ID, ISO/SOC 2/HIPAA) are optional.</p>')
     + '</div>'
     + '<div class="onboard-features">'
     + '<div class="onboard-feature"><span>📋</span><div><strong>Policies</strong><p>Build AC, AU, SC, and the rest after setup.</p></div></div>'
-    + '<div class="onboard-feature"><span>🔧</span><div><strong>Controls</strong><p>Design obligations and link SharePoint evidence.</p></div></div>'
+    + '<div class="onboard-feature"><span>🔧</span><div><strong>Controls</strong><p>Design obligations and link evidence from cloud storage.</p></div></div>'
     + '<div class="onboard-feature"><span>🖥️</span><div><strong>Assets &amp; SSP</strong><p>Inventory systems and submit attestation packages.</p></div></div>'
     + '</div>';
 }
@@ -83,7 +83,7 @@ function getNextActions() {
   });
 
   (state.poamItems || []).forEach(function(p) {
-    if (p.dueDate && p.dueDate < today && p.status !== 'Closed' && p.status !== 'Mitigated') {
+    if (p.dueDate && p.dueDate < today && p.status !== 'Closed' && p.status !== 'Mitigated' && p.status !== 'Risk Accepted') {
       actions.push({ priority: 0, icon: '⚠️', label: 'Overdue POA&M', desc: (p.finding || '').slice(0, 60), action: "showTab('poam');" });
     }
   });
