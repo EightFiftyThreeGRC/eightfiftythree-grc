@@ -760,7 +760,7 @@ function renderAssetOwnerReport(user) {
       +   '<span style="font-size:11px;font-weight:600;padding:3px 9px;border-radius:10px;background:' + r.col + '22;color:' + r.col + ';white-space:nowrap;">' + r.status + '</span>'
       + '</td>'
       + '<td style="padding:10px 8px;text-align:center;">'
-      +   '<button class="btn btn-secondary btn-sm" onclick="openAssetWizardFromLibrary(\'' + r.a.id + '\')" style="font-size:11px;padding:4px 10px;">Open ' + sspLabel + ' →</button>'
+      +   '<button class="btn btn-secondary btn-sm" onclick="openAssetWizardFromLibrary(\'' + escapeHTML(String(r.a.id).replace(/'/g, "\\'")) + '\')" style="font-size:11px;padding:4px 10px;">Open ' + sspLabel + ' →</button>'
       + '</td>'
       + '</tr>';
   });
@@ -1246,7 +1246,7 @@ function renderReports() {
   if (!user && state.cisoComplete) {
     postSetupCallout = '<div style="background:linear-gradient(135deg,#ecfdf5,#f0fdf4);border:1px solid #86efac;border-radius:12px;padding:18px 22px;margin-bottom:22px;max-width:920px;">'
       + '<div style="font-size:15px;font-weight:800;color:#14532d;margin-bottom:8px;">Program setup is complete</div>'
-      + '<div style="font-size:13px;color:#166534;line-height:1.6;margin-bottom:14px;">Choose a <strong>workspace</strong> in the sidebar to build domain policies, document controls, manage assets, or run tests. This screen is your program-wide dashboard and reports.</div>'
+      + '<div style="font-size:13px;color:#166534;line-height:1.6;margin-bottom:14px;">Choose a <strong>workspace</strong> in the sidebar to build domain policies, document controls, or manage assets. This screen is your program-wide dashboard and reports.</div>'
       + '<div style="display:flex;flex-wrap:wrap;gap:10px;">'
       + '<button type="button" class="btn btn-primary" onclick="goToPoliciesHome()">Open domain policies</button>'
       + '<button type="button" class="btn btn-secondary" onclick="showTab(\'users\')">Users &amp; roles</button>'
@@ -1671,7 +1671,7 @@ function openControlReassignmentFromQueue(controlId) {
 function approveAllReviewQueue() {
   var queue = state.controlReviewQueue || [];
   var attestationOnly = queue.filter(function(r) {
-    return r.type !== 'baseline-elevation' && r.controlId;
+    return r.type !== 'baseline-elevation' && r.type !== 'ssp' && r.controlId;
   });
   if (!attestationOnly.length) return;
   if (!confirm('Approve all ' + attestationOnly.length + ' pending attestations?')) return;

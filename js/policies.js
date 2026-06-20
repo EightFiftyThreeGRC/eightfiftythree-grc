@@ -1758,6 +1758,7 @@ function confirmReturnToCISO(fam) {
     });
     if (!stillAssigned.length) state._policyOwnerFilter = '';
   }
+  markDirty();
   var ownerTitle = state.programOwnerTitle || 'Program Owner';
   addAuditEntry('policy', fam, 'Policy returned to ' + ownerTitle + ' by ' + previousOwner);
   showToast('\u21A9 Policy returned to ' + ownerTitle + '. Switch to Admin view \u2192 Program Setup Step 5 to reassign.');
@@ -1975,9 +1976,11 @@ function toggleDomainControl(fam, ctrlId, checked) {
   if (!state.policySelectedControls[fam]) state.policySelectedControls[fam] = [];
   if (checked && !state.policySelectedControls[fam].includes(ctrlId)) state.policySelectedControls[fam].push(ctrlId);
   if (!checked) state.policySelectedControls[fam] = state.policySelectedControls[fam].filter(function(id){ return id !== ctrlId; });
+  markDirty();
   const sel = state.policySelectedControls[fam];
+  const allFams = typeof getPolicyAllFamilies === 'function' ? getPolicyAllFamilies(fam) : [fam];
   const baselineCount = CONTROLS.filter(function(c){
-    return c.f === fam && (c.bl.includes(state.baseline) || (state.privacyOverlay && c.bl.includes('P')));
+    return allFams.includes(c.f) && (c.bl.includes(state.baseline) || (state.privacyOverlay && c.bl.includes('P')));
   }).length;
   const fc  = document.getElementById('policy-step-2-count');
   const fcs = document.getElementById('policy-step-2-count-side');
@@ -2001,6 +2004,7 @@ function selectAllDomainControls(fam, mode) {
   else                     state.policySelectedControls[fam] = [];
   // Auto-populate control owners from domain owner for newly selected controls
   if (mode !== 'none') autoPopulateControlOwnersFromDomain(fam);
+  markDirty();
   const sel = state.policySelectedControls[fam];
   document.querySelectorAll('.domain-cb').forEach(function(cb){
     cb.checked = sel.includes(cb.dataset.id||'');
@@ -2018,6 +2022,7 @@ function selectPolicyProcControls(fam) {
   const p1 = CONTROLS.filter(function(c){ return allFams.includes(c.f) && c.id.match(/-1$/); }).map(function(c){ return c.id; });
   if (!state.policySelectedControls) state.policySelectedControls = {};
   state.policySelectedControls[fam] = p1;
+  markDirty();
   renderPolicyStep2();
 }
 
@@ -2351,11 +2356,12 @@ function _renderDomainReferences(fam, dp) {
 function addDomainRef(fam) {
   if (!state.domainPolicies[fam].references) state.domainPolicies[fam].references = [];
   state.domainPolicies[fam].references.push({ title:'', description:'', url:'', internal:false });
+  markDirty();
   renderPolicyStep3();
 }
 
 function removeDomainRef(fam, i) {
-  if(confirm('Delete this reference?')) state.domainPolicies[fam].references.splice(i, 1);
+  if(confirm('Delete this reference?')) { state.domainPolicies[fam].references.splice(i, 1); markDirty(); }
   renderPolicyStep3();
 }
 
@@ -3332,6 +3338,7 @@ function _renderDomainRequirements(fam, dp, selected) {
 
 function addDomainRole(fam) {
   state.domainPolicies[fam].roles.push({name:'New Role', title:'', responsibilities:['']});
+  markDirty();
   renderPolicyStep3();
 }
 function removeDomainRole(fam, i) {
@@ -3354,10 +3361,12 @@ function moveDomainRole(fam, i, dir) {
 }
 function addDomainResp(fam, ri) {
   state.domainPolicies[fam].roles[ri].responsibilities.push('');
+  markDirty();
   renderPolicyStep3();
 }
 function removeDomainResp(fam, ri, rsi) {
   state.domainPolicies[fam].roles[ri].responsibilities.splice(rsi,1);
+  markDirty();
   renderPolicyStep3();
 }
 function addDomainReq(fam) {
@@ -3365,6 +3374,7 @@ function addDomainReq(fam) {
   const n = (dp.requirements||[]).length;
   if (!dp.requirements) dp.requirements = [];
   dp.requirements.push({ id: fam+'-REQ-'+(n+1), controls: [], text: '' });
+  markDirty();
   renderPolicyStep3();
 }
 function removeDomainReq(fam, qi) {
@@ -3416,10 +3426,12 @@ function removeDomainSection(fam, i) {
     }
   });
   state.domainPolicies[fam].sections.splice(i,1);
+  markDirty();
   renderPolicyStep3();
 }
 function addDomainCustomSection(fam) {
   state.domainPolicies[fam].sections.push({ type:'custom', title:'New Section', content:'' });
+  markDirty();
   renderPolicyStep3();
 }
 
@@ -3435,6 +3447,7 @@ function dpDrop(e, fam, targetIdx) {
   const item = secs.splice(_dpDragIdx,1)[0];
   secs.splice(targetIdx,0,item);
   _dpDragFam=null; _dpDragIdx=null;
+  markDirty();
   renderPolicyStep3();
 }
 
@@ -3688,6 +3701,7 @@ function setCtrlOwner(ctrlId, field, value) {
     delete state.controlOwners[ctrlId].isDemoPlaceholder;
   }
   logFieldChange(path, prev, value);
+  markDirty();
   // Refresh assignment count in left panel
   const fam = state._policyDomain;
   const selected = (state.policySelectedControls||{})[fam]||[];
