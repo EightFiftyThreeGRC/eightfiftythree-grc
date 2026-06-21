@@ -316,7 +316,7 @@ function renderControlStep1() {
               <td><span class="family-badge">${c.f}</span></td>
               <td>${pillsHTML(c.bl)}</td>
               <td>${pReqCell}</td>
-              <td style="font-size:12px;color:${co.name?'var(--navy)':'var(--text-muted)'};font-style:${co.name?'normal':'italic'};">${co.name||'Unassigned'}</td>
+              <td style="font-size:12px;color:${hasRealControlOwner(co)?'var(--navy)':'var(--text-muted)'};font-style:${hasRealControlOwner(co)?'normal':'italic'};">${escapeHTML(getControlOwnerDisplayName(co))}</td>
               <td style="font-size:12px;font-weight:${isDueSoon?'700':'400'};color:${isDueSoon?'#d97706':'var(--text-muted)'};">${ddStr}${isDueSoon?' ⚠️':''}</td>
               <td>${chipHTML(st)}</td>
               <td onclick="event.stopPropagation();" style="white-space:nowrap;">

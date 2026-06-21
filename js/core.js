@@ -1313,6 +1313,23 @@ function migrateCustodianFormats() {
   });
 }
 
+var _SUGGESTED_ROLE_BUCKET_LABELS = null;
+function getSuggestedRoleBucketLabelSet() {
+  if (!_SUGGESTED_ROLE_BUCKET_LABELS) {
+    _SUGGESTED_ROLE_BUCKET_LABELS = {};
+    Object.keys(DOMAIN_SUGGESTED_ROLES).forEach(function(fam) {
+      var label = DOMAIN_SUGGESTED_ROLES[fam];
+      if (label) _SUGGESTED_ROLE_BUCKET_LABELS[label] = true;
+    });
+  }
+  return _SUGGESTED_ROLE_BUCKET_LABELS;
+}
+
+function isSuggestedRoleBucketLabel(name) {
+  if (!name) return false;
+  return !!getSuggestedRoleBucketLabelSet()[String(name).trim()];
+}
+
 /** Legacy placeholder owner names (single letters) were never valid ISSM names. */
 function migrateLegacySingleLetterOwnerNames() {
   var owners = state.domainOwners;
@@ -1321,9 +1338,42 @@ function migrateLegacySingleLetterOwnerNames() {
     var o = owners[fam];
     if (!o || !o.name) return;
     if (o.name.length === 1 && DOMAIN_SUGGESTED_ROLES[fam]) {
-      o.name = DOMAIN_SUGGESTED_ROLES[fam];
+      if (!o.role) o.role = DOMAIN_SUGGESTED_ROLES[fam];
+      delete o.name;
     }
   });
+}
+
+/** Older builds stored suggested role bucket labels (e.g. "GRC/Risk Lead") as owner names. */
+function migrateLegacyRoleBucketOwnerNames() {
+  var changed = false;
+  var owners = state.domainOwners;
+  if (owners && typeof owners === 'object') {
+    Object.keys(owners).forEach(function(fam) {
+      var o = owners[fam];
+      if (!o) return;
+      var name = (o.name || '').trim();
+      if (!name || !isSuggestedRoleBucketLabel(name)) return;
+      if (isValidOwnerEmail(o.email)) return;
+      if (!o.role) o.role = name;
+      delete o.name;
+      changed = true;
+      if (!o.email && !o.role && !o.name) delete owners[fam];
+    });
+  }
+  var ctrlOwners = state.controlOwners;
+  if (ctrlOwners && typeof ctrlOwners === 'object') {
+    Object.keys(ctrlOwners).forEach(function(cid) {
+      var o = ctrlOwners[cid];
+      if (!o) return;
+      var name = (o.name || '').trim();
+      if (!name || !isSuggestedRoleBucketLabel(name)) return;
+      if (isValidOwnerEmail(o.email)) return;
+      delete ctrlOwners[cid];
+      changed = true;
+    });
+  }
+  if (changed && typeof markDirty === 'function') markDirty();
 }
 
 function migrateAtoStateShape() {
@@ -1411,6 +1461,7 @@ function applyLoadedState(saved) {
   // Migrate legacy custodian string formats to object format
   migrateCustodianFormats();
   migrateLegacySingleLetterOwnerNames();
+  migrateLegacyRoleBucketOwnerNames();
   migrateAtoStateShape();
   seedXmplAtoDemoDataIfMissing();
   return true;
@@ -1461,10 +1512,22 @@ function isValidOwnerEmail(email) {
 function getOwnerDisplayName(owner) {
   if (!owner) return '—';
   var name = (owner.name || '').trim();
-  if (name) return name;
+  if (name && !isSuggestedRoleBucketLabel(name)) return name;
   var email = (owner.email || '').trim();
   if (email) return email.split('@')[0] || email;
   return '—';
+}
+
+function hasRealControlOwner(co) {
+  if (!co) return false;
+  var name = (co.name || '').trim();
+  if (name && !isSuggestedRoleBucketLabel(name)) return true;
+  return isValidOwnerEmail(co.email);
+}
+
+function getControlOwnerDisplayName(co) {
+  var label = getOwnerDisplayName(co);
+  return label === '—' ? 'Unassigned' : label;
 }
 
 function userNeedsProfileSetup(user) {

@@ -429,7 +429,7 @@ function cisoFinish() {
     var pmControls = state.pmControls || {};
     Object.keys(pmControls).forEach(function(cid) {
       if (!pmControls[cid]) return;                          // not selected
-      if ((state.controlOwners[cid] || {}).name || (state.controlOwners[cid] || {}).email) return;    // already assigned
+      if (hasRealControlOwner(state.controlOwners[cid])) return;    // already assigned
       state.controlOwners[cid] = { name: ownerName, role: ownerRole, email: ownerEmail };
     });
   })();
@@ -2009,7 +2009,12 @@ function renderControlsSection(activeControls, mappedControls, allActivePM) {
             <td style="font-size:12px;">${c.n}</td>
             <td><span class="family-badge">${c.f}</span></td>
             <td style="font-size:12px;color:var(--text-muted);">
-              <span style="display:inline-flex;align-items:center;gap:4px;">👤 ${(state.domainOwners[c.f]||{}).name || (state.controlOwners||{})[c.id]?.name || 'Unassigned'}</span>
+              ${(() => {
+                var domainLabel = getOwnerDisplayName(state.domainOwners[c.f]);
+                var ctrlLabel = getOwnerDisplayName((state.controlOwners || {})[c.id]);
+                var label = domainLabel !== '—' ? domainLabel : (ctrlLabel !== '—' ? ctrlLabel : 'Unassigned');
+                return '<span style="display:inline-flex;align-items:center;gap:4px;">👤 ' + escapeHTML(label) + '</span>';
+              })()}
             </td>
           </tr>`).join('')}
         </tbody>
@@ -2619,9 +2624,9 @@ window.applyAllMerges = function() {
       if (!state.policyMerges[sf]) {
         state.policyMerges[sf] = masterFam;
         var masterOwner = state.domainOwners[masterFam];
-        var masterName = masterOwner ? masterOwner.name : (DOMAIN_SUGGESTED_ROLES[masterFam] || '');
-        state.domainOwners[sf] = Object.assign({}, masterOwner || {}, { name: masterName });
-        if (!state.domainOwners[masterFam]) state.domainOwners[masterFam] = { name: masterName };
+        if (masterOwner && (isValidOwnerEmail(masterOwner.email) || getOwnerDisplayName(masterOwner) !== '—')) {
+          state.domainOwners[sf] = Object.assign({}, masterOwner);
+        }
         addAuditEntry('program', null, 'Merged ' + sf + ' into ' + masterFam);
         applied++;
       }
@@ -2648,12 +2653,9 @@ function mergePolicy(slaveFam, masterFam) {
   });
   if (!state.policyMerges) state.policyMerges = {};
   state.policyMerges[slaveFam] = masterFam;
-  // Copy owner from master, falling back to the suggested role if not yet set
   const masterOwner = state.domainOwners[masterFam];
-  const masterName = (masterOwner && masterOwner.name) || DOMAIN_SUGGESTED_ROLES[masterFam] || '';
-  state.domainOwners[slaveFam] = Object.assign({}, masterOwner || {}, { name: masterName });
-  if (!state.domainOwners[masterFam]) {
-    state.domainOwners[masterFam] = { name: masterName };
+  if (masterOwner && (isValidOwnerEmail(masterOwner.email) || getOwnerDisplayName(masterOwner) !== '—')) {
+    state.domainOwners[slaveFam] = Object.assign({}, masterOwner);
   }
   addAuditEntry('program', null, 'Merged ' + slaveFam + ' into ' + masterFam);
   try { window.markDirty && window.markDirty(); } catch (e) {}
@@ -2758,9 +2760,10 @@ function setDomainOwner(fam, field, value) {
 // with the domain owner as the default control owner (unless already assigned to someone else).
 function autoPopulateControlOwnersFromDomain(fam) {
   var owner = state.domainOwners[fam];
-  if (!owner || (!owner.email && !owner.name)) return;
-  if (!state.controlOwners) state.controlOwners = {};
+  if (!owner) return;
   var displayName = getOwnerDisplayName(owner);
+  if (displayName === '—' && !isValidOwnerEmail(owner.email)) return;
+  if (!state.controlOwners) state.controlOwners = {};
   // Get all selected controls for this family (from policy wizard step 2)
   var selected = (state.policySelectedControls || {})[fam] || [];
   // If no controls selected yet, try the baseline controls for this family
@@ -2778,7 +2781,7 @@ function autoPopulateControlOwnersFromDomain(fam) {
     selected = selected.concat(sfSelected);
   });
   selected.forEach(function(cid) {
-    if (!state.controlOwners[cid] || (!state.controlOwners[cid].name && !state.controlOwners[cid].email)) {
+    if (!state.controlOwners[cid] || !hasRealControlOwner(state.controlOwners[cid])) {
       state.controlOwners[cid] = {
         name: displayName,
         role: owner.role || '',
