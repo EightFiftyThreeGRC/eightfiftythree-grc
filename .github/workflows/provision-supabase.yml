@@ -27,6 +27,8 @@ on:
 jobs:
   provision:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -38,3 +40,14 @@ jobs:
           SUPABASE_PROJECT_NAME: ${{ github.event.inputs.project_name }}
           SUPABASE_REGION: ${{ github.event.inputs.region }}
         run: node scripts/provision-supabase.mjs
+      - name: Commit cloud-config.js
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add js/cloud-config.js
+          if git diff --cached --quiet; then
+            echo "No changes to cloud-config.js"
+          else
+            git commit -m "chore: wire Supabase cloud-config (provisioned)"
+            git push origin HEAD:provision-supabase
+          fi
