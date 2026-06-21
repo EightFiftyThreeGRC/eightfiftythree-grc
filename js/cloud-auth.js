@@ -20,6 +20,7 @@ var __cloudProgramOwnerId = null; // owner_id of that row (for "is owner" checks
 var __cloudLocked = false;        // true once signed in -> impersonation disabled
 var __cloudRealtimeChannel = null;
 var __cloudPushTimer = null;
+var __sbLoadPromise = null;
 
 // ── configuration / capability checks ───────────────────────────────────────
 function isCloudConfigured() {
@@ -28,11 +29,29 @@ function isCloudConfigured() {
     && !!String(CLOUD_CONFIG.supabaseAnonKey || '').trim();
 }
 
-// Cloud mode is "enabled" when configured AND the Supabase library loaded.
+// Cloud mode is "enabled" whenever it's configured. The Supabase library is
+// loaded lazily on demand (see loadSupabaseScript) so the public demo never
+// pulls a third-party script.
 function isCloudEnabled() {
-  return isCloudConfigured() && typeof window !== 'undefined'
-    && typeof window.supabase !== 'undefined'
-    && !!window.supabase.createClient;
+  return isCloudConfigured();
+}
+
+// Lazily inject the Supabase JS client from CDN — only ever called when cloud
+// mode is configured (mirrors the MSAL loader in entra-auth.js).
+function loadSupabaseScript() {
+  if (typeof window !== 'undefined' && window.supabase && window.supabase.createClient) {
+    return Promise.resolve();
+  }
+  if (__sbLoadPromise) return __sbLoadPromise;
+  __sbLoadPromise = new Promise(function(resolve, reject) {
+    var s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
+    s.async = true;
+    s.onload = function() { resolve(); };
+    s.onerror = function() { reject(new Error('Failed to load the Supabase library.')); };
+    document.head.appendChild(s);
+  });
+  return __sbLoadPromise;
 }
 
 function isCloudSessionActive() {
@@ -46,7 +65,8 @@ function isCloudLocked() {
 
 function getCloudClient() {
   if (__sbClient) return __sbClient;
-  if (!isCloudEnabled()) return null;
+  if (!isCloudConfigured()) return null;
+  if (typeof window === 'undefined' || !window.supabase || !window.supabase.createClient) return null;
   __sbClient = window.supabase.createClient(
     String(CLOUD_CONFIG.supabaseUrl).trim(),
     String(CLOUD_CONFIG.supabaseAnonKey).trim(),
@@ -320,8 +340,18 @@ function teardownCloudRealtime() {
 // ── boot entry point (called from app.js DOMContentLoaded) ──────────────────
 async function initCloudAuth() {
   if (!isCloudEnabled()) return false;
+  try {
+    await loadSupabaseScript();
+  } catch (e) {
+    console.warn('loadSupabaseScript', e);
+    showCloudSignInGate('Could not load the sign-in library. Check your connection, or continue in local demo mode.');
+    return false;
+  }
   var sb = getCloudClient();
-  if (!sb) return false;
+  if (!sb) {
+    showCloudSignInGate('Sign-in is misconfigured. Continue in local demo mode for now.');
+    return false;
+  }
 
   // React to future auth changes (e.g. token refresh / sign-out in another tab).
   try {
