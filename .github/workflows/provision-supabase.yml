@@ -1,0 +1,53 @@
+name: Provision Supabase
+
+# Manual, one-shot setup. Creates the Supabase project, applies the schema, and
+# prints the public Project URL + anon key in the logs. The runner has open
+# internet (the Claude sandbox does not), so this is how provisioning happens.
+#
+# Requires a repo secret: SUPABASE_ACCESS_TOKEN (a Supabase personal access
+# token, sbp_...). GitHub masks the secret in logs. Delete the token after.
+
+on:
+  # Runs when I push the dedicated "provision-supabase" branch (no default-branch
+  # requirement, unlike workflow_dispatch). Also dispatchable from the UI if the
+  # workflow ever lands on the default branch.
+  push:
+    branches: ["provision-supabase"]
+  workflow_dispatch:
+    inputs:
+      project_name:
+        description: "Supabase project name"
+        required: false
+        default: "eightfiftythree-grc"
+      region:
+        description: "Supabase region"
+        required: false
+        default: "us-east-1"
+
+jobs:
+  provision:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Provision
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_NAME: ${{ github.event.inputs.project_name }}
+          SUPABASE_REGION: ${{ github.event.inputs.region }}
+        run: node scripts/provision-supabase.mjs
+      - name: Commit cloud-config.js
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add js/cloud-config.js
+          if git diff --cached --quiet; then
+            echo "No changes to cloud-config.js"
+          else
+            git commit -m "chore: wire Supabase cloud-config (provisioned)"
+            git push origin HEAD:provision-supabase
+          fi

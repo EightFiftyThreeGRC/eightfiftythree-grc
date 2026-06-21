@@ -113,6 +113,12 @@ function renderProfileButtonContent(user) {
 }
 
 function showRolePicker() {
+  // In multi-user (cloud) mode there is no profile picking — show the signed-in
+  // account + sign-out instead. Identity and role come from real authentication.
+  if (typeof isCloudLocked === 'function' && isCloudLocked()) {
+    if (typeof showCloudAccountMenu === 'function') showCloudAccountMenu();
+    return;
+  }
   const overlay = document.getElementById('rolePickerOverlay');
   if (!overlay) return;
   syncUsersFromState();
@@ -211,6 +217,11 @@ function renderRolePickerProfiles() {
 }
 
 function selectUserProfile(userId) {
+  // Multi-user mode: identity is fixed by sign-in; never allow switching personas.
+  if (typeof isCloudLocked === 'function' && isCloudLocked()) {
+    if (typeof showToast === 'function') showToast('Your role is set by your account. Switching identities is disabled in multi-user mode.', true);
+    return;
+  }
   if (userId === 'admin' && typeof clearEntraSessionLocal === 'function') clearEntraSessionLocal();
   // Block impersonation of demo placeholder users — any attestation made
   // while signed in as one of them would have no real signatory and would

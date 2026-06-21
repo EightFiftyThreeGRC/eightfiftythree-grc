@@ -2603,3 +2603,159 @@
     .poam-row-overdue { background: #fef2f2; }
     .poam-inline-select, .poam-inline-date, .poam-inline-input { font-size: 12px !important; padding: 6px 8px !important; }
     .poam-modal-card { background: var(--white); border-radius: 16px; padding: 28px; max-width: 520px; width: 100%; box-shadow: 0 24px 80px rgba(0,0,0,0.2); }
+
+    /* ============================================================
+       MULTI-USER CLOUD SIGN-IN GATE + ACCOUNT MENU
+       ============================================================ */
+    #cloudSignInGate {
+      position: fixed;
+      inset: 0;
+      z-index: 12000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: linear-gradient(160deg, #0b1220 0%, #111c33 60%, #0b1220 100%);
+    }
+    .cloud-gate-card {
+      width: min(440px, 94vw);
+      background: var(--white);
+      border-radius: 18px;
+      padding: 36px 32px 28px;
+      box-shadow: 0 30px 90px rgba(0,0,0,0.45);
+      text-align: center;
+    }
+    .cloud-gate-brand {
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--teal, #0d9488);
+      margin-bottom: 14px;
+    }
+    .cloud-gate-title {
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--navy, #0f172a);
+      margin-bottom: 8px;
+    }
+    .cloud-gate-sub {
+      font-size: 13.5px;
+      line-height: 1.55;
+      color: var(--text-muted, #64748b);
+      margin: 0 0 22px;
+    }
+    .cloud-gate-message {
+      font-size: 13px;
+      line-height: 1.5;
+      color: #92400e;
+      background: #fef3c7;
+      border-radius: 10px;
+      padding: 10px 12px;
+      margin-bottom: 18px;
+      text-align: left;
+    }
+    .cloud-gate-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .cloud-signin-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      width: 100%;
+      padding: 13px 16px;
+      font-size: 15px;
+      font-weight: 700;
+      color: #1f2937;
+      background: var(--white);
+      border: 1.5px solid #d8dee9;
+      border-radius: 11px;
+      cursor: pointer;
+      transition: border-color 0.15s, box-shadow 0.15s, transform 0.05s;
+    }
+    .cloud-signin-btn:hover {
+      border-color: #94a3b8;
+      box-shadow: 0 4px 14px rgba(15,23,42,0.10);
+    }
+    .cloud-signin-btn:active { transform: translateY(1px); }
+    .cloud-gate-status {
+      font-size: 12.5px;
+      color: var(--text-muted, #64748b);
+      margin-top: 16px;
+    }
+    .cloud-gate-foot {
+      margin-top: 22px;
+      padding-top: 18px;
+      border-top: 1px solid #eef1f5;
+    }
+    .cloud-account-card {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 28px 20px;
+      color: #fff;
+    }
+    .cloud-account-name { font-size: 18px; font-weight: 800; }
+    .cloud-account-email { font-size: 13px; color: rgba(255,255,255,0.7); margin-top: 4px; }
+    .cloud-account-role {
+      display: inline-block;
+      margin-top: 12px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--teal, #2dd4bf);
+      background: rgba(45,212,191,0.12);
+      border-radius: 999px;
+      padding: 4px 12px;
+    }
+
+    /* Magic-link form inside the cloud sign-in gate */
+    .cloud-gate-magic {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .cloud-gate-email {
+      width: 100%;
+      padding: 12px 14px;
+      font-size: 15px;
+      border: 1.5px solid #d8dee9;
+      border-radius: 11px;
+      box-sizing: border-box;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .cloud-gate-email:focus {
+      border-color: var(--teal, #0d9488);
+      box-shadow: 0 0 0 3px rgba(13,148,136,0.12);
+    }
+    .cloud-signin-primary {
+      color: #fff;
+      background: var(--teal, #0d9488);
+      border-color: var(--teal, #0d9488);
+      justify-content: center;
+    }
+    .cloud-signin-primary:hover {
+      background: #0b8076;
+      border-color: #0b8076;
+      box-shadow: 0 4px 14px rgba(13,148,136,0.30);
+    }
+    .cloud-gate-divider {
+      display: flex;
+      align-items: center;
+      text-align: center;
+      color: #94a3b8;
+      font-size: 12px;
+      margin: 6px 0;
+    }
+    .cloud-gate-divider::before,
+    .cloud-gate-divider::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: #e5e9f0;
+    }
+    .cloud-gate-divider span { padding: 0 12px; }

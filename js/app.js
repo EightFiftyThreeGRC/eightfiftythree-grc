@@ -1153,7 +1153,19 @@ function maybeShowWelcomeIntro() {
   }, 50);
 }
 
-document.addEventListener('DOMContentLoaded', function() {
+// Render the app UI once `state` has been loaded (from localStorage in local
+// mode, or from the shared backend in cloud mode). Safe to call more than once
+// (cloud realtime re-invokes it after a remote update).
+function bootAfterStateReady() {
+  try { renderSidebarBadges(); } catch (e) { console.warn('renderSidebarBadges:', e); }
+  try { applySetupFocusMode(); } catch (e) { console.warn('applySetupFocusMode:', e); }
+  try { showTab('home'); } catch (e) { console.warn('showTab:', e); }
+}
+window.bootAfterStateReady = bootAfterStateReady;
+
+// Single-user / demo boot: load from this browser's localStorage and show the
+// full app (admin view), optionally honoring a legacy Entra session.
+function bootLocalMode() {
   try { loadFromStorage(); } catch (e) { console.warn('loadFromStorage:', e); }
   var entraBoot = Promise.resolve(false);
   if (typeof initEntraAuth === 'function') {
@@ -1166,15 +1178,27 @@ document.addEventListener('DOMContentLoaded', function() {
     if (!entraSignedIn) {
       try { applyRoleView('admin'); } catch (e) { console.warn('applyRoleView:', e); }
     }
-    try { renderSidebarBadges(); } catch (e) { console.warn('renderSidebarBadges:', e); }
-    try { applySetupFocusMode(); } catch (e) { console.warn('applySetupFocusMode:', e); }
-    try {
-      if (state.cisoComplete) showTab('home');
-      else showTab('home');
-    } catch (e) { console.warn('showTab:', e); }
+    bootAfterStateReady();
   });
+}
+window.bootLocalMode = bootLocalMode;
+
+// "Continue without an account" escape hatch from the cloud sign-in gate —
+// keeps the public GitHub Pages demo usable for portfolio viewers.
+function continueAsLocalDemo() {
+  if (typeof hideCloudSignInGate === 'function') hideCloudSignInGate();
+  bootLocalMode();
+}
+window.continueAsLocalDemo = continueAsLocalDemo;
+
+document.addEventListener('DOMContentLoaded', function() {
+  // Auth-independent UI wiring.
   try { setupMobileNav(); } catch (e) { console.warn('setupMobileNav:', e); }
-  try { maybeShowWelcomeIntro(); } catch (e) { console.warn('maybeShowWelcomeIntro:', e); }
+  // The first-visit welcome ("data stays in this browser") only applies to local
+  // mode; in cloud mode the sign-in gate is the entry point.
+  if (!(typeof isCloudEnabled === 'function' && isCloudEnabled())) {
+    try { maybeShowWelcomeIntro(); } catch (e) { console.warn('maybeShowWelcomeIntro:', e); }
+  }
   try {
     var wvo = document.getElementById('wizardVideoOverlay');
     if (wvo) {
@@ -1186,9 +1210,27 @@ document.addEventListener('DOMContentLoaded', function() {
   window.addEventListener('beforeunload', function(ev) {
     if (!window.isDirty) return;
     try { saveToStorage(); } catch (e2) {}
+    if (typeof cloudPushNow === 'function' && typeof isCloudSessionActive === 'function' && isCloudSessionActive()) {
+      try { cloudPushNow(); } catch (e3) {}
+    }
     if (window.isDirty) {
       ev.preventDefault();
       ev.returnValue = '';
     }
   });
+
+  // Cloud (multi-user) mode drives boot when configured; otherwise local mode.
+  if (typeof isCloudEnabled === 'function' && isCloudEnabled()) {
+    try {
+      initCloudAuth().catch(function(e) {
+        console.warn('initCloudAuth:', e);
+        if (typeof showCloudSignInGate === 'function') showCloudSignInGate('Sign-in failed to initialize. Try again, or continue in local demo mode.');
+      });
+    } catch (e) {
+      console.warn('initCloudAuth threw:', e);
+      bootLocalMode();
+    }
+  } else {
+    bootLocalMode();
+  }
 });
