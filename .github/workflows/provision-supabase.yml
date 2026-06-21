@@ -8,6 +8,11 @@ name: Provision Supabase
 # token, sbp_...). GitHub masks the secret in logs. Delete the token after.
 
 on:
+  # Runs when I push the dedicated "provision-supabase" branch (no default-branch
+  # requirement, unlike workflow_dispatch). Also dispatchable from the UI if the
+  # workflow ever lands on the default branch.
+  push:
+    branches: ["provision-supabase"]
   workflow_dispatch:
     inputs:
       project_name:
