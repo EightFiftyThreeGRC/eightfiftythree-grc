@@ -1,13 +1,5 @@
-// js/cloud-auth.js — Multi-user cloud mode: real OAuth sign-in (Microsoft + Google)
-// and cross-computer data sync, backed by Supabase. Loaded after core.js / admin.js.
-//
-// When CLOUD_CONFIG is blank the whole module no-ops and the app runs exactly as
-// before (single-user, localStorage only). When configured:
-//   1. A full-screen sign-in gate replaces the demo role-picker.
-//   2. "Sign in with Microsoft / Google" -> Supabase OAuth (redirect flow).
-//   3. The signed-in identity is matched to ONE real roster person -> their role.
-//      No impersonation: you are locked to your own authenticated identity.
-//   4. The program lives in a shared Postgres row; edits sync to every computer.
+// js/cloud-auth.js — Multi-user cloud mode: email/password sign-in and cross-computer
+// data sync, backed by Supabase. Loaded after core.js / admin.js.
 //
 // Backend contract: supabase/schema.sql (table `programs`, email-roster RLS).
 // Globals only, defensive typeof guards — same conventions as the rest of js/.
@@ -20,6 +12,7 @@ var __cloudProgramOwnerId = null; // owner_id of that row (for "is owner" checks
 var __cloudLocked = false;        // true once signed in -> impersonation disabled
 var __cloudRealtimeChannel = null;
 var __cloudPushTimer = null;
+var __cloudLastPushedFingerprint = null;
 var __sbLoadPromise = null;
 var __cloudEntered = false;   // true once a program is loaded for the session
 var __cloudEntering = false;  // re-entrancy guard for enterCloudWithSession
@@ -106,9 +99,12 @@ function getCloudSessionName() {
 // Show only the sign-in methods that are turned on in CLOUD_CONFIG.
 function renderCloudGateMethods() {
   var cfg = (typeof CLOUD_CONFIG === 'object' && CLOUD_CONFIG) || {};
-  var magic = cfg.enableMagicLink !== false;
+  var password = !!cfg.enableEmailPassword;
+  var magic = !password && cfg.enableMagicLink !== false;
   var ms = !!cfg.enableMicrosoft;
   var gg = !!cfg.enableGoogle;
+  var elPassword = document.getElementById('cloudGatePasswordForm');
+  if (elPassword) elPassword.style.display = password ? '' : 'none';
   var elMagic = document.getElementById('cloudGateMagicLink');
   if (elMagic) elMagic.style.display = magic ? '' : 'none';
   var elMs = document.getElementById('cloudGateMsBtn');
@@ -118,7 +114,7 @@ function renderCloudGateMethods() {
   var elBtns = document.getElementById('cloudGateButtons');
   if (elBtns) elBtns.style.display = (ms || gg) ? '' : 'none';
   var elDiv = document.getElementById('cloudGateDivider');
-  if (elDiv) elDiv.style.display = (magic && (ms || gg)) ? '' : 'none';
+  if (elDiv) elDiv.style.display = ((password || magic) && (ms || gg)) ? '' : 'none';
 }
 
 function showCloudSignInGate(message) {
@@ -154,11 +150,25 @@ function hideCloudSignInGate() {
 function setCloudGateBusy(busy, label) {
   var wrap = document.getElementById('cloudGateButtons');
   if (wrap) wrap.style.opacity = busy ? '0.5' : '';
+  var form = document.getElementById('cloudGatePasswordForm');
+  if (form) form.style.opacity = busy ? '0.5' : '';
   var status = document.getElementById('cloudGateStatus');
   if (status) {
     status.textContent = busy ? (label || 'Working…') : '';
     status.style.display = busy ? '' : 'none';
   }
+}
+
+function getCloudGateCredentials() {
+  var emailEl = document.getElementById('cloudGateEmail');
+  var passEl = document.getElementById('cloudGatePassword');
+  var email = String((emailEl && emailEl.value) || '').trim();
+  var password = String((passEl && passEl.value) || '');
+  return { email: email, password: password };
+}
+
+function validateCloudGateEmail(email) {
+  return !!email && email.indexOf('@') >= 1 && email.indexOf('.') >= 0;
 }
 
 // ── OAuth sign-in ────────────────────────────────────────────────────────────
@@ -188,7 +198,75 @@ async function signInWithProvider(provider) {
 function signInWithMicrosoft() { return signInWithProvider('azure'); }
 function signInWithGoogle() { return signInWithProvider('google'); }
 
-// Passwordless email sign-in — no OAuth app registration required.
+async function signInWithPassword() {
+  var sb = getCloudClient();
+  if (!sb) {
+    if (typeof showToast === 'function') showToast('Cloud sign-in is not configured.', true);
+    return;
+  }
+  var creds = getCloudGateCredentials();
+  if (!validateCloudGateEmail(creds.email)) {
+    if (typeof showToast === 'function') showToast('Enter a valid email address.', true);
+    return;
+  }
+  if (!creds.password) {
+    if (typeof showToast === 'function') showToast('Enter your password.', true);
+    return;
+  }
+  try {
+    setCloudGateBusy(true, 'Signing in…');
+    var res = await sb.auth.signInWithPassword({ email: creds.email, password: creds.password });
+    if (res && res.error) throw res.error;
+    if (res && res.data && res.data.session) {
+      await enterCloudWithSession(res.data.session);
+    } else {
+      throw new Error('No session returned.');
+    }
+  } catch (err) {
+    console.warn('signInWithPassword', err);
+    if (typeof showToast === 'function') {
+      showToast('Sign-in failed: ' + ((err && err.message) || 'check your email and password.'), true);
+    }
+  } finally {
+    setCloudGateBusy(false);
+  }
+}
+
+async function signUpWithPassword() {
+  var sb = getCloudClient();
+  if (!sb) {
+    if (typeof showToast === 'function') showToast('Cloud sign-in is not configured.', true);
+    return;
+  }
+  var creds = getCloudGateCredentials();
+  if (!validateCloudGateEmail(creds.email)) {
+    if (typeof showToast === 'function') showToast('Enter a valid email address.', true);
+    return;
+  }
+  if (creds.password.length < 6) {
+    if (typeof showToast === 'function') showToast('Choose a password with at least 6 characters.', true);
+    return;
+  }
+  try {
+    setCloudGateBusy(true, 'Creating your account…');
+    var res = await sb.auth.signUp({ email: creds.email, password: creds.password });
+    if (res && res.error) throw res.error;
+    if (res && res.data && res.data.session) {
+      await enterCloudWithSession(res.data.session);
+      return;
+    }
+    setCloudGateBusy(false);
+    showCloudGateInfo('Account created for ' + creds.email + '. If email confirmation is enabled in Supabase, check your inbox first, then sign in.');
+  } catch (err) {
+    setCloudGateBusy(false);
+    console.warn('signUpWithPassword', err);
+    if (typeof showToast === 'function') {
+      showToast('Could not create account: ' + ((err && err.message) || 'unknown error'), true);
+    }
+  }
+}
+
+// Passwordless email sign-in — kept for legacy config; disabled by default.
 async function sendMagicLink() {
   var sb = getCloudClient();
   if (!sb) {
@@ -317,6 +395,7 @@ function applyCloudProgramRow(row) {
   __cloudProgramId = row.id;
   __cloudProgramOwnerId = row.owner_id;
   if (row.state && typeof applyLoadedState === 'function') applyLoadedState(row.state);
+  rememberCloudLocalFingerprint();
   // Mirror into localStorage as an offline cache for this browser.
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(buildPersistedPayload())); } catch (e) {}
   __cloudLocked = true;
@@ -365,6 +444,18 @@ function cloudPushDebounced() {
   }, 1000);
 }
 
+function cloudStateFingerprint(payload) {
+  try { return JSON.stringify(payload || {}); } catch (e) { return ''; }
+}
+
+function rememberCloudLocalFingerprint() {
+  try {
+    if (typeof buildPersistedPayload === 'function') {
+      __cloudLastPushedFingerprint = cloudStateFingerprint(buildPersistedPayload());
+    }
+  } catch (e) { /* ignore */ }
+}
+
 async function cloudPushNow() {
   if (!isCloudSessionActive()) return;
   var sb = getCloudClient();
@@ -372,6 +463,7 @@ async function cloudPushNow() {
   try {
     var payload = typeof buildPersistedPayload === 'function' ? buildPersistedPayload() : null;
     if (!payload) return;
+    __cloudLastPushedFingerprint = cloudStateFingerprint(payload);
     var res = await sb.from('programs')
       .update({ state: payload, name: (state.orgName || 'GRC Program') })
       .eq('id', __cloudProgramId);
@@ -394,11 +486,16 @@ function subscribeCloudRealtime() {
           // Only refresh when this browser has no unsaved edits, so we never
           // clobber in-progress work with a remote update.
           if (window.isDirty) return;
-          if (payload && payload.new && payload.new.state && typeof applyLoadedState === 'function') {
-            applyLoadedState(payload.new.state);
-            if (typeof bootAfterStateReady === 'function') bootAfterStateReady();
-            if (typeof showToast === 'function') showToast('Program updated by another user.');
-          }
+          if (!(payload && payload.new && payload.new.state && typeof applyLoadedState === 'function')) return;
+          var incoming = payload.new.state;
+          var incomingFp = cloudStateFingerprint(incoming);
+          if (incomingFp === __cloudLastPushedFingerprint) return;
+          var localFp = cloudStateFingerprint(typeof buildPersistedPayload === 'function' ? buildPersistedPayload() : null);
+          if (incomingFp === localFp) return;
+          applyLoadedState(incoming);
+          rememberCloudLocalFingerprint();
+          if (typeof bootAfterStateReady === 'function') bootAfterStateReady();
+          if (typeof showToast === 'function') showToast('Program updated by another user.');
         })
       .subscribe();
   } catch (e) {
@@ -497,6 +594,8 @@ if (typeof window !== 'undefined') {
   window.isCloudLocked = isCloudLocked;
   window.signInWithMicrosoft = signInWithMicrosoft;   // overrides the legacy Entra one
   window.signInWithGoogle = signInWithGoogle;
+  window.signInWithPassword = signInWithPassword;
+  window.signUpWithPassword = signUpWithPassword;
   window.sendMagicLink = sendMagicLink;
   window.signOutCloud = signOutCloud;
   window.showCloudAccountMenu = showCloudAccountMenu;

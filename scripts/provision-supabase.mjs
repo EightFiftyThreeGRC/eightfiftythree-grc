@@ -146,7 +146,8 @@ async function main() {
 var CLOUD_CONFIG = {
   supabaseUrl: ${JSON.stringify(url)},
   supabaseAnonKey: ${JSON.stringify(anon.api_key)},
-  enableMagicLink: true,
+  enableMagicLink: false,
+  enableEmailPassword: true,
   enableGoogle: false,
   enableMicrosoft: false
 };

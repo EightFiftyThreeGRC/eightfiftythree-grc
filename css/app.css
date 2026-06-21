@@ -2712,12 +2712,25 @@
       padding: 4px 12px;
     }
 
-    /* Magic-link form inside the cloud sign-in gate */
-    .cloud-gate-magic {
+    /* Email/password form inside the cloud sign-in gate */
+    .cloud-gate-form {
       display: flex;
       flex-direction: column;
       gap: 10px;
     }
+    .cloud-gate-link-btn {
+      margin-top: 4px;
+      padding: 0;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--teal, #0d9488);
+      background: none;
+      border: none;
+      cursor: pointer;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+    .cloud-gate-link-btn:hover { color: #0b8076; }
     .cloud-gate-email {
       width: 100%;
       padding: 12px 14px;

@@ -638,11 +638,13 @@
     <div class="cloud-gate-title" id="cloudGateTitle">Sign in to your program</div>
     <p class="cloud-gate-sub">Use your work account. Your access and role are tied to your identity — no profile picking.</p>
     <div id="cloudGateMessage" class="cloud-gate-message" style="display:none;"></div>
-    <div id="cloudGateMagicLink" class="cloud-gate-magic" style="display:none;">
-      <input type="email" id="cloudGateEmail" class="cloud-gate-email" placeholder="you@company.com" autocomplete="email" onkeydown="if(event.key==='Enter')sendMagicLink()">
-      <button type="button" class="cloud-signin-btn cloud-signin-primary" onclick="sendMagicLink()">
-        <span>Email me a sign-in link</span>
+    <div id="cloudGatePasswordForm" class="cloud-gate-form" style="display:none;">
+      <input type="email" id="cloudGateEmail" class="cloud-gate-email" placeholder="you@company.com" autocomplete="email">
+      <input type="password" id="cloudGatePassword" class="cloud-gate-email" placeholder="Password" autocomplete="current-password" onkeydown="if(event.key==='Enter')signInWithPassword()">
+      <button type="button" class="cloud-signin-btn cloud-signin-primary" onclick="signInWithPassword()">
+        <span>Sign in</span>
       </button>
+      <button type="button" class="cloud-gate-link-btn" onclick="signUpWithPassword()">Need an account? Create one</button>
     </div>
     <div id="cloudGateDivider" class="cloud-gate-divider" style="display:none;"><span>or</span></div>
     <div id="cloudGateButtons" class="cloud-gate-buttons" style="display:none;">
