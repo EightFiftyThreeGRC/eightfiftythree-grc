@@ -290,8 +290,15 @@ function cisoNext(fromStep) {
     }
   }
   if (fromStep===5) {
+    var ispRc = (state.policyReviewCycle || {}).ISP || {};
+    if (ispRc._customApprover) {
+      var approverEm = String(ispRc.approverEmail || '').trim();
+      if (!isValidOwnerEmail(approverEm)) {
+        showToast('Enter a valid approver email — they will receive a sign-up link to review the ISP.', true);
+        return;
+      }
+    }
     // Finalize the ISP and submit to the selected approver for review.
-    // Wrapped so a submission failure can never block the wizard from advancing.
     try { submitISPForApproval(/*silent=*/false); } catch (e) { console.warn('submitISPForApproval failed:', e); }
   }
   goToStep('ciso', fromStep+1);
@@ -334,7 +341,9 @@ function submitISPForApproval(silent) {
 
   // Only (re)submit if the ISP isn't already approved. Approved policies shouldn't regress on re-edit.
   var current = (state.policyStatus.ISP || {}).status;
+  var justSubmitted = false;
   if (current !== 'Approved') {
+    justSubmitted = current !== 'Under Review';
     state.policyStatus.ISP = {
       status: 'Under Review',
       submittedTo: approverName,
@@ -345,7 +354,28 @@ function submitISPForApproval(silent) {
       version: (state.infoSecPolicy && state.infoSecPolicy.version) || '1.0'
     };
     try { addAuditEntry('policy', 'ISP', 'ISP submitted for approval — routed to ' + approverName + (approverRole ? ' (' + approverRole + ')' : '')); } catch (e) { console.warn('audit log failed:', e); }
-    if (!silent) showToast('📨 ISP submitted to ' + approverName + ' for review.');
+    var willEmail = justSubmitted && isCustom && approverEmail
+      && typeof sendISPApprovalRequestEmail === 'function'
+      && typeof isCloudSessionActive === 'function' && isCloudSessionActive();
+    if (!silent && !willEmail) showToast('📨 ISP submitted to ' + approverName + ' for review.');
+  }
+
+  if (justSubmitted && isCustom && approverEmail && typeof sendISPApprovalRequestEmail === 'function') {
+    sendISPApprovalRequestEmail({
+      approverEmail: approverEmail,
+      approverName: approverName,
+      programOwnerName: state.programOwner || defaultApproverName,
+      orgName: state.orgName || 'your organization'
+    }).then(function(res) {
+      if (res && res.ok) {
+        if (!silent) showToast('📨 ISP submitted to ' + approverName + '. Sign-up email sent to ' + approverEmail + '.');
+        try { addAuditEntry('policy', 'ISP', 'Approval request email sent to ' + approverEmail); } catch (e) { /* ignore */ }
+      } else if (res && res.reason === 'not_cloud') {
+        if (!silent) showToast('📨 ISP submitted to ' + approverName + ' for review.');
+      } else if (!silent) {
+        showToast('ISP submitted, but the sign-up email could not be sent. Ask ' + approverName + ' to open the app and register with ' + approverEmail + '.', true);
+      }
+    });
   }
 
   // Make sure the approver shows up as a user so they can log in and see the queue.
