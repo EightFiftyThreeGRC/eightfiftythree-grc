@@ -1106,6 +1106,7 @@ const state = {
   baselineOverride: null,   // 'L'|'M'|'H'|null — FISMA-mode tailoring override (NIST 800-37 / 800-60 allows raising or lowering the derived baseline with justification)
   baselineOverrideRationale: '', // free-text justification for the tailoring decision (required if override differs from derived)
   orgName: '',              // organization / agency name
+  orgSector: '',            // sector dropdown (step 1) — drives reg-mapping suggestions in step 3
   programOwner: '',         // program owner full name (CISO / SAISO)
   programOwnerTitle: 'Chief Information Security Officer',  // title/role
   programOwnerEmail: '',    // program owner email
@@ -1189,7 +1190,9 @@ const state = {
   _reportsProgramReadinessHidden: false, // true = collapse Program Readiness panel in Reports
   _reportsMySummaryHidden: false, // true = collapse "My dashboard" summary card in Reports
   _reportsPhase1BannerHidden: false, // true = collapse Phase 1 completion banner in Reports
-  activeFrameworks: { iso27001: true, soc2: true, hipaa: true }, // which cross-framework lenses to track
+  activeFrameworks: { iso27001: true, soc2: true, cis: true }, // voluntary standards crosswalk lenses
+  activeComplianceLaws: {}, // laws & regulations (HIPAA, GLBA, …) tracked separately
+  _regMappingInitialized: false,
   sharePointConfig: { enabled: false, siteUrl: '', libraryName: 'Evidence', defaultFolder: 'GRC/Evidence' },
   entraConfig: { enabled: false, clientId: '', tenantId: 'organizations', redirectUri: '' },
   entraSession: null, // { email, name, oid, matchedUserId, signedInAt } when signed in via Entra
@@ -1253,6 +1256,24 @@ function normalizeStateShape() {
       state[k] = cloneStateValue(STATE_DEFAULTS[k]);
     }
   });
+  migrateRegMappingStateShape();
+}
+
+function migrateRegMappingStateShape() {
+  if (!state.activeComplianceLaws || typeof state.activeComplianceLaws !== 'object') {
+    state.activeComplianceLaws = {};
+  }
+  if (!state.activeFrameworks || typeof state.activeFrameworks !== 'object') {
+    state.activeFrameworks = cloneStateValue(STATE_DEFAULTS.activeFrameworks);
+  }
+  if (state.activeFrameworks.hipaa) {
+    if (state.activeComplianceLaws.hipaa !== false) state.activeComplianceLaws.hipaa = true;
+    delete state.activeFrameworks.hipaa;
+  }
+  if (state.activeFrameworks.cis === undefined) {
+    state.activeFrameworks.cis = state.activeFrameworks.iso27001 !== false;
+  }
+  if (state._regMappingInitialized === undefined) state._regMappingInitialized = false;
 }
 
 function resetStateToDefaults() {

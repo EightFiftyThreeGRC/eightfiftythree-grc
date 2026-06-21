@@ -3,7 +3,7 @@
 function getSetupProgressSummary() {
   var step = (typeof currentStep !== 'undefined' && currentStep.ciso) ? currentStep.ciso : 1;
   var pct = Math.round((step / 7) * 100);
-  var labels = ['Organization', 'Baseline', 'Integrations', 'PM Controls', 'InfoSec Policy', 'Consolidate', 'Assign Owners'];
+  var labels = ['Organization', 'Baseline', 'Reg mapping', 'PM Controls', 'InfoSec Policy', 'Consolidate', 'Assign Owners'];
   return { step: step, pct: pct, label: labels[step - 1] || 'Organization' };
 }
 
@@ -30,7 +30,7 @@ function renderOnboardingHome() {
   var steps = [
     { n: 1, label: 'Organization' },
     { n: 2, label: 'Baseline' },
-    { n: 3, label: 'Integrations' },
+    { n: 3, label: 'Reg mapping' },
     { n: 4, label: 'PM controls' },
     { n: 5, label: 'InfoSec policy' },
     { n: 6, label: 'Consolidate' },
@@ -56,7 +56,7 @@ function renderOnboardingHome() {
     + '</div>'
     + (hasStarted
       ? '<p class="onboard-resume">You\'re on step ' + progress.step + ' — <strong>' + escapeHTML(progress.label) + '</strong>. Pick up where you left off.</p>'
-      : '<p class="onboard-resume">Most teams finish setup in 15–20 minutes. Integrations (SharePoint, Entra, ISO/SOC 2/HIPAA) are optional.</p>')
+      : '<p class="onboard-resume">Most teams finish setup in 15–20 minutes. Step 3 maps ISO, SOC 2, CIS, and sector-specific laws.</p>')
     + '</div>'
     + '<div class="onboard-features">'
     + '<div class="onboard-feature"><span>📋</span><div><strong>Policies</strong><p>Build AC, AU, SC, and the rest after setup.</p></div></div>'
@@ -155,7 +155,7 @@ function renderHomeTab() {
     { icon: '🔧', label: 'Controls', desc: 'Implementation design', fn: 'goToControlWorkspace()' },
     { icon: '🖥️', label: 'Assets & SSP', desc: 'Inventory & attestations', fn: 'goToAssetWorkspace()' },
     { icon: '📊', label: 'Reports', desc: 'Program dashboard', fn: "showTab('reports')" },
-    { icon: '◇', label: 'Frameworks', desc: 'ISO / SOC 2 / HIPAA', fn: "showTab('frameworks')" },
+    { icon: '◇', label: 'Frameworks', desc: 'ISO / SOC 2 / CIS', fn: "showTab('frameworks')" },
     { icon: '📝', label: 'POA&M', desc: 'Findings & remediation', fn: "showTab('poam')" }
   ];
 

@@ -2129,6 +2129,7 @@
     .fw-setup-chip-on { border-color: var(--fw-color); background: color-mix(in srgb, var(--fw-color) 8%, white); color: var(--fw-color); }
     .fw-setup-chip-dot { width: 8px; height: 8px; border-radius: 50%; background: #d2d2d7; }
     .fw-setup-chip-on .fw-setup-chip-dot { background: var(--fw-color); }
+    .fw-setup-chip-suggested { box-shadow: 0 0 0 2px color-mix(in srgb, var(--fw-color) 25%, transparent); }
     .fw-toggle { position: relative; display: inline-flex; cursor: pointer; }
     .fw-toggle input { position: absolute; opacity: 0; width: 0; height: 0; }
     .fw-toggle-track {

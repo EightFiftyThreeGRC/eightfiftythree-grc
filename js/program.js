@@ -220,7 +220,7 @@ function updateCISOFinishBtn() {
 // updateCISOFinishBtn, goToStep, prefillFakeOwners, etc.
 // ============================================================
 var CISO_WIZARD_STEPS = 7;
-var CISO_STEP_LABELS = ['Organization', 'Baseline', 'Integrations', 'PM Controls', 'InfoSec Policy', 'Consolidate', 'Assign Owners'];
+var CISO_STEP_LABELS = ['Organization', 'Baseline', 'Reg mapping', 'PM Controls', 'InfoSec Policy', 'Consolidate', 'Assign Owners'];
 
 function updateCisoSetupProgress(step) {
   var s = step || (typeof currentStep !== 'undefined' ? currentStep.ciso : 1) || 1;
@@ -779,7 +779,7 @@ function openProcessSspFromLibrary(procId) {
 // ============================================================
 // CISO STEP 1 — ORGANIZATION
 // CISO STEP 2 — BASELINE & SCOPE
-// CISO STEP 3 — INTEGRATIONS (optional)
+// CISO STEP 3 — REGULATORY MAPPING
 // ============================================================
 function renderCISOStep1() {
   const body = document.getElementById('ciso-step-1-body');
@@ -795,6 +795,15 @@ function renderCISOStep1() {
         <label class="form-label">Organization / Agency Name <span class="required">*</span></label>
         <input class="form-input" id="orgNameInput" placeholder="e.g., Acme Corp, Department of Defense — Agency X" value="${escapeHTML(state.orgName)}" oninput="state.orgName=this.value; window.markDirty();">
         <div class="form-hint">Full legal name of the organization this information security program governs.</div>
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Sector <span class="required">*</span></label>
+        <select class="form-select" id="orgSectorSelect" onchange="setOrgSector(this.value)">
+          ${(typeof ORG_SECTOR_OPTIONS !== 'undefined' ? ORG_SECTOR_OPTIONS : [{ id: '', label: 'Select sector…' }]).map(function(opt) {
+            return '<option value="' + escapeHTML(opt.id) + '"' + ((state.orgSector || '') === opt.id ? ' selected' : '') + '>' + escapeHTML(opt.label) + '</option>';
+          }).join('')}
+        </select>
+        <div class="form-hint">Used in Step 3 to suggest which voluntary frameworks and laws typically apply to your organization.</div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
         <div class="form-group" style="margin-bottom:0;">
@@ -994,17 +1003,16 @@ function renderCISOStep2Baseline() {
 function renderCISOStep3Integrations() {
   const body = document.getElementById('ciso-step-3-body');
   if (!body) return;
+  if (typeof applySectorRegMappingSuggestions === 'function') applySectorRegMappingSuggestions(false);
 
   body.innerHTML = `
-    ${cisoStepProgressHtml(3, 'Integrations')}
-    <div class="section-title">Connect your tools</div>
-    <div class="section-subtitle">All optional — enable multi-framework tracking, SharePoint evidence links, or Microsoft Entra ID sign-in now, or configure later under Users &amp; Program.</div>
+    ${cisoStepProgressHtml(3, 'Reg mapping')}
+    <div class="section-title">Regulatory &amp; framework mapping</div>
+    <div class="section-subtitle">NIST 800-53 is your anchor. Choose voluntary standards and applicable laws — suggestions follow the sector you selected in Step 1.</div>
 
     ${typeof renderFrameworkSetupSectionHtml === 'function' ? renderFrameworkSetupSectionHtml() : ''}
 
-    ${typeof renderSharePointSetupCardHtml === 'function' ? renderSharePointSetupCardHtml() : ''}
-
-    ${typeof renderEntraSetupCardHtml === 'function' ? renderEntraSetupCardHtml() : ''}
+    ${typeof renderComplianceLawSetupSectionHtml === 'function' ? renderComplianceLawSetupSectionHtml() : ''}
   `;
 }
 
