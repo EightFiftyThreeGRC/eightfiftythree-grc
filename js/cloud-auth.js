@@ -21,6 +21,8 @@ var __cloudLocked = false;        // true once signed in -> impersonation disabl
 var __cloudRealtimeChannel = null;
 var __cloudPushTimer = null;
 var __sbLoadPromise = null;
+var __cloudEntered = false;   // true once a program is loaded for the session
+var __cloudEntering = false;  // re-entrancy guard for enterCloudWithSession
 
 // ── configuration / capability checks ───────────────────────────────────────
 function isCloudConfigured() {
@@ -70,7 +72,7 @@ function getCloudClient() {
   __sbClient = window.supabase.createClient(
     String(CLOUD_CONFIG.supabaseUrl).trim(),
     String(CLOUD_CONFIG.supabaseAnonKey).trim(),
-    { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } }
+    { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: 'implicit' } }
   );
   return __sbClient;
 }
@@ -339,6 +341,17 @@ function mapCloudIdentityToRoleView() {
     // Rostered (RLS let us in) but no exact match — fall back to read-only-ish reports.
     if (typeof applyRoleView === 'function') applyRoleView('admin');
   }
+  // Make the top-left profile button reflect the signed-in identity (name/email)
+  // and a sign-out hint, instead of the generic "Admin mode / impersonate".
+  try {
+    var btn = document.getElementById('profileBtn');
+    if (btn) {
+      var u = state.currentUserId ? (state.users || []).find(function(x) { return x.id === state.currentUserId; }) : null;
+      if (typeof renderProfileButtonContent === 'function') btn.innerHTML = renderProfileButtonContent(u);
+      btn.title = 'Signed in as ' + (getCloudSessionName() || getCloudSessionEmail()) + ' — click to sign out';
+      btn.setAttribute('aria-label', btn.title);
+    }
+  } catch (e) { /* ignore */ }
 }
 
 // ── save / sync ──────────────────────────────────────────────────────────────
@@ -400,6 +413,37 @@ function teardownCloudRealtime() {
   __cloudRealtimeChannel = null;
 }
 
+// Strip auth tokens (#access_token=…, ?code=…) from the address bar after sign-in.
+function cleanCloudUrl() {
+  try {
+    if (window.location.hash || window.location.search) {
+      var clean = window.location.href.split('#')[0].split('?')[0];
+      window.history.replaceState({}, document.title, clean);
+    }
+  } catch (e) { /* ignore */ }
+}
+
+// Idempotently bring a signed-in session into the app (load program, lock view).
+// Called from both getSession() and onAuthStateChange so a magic-link return is
+// never missed regardless of timing.
+async function enterCloudWithSession(session) {
+  if (!session || __cloudEntered || __cloudEntering) return false;
+  __cloudEntering = true;
+  __cloudSession = session;
+  setCloudGateBusy(true, 'Loading your program…');
+  var ok = false;
+  try { ok = await loadOrCreateCloudProgram(); } catch (e) { console.warn('loadOrCreateCloudProgram', e); }
+  __cloudEntering = false;
+  if (ok) {
+    __cloudEntered = true;
+    hideCloudSignInGate();
+    cleanCloudUrl();
+    if (typeof bootAfterStateReady === 'function') bootAfterStateReady();
+  }
+  setCloudGateBusy(false);
+  return ok;
+}
+
 // ── boot entry point (called from app.js DOMContentLoaded) ──────────────────
 async function initCloudAuth() {
   if (!isCloudEnabled()) return false;
@@ -407,40 +451,42 @@ async function initCloudAuth() {
     await loadSupabaseScript();
   } catch (e) {
     console.warn('loadSupabaseScript', e);
-    showCloudSignInGate('Could not load the sign-in library. Check your connection, or continue in local demo mode.');
+    showCloudSignInGate('Could not load the sign-in library. Check your connection and try again.');
     return false;
   }
   var sb = getCloudClient();
   if (!sb) {
-    showCloudSignInGate('Sign-in is misconfigured. Continue in local demo mode for now.');
+    showCloudSignInGate('Sign-in is misconfigured.');
     return false;
   }
 
-  // React to future auth changes (e.g. token refresh / sign-out in another tab).
+  // Catch sign-in that completes asynchronously (magic-link URL processing,
+  // token refresh, or sign-in from another tab) as well as sign-out.
   try {
     sb.auth.onAuthStateChange(function(event, session) {
-      if (event === 'SIGNED_OUT') { __cloudSession = null; }
+      if (event === 'SIGNED_OUT') { __cloudSession = null; __cloudEntered = false; return; }
+      if (session && !__cloudEntered) { enterCloudWithSession(session); }
     });
   } catch (e) { /* ignore */ }
 
   var got = null;
   try { got = await sb.auth.getSession(); } catch (e) { console.warn('getSession', e); }
   var session = got && got.data ? got.data.session : null;
+  if (session) return enterCloudWithSession(session);
 
-  if (!session) {
-    showCloudSignInGate();
+  // No session yet, but if the URL carries auth params (just clicked the email
+  // link) give detectSessionInUrl a moment to fire onAuthStateChange before we
+  // fall back to showing the gate.
+  if (/[#&?](access_token|refresh_token|code=|type=)/.test(window.location.href)) {
+    setCloudGateBusy(true, 'Finishing sign-in…');
+    setTimeout(function() {
+      if (!__cloudEntered) { setCloudGateBusy(false); showCloudSignInGate(); }
+    }, 5000);
     return false;
   }
 
-  __cloudSession = session;
-  setCloudGateBusy(true, 'Loading your program…');
-  var ok = await loadOrCreateCloudProgram();
-  if (ok) {
-    hideCloudSignInGate();
-    if (typeof bootAfterStateReady === 'function') bootAfterStateReady();
-  }
-  setCloudGateBusy(false);
-  return ok;
+  showCloudSignInGate();
+  return false;
 }
 
 // ── exports ──────────────────────────────────────────────────────────────────
