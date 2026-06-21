@@ -1106,7 +1106,10 @@ const state = {
   baselineOverride: null,   // 'L'|'M'|'H'|null — FISMA-mode tailoring override (NIST 800-37 / 800-60 allows raising or lowering the derived baseline with justification)
   baselineOverrideRationale: '', // free-text justification for the tailoring decision (required if override differs from derived)
   orgName: '',              // organization / agency name
-  orgSector: '',            // sector dropdown (step 1) — drives reg-mapping suggestions in step 3
+  orgOwnership: '',         // 'government' | 'private' — step 1 org classification (level 1)
+  orgGovLevel: '',          // 'federal' | 'slg' — step 1 when orgOwnership is government (level 2)
+  orgSector: '',            // sector id — context-specific options (level 2 private, level 3 gov)
+  customRegFrameworks: [],  // [{ id, label, subtitle, kind:'standard'|'law', color, active }]
   programOwner: '',         // program owner full name (CISO / SAISO)
   programOwnerTitle: 'Chief Information Security Officer',  // title/role
   programOwnerEmail: '',    // program owner email
@@ -1274,6 +1277,22 @@ function migrateRegMappingStateShape() {
     state.activeFrameworks.cis = state.activeFrameworks.iso27001 !== false;
   }
   if (state._regMappingInitialized === undefined) state._regMappingInitialized = false;
+  if (!Array.isArray(state.customRegFrameworks)) state.customRegFrameworks = [];
+  // Legacy flat orgSector → hierarchical orgOwnership / orgGovLevel / orgSector
+  if (!state.orgOwnership && state.orgSector) {
+    var legacySector = state.orgSector;
+    if (legacySector === 'federal') {
+      state.orgOwnership = 'government';
+      state.orgGovLevel = 'federal';
+      state.orgSector = 'civilian';
+    } else if (legacySector === 'state_local') {
+      state.orgOwnership = 'government';
+      state.orgGovLevel = 'slg';
+      state.orgSector = 'general';
+    } else if (['commercial', 'healthcare', 'financial', 'education', 'critical_infra'].indexOf(legacySector) >= 0) {
+      state.orgOwnership = 'private';
+    }
+  }
 }
 
 function resetStateToDefaults() {

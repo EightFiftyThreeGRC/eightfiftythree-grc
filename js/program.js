@@ -266,6 +266,10 @@ function cisoNext(fromStep) {
     if (!state.programOwner || !state.programOwner.trim()) { showToast('Please enter the Security Program Owner name before continuing.', true); document.getElementById('programOwnerInput')?.focus(); return; }
     if (!state.programOwnerTitle || !state.programOwnerTitle.trim()) { showToast('Please enter the Program Owner title before continuing.', true); document.getElementById('programOwnerTitleInput')?.focus(); return; }
     if (!isValidOwnerEmail(state.programOwnerEmail)) { showToast('Please enter the program owner email before continuing.', true); document.getElementById('programOwnerEmailInput')?.focus(); return; }
+    if (typeof isOrgClassificationComplete === 'function' && !isOrgClassificationComplete()) {
+      showToast('Select organization type' + (state.orgOwnership === 'government' ? ', government level,' : '') + ' and sector before continuing.', true);
+      return;
+    }
   }
   if (fromStep===2) {
     if (state.fismaMode) {
@@ -796,15 +800,7 @@ function renderCISOStep1() {
         <input class="form-input" id="orgNameInput" placeholder="e.g., Acme Corp, Department of Defense — Agency X" value="${escapeHTML(state.orgName)}" oninput="state.orgName=this.value; window.markDirty();">
         <div class="form-hint">Full legal name of the organization this information security program governs.</div>
       </div>
-      <div class="form-group" style="margin-bottom:0;">
-        <label class="form-label">Sector <span class="required">*</span></label>
-        <select class="form-select" id="orgSectorSelect" onchange="setOrgSector(this.value)">
-          ${(typeof ORG_SECTOR_OPTIONS !== 'undefined' ? ORG_SECTOR_OPTIONS : [{ id: '', label: 'Select sector…' }]).map(function(opt) {
-            return '<option value="' + escapeHTML(opt.id) + '"' + ((state.orgSector || '') === opt.id ? ' selected' : '') + '>' + escapeHTML(opt.label) + '</option>';
-          }).join('')}
-        </select>
-        <div class="form-hint">Used in Step 3 to suggest which voluntary frameworks and laws typically apply to your organization.</div>
-      </div>
+      ${typeof renderOrgClassificationFieldsHtml === 'function' ? renderOrgClassificationFieldsHtml() : ''}
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
         <div class="form-group" style="margin-bottom:0;">
           <label class="form-label">Security Program Owner — Full Name <span class="required">*</span></label>
@@ -1008,11 +1004,13 @@ function renderCISOStep3Integrations() {
   body.innerHTML = `
     ${cisoStepProgressHtml(3, 'Reg mapping')}
     <div class="section-title">Regulatory &amp; framework mapping</div>
-    <div class="section-subtitle">NIST 800-53 is your anchor. Choose voluntary standards and applicable laws — suggestions follow the sector you selected in Step 1.</div>
+    <div class="section-subtitle">NIST 800-53 is your anchor. Choose voluntary standards and applicable laws — suggestions follow the organization profile you set in Step 1.</div>
 
     ${typeof renderFrameworkSetupSectionHtml === 'function' ? renderFrameworkSetupSectionHtml() : ''}
 
     ${typeof renderComplianceLawSetupSectionHtml === 'function' ? renderComplianceLawSetupSectionHtml() : ''}
+
+    ${typeof renderCustomRegAddFormHtml === 'function' ? renderCustomRegAddFormHtml() : ''}
   `;
 }
 

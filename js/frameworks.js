@@ -12,28 +12,64 @@ var COMPLIANCE_LAW_META = {
   ferpa:         { id: 'ferpa',         label: 'FERPA',              subtitle: 'Student records', color: '#6366f1', bg: '#eef2ff' },
   sox:           { id: 'sox',           label: 'SOX',                subtitle: 'IT general controls', color: '#b45309', bg: '#fffbeb' },
   fisma:         { id: 'fisma',         label: 'FISMA',              subtitle: 'Federal systems', color: '#7c3aed', bg: '#f5f3ff' },
+  mar_e:         { id: 'mar_e',         label: 'MARS-E',             subtitle: 'CMS Medicare / SLG systems', color: '#0891b2', bg: '#ecfeff' },
   state_privacy: { id: 'state_privacy', label: 'State privacy laws', subtitle: 'CCPA / CPRA / similar', color: '#64748b', bg: '#f8fafc' }
 };
 
-var ORG_SECTOR_OPTIONS = [
+var ORG_OWNERSHIP_OPTIONS = [
+  { id: '', label: 'Select organization type…' },
+  { id: 'government', label: 'Government' },
+  { id: 'private', label: 'Private sector' }
+];
+
+var ORG_GOV_LEVEL_OPTIONS = [
+  { id: '', label: 'Select level…' },
+  { id: 'federal', label: 'Federal' },
+  { id: 'slg', label: 'State & local (SLG)' }
+];
+
+var PRIVATE_SECTOR_OPTIONS = [
   { id: '', label: 'Select sector…' },
-  { id: 'commercial', label: 'Commercial / private sector' },
+  { id: 'commercial', label: 'Commercial / general business' },
   { id: 'healthcare', label: 'Healthcare' },
   { id: 'financial', label: 'Financial services' },
   { id: 'education', label: 'Education' },
-  { id: 'federal', label: 'Federal government' },
-  { id: 'state_local', label: 'State & local government' },
   { id: 'critical_infra', label: 'Critical infrastructure' }
 ];
 
-var SECTOR_REG_SUGGESTIONS = {
-  commercial:    { frameworks: ['iso27001', 'soc2', 'cis'], laws: ['state_privacy'] },
-  healthcare:    { frameworks: ['iso27001', 'soc2', 'cis'], laws: ['hipaa'] },
-  financial:     { frameworks: ['iso27001', 'soc2', 'cis'], laws: ['glba', 'sox'] },
-  education:     { frameworks: ['iso27001', 'soc2', 'cis'], laws: ['ferpa'] },
-  federal:       { frameworks: ['iso27001', 'cis'], laws: ['fisma'] },
-  state_local:   { frameworks: ['iso27001', 'soc2', 'cis'], laws: ['fisma'] },
-  critical_infra:{ frameworks: ['iso27001', 'soc2', 'cis'], laws: [] }
+var FEDERAL_SECTOR_OPTIONS = [
+  { id: '', label: 'Select sector…' },
+  { id: 'defense', label: 'Defense / national security' },
+  { id: 'civilian', label: 'Civilian agency' },
+  { id: 'intelligence', label: 'Intelligence community' },
+  { id: 'law_enforcement', label: 'Law enforcement / justice' }
+];
+
+var SLG_SECTOR_OPTIONS = [
+  { id: '', label: 'Select sector…' },
+  { id: 'general', label: 'General / multi-purpose' },
+  { id: 'healthcare', label: 'Healthcare (non-Medicare)' },
+  { id: 'medicare_integrator', label: 'Medicare / CMS integrator (MARS-E)' },
+  { id: 'education', label: 'Education / K-12 / higher ed' },
+  { id: 'justice_public_safety', label: 'Justice / public safety' }
+];
+
+// Keys: private:<sector> | government:<federal|slg>:<sector>
+var REG_SUGGESTION_MAP = {
+  'private:commercial':         { frameworks: ['iso27001', 'soc2', 'cis'], laws: ['state_privacy'] },
+  'private:healthcare':         { frameworks: ['iso27001', 'soc2', 'cis'], laws: ['hipaa'] },
+  'private:financial':          { frameworks: ['iso27001', 'soc2', 'cis'], laws: ['glba', 'sox'] },
+  'private:education':          { frameworks: ['iso27001', 'soc2', 'cis'], laws: ['ferpa'] },
+  'private:critical_infra':     { frameworks: ['iso27001', 'soc2', 'cis'], laws: [] },
+  'government:federal:defense':           { frameworks: ['iso27001', 'cis'], laws: ['fisma'] },
+  'government:federal:civilian':          { frameworks: ['iso27001', 'cis'], laws: ['fisma'] },
+  'government:federal:intelligence':      { frameworks: ['iso27001', 'cis'], laws: ['fisma'] },
+  'government:federal:law_enforcement':   { frameworks: ['iso27001', 'cis'], laws: ['fisma'] },
+  'government:slg:general':               { frameworks: ['iso27001', 'soc2', 'cis'], laws: ['fisma', 'state_privacy'] },
+  'government:slg:healthcare':            { frameworks: ['iso27001', 'soc2', 'cis'], laws: ['hipaa', 'fisma'] },
+  'government:slg:medicare_integrator':   { frameworks: ['iso27001', 'soc2', 'cis'], laws: ['hipaa', 'mar_e', 'fisma'] },
+  'government:slg:education':             { frameworks: ['iso27001', 'soc2', 'cis'], laws: ['ferpa', 'fisma'] },
+  'government:slg:justice_public_safety': { frameworks: ['iso27001', 'soc2', 'cis'], laws: ['fisma'] }
 };
 
 var CIS_BY_FAMILY = {
@@ -49,6 +85,7 @@ var GENERIC_LAW_REF = {
   ferpa: 'FERPA §99.31',
   sox: 'SOX ITGC',
   fisma: 'FISMA / NIST RMF',
+  mar_e: 'CMS MARS-E v2',
   state_privacy: 'State privacy statute'
 };
 
@@ -119,19 +156,142 @@ var CONTROL_FRAMEWORK_OVERRIDES = {
   });
 })();
 
-function getOrgSectorLabel(sectorId) {
-  var match = ORG_SECTOR_OPTIONS.find(function(o) { return o.id === sectorId; });
-  return match ? match.label : '';
+function getOrgRegProfileKey() {
+  if (!state.orgOwnership) return '';
+  if (state.orgOwnership === 'private') {
+    return state.orgSector ? ('private:' + state.orgSector) : '';
+  }
+  if (state.orgOwnership === 'government') {
+    if (!state.orgGovLevel || !state.orgSector) return '';
+    return 'government:' + state.orgGovLevel + ':' + state.orgSector;
+  }
+  return '';
 }
 
-function getSectorRegSuggestions(sectorId) {
-  return SECTOR_REG_SUGGESTIONS[sectorId] || { frameworks: ['iso27001', 'soc2', 'cis'], laws: [] };
+function getOrgSectorOptionsForContext() {
+  if (state.orgOwnership === 'private') return PRIVATE_SECTOR_OPTIONS;
+  if (state.orgOwnership === 'government') {
+    if (state.orgGovLevel === 'federal') return FEDERAL_SECTOR_OPTIONS;
+    if (state.orgGovLevel === 'slg') return SLG_SECTOR_OPTIONS;
+    return [{ id: '', label: 'Select federal or SLG first…' }];
+  }
+  return [{ id: '', label: 'Select organization type first…' }];
+}
+
+function labelFromOptions(options, id) {
+  var match = (options || []).find(function(o) { return o.id === id; });
+  return match ? match.label : id || '';
+}
+
+function getOrgClassificationSummary() {
+  if (!state.orgOwnership) return '';
+  if (state.orgOwnership === 'private') {
+    if (!state.orgSector) return 'Private sector';
+    return 'Private · ' + labelFromOptions(PRIVATE_SECTOR_OPTIONS, state.orgSector);
+  }
+  var level = labelFromOptions(ORG_GOV_LEVEL_OPTIONS, state.orgGovLevel);
+  var sector = labelFromOptions(getOrgSectorOptionsForContext(), state.orgSector);
+  if (!state.orgGovLevel) return 'Government';
+  if (!state.orgSector) return 'Government · ' + level;
+  return 'Government · ' + level + ' · ' + sector;
+}
+
+function getRegSuggestionsForProfile(key) {
+  return REG_SUGGESTION_MAP[key] || { frameworks: ['iso27001', 'soc2', 'cis'], laws: [] };
+}
+
+function isOrgClassificationComplete() {
+  if (!state.orgOwnership) return false;
+  if (state.orgOwnership === 'private') return !!state.orgSector;
+  return !!(state.orgGovLevel && state.orgSector);
+}
+
+function setOrgClassification(field, value) {
+  var prev = state[field] || '';
+  state[field] = value;
+  if (field === 'orgOwnership') {
+    if (value !== 'government') state.orgGovLevel = '';
+    if (!value) {
+      state.orgGovLevel = '';
+      state.orgSector = '';
+    } else if (value === 'government') {
+      var privateIds = PRIVATE_SECTOR_OPTIONS.map(function(o) { return o.id; });
+      if (privateIds.indexOf(state.orgSector) >= 0) state.orgSector = '';
+    } else if (value === 'private') {
+      var govIds = FEDERAL_SECTOR_OPTIONS.concat(SLG_SECTOR_OPTIONS).map(function(o) { return o.id; });
+      if (govIds.indexOf(state.orgSector) >= 0 || state.orgSector === 'federal' || state.orgSector === 'state_local') state.orgSector = '';
+      state.orgGovLevel = '';
+    }
+  }
+  if (field === 'orgGovLevel') {
+    var valid = getOrgSectorOptionsForContext().map(function(o) { return o.id; });
+    if (valid.indexOf(state.orgSector) < 0) state.orgSector = '';
+  }
+  if (prev !== value) state._regMappingInitialized = false;
+  logFieldChange(field, prev, value);
+  markDirty();
+  if (typeof renderCISOStep1 === 'function') renderCISOStep1();
+  if (typeof refreshCurrentCisoStep === 'function') refreshCurrentCisoStep();
+}
+
+function renderOrgClassificationFieldsHtml() {
+  var showGov = state.orgOwnership === 'government';
+  var showSector = state.orgOwnership === 'private' || (showGov && !!state.orgGovLevel);
+  var sectorOptions = getOrgSectorOptionsForContext();
+  return ''
+    + '<div class="form-group" style="margin-bottom:0;">'
+    + '<label class="form-label">Organization type <span class="required">*</span></label>'
+    + '<select class="form-select" onchange="setOrgClassification(\'orgOwnership\', this.value)">'
+    + ORG_OWNERSHIP_OPTIONS.map(function(opt) {
+      return '<option value="' + escapeHTML(opt.id) + '"' + ((state.orgOwnership || '') === opt.id ? ' selected' : '') + '>' + escapeHTML(opt.label) + '</option>';
+    }).join('')
+    + '</select>'
+    + '<div class="form-hint">Government programs use a different mapping path than private sector.</div>'
+    + '</div>'
+    + (showGov
+      ? '<div class="form-group" style="margin-bottom:0;">'
+        + '<label class="form-label">Government level <span class="required">*</span></label>'
+        + '<select class="form-select" onchange="setOrgClassification(\'orgGovLevel\', this.value)">'
+        + ORG_GOV_LEVEL_OPTIONS.map(function(opt) {
+          return '<option value="' + escapeHTML(opt.id) + '"' + ((state.orgGovLevel || '') === opt.id ? ' selected' : '') + '>' + escapeHTML(opt.label) + '</option>';
+        }).join('')
+        + '</select>'
+        + '<div class="form-hint">Federal vs state &amp; local (SLG) — SLG includes Medicare integrators subject to MARS-E.</div>'
+        + '</div>'
+      : '')
+    + (showSector
+      ? '<div class="form-group" style="margin-bottom:0;">'
+        + '<label class="form-label">Sector <span class="required">*</span></label>'
+        + '<select class="form-select" onchange="setOrgClassification(\'orgSector\', this.value)">'
+        + sectorOptions.map(function(opt) {
+          return '<option value="' + escapeHTML(opt.id) + '"' + ((state.orgSector || '') === opt.id ? ' selected' : '') + '>' + escapeHTML(opt.label) + '</option>';
+        }).join('')
+        + '</select>'
+        + '<div class="form-hint">Drives Step 3 suggestions — e.g., Medicare SLG integrators get MARS-E.</div>'
+        + '</div>'
+      : '');
+}
+
+function getCustomRegFrameworks(kind) {
+  return (state.customRegFrameworks || []).filter(function(c) { return c.kind === kind; });
+}
+
+function getCustomRegMeta(entry) {
+  return {
+    id: entry.id,
+    label: entry.label,
+    subtitle: entry.subtitle || 'Custom',
+    color: entry.color || '#64748b',
+    bg: '#f8fafc',
+    custom: true
+  };
 }
 
 function applySectorRegMappingSuggestions(force) {
-  if (!state.orgSector) return false;
+  var key = getOrgRegProfileKey();
+  if (!key) return false;
   if (state._regMappingInitialized && !force) return false;
-  var sug = getSectorRegSuggestions(state.orgSector);
+  var sug = getRegSuggestionsForProfile(key);
   if (!state.activeFrameworks) state.activeFrameworks = {};
   if (!state.activeComplianceLaws) state.activeComplianceLaws = {};
   Object.keys(FRAMEWORK_META).forEach(function(id) {
@@ -140,31 +300,110 @@ function applySectorRegMappingSuggestions(force) {
   Object.keys(COMPLIANCE_LAW_META).forEach(function(id) {
     state.activeComplianceLaws[id] = sug.laws.indexOf(id) >= 0;
   });
+  (state.customRegFrameworks || []).forEach(function(c) { c.active = false; });
   state._regMappingInitialized = true;
   markDirty();
   return true;
 }
 
-function setOrgSector(sectorId) {
-  var prev = state.orgSector || '';
-  state.orgSector = sectorId;
-  if (prev !== sectorId) state._regMappingInitialized = false;
-  logFieldChange('orgSector', prev, sectorId);
+function addCustomRegFramework(label, kind, subtitle) {
+  var name = String(label || '').trim();
+  if (!name) {
+    if (typeof showToast === 'function') showToast('Enter a name for the custom framework.', true);
+    return false;
+  }
+  if (kind !== 'standard' && kind !== 'law') kind = 'law';
+  if (!state.customRegFrameworks) state.customRegFrameworks = [];
+  var id = 'custom-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 5);
+  state.customRegFrameworks.push({
+    id: id,
+    label: name,
+    subtitle: String(subtitle || 'Custom').trim() || 'Custom',
+    kind: kind,
+    color: '#64748b',
+    active: true
+  });
+  state._regMappingInitialized = true;
   markDirty();
-  if (typeof renderCISOStep1 === 'function') renderCISOStep1();
   if (typeof refreshCurrentCisoStep === 'function') refreshCurrentCisoStep();
+  else if (typeof renderCISOStep3Integrations === 'function') renderCISOStep3Integrations();
+  if (typeof renderFrameworksTab === 'function') renderFrameworksTab();
+  return true;
+}
+
+function submitCustomRegFramework(kind) {
+  var labelEl = document.getElementById('customRegLabel');
+  var subEl = document.getElementById('customRegSubtitle');
+  var label = labelEl ? labelEl.value : '';
+  var subtitle = subEl ? subEl.value : '';
+  if (!addCustomRegFramework(label, kind, subtitle)) return;
+  if (labelEl) labelEl.value = '';
+  if (subEl) subEl.value = '';
+}
+
+function removeCustomRegFramework(id) {
+  if (!state.customRegFrameworks) return;
+  state.customRegFrameworks = state.customRegFrameworks.filter(function(c) { return c.id !== id; });
+  markDirty();
+  if (typeof refreshCurrentCisoStep === 'function') refreshCurrentCisoStep();
+  if (typeof renderFrameworksTab === 'function') renderFrameworksTab();
+}
+
+function toggleCustomRegFramework(id) {
+  var entry = (state.customRegFrameworks || []).find(function(c) { return c.id === id; });
+  if (!entry) return;
+  entry.active = !entry.active;
+  state._regMappingInitialized = true;
+  markDirty();
+  if (typeof refreshCurrentCisoStep === 'function') refreshCurrentCisoStep();
+  if (typeof renderFrameworksTab === 'function') renderFrameworksTab();
+}
+
+function renderCustomRegAddFormHtml() {
+  return '<div class="custom-reg-add" style="margin-top:16px;padding:14px;border:1px dashed #d8dee9;border-radius:12px;background:#fafbfc;">'
+    + '<div class="section-subtitle" style="margin-bottom:10px;">Add a custom framework or regulation (e.g., NIS2, EU AI Act, contract-specific CSF).</div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">'
+    + '<input class="form-input" id="customRegLabel" placeholder="Name (required)" onkeydown="if(event.key===\'Enter\')submitCustomRegFramework(\'law\')">'
+    + '<input class="form-input" id="customRegSubtitle" placeholder="Short description (optional)">'
+    + '</div>'
+    + '<div style="display:flex;flex-wrap:wrap;gap:8px;">'
+    + '<button type="button" class="btn btn-secondary btn-sm" onclick="submitCustomRegFramework(\'standard\')">+ Add voluntary standard</button>'
+    + '<button type="button" class="btn btn-secondary btn-sm" onclick="submitCustomRegFramework(\'law\')">+ Add law / regulation</button>'
+    + '</div></div>';
 }
 
 function getActiveFrameworkIds() {
   var af = state && state.activeFrameworks;
-  if (!af || typeof af !== 'object') return ['iso27001', 'soc2', 'cis'];
-  return Object.keys(FRAMEWORK_META).filter(function(k) { return !!af[k]; });
+  var ids = Object.keys(FRAMEWORK_META).filter(function(k) {
+    return !af || typeof af !== 'object' ? true : !!af[k];
+  });
+  getCustomRegFrameworks('standard').forEach(function(c) {
+    if (c.active) ids.push(c.id);
+  });
+  return ids;
 }
 
 function getActiveComplianceLawIds() {
   var laws = state && state.activeComplianceLaws;
-  if (!laws || typeof laws !== 'object') return [];
-  return Object.keys(COMPLIANCE_LAW_META).filter(function(k) { return !!laws[k]; });
+  var ids = Object.keys(COMPLIANCE_LAW_META).filter(function(k) {
+    return laws && typeof laws === 'object' ? !!laws[k] : false;
+  });
+  getCustomRegFrameworks('law').forEach(function(c) {
+    if (c.active) ids.push(c.id);
+  });
+  return ids;
+}
+
+function resolveFrameworkMeta(fwId) {
+  if (FRAMEWORK_META[fwId]) return FRAMEWORK_META[fwId];
+  var custom = (state.customRegFrameworks || []).find(function(c) { return c.id === fwId && c.kind === 'standard'; });
+  return custom ? getCustomRegMeta(custom) : null;
+}
+
+function resolveLawMeta(lawId) {
+  if (COMPLIANCE_LAW_META[lawId]) return COMPLIANCE_LAW_META[lawId];
+  var custom = (state.customRegFrameworks || []).find(function(c) { return c.id === lawId && c.kind === 'law'; });
+  return custom ? getCustomRegMeta(custom) : null;
 }
 
 function getFrameworkRefsForControl(ctrlId) {
@@ -175,6 +414,9 @@ function getFrameworkRefsForControl(ctrlId) {
   Object.keys(FRAMEWORK_META).forEach(function(fw) {
     var refs = over[fw] || base[fw] || [];
     if (refs.length) out[fw] = refs.slice();
+  });
+  getCustomRegFrameworks('standard').forEach(function(c) {
+    if (c.active) out[c.id] = [c.label];
   });
   return out;
 }
@@ -188,6 +430,9 @@ function getLawRefsForControl(ctrlId) {
     var refs = over[lawId] || base[lawId] || [];
     if (refs.length) out[lawId] = refs.slice();
   });
+  getCustomRegFrameworks('law').forEach(function(c) {
+    if (c.active) out[c.id] = [c.label];
+  });
   return out;
 }
 
@@ -198,7 +443,8 @@ function renderFrameworkBadgesHtml(ctrlId, compact) {
   active.forEach(function(fw) {
     var list = refs[fw];
     if (!list || !list.length) return;
-    var meta = FRAMEWORK_META[fw];
+    var meta = resolveFrameworkMeta(fw);
+    if (!meta) return;
     var label = compact ? meta.label.split(' ')[0] : (list[0] + (list.length > 1 ? ' +' + (list.length - 1) : ''));
     parts.push('<span class="fw-badge" style="background:' + meta.bg + ';color:' + meta.color + ';border:1px solid ' + meta.color + '33;" title="' + escapeHTML(meta.label + ': ' + list.join(', ')) + '">' + escapeHTML(label) + '</span>');
   });
@@ -206,6 +452,10 @@ function renderFrameworkBadgesHtml(ctrlId, compact) {
 }
 
 function toggleActiveFramework(fwId) {
+  if (String(fwId).indexOf('custom-') === 0) {
+    toggleCustomRegFramework(fwId);
+    return;
+  }
   if (!state.activeFrameworks) state.activeFrameworks = { iso27001: true, soc2: true, cis: true };
   var current = state.activeFrameworks[fwId] !== false;
   state.activeFrameworks[fwId] = !current;
@@ -217,6 +467,10 @@ function toggleActiveFramework(fwId) {
 }
 
 function toggleActiveComplianceLaw(lawId) {
+  if (String(lawId).indexOf('custom-') === 0) {
+    toggleCustomRegFramework(lawId);
+    return;
+  }
   if (!state.activeComplianceLaws) state.activeComplianceLaws = {};
   var current = !!state.activeComplianceLaws[lawId];
   state.activeComplianceLaws[lawId] = !current;
@@ -255,24 +509,28 @@ function renderFrameworksTab() {
   var filterFw = state._frameworkFilter || '';
   var search = (state._frameworkSearch || '').toLowerCase();
 
-  var cards = Object.keys(FRAMEWORK_META).map(function(fwId) {
-    var meta = FRAMEWORK_META[fwId];
-    var on = !!(state.activeFrameworks || {})[fwId];
-    var cov = computeFrameworkCoverage(fwId);
+  var cards = active.map(function(fw) {
+    var meta = resolveFrameworkMeta(fw);
+    if (!meta) return '';
+    var on = String(fw).indexOf('custom-') === 0
+      ? !!(state.customRegFrameworks || []).find(function(c) { return c.id === fw && c.active; })
+      : !!(state.activeFrameworks || {})[fw];
+    var cov = computeFrameworkCoverage(fw);
+    var customNote = meta.custom ? '<div class="fw-coverage-stats" style="opacity:0.75;">Custom — tracked in your program; add control crosswalks as needed.</div>' : '';
     return '<div class="fw-coverage-card' + (on ? '' : ' fw-coverage-card-off') + '" style="--fw-color:' + meta.color + ';">'
       + '<div class="fw-coverage-head">'
       + '<div><div class="fw-coverage-title">' + escapeHTML(meta.label) + '</div>'
       + '<div class="fw-coverage-sub">' + escapeHTML(meta.subtitle) + '</div></div>'
-      + '<label class="fw-toggle" onclick="event.stopPropagation();"><input type="checkbox"' + (on ? ' checked' : '') + ' onchange="toggleActiveFramework(\'' + fwId + '\')"><span class="fw-toggle-track"></span></label>'
+      + '<label class="fw-toggle" onclick="event.stopPropagation();"><input type="checkbox"' + (on ? ' checked' : '') + ' onchange="toggleActiveFramework(\'' + fw + '\')"><span class="fw-toggle-track"></span></label>'
       + '</div>'
-      + (on
+      + (on && !meta.custom
         ? '<div class="fw-coverage-bar-wrap"><div class="fw-coverage-bar" style="width:' + cov.pct + '%;"></div></div>'
           + '<div class="fw-coverage-stats">'
           + '<span><strong>' + cov.pct + '%</strong> implemented</span>'
           + '<span>' + cov.implemented + ' / ' + cov.mapped + ' mapped controls</span>'
           + '</div>'
-          + '<button type="button" class="btn btn-secondary btn-sm" onclick="state._frameworkFilter=\'' + fwId + '\';renderFrameworksTab();">View mapping →</button>'
-        : '<div class="fw-coverage-stats" style="opacity:0.6;">Tracking off — enable to see crosswalk</div>')
+          + '<button type="button" class="btn btn-secondary btn-sm" onclick="state._frameworkFilter=\'' + fw + '\';renderFrameworksTab();">View mapping →</button>'
+        : (on ? customNote : '<div class="fw-coverage-stats" style="opacity:0.6;">Tracking off — enable to include in posture</div>'))
       + '</div>';
   }).join('');
 
@@ -294,12 +552,14 @@ function renderFrameworksTab() {
     var status = st.status || 'Not Started';
     var refCells = active.map(function(fw) {
       var list = refs[fw] || [];
-      var meta = FRAMEWORK_META[fw];
+      var meta = resolveFrameworkMeta(fw);
+      if (!meta) return '';
       return '<td style="font-size:11px;color:' + meta.color + ';font-weight:600;">' + (list.length ? escapeHTML(list.join(', ')) : '<span style="color:var(--text-muted);font-weight:400;">—</span>') + '</td>';
     }).join('');
     var lawCells = activeLaws.map(function(lawId) {
       var list = lawRefs[lawId] || [];
-      var meta = COMPLIANCE_LAW_META[lawId];
+      var meta = resolveLawMeta(lawId);
+      if (!meta) return '';
       return '<td style="font-size:11px;color:' + meta.color + ';font-weight:600;">' + (list.length ? escapeHTML(list.join(', ')) : '<span style="color:var(--text-muted);font-weight:400;">—</span>') + '</td>';
     }).join('');
     return '<tr class="fw-map-row" onclick="goToControlFromFramework(\'' + c.id.replace(/'/g, "\\'") + '\')" style="cursor:pointer;">'
@@ -311,9 +571,11 @@ function renderFrameworksTab() {
   }).join('');
 
   var headCols = active.map(function(fw) {
-    return '<th style="font-size:11px;color:' + FRAMEWORK_META[fw].color + ';">' + escapeHTML(FRAMEWORK_META[fw].label) + '</th>';
+    var meta = resolveFrameworkMeta(fw);
+    return meta ? '<th style="font-size:11px;color:' + meta.color + ';">' + escapeHTML(meta.label) + '</th>' : '';
   }).join('') + activeLaws.map(function(lawId) {
-    return '<th style="font-size:11px;color:' + COMPLIANCE_LAW_META[lawId].color + ';">' + escapeHTML(COMPLIANCE_LAW_META[lawId].label) + '</th>';
+    var meta = resolveLawMeta(lawId);
+    return meta ? '<th style="font-size:11px;color:' + meta.color + ';">' + escapeHTML(meta.label) + '</th>' : '';
   }).join('');
 
   body.innerHTML = ''
@@ -356,7 +618,8 @@ function renderFrameworkDashboardStripHtml() {
   var active = getActiveFrameworkIds();
   if (!active.length) return '';
   var cards = active.map(function(fw) {
-    var meta = FRAMEWORK_META[fw];
+    var meta = resolveFrameworkMeta(fw);
+    if (!meta) return '';
     var cov = computeFrameworkCoverage(fw);
     return '<button type="button" class="fw-dash-chip" style="--fw-color:' + meta.color + ';" onclick="showTab(\'frameworks\')">'
       + '<span class="fw-dash-chip-label">' + escapeHTML(meta.label) + '</span>'
@@ -372,19 +635,21 @@ function renderFrameworkDashboardStripHtml() {
 
 function renderFrameworkSetupSectionHtml() {
   var af = state.activeFrameworks || {};
-  var sug = state.orgSector ? getSectorRegSuggestions(state.orgSector) : null;
+  var profileKey = getOrgRegProfileKey();
+  var sug = profileKey ? getRegSuggestionsForProfile(profileKey) : null;
   var chips = Object.keys(FRAMEWORK_META).map(function(fwId) {
     var meta = FRAMEWORK_META[fwId];
     var on = af[fwId] !== false;
     var suggested = sug && sug.frameworks.indexOf(fwId) >= 0;
-    return '<button type="button" class="fw-setup-chip' + (on ? ' fw-setup-chip-on' : '') + (suggested ? ' fw-setup-chip-suggested' : '') + '" style="--fw-color:' + meta.color + ';" onclick="toggleActiveFramework(\'' + fwId + '\')">'
-      + '<span class="fw-setup-chip-dot"></span>'
-      + escapeHTML(meta.label)
-      + '</button>';
+    return renderRegSetupChip(meta, on, suggested, 'toggleActiveFramework(\'' + fwId + '\')', null);
   }).join('');
-  var sectorHint = state.orgSector
-    ? '<div class="form-hint" style="margin-bottom:12px;">Sector: <strong>' + escapeHTML(getOrgSectorLabel(state.orgSector)) + '</strong> — highlighted chips are typical for your sector.</div>'
-    : '<div class="form-hint" style="margin-bottom:12px;">Pick a sector in Step 1 to see tailored suggestions.</div>';
+  chips += getCustomRegFrameworks('standard').map(function(c) {
+    var meta = getCustomRegMeta(c);
+    return renderRegSetupChip(meta, !!c.active, false, 'toggleActiveFramework(\'' + c.id + '\')', 'removeCustomRegFramework(\'' + c.id + '\')');
+  }).join('');
+  var sectorHint = isOrgClassificationComplete()
+    ? '<div class="form-hint" style="margin-bottom:12px;"><strong>' + escapeHTML(getOrgClassificationSummary()) + '</strong> — highlighted chips are typical for your profile.</div>'
+    : '<div class="form-hint" style="margin-bottom:12px;">Complete organization type, level, and sector in Step 1 to see tailored suggestions.</div>';
   return '<div class="fw-setup-section">'
     + '<div class="section-title" style="margin-bottom:4px;">Voluntary standards &amp; frameworks</div>'
     + '<div class="section-subtitle" style="margin-bottom:8px;">NIST 800-53 is your anchor — enable other lenses to see crosswalks on every control.</div>'
@@ -393,24 +658,34 @@ function renderFrameworkSetupSectionHtml() {
     + '</div>';
 }
 
+function renderRegSetupChip(meta, on, suggested, toggleFn, removeFn) {
+  return '<button type="button" class="fw-setup-chip' + (on ? ' fw-setup-chip-on' : '') + (suggested ? ' fw-setup-chip-suggested' : '') + (meta.custom ? ' fw-setup-chip-custom' : '') + '" style="--fw-color:' + meta.color + ';" onclick="' + toggleFn + '">'
+    + '<span class="fw-setup-chip-dot"></span>'
+    + escapeHTML(meta.label)
+    + (removeFn ? '<span class="fw-setup-chip-remove" title="Remove" onclick="event.stopPropagation();' + removeFn + '">×</span>' : '')
+    + '</button>';
+}
+
 function renderComplianceLawSetupSectionHtml() {
   var laws = state.activeComplianceLaws || {};
-  var sug = state.orgSector ? getSectorRegSuggestions(state.orgSector) : null;
+  var profileKey = getOrgRegProfileKey();
+  var sug = profileKey ? getRegSuggestionsForProfile(profileKey) : null;
   var chips = Object.keys(COMPLIANCE_LAW_META).map(function(lawId) {
     var meta = COMPLIANCE_LAW_META[lawId];
     var on = !!laws[lawId];
     var suggested = sug && sug.laws.indexOf(lawId) >= 0;
-    return '<button type="button" class="fw-setup-chip' + (on ? ' fw-setup-chip-on' : '') + (suggested ? ' fw-setup-chip-suggested' : '') + '" style="--fw-color:' + meta.color + ';" onclick="toggleActiveComplianceLaw(\'' + lawId + '\')">'
-      + '<span class="fw-setup-chip-dot"></span>'
-      + escapeHTML(meta.label)
-      + '</button>';
+    return renderRegSetupChip(meta, on, suggested, 'toggleActiveComplianceLaw(\'' + lawId + '\')', null);
   }).join('');
-  var applyBtn = state.orgSector
-    ? '<button type="button" class="btn btn-secondary btn-sm" style="margin-top:10px;" onclick="applySectorRegMappingSuggestions(true);if(typeof refreshCurrentCisoStep===\'function\')refreshCurrentCisoStep();">Apply suggestions for ' + escapeHTML(getOrgSectorLabel(state.orgSector)) + '</button>'
+  chips += getCustomRegFrameworks('law').map(function(c) {
+    var meta = getCustomRegMeta(c);
+    return renderRegSetupChip(meta, !!c.active, false, 'toggleActiveComplianceLaw(\'' + c.id + '\')', 'removeCustomRegFramework(\'' + c.id + '\')');
+  }).join('');
+  var applyBtn = isOrgClassificationComplete()
+    ? '<button type="button" class="btn btn-secondary btn-sm" style="margin-top:10px;" onclick="applySectorRegMappingSuggestions(true);if(typeof refreshCurrentCisoStep===\'function\')refreshCurrentCisoStep();">Apply suggestions for ' + escapeHTML(getOrgClassificationSummary()) + '</button>'
     : '';
   return '<div class="fw-setup-section" style="margin-top:24px;">'
     + '<div class="section-title" style="margin-bottom:4px;">Compliance frameworks (laws &amp; regulations)</div>'
-    + '<div class="section-subtitle" style="margin-bottom:12px;">Separate from voluntary standards — track statutory and regulatory obligations that apply to your sector.</div>'
+    + '<div class="section-subtitle" style="margin-bottom:12px;">Separate from voluntary standards — track statutory and regulatory obligations (including MARS-E for Medicare SLG integrators).</div>'
     + '<div class="fw-setup-chips">' + chips + '</div>'
     + applyBtn
     + '</div>';
@@ -420,18 +695,26 @@ function renderComplianceLawCoverageCardsHtml() {
   var cards = Object.keys(COMPLIANCE_LAW_META).map(function(lawId) {
     var meta = COMPLIANCE_LAW_META[lawId];
     var on = !!(state.activeComplianceLaws || {})[lawId];
-    return '<div class="fw-coverage-card' + (on ? '' : ' fw-coverage-card-off') + '" style="--fw-color:' + meta.color + ';">'
-      + '<div class="fw-coverage-head">'
-      + '<div><div class="fw-coverage-title">' + escapeHTML(meta.label) + '</div>'
-      + '<div class="fw-coverage-sub">' + escapeHTML(meta.subtitle) + '</div></div>'
-      + '<label class="fw-toggle" onclick="event.stopPropagation();"><input type="checkbox"' + (on ? ' checked' : '') + ' onchange="toggleActiveComplianceLaw(\'' + lawId + '\')"><span class="fw-toggle-track"></span></label>'
-      + '</div>'
-      + (on
-        ? '<div class="fw-coverage-stats">Tracking on — citations appear in the Framework alignment mapping table when enabled.</div>'
-        : '<div class="fw-coverage-stats" style="opacity:0.6;">Tracking off</div>')
-      + '</div>';
+    return renderLawCoverageCard(meta, on, 'toggleActiveComplianceLaw(\'' + lawId + '\')');
+  }).join('');
+  cards += getCustomRegFrameworks('law').map(function(c) {
+    return renderLawCoverageCard(getCustomRegMeta(c), !!c.active, 'toggleActiveComplianceLaw(\'' + c.id + '\')', 'removeCustomRegFramework(\'' + c.id + '\')');
   }).join('');
   return '<div class="fw-setup-section" style="margin-top:8px;"><div class="section-title" style="margin-bottom:10px;">Laws &amp; regulations</div><div class="fw-coverage-grid">' + cards + '</div></div>';
+}
+
+function renderLawCoverageCard(meta, on, toggleAttr, removeAttr) {
+  return '<div class="fw-coverage-card' + (on ? '' : ' fw-coverage-card-off') + '" style="--fw-color:' + meta.color + ';">'
+    + '<div class="fw-coverage-head">'
+    + '<div><div class="fw-coverage-title">' + escapeHTML(meta.label) + '</div>'
+    + '<div class="fw-coverage-sub">' + escapeHTML(meta.subtitle) + '</div></div>'
+    + '<label class="fw-toggle" onclick="event.stopPropagation();"><input type="checkbox"' + (on ? ' checked' : '') + ' onchange="' + toggleAttr + '"><span class="fw-toggle-track"></span></label>'
+    + '</div>'
+    + (on
+      ? '<div class="fw-coverage-stats">' + (meta.custom ? 'Custom regulation tracked in your program.' : 'Tracking on — citations appear in the mapping table when enabled.') + '</div>'
+      + (removeAttr ? '<button type="button" class="btn btn-secondary btn-sm" onclick="' + removeAttr + '">Remove</button>' : '')
+      : '<div class="fw-coverage-stats" style="opacity:0.6;">Tracking off</div>')
+    + '</div>';
 }
 
 // ─── SharePoint evidence helpers ───────────────────────────────────────────
