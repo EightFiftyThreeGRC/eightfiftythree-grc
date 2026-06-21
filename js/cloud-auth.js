@@ -196,6 +196,21 @@ function validateCloudGateEmail(email) {
   return !!email && email.indexOf('@') >= 1 && email.indexOf('.') >= 0;
 }
 
+function formatCloudAuthError(err, fallback) {
+  var msg = String((err && err.message) || fallback || 'unknown error').toLowerCase();
+  if (msg.indexOf('rate limit') >= 0 || msg.indexOf('too many requests') >= 0) {
+    return 'Supabase has temporarily blocked auth emails for this project (rate limit). '
+      + 'Wait about an hour, then try Sign in instead of Create one — your account may already exist from an earlier attempt.';
+  }
+  if (msg.indexOf('invalid login credentials') >= 0) {
+    return 'Wrong email or password. If you just created an account, confirm the email from your inbox first, then sign in.';
+  }
+  if (msg.indexOf('user already registered') >= 0) {
+    return 'An account with this email already exists. Use Sign in instead.';
+  }
+  return (err && err.message) || fallback || 'unknown error';
+}
+
 // ── OAuth sign-in ────────────────────────────────────────────────────────────
 async function signInWithProvider(provider) {
   var sb = getCloudClient();
