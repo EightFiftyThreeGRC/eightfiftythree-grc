@@ -1153,6 +1153,9 @@ function _buildISPExportPayload() {
   if ((isp.requirements || []).length) {
     sections.push({ heading: 'Policy Requirements', content: (isp.requirements || []).map(function(r) { return (r.id || 'REQ') + ': ' + stripRequirementNistRef(r.text || r.requirement || ''); }).join('\n\n') });
   }
+  if (isp.complianceNotes && String(isp.complianceNotes).trim()) {
+    sections.push({ heading: 'Compliance & Applicable Requirements', content: String(isp.complianceNotes).trim() });
+  }
   if ((isp.documents || []).length) {
     sections.push({ heading: 'Referenced Documents', content: (isp.documents || []).map(function(d) { return (d.title || 'Document') + (d.url ? ' — ' + d.url : '') + (d.desc ? '\n' + d.desc : ''); }).join('\n\n') });
   }

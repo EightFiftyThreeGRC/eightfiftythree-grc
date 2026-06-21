@@ -1344,6 +1344,7 @@ function renderCISOStep3() {
         { type:'scope', title:'Scope', content:`This policy applies to all employees, contractors, third-party service providers, and any individual or system that accesses ${orgNameVal}'s information assets. It encompasses all information systems, business processes, and data regardless of form, format, or location, including cloud-hosted systems, mobile devices, and remote access connections.` },
         { type:'roles', title:'Roles & Responsibilities' },
         { type:'requirements', title:'Policy Requirements' },
+        { type:'compliance', title:'Compliance & Applicable Requirements' },
         { type:'documents', title:'Related Documents & Standards' },
         { type:'revision-history', title:'Revision History' },
         { type:'controls', title:'Related Controls' },
@@ -1389,6 +1390,7 @@ function renderCISOStep3() {
       { type:'scope', title:'Scope', content: old.scope || '' },
       { type:'roles', title:'Roles & Responsibilities' },
       { type:'requirements', title:'Policy Requirements' },
+      { type:'compliance', title:'Compliance & Applicable Requirements' },
       { type:'documents', title:'Related Documents & Standards' },
       { type:'revision-history', title:'Revision History' },
       { type:'controls', title:'Related Controls' },
@@ -1407,6 +1409,13 @@ function renderCISOStep3() {
 
   // Ensure custodian object exists (migration for old saves)
   if (!state.infoSecPolicy.custodian) state.infoSecPolicy.custodian = { name: '', role: '', email: '' };
+
+  // Insert compliance section for saves created before it was added to defaults
+  if (state.infoSecPolicy.sections && !state.infoSecPolicy.sections.some(function(s) { return s.type === 'compliance'; })) {
+    var _reqIdx = state.infoSecPolicy.sections.findIndex(function(s) { return s.type === 'requirements'; });
+    var _insertAt = _reqIdx >= 0 ? _reqIdx + 1 : state.infoSecPolicy.sections.length;
+    state.infoSecPolicy.sections.splice(_insertAt, 0, { type: 'compliance', title: 'Compliance & Applicable Requirements' });
+  }
 
   // Keep CISO role name in sync with Step 1 title
   var cisoTitle = (state.programOwnerTitle || '').trim() || getDefaultProgramOwnerTitle();
@@ -1448,6 +1457,10 @@ function renderCISOStep3() {
       content = renderRequirementsSection(unmappedPM);
     } else if (sec.type === 'documents') {
       content = renderDocumentsSection();
+    } else if (sec.type === 'compliance') {
+      content = renderComplianceSection(si);
+    } else if (sec.type === 'revision-history') {
+      content = renderRevisionHistorySection(si);
     } else if (sec.type === 'controls') {
       content = renderControlsSection(activeControls, mappedControls, allActivePM);
     } else if (sec.type === 'custom') {
@@ -1797,7 +1810,6 @@ function renderDocumentsSection() {
 
 function renderComplianceSection(si) {
   const isp = state.infoSecPolicy;
-  if (!isp.complianceNotes) isp.complianceNotes = '';
   const defaultCompliance = `Legal, regulatory, and contractual compliance requirements applicable to this information security program include:\n\n` +
     `• Federal Information Security Modernization Act (FISMA) — requires agencies to implement information security programs consistent with NIST standards.\n` +
     `• OMB Circular A-130 — establishes policy for the management of Federal information resources.\n` +
@@ -1805,9 +1817,12 @@ function renderComplianceSection(si) {
     `• NIST SP 800-37 Rev. 2 (RMF) — governs the lifecycle process for authorizing systems to operate.\n` +
     (state.privacyOverlay ? `• Privacy Act of 1974 / E-Government Act of 2002 — governs the collection, maintenance, use, and dissemination of personally identifiable information (PII).\n` : '') +
     `\nAll personnel must comply with the above requirements as implemented through this policy and its subordinate domain policies.`;
+  if (!isp.complianceNotes || !String(isp.complianceNotes).trim()) {
+    isp.complianceNotes = defaultCompliance;
+  }
   return `
     <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px;">Enumerate the laws, regulations, standards, and contractual obligations this program must satisfy.</div>
-    <textarea class="form-input" rows="10" style="font-size:13px;line-height:1.8;padding:16px 18px;border-radius:8px;background:white;border:1px solid var(--border);resize:vertical;min-height:180px;" oninput="state.infoSecPolicy.complianceNotes=this.value; window.markDirty();" placeholder="List applicable laws, regulations, and standards…">${escapeHTML(isp.complianceNotes || defaultCompliance)}</textarea>`;
+    <textarea class="form-input" rows="10" style="font-size:13px;line-height:1.8;padding:16px 18px;border-radius:8px;background:white;border:1px solid var(--border);resize:vertical;min-height:180px;" oninput="state.infoSecPolicy.complianceNotes=this.value; window.markDirty();" placeholder="List applicable laws, regulations, and standards…">${escapeHTML(isp.complianceNotes)}</textarea>`;
 }
 
 function renderRevisionHistorySection(si) {
