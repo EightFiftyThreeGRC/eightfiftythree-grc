@@ -86,34 +86,40 @@ function getCloudAppUrl() {
   return getCloudRedirectUri();
 }
 
-// Notify a custom ISP approver to sign up (cloud mode only; requires deployed edge function + Resend).
+// Notify a custom ISP approver to sign up and open the app (cloud mode only).
+// Uses Supabase Auth magic links — no edge function or Resend required.
 async function sendISPApprovalRequestEmail(opts) {
   if (!isCloudSessionActive()) return { ok: false, reason: 'not_cloud' };
   var sb = getCloudClient();
-  if (!sb || typeof sb.functions === 'undefined' || typeof sb.functions.invoke !== 'function') {
+  if (!sb || !sb.auth || typeof sb.auth.signInWithOtp !== 'function') {
     return { ok: false, reason: 'no_client' };
   }
   opts = opts || {};
-  var approverEmail = String(opts.approverEmail || '').trim();
+  var approverEmail = String(opts.approverEmail || '').trim().toLowerCase();
   if (!approverEmail || approverEmail.indexOf('@') < 0) return { ok: false, reason: 'no_email' };
+  var approverName = String(opts.approverName || '').trim();
+  var programOwnerName = String(opts.programOwnerName || '').trim();
+  var orgName = String(opts.orgName || '').trim();
+  var appUrl = getCloudAppUrl();
   try {
-    var result = await sb.functions.invoke('send-isp-approval-request', {
-      body: {
-        approverEmail: approverEmail,
-        approverName: String(opts.approverName || '').trim(),
-        programOwnerName: String(opts.programOwnerName || '').trim(),
-        orgName: String(opts.orgName || '').trim(),
-        appUrl: getCloudAppUrl()
+    var res = await sb.auth.signInWithOtp({
+      email: approverEmail,
+      options: {
+        emailRedirectTo: appUrl,
+        shouldCreateUser: true,
+        data: {
+          isp_approver_invite: true,
+          approver_name: approverName,
+          org_name: orgName,
+          invited_by: programOwnerName
+        }
       }
     });
-    if (result.error) {
-      console.warn('sendISPApprovalRequestEmail invoke error', result.error);
-      return { ok: false, reason: result.error.message || 'invoke_failed' };
+    if (res && res.error) {
+      console.warn('sendISPApprovalRequestEmail signInWithOtp', res.error);
+      return { ok: false, reason: res.error.message || 'otp_failed' };
     }
-    if (result.data && result.data.error) {
-      return { ok: false, reason: result.data.error };
-    }
-    return { ok: true };
+    return { ok: true, method: 'magic_link' };
   } catch (e) {
     console.warn('sendISPApprovalRequestEmail', e);
     return { ok: false, reason: String(e && e.message ? e.message : e) };

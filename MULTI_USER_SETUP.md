@@ -75,25 +75,18 @@ nothing on its own; all access is enforced by the RLS policies from step 2.
 
 Commit, push, and GitHub Pages redeploys. Done.
 
-### 5. ISP approver emails (optional)
-When a CISO routes the Tier-1 ISP to a **different approver**, cloud mode can email
-them a sign-up link. This uses a Supabase Edge Function plus [Resend](https://resend.com).
+### 5. ISP approver emails
+When a CISO routes the Tier-1 ISP to a **different approver** while signed in (cloud mode),
+the app emails them a **Supabase magic sign-in link** to `app.html`. No edge function or
+Resend setup is required — Supabase Auth sends the message using your project's built-in
+email settings (Dashboard → Authentication → Email).
 
-1. Create a Resend account and API key.
-2. Install the [Supabase CLI](https://supabase.com/docs/guides/cli) and link your project.
-3. Set secrets (Dashboard → Edge Functions → Secrets, or CLI):
-   - `RESEND_API_KEY` — your Resend API key
-   - `EMAIL_FROM` (optional) — verified sender, e.g. `EightFiftyThree GRC <noreply@yourdomain.com>`
-4. Deploy the function from this repo:
-   ```bash
-   supabase functions deploy send-isp-approval-request
-   ```
-5. Ensure `appUrl` in `js/cloud-config.js` points at your live `app.html` (the provision
-   script sets this automatically).
+The approver opens the link, creates/signs into their account with **the same email** you
+entered in the Policy Review card, and lands in the app with the **approver** role from
+your roster.
 
-The email reads: *"[Program owner] has asked you to approve the Information Security
-Policy for [Organization]. Sign up to approve the policy."* with a link to the app.
-The approver must register using the **same email** you entered in the Policy Review card.
+Optional: deploy `supabase/functions/send-isp-approval-request` with `RESEND_API_KEY` if
+you prefer a custom-branded message instead of the default Supabase magic-link template.
 
 ---
 

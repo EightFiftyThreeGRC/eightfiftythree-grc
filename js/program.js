@@ -370,28 +370,38 @@ function submitISPForApproval(silent) {
   }
 
   if (justSubmitted && isCustom && approverEmail && typeof sendISPApprovalRequestEmail === 'function') {
-    sendISPApprovalRequestEmail({
-      approverEmail: approverEmail,
-      approverName: approverName,
-      programOwnerName: state.programOwner || defaultApproverName,
-      orgName: state.orgName || 'your organization'
+    // Roster the approver and push to cloud before emailing so RLS lets them in when they click the link.
+    try { if (typeof syncUsersFromState === 'function') syncUsersFromState(); } catch (e) { console.warn('syncUsersFromState failed:', e); }
+    try { markDirty(); } catch (e) { console.warn('markDirty failed:', e); }
+    var pushThenEmail = Promise.resolve();
+    if (typeof isCloudSessionActive === 'function' && isCloudSessionActive() && typeof cloudPushNow === 'function') {
+      pushThenEmail = cloudPushNow().catch(function(e) {
+        console.warn('cloudPushNow before approver email', e);
+      });
+    }
+    pushThenEmail.then(function() {
+      return sendISPApprovalRequestEmail({
+        approverEmail: approverEmail,
+        approverName: approverName,
+        programOwnerName: state.programOwner || defaultApproverName,
+        orgName: state.orgName || 'your organization'
+      });
     }).then(function(res) {
       if (res && res.ok) {
-        if (!silent) showToast('📨 ISP submitted to ' + approverName + '. Sign-up email sent to ' + approverEmail + '.');
-        try { addAuditEntry('policy', 'ISP', 'Approval request email sent to ' + approverEmail); } catch (e) { /* ignore */ }
+        if (!silent) showToast('📨 ISP submitted to ' + approverName + '. Sign-in link sent to ' + approverEmail + ' — open it to register and approve.');
+        try { addAuditEntry('policy', 'ISP', 'Approver sign-in link sent to ' + approverEmail); } catch (e) { /* ignore */ }
       } else if (res && res.reason === 'not_cloud') {
         if (!silent) showToast('ISP submitted to ' + approverName + '. Sign in (cloud mode) to email ' + approverEmail + ' a sign-up link.', true);
       } else if (!silent) {
         var detail = (res && res.reason) ? (' (' + res.reason + ')') : '';
-        showToast('ISP submitted, but the sign-up email could not be sent' + detail + '. Deploy send-isp-approval-request + RESEND_API_KEY, or ask ' + approverName + ' to register at the app with ' + approverEmail + '.', true);
+        showToast('ISP submitted, but could not email ' + approverEmail + detail + '. Ask them to open the app and register with that address.', true);
       }
     });
+  } else {
+    try { if (typeof syncUsersFromState === 'function') syncUsersFromState(); } catch (e) { console.warn('syncUsersFromState failed:', e); }
+    try { markDirty(); } catch (e) { console.warn('markDirty failed:', e); }
   }
 
-  // Make sure the approver shows up as a user so they can log in and see the queue.
-  // These are best-effort — never let them block the wizard from advancing.
-  try { if (typeof syncUsersFromState === 'function') syncUsersFromState(); } catch (e) { console.warn('syncUsersFromState failed:', e); }
-  try { markDirty(); } catch (e) { console.warn('markDirty failed:', e); }
   try { renderSidebarBadges(); } catch (e) { console.warn('renderSidebarBadges failed:', e); }
 }
 
