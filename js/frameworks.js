@@ -1,55 +1,55 @@
-// js/frameworks.js — multi-framework alignment (ISO 27001, SOC 2, HIPAA) + SharePoint evidence helpers
+// js/frameworks.js — multi-framework alignment (ISO 27001, SOC 2, CIS Controls v8) + evidence storage helpers (SharePoint, Google Drive, OneDrive)
 
 var FRAMEWORK_META = {
   iso27001: { id: 'iso27001', label: 'ISO 27001', subtitle: 'Annex A (2022)', color: '#5856D6', bg: '#f5f3ff' },
   soc2:     { id: 'soc2',     label: 'SOC 2',     subtitle: 'Trust Services Criteria', color: '#FF9500', bg: '#fff7ed' },
-  hipaa:    { id: 'hipaa',    label: 'HIPAA',     subtitle: 'Security Rule', color: '#34C759', bg: '#f0fdf4' }
+  cisv8:    { id: 'cisv8',    label: 'CIS Controls', subtitle: 'v8 (18 control groups)', color: '#34C759', bg: '#f0fdf4' }
 };
 
 // Family-level crosswalk defaults — applied to every control in the family unless overridden.
 var FAMILY_FRAMEWORK_REFS = {
-  AC: { iso27001: ['A.5.15','A.5.16','A.5.17','A.5.18','A.8.2','A.8.3','A.8.5'], soc2: ['CC6.1','CC6.2','CC6.3','CC6.6'], hipaa: ['§164.308(a)(3)','§164.308(a)(4)','§164.312(a)(1)'] },
-  AT: { iso27001: ['A.6.3','A.6.4'], soc2: ['CC1.4','CC2.2'], hipaa: ['§164.308(a)(5)'] },
-  AU: { iso27001: ['A.8.15','A.8.16'], soc2: ['CC7.2','CC7.3'], hipaa: ['§164.312(b)'] },
-  CA: { iso27001: ['A.8.8','A.8.9'], soc2: ['CC8.1'], hipaa: ['§164.308(a)(8)'] },
-  CM: { iso27001: ['A.8.9','A.8.19','A.8.32'], soc2: ['CC8.1'], hipaa: ['§164.310(d)(1)'] },
-  CP: { iso27001: ['A.5.29','A.5.30','A.8.13','A.8.14'], soc2: ['A1.2','A1.3'], hipaa: ['§164.308(a)(7)'] },
-  IA: { iso27001: ['A.5.16','A.5.17','A.8.5'], soc2: ['CC6.1','CC6.6'], hipaa: ['§164.312(d)'] },
-  IR: { iso27001: ['A.5.24','A.5.25','A.5.26','A.5.27'], soc2: ['CC7.4','CC7.5'], hipaa: ['§164.308(a)(6)'] },
-  MA: { iso27001: ['A.7.13','A.8.1'], soc2: ['CC8.1'], hipaa: ['§164.310(a)(2)'] },
-  MP: { iso27001: ['A.5.10','A.5.11','A.5.12','A.7.10'], soc2: ['CC6.7'], hipaa: ['§164.310(c)'] },
-  PE: { iso27001: ['A.7.1','A.7.2','A.7.3','A.7.4'], soc2: ['CC6.4'], hipaa: ['§164.310(a)(1)','§164.310(b)'] },
-  PL: { iso27001: ['A.5.1','A.5.2','A.5.4'], soc2: ['CC1.1','CC2.1'], hipaa: ['§164.308(a)(1)'] },
-  PM: { iso27001: ['A.5.1','A.5.2','A.5.4','A.5.35'], soc2: ['CC1.1','CC1.2'], hipaa: ['§164.308(a)(1)','§164.316'] },
-  PS: { iso27001: ['A.6.1','A.6.2','A.6.4'], soc2: ['CC1.4'], hipaa: ['§164.308(a)(3)(ii)(A)'] },
-  PT: { iso27001: ['A.5.33','A.5.34','A.8.10','A.8.11'], soc2: ['P1.1','P2.1'], hipaa: ['§164.308(a)(1)','§164.502'] },
-  RA: { iso27001: ['A.5.7','A.5.8','A.8.8'], soc2: ['CC3.1','CC3.2'], hipaa: ['§164.308(a)(1)(ii)(A)'] },
-  SA: { iso27001: ['A.5.19','A.5.20','A.5.21','A.5.23'], soc2: ['CC9.2'], hipaa: ['§164.308(b)'] },
-  SC: { iso27001: ['A.5.14','A.8.20','A.8.21','A.8.22'], soc2: ['CC6.6','CC6.7'], hipaa: ['§164.312(e)(1)'] },
-  SI: { iso27001: ['A.8.7','A.8.8'], soc2: ['CC7.1'], hipaa: ['§164.308(a)(5)(ii)(B)'] },
-  SR: { iso27001: ['A.5.19','A.5.20','A.5.21','A.5.22'], soc2: ['CC9.2'], hipaa: ['§164.308(b)(1)'] }
+  AC: { iso27001: ['A.5.15','A.5.16','A.5.17','A.5.18','A.8.2','A.8.3','A.8.5'], soc2: ['CC6.1','CC6.2','CC6.3','CC6.6'], cisv8: ['CIS 5.3','CIS 6.1','CIS 6.2','CIS 6.3','CIS 6.5','CIS 6.7','CIS 6.8'] },
+  AT: { iso27001: ['A.6.3','A.6.4'], soc2: ['CC1.4','CC2.2'], cisv8: ['CIS 14.1','CIS 14.2','CIS 14.3','CIS 14.9'] },
+  AU: { iso27001: ['A.8.15','A.8.16'], soc2: ['CC7.2','CC7.3'], cisv8: ['CIS 8.1','CIS 8.2','CIS 8.5','CIS 8.9','CIS 8.11'] },
+  CA: { iso27001: ['A.8.8','A.8.9'], soc2: ['CC8.1'], cisv8: ['CIS 18.1','CIS 18.2','CIS 18.3'] },
+  CM: { iso27001: ['A.8.9','A.8.19','A.8.32'], soc2: ['CC8.1'], cisv8: ['CIS 4.1','CIS 4.2','CIS 4.3','CIS 4.6','CIS 4.8'] },
+  CP: { iso27001: ['A.5.29','A.5.30','A.8.13','A.8.14'], soc2: ['A1.2','A1.3'], cisv8: ['CIS 11.1','CIS 11.2','CIS 11.3','CIS 11.4','CIS 11.5'] },
+  IA: { iso27001: ['A.5.16','A.5.17','A.8.5'], soc2: ['CC6.1','CC6.6'], cisv8: ['CIS 5.2','CIS 5.3','CIS 5.4','CIS 6.3','CIS 6.5'] },
+  IR: { iso27001: ['A.5.24','A.5.25','A.5.26','A.5.27'], soc2: ['CC7.4','CC7.5'], cisv8: ['CIS 17.1','CIS 17.2','CIS 17.3','CIS 17.4','CIS 17.6','CIS 17.8','CIS 17.9'] },
+  MA: { iso27001: ['A.7.13','A.8.1'], soc2: ['CC8.1'], cisv8: ['CIS 4.1','CIS 4.6'] },
+  MP: { iso27001: ['A.5.10','A.5.11','A.5.12','A.7.10'], soc2: ['CC6.7'], cisv8: ['CIS 3.1','CIS 3.5','CIS 3.6','CIS 3.9','CIS 3.10'] },
+  PE: { iso27001: ['A.7.1','A.7.2','A.7.3','A.7.4'], soc2: ['CC6.4'], cisv8: ['CIS 1.1','CIS 1.2'] },
+  PL: { iso27001: ['A.5.1','A.5.2','A.5.4'], soc2: ['CC1.1','CC2.1'], cisv8: ['CIS 15.1'] },
+  PM: { iso27001: ['A.5.1','A.5.2','A.5.4','A.5.35'], soc2: ['CC1.1','CC1.2'], cisv8: ['CIS 15.1','CIS 15.2','CIS 15.3'] },
+  PS: { iso27001: ['A.6.1','A.6.2','A.6.4'], soc2: ['CC1.4'], cisv8: ['CIS 14.1','CIS 14.9'] },
+  PT: { iso27001: ['A.5.33','A.5.34','A.8.10','A.8.11'], soc2: ['P1.1','P2.1'], cisv8: ['CIS 3.1','CIS 3.4','CIS 3.7','CIS 3.12'] },
+  RA: { iso27001: ['A.5.7','A.5.8','A.8.8'], soc2: ['CC3.1','CC3.2'], cisv8: ['CIS 7.1','CIS 7.4','CIS 7.5','CIS 7.6','CIS 18.1','CIS 18.2'] },
+  SA: { iso27001: ['A.5.19','A.5.20','A.5.21','A.5.23'], soc2: ['CC9.2'], cisv8: ['CIS 15.1','CIS 15.2','CIS 15.4','CIS 16.1','CIS 16.2'] },
+  SC: { iso27001: ['A.5.14','A.8.20','A.8.21','A.8.22'], soc2: ['CC6.6','CC6.7'], cisv8: ['CIS 3.10','CIS 12.1','CIS 12.2','CIS 12.6','CIS 13.1','CIS 13.6'] },
+  SI: { iso27001: ['A.8.7','A.8.8'], soc2: ['CC7.1'], cisv8: ['CIS 7.1','CIS 7.4','CIS 10.1','CIS 10.2','CIS 10.5','CIS 10.7'] },
+  SR: { iso27001: ['A.5.19','A.5.20','A.5.21','A.5.22'], soc2: ['CC9.2'], cisv8: ['CIS 15.1','CIS 15.2','CIS 15.3','CIS 15.4','CIS 16.1'] }
 };
 
 // Control-specific refinements for high-traffic controls.
 var CONTROL_FRAMEWORK_OVERRIDES = {
-  'AC-1':  { iso27001: ['A.5.1','A.5.37'], soc2: ['CC1.1','CC2.2'], hipaa: ['§164.308(a)(1)'] },
-  'AC-2':  { iso27001: ['A.5.16','A.5.18','A.8.2'], soc2: ['CC6.1','CC6.2'], hipaa: ['§164.312(a)(1)','§164.312(a)(2)(i)'] },
-  'AC-3':  { iso27001: ['A.8.3'], soc2: ['CC6.1'], hipaa: ['§164.312(a)(1)'] },
-  'AU-2':  { iso27001: ['A.8.15'], soc2: ['CC7.2'], hipaa: ['§164.312(b)'] },
-  'CM-2':  { iso27001: ['A.8.9'], soc2: ['CC8.1'], hipaa: ['§164.310(d)(1)'] },
-  'CP-1':  { iso27001: ['A.5.29'], soc2: ['A1.2'], hipaa: ['§164.308(a)(7)'] },
-  'IA-2':  { iso27001: ['A.8.5'], soc2: ['CC6.1'], hipaa: ['§164.312(d)'] },
-  'IR-1':  { iso27001: ['A.5.24'], soc2: ['CC7.4'], hipaa: ['§164.308(a)(6)'] },
-  'PL-1':  { iso27001: ['A.5.1'], soc2: ['CC1.1'], hipaa: ['§164.308(a)(1)'] },
-  'PM-1':  { iso27001: ['A.5.1'], soc2: ['CC1.1'], hipaa: ['§164.308(a)(1)'] },
-  'RA-1':  { iso27001: ['A.5.7'], soc2: ['CC3.1'], hipaa: ['§164.308(a)(1)(ii)(A)'] },
-  'SC-7':  { iso27001: ['A.8.20'], soc2: ['CC6.6'], hipaa: ['§164.312(e)(1)'] },
-  'SI-2':  { iso27001: ['A.8.8'], soc2: ['CC7.1'], hipaa: ['§164.308(a)(5)(ii)(B)'] }
+  'AC-1':  { iso27001: ['A.5.1','A.5.37'], soc2: ['CC1.1','CC2.2'], cisv8: ['CIS 6.8'] },
+  'AC-2':  { iso27001: ['A.5.16','A.5.18','A.8.2'], soc2: ['CC6.1','CC6.2'], cisv8: ['CIS 5.1','CIS 5.2','CIS 5.3','CIS 5.4'] },
+  'AC-3':  { iso27001: ['A.8.3'], soc2: ['CC6.1'], cisv8: ['CIS 6.1','CIS 6.2'] },
+  'AU-2':  { iso27001: ['A.8.15'], soc2: ['CC7.2'], cisv8: ['CIS 8.2','CIS 8.5'] },
+  'CM-2':  { iso27001: ['A.8.9'], soc2: ['CC8.1'], cisv8: ['CIS 4.1','CIS 4.2'] },
+  'CP-1':  { iso27001: ['A.5.29'], soc2: ['A1.2'], cisv8: ['CIS 11.1'] },
+  'IA-2':  { iso27001: ['A.8.5'], soc2: ['CC6.1'], cisv8: ['CIS 6.3','CIS 6.4','CIS 6.5'] },
+  'IR-1':  { iso27001: ['A.5.24'], soc2: ['CC7.4'], cisv8: ['CIS 17.1','CIS 17.4'] },
+  'PL-1':  { iso27001: ['A.5.1'], soc2: ['CC1.1'], cisv8: ['CIS 15.1'] },
+  'PM-1':  { iso27001: ['A.5.1'], soc2: ['CC1.1'], cisv8: ['CIS 15.1'] },
+  'RA-1':  { iso27001: ['A.5.7'], soc2: ['CC3.1'], cisv8: ['CIS 7.1','CIS 7.4'] },
+  'SC-7':  { iso27001: ['A.8.20'], soc2: ['CC6.6'], cisv8: ['CIS 12.1','CIS 13.1'] },
+  'SI-2':  { iso27001: ['A.8.8'], soc2: ['CC7.1'], cisv8: ['CIS 7.4','CIS 7.6'] }
 };
 
 function getActiveFrameworkIds() {
   var af = state && state.activeFrameworks;
-  if (!af || typeof af !== 'object') return ['iso27001', 'soc2', 'hipaa'];
+  if (!af || typeof af !== 'object') return ['iso27001', 'soc2', 'cisv8'];
   return Object.keys(FRAMEWORK_META).filter(function(k) { return !!af[k]; });
 }
 
@@ -80,7 +80,7 @@ function renderFrameworkBadgesHtml(ctrlId, compact) {
 }
 
 function toggleActiveFramework(fwId) {
-  if (!state.activeFrameworks) state.activeFrameworks = { iso27001: true, soc2: true, hipaa: true };
+  if (!state.activeFrameworks) state.activeFrameworks = { iso27001: true, soc2: true, cisv8: true };
   var current = state.activeFrameworks[fwId] !== false;
   state.activeFrameworks[fwId] = !current;
   markDirty();
@@ -171,7 +171,7 @@ function renderFrameworksTab() {
 
   body.innerHTML = ''
     + '<div class="fw-intro">'
-    + '<p>EightFiftyThree maps your NIST 800-53 program to <strong>ISO 27001</strong>, <strong>SOC 2</strong>, and <strong>HIPAA</strong> so one control implementation satisfies multiple audit lenses. Enable the frameworks you care about — coverage updates as control owners mark implementation.</p>'
+    + '<p>EightFiftyThree maps your NIST 800-53 program to <strong>ISO 27001</strong>, <strong>SOC 2</strong>, and <strong>CIS Controls v8</strong> so one control implementation satisfies multiple audit lenses. Enable the frameworks you care about — coverage updates as control owners mark implementation.</p>'
     + '</div>'
     + '<div class="fw-coverage-grid">' + cards + '</div>'
     + '<div class="fw-map-panel">'
@@ -323,6 +323,7 @@ function renderSharePointSetupCardHtml() {
 }
 
 function addSharePointEvidence(ctrlId) {
+  if (!state.controlStatus) state.controlStatus = {};
   if (!state.controlStatus[ctrlId]) state.controlStatus[ctrlId] = { status: 'Not Started', evidence: [] };
   if (!state.controlStatus[ctrlId].evidence) state.controlStatus[ctrlId].evidence = [];
   state.controlStatus[ctrlId].evidence.push({
@@ -345,6 +346,141 @@ function applySharePointPathToEvidence(ctrlId, idx, path) {
     row.url = buildSharePointEvidenceUrl(path);
     row.ref = row.url;
   }
+  markDirty();
+  renderControlStep2();
+}
+
+// ─── Google Drive evidence helpers ────────────────────────────────────────────
+
+function getGoogleDriveConfig() {
+  var cfg = state.googleDriveConfig || {};
+  return {
+    enabled: !!cfg.enabled,
+    folderUrl: String(cfg.folderUrl || '').trim()
+  };
+}
+
+function isGoogleDriveUrl(url) {
+  return /drive\.google\.com/i.test(String(url || '')) || /docs\.google\.com/i.test(String(url || ''));
+}
+
+function openGoogleDriveFolder() {
+  var cfg = getGoogleDriveConfig();
+  if (!cfg.folderUrl) {
+    showToast('Set your Google Drive evidence folder URL in Program setup first.', true);
+    return;
+  }
+  window.open(cfg.folderUrl, '_blank', 'noopener,noreferrer');
+}
+
+function setGoogleDriveConfigField(field, value) {
+  if (!state.googleDriveConfig) state.googleDriveConfig = { enabled: false, folderUrl: '' };
+  var prev = state.googleDriveConfig[field];
+  state.googleDriveConfig[field] = value;
+  if (field === 'enabled') state.googleDriveConfig.enabled = !!value;
+  logFieldChange('googleDriveConfig.' + field, prev, value);
+  markDirty();
+}
+
+function renderGoogleDriveSetupCardHtml() {
+  var cfg = getGoogleDriveConfig();
+  return '<div class="sp-setup-card">'
+    + '<div class="sp-setup-head">'
+    + '<div><div class="sp-setup-title">Evidence in Google Drive</div>'
+    + '<div class="sp-setup-sub">Link control evidence to files in Google Drive — we store links, not copies.</div></div>'
+    + '<label class="fw-toggle" onclick="event.stopPropagation();"><input type="checkbox"' + (cfg.enabled ? ' checked' : '') + ' onchange="setGoogleDriveConfigField(\'enabled\',this.checked);if(typeof refreshCurrentCisoStep===\'function\')refreshCurrentCisoStep();"><span class="fw-toggle-track"></span></label>'
+    + '</div>'
+    + (cfg.enabled
+      ? '<div class="sp-setup-fields">'
+        + '<div class="form-group" style="margin-bottom:0;"><label class="form-label">Evidence folder URL</label>'
+        + '<input class="form-input" placeholder="https://drive.google.com/drive/folders/..." value="' + escapeHTML(state.googleDriveConfig.folderUrl || '') + '" oninput="setGoogleDriveConfigField(\'folderUrl\',this.value);">'
+        + '<div class="form-hint">Right-click your evidence folder in Google Drive → Get link → paste here.</div></div>'
+        + '<div class="sp-setup-actions">'
+        + '<button type="button" class="btn btn-secondary btn-sm" onclick="openGoogleDriveFolder()">Open folder</button>'
+        + '</div></div>'
+      : '<div class="sp-setup-off">Enable to link control evidence directly to Google Drive documents.</div>')
+    + '</div>';
+}
+
+function addGoogleDriveEvidence(ctrlId) {
+  if (!state.controlStatus) state.controlStatus = {};
+  if (!state.controlStatus[ctrlId]) state.controlStatus[ctrlId] = { status: 'Not Started', evidence: [] };
+  if (!state.controlStatus[ctrlId].evidence) state.controlStatus[ctrlId].evidence = [];
+  state.controlStatus[ctrlId].evidence.push({
+    kind: 'gdrive',
+    type: 'Document',
+    title: '',
+    description: '',
+    url: ''
+  });
+  markDirty();
+  renderControlStep2();
+}
+
+// ─── OneDrive evidence helpers ────────────────────────────────────────────────
+
+function getOneDriveConfig() {
+  var cfg = state.oneDriveConfig || {};
+  return {
+    enabled: !!cfg.enabled,
+    folderUrl: String(cfg.folderUrl || '').trim()
+  };
+}
+
+function isOneDriveUrl(url) {
+  var s = String(url || '');
+  return /onedrive\.live\.com/i.test(s) || /1drv\.ms/i.test(s) || /-my\.sharepoint\.com/i.test(s);
+}
+
+function openOneDriveFolder() {
+  var cfg = getOneDriveConfig();
+  if (!cfg.folderUrl) {
+    showToast('Set your OneDrive evidence folder URL in Program setup first.', true);
+    return;
+  }
+  window.open(cfg.folderUrl, '_blank', 'noopener,noreferrer');
+}
+
+function setOneDriveConfigField(field, value) {
+  if (!state.oneDriveConfig) state.oneDriveConfig = { enabled: false, folderUrl: '' };
+  var prev = state.oneDriveConfig[field];
+  state.oneDriveConfig[field] = value;
+  if (field === 'enabled') state.oneDriveConfig.enabled = !!value;
+  logFieldChange('oneDriveConfig.' + field, prev, value);
+  markDirty();
+}
+
+function renderOneDriveSetupCardHtml() {
+  var cfg = getOneDriveConfig();
+  return '<div class="sp-setup-card">'
+    + '<div class="sp-setup-head">'
+    + '<div><div class="sp-setup-title">Evidence in OneDrive</div>'
+    + '<div class="sp-setup-sub">Link control evidence to files in OneDrive — we store links, not copies.</div></div>'
+    + '<label class="fw-toggle" onclick="event.stopPropagation();"><input type="checkbox"' + (cfg.enabled ? ' checked' : '') + ' onchange="setOneDriveConfigField(\'enabled\',this.checked);if(typeof refreshCurrentCisoStep===\'function\')refreshCurrentCisoStep();"><span class="fw-toggle-track"></span></label>'
+    + '</div>'
+    + (cfg.enabled
+      ? '<div class="sp-setup-fields">'
+        + '<div class="form-group" style="margin-bottom:0;"><label class="form-label">Evidence folder URL</label>'
+        + '<input class="form-input" placeholder="https://onedrive.live.com/..." value="' + escapeHTML(state.oneDriveConfig.folderUrl || '') + '" oninput="setOneDriveConfigField(\'folderUrl\',this.value);">'
+        + '<div class="form-hint">Open your evidence folder in OneDrive → Share → Copy link → paste here.</div></div>'
+        + '<div class="sp-setup-actions">'
+        + '<button type="button" class="btn btn-secondary btn-sm" onclick="openOneDriveFolder()">Open folder</button>'
+        + '</div></div>'
+      : '<div class="sp-setup-off">Enable to link control evidence directly to OneDrive documents.</div>')
+    + '</div>';
+}
+
+function addOneDriveEvidence(ctrlId) {
+  if (!state.controlStatus) state.controlStatus = {};
+  if (!state.controlStatus[ctrlId]) state.controlStatus[ctrlId] = { status: 'Not Started', evidence: [] };
+  if (!state.controlStatus[ctrlId].evidence) state.controlStatus[ctrlId].evidence = [];
+  state.controlStatus[ctrlId].evidence.push({
+    kind: 'onedrive',
+    type: 'Document',
+    title: '',
+    description: '',
+    url: ''
+  });
   markDirty();
   renderControlStep2();
 }

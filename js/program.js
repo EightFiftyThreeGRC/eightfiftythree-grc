@@ -814,7 +814,7 @@ function renderCISOStep1() {
         </div>
       </div>
       <label style="display:inline-flex;align-items:center;gap:10px;margin-top:4px;padding:10px 16px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;cursor:pointer;user-select:none;">
-        <input type="checkbox" ${state.cisoIsISSM ? 'checked' : ''} onchange="state.cisoIsISSM=this.checked;renderCISOStep1(); window.markDirty();" style="width:16px;height:16px;accent-color:#0369a1;cursor:pointer;">
+        <input type="checkbox" ${state.cisoIsISSM ? 'checked' : ''} onchange="state.cisoIsISSM=this.checked; window.markDirty(); setTimeout(function(){renderCISOStep1();},0);" style="width:16px;height:16px;accent-color:#0369a1;cursor:pointer;">
         <div>
           <span style="font-size:13px;color:#0369a1;font-weight:600;">Program Owner also owns domain policies</span>
           <span style="font-size:12px;color:#64748b;"> — common in teams under ~100 people.</span>
@@ -998,11 +998,15 @@ function renderCISOStep3Integrations() {
   body.innerHTML = `
     ${cisoStepProgressHtml(3, 'Integrations')}
     <div class="section-title">Connect your tools</div>
-    <div class="section-subtitle">All optional — enable multi-framework tracking, SharePoint evidence links, or Microsoft Entra ID sign-in now, or configure later under Users &amp; Program.</div>
+    <div class="section-subtitle">All optional — enable multi-framework tracking, evidence storage (SharePoint, Google Drive, or OneDrive), or Microsoft Entra ID sign-in now, or configure later under Users &amp; Program.</div>
 
     ${typeof renderFrameworkSetupSectionHtml === 'function' ? renderFrameworkSetupSectionHtml() : ''}
 
     ${typeof renderSharePointSetupCardHtml === 'function' ? renderSharePointSetupCardHtml() : ''}
+
+    ${typeof renderGoogleDriveSetupCardHtml === 'function' ? renderGoogleDriveSetupCardHtml() : ''}
+
+    ${typeof renderOneDriveSetupCardHtml === 'function' ? renderOneDriveSetupCardHtml() : ''}
 
     ${typeof renderEntraSetupCardHtml === 'function' ? renderEntraSetupCardHtml() : ''}
   `;
@@ -1254,7 +1258,7 @@ function renderCISOStep2() {
       <td style="vertical-align:top; padding-top:12px;">
         <label class="cb-label">
           <input type="checkbox" ${state.pmControls[c.id]?'checked':''}
-            onchange="state.pmControls['${c.id}']=this.checked"
+            onchange="state.pmControls['${c.id}']=this.checked; markDirty();"
             style="accent-color:var(--teal);">
           <span class="control-id">${c.id}</span>
           ${isRequired ? '<span style="font-size:10px;background:var(--teal);color:white;padding:1px 5px;border-radius:8px;margin-left:4px;font-weight:700;">CORE</span>' : ''}
@@ -1710,7 +1714,7 @@ function renderRolesSection() {
           ${role.responsibilities.map((resp, rsi) => `
           <div style="display:flex;align-items:flex-start;gap:6px;margin-bottom:5px;">
             <span style="color:var(--text-muted);font-size:14px;margin-top:8px;">·</span>
-            <textarea class="form-input" rows="1" style="font-size:13px;flex:1;background:white;resize:none;overflow:hidden;line-height:1.5;" oninput="state.infoSecPolicy.roles[${ri}].responsibilities[${rsi}]=this.value;this.style.height='auto';this.style.height=this.scrollHeight+'px';; window.markDirty();" placeholder="Responsibility…" onfocus="this.style.height='auto';this.style.height=this.scrollHeight+'px';">${escapeHTML(resp)}</textarea>
+            <textarea class="form-input" rows="1" style="font-size:13px;flex:1;background:white;resize:none;overflow:hidden;line-height:1.5;" oninput="state.infoSecPolicy.roles[${ri}].responsibilities[${rsi}]=this.value;this.style.height='auto';this.style.height=this.scrollHeight+'px'; window.markDirty();" placeholder="Responsibility…" onfocus="this.style.height='auto';this.style.height=this.scrollHeight+'px';">${escapeHTML(resp)}</textarea>
             <button style="background:none;border:none;color:var(--red);cursor:pointer;font-size:12px;opacity:0.5;margin-top:6px;" onclick="removeResp(${ri},${rsi})">✕</button>
           </div>`).join('')}
         </div>
@@ -1777,7 +1781,7 @@ function renderDocumentsSection() {
       <span style="font-size:18px;margin-top:2px;">📄</span>
       <div style="flex:1;display:flex;flex-direction:column;gap:6px;">
         <input class="form-input" style="font-weight:600;font-size:13px;border:none;border-bottom:1px solid var(--border);border-radius:0;padding:2px 0;background:transparent;" value="${escapeHTML(d.title)}" oninput="state.infoSecPolicy.documents[${i}].title=this.value; window.markDirty();" placeholder="Document title">
-        <textarea class="form-input" rows="1" style="font-size:12px;color:var(--text-muted);border:none;border-bottom:1px solid #e9ecef;border-radius:0;padding:2px 0;background:transparent;resize:none;overflow:hidden;line-height:1.5;width:100%;" oninput="state.infoSecPolicy.documents[${i}].desc=this.value;this.style.height='auto';this.style.height=this.scrollHeight+'px';; window.markDirty();" onfocus="this.style.height='auto';this.style.height=this.scrollHeight+'px';" placeholder="Short description…">${escapeHTML(d.desc)}</textarea>
+        <textarea class="form-input" rows="1" style="font-size:12px;color:var(--text-muted);border:none;border-bottom:1px solid #e9ecef;border-radius:0;padding:2px 0;background:transparent;resize:none;overflow:hidden;line-height:1.5;width:100%;" oninput="state.infoSecPolicy.documents[${i}].desc=this.value;this.style.height='auto';this.style.height=this.scrollHeight+'px'; window.markDirty();" onfocus="this.style.height='auto';this.style.height=this.scrollHeight+'px';" placeholder="Short description…">${escapeHTML(d.desc)}</textarea>
         <div style="display:flex;align-items:center;gap:8px;margin-top:2px;padding:6px 8px;background:#fff;border:1px solid #e0eaff;border-radius:6px;">
           <span style="font-size:13px;flex-shrink:0;">🔗</span>
           <span style="font-size:11px;font-weight:600;color:#6b7280;white-space:nowrap;flex-shrink:0;">Link</span>
@@ -2617,6 +2621,7 @@ function prefillDemoOwners() {
     // Auto-populate control owners from domain owner
     autoPopulateControlOwnersFromDomain(fam);
   });
+  markDirty();
   showToast('🧪 Demo data prefilled — replace names with real owners before finalizing.');
   renderActiveCisoSetupStep();
 }

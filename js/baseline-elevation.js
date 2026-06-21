@@ -80,7 +80,7 @@ function userMayActOnBaselineElevation() {
   if (!state.currentUserId) return true;
   var u = (state.users || []).find(function(x) { return x.id === state.currentUserId; });
   if (!u) return false;
-  if (u.role === 'ciso' || u.role === 'admin') return true;
+  if (u.role === 'ciso' || u.role === 'issm') return true;
   if ((u.roles || []).indexOf('ciso') !== -1) return true;
   return false;
 }

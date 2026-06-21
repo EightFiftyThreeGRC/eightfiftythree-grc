@@ -22,7 +22,7 @@ function getPoamOverdueCount() {
   ensurePoamState();
   var today = new Date().toISOString().slice(0, 10);
   return state.poamItems.filter(function(p) {
-    return p.dueDate && p.dueDate < today && p.status !== 'Closed' && p.status !== 'Mitigated';
+    return p.dueDate && p.dueDate < today && p.status !== 'Closed' && p.status !== 'Mitigated' && p.status !== 'Risk Accepted';
   }).length;
 }
 
@@ -60,7 +60,7 @@ function updatePoamField(id, field, value) {
   if (!item) return;
   var prev = item[field];
   item[field] = value;
-  if (field === 'status' && (value === 'Closed' || value === 'Mitigated')) {
+  if (field === 'status' && (value === 'Closed' || value === 'Mitigated' || value === 'Risk Accepted')) {
     item.closedDate = new Date().toISOString().slice(0, 10);
   }
   logFieldChange('poamItems.' + id + '.' + field, prev, value);
@@ -141,8 +141,8 @@ function renderPoamTab() {
   var today = new Date().toISOString().slice(0, 10);
   var items = state.poamItems.slice().filter(function(p) {
     if (filter === 'open' && (p.status === 'Closed' || p.status === 'Mitigated' || p.status === 'Risk Accepted')) return false;
-    if (filter === 'overdue' && (!p.dueDate || p.dueDate >= today || p.status === 'Closed')) return false;
-    if (filter === 'closed' && p.status !== 'Closed' && p.status !== 'Mitigated') return false;
+    if (filter === 'overdue' && (!p.dueDate || p.dueDate >= today || p.status === 'Closed' || p.status === 'Mitigated' || p.status === 'Risk Accepted')) return false;
+    if (filter === 'closed' && p.status !== 'Closed' && p.status !== 'Mitigated' && p.status !== 'Risk Accepted') return false;
     if (search) {
       var blob = (p.finding + ' ' + p.controlId + ' ' + p.assignee).toLowerCase();
       if (blob.indexOf(search) === -1) return false;
@@ -160,7 +160,7 @@ function renderPoamTab() {
   var overdue = getPoamOverdueCount();
 
   var rows = items.map(function(p) {
-    var isOverdue = p.dueDate && p.dueDate < today && p.status !== 'Closed' && p.status !== 'Mitigated';
+    var isOverdue = p.dueDate && p.dueDate < today && p.status !== 'Closed' && p.status !== 'Mitigated' && p.status !== 'Risk Accepted';
     return '<tr class="poam-row' + (isOverdue ? ' poam-row-overdue' : '') + '">'
       + '<td><span class="poam-sev-pill ' + poamSeverityClass(p.severity) + '">' + escapeHTML(p.severity) + '</span></td>'
       + '<td style="font-weight:700;font-family:monospace;font-size:12px;">' + escapeHTML(p.controlId || '—') + '</td>'

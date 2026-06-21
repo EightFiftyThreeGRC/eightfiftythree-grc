@@ -549,7 +549,7 @@ function renderProgramDashboard(controls, families) {
           <div style="display:flex;flex-wrap:wrap;gap:10px 16px;">
             ${dot('var(--green)','Approved',sspApproved)}
             ${dot('var(--blue)','Submitted',sspSubmitted)}
-            ${dot('var(--amber)','In Progress',allAssets.length - sspApproved - sspSubmitted - (allAssets.length - sspApproved - sspSubmitted > 0 ? allAssets.filter(function(a){ var s=(sspSign[a.id]||{}).status; return !s||s==='Not Started'; }).length : 0))}
+            ${dot('var(--amber)','In Progress',allAssets.filter(function(a){ var s=(sspSign[a.id]||{}).status; return s && s!=='Submitted' && s!=='Approved' && s!=='Not Started'; }).length)}
             ${dot('var(--slate)','Not Started',allAssets.filter(function(a){ var s=(sspSign[a.id]||{}).status; return !s; }).length)}
           </div>
         </div>
@@ -580,7 +580,7 @@ function renderProgramDashboard(controls, families) {
 
 function openReturnedPolicyReassignment(fam) {
   var user = state.currentUserId ? (state.users || []).find(function(u){ return u.id === state.currentUserId; }) : null;
-  var canReassign = !user || user.role === 'ciso' || user.role === 'admin';
+  var canReassign = !user || user.role === 'ciso';
   if (!canReassign) {
     showToast('Switch to CISO/Admin mode to reassign returned policies.', true);
     if (typeof showRolePicker === 'function') showRolePicker();
@@ -614,11 +614,11 @@ function getScopedFamilies() {
 // True when this login should see the org-level Reports executive block (domain policy approval queue, etc.).
 function userSeesProgramExecutiveDashboard(user) {
   if (!user) return false;
-  if (user.role === 'ciso' || user.role === 'admin') return true;
+  if (user.role === 'ciso') return true;
   var ids = state._currentPersonIds || [user.id];
   for (var i = 0; i < ids.length; i++) {
     var rec = (state.users || []).find(function(u) { return u.id === ids[i]; });
-    if (rec && (rec.role === 'ciso' || rec.role === 'admin')) return true;
+    if (rec && rec.role === 'ciso') return true;
   }
   return false;
 }
@@ -741,7 +741,7 @@ function renderAssetOwnerReport(user) {
     + '<th style="padding:6px 8px;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Progress</th>'
     + '<th style="text-align:center;padding:6px 8px;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Status</th>'
     + '<th style="text-align:center;padding:6px 8px;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Action</th>'
-    + '</tr></thead><tbody id="tbod-${Math.random().toString(36).slice(2,8)}">';
+    + '</tr></thead><tbody id="tbod-' + Math.random().toString(36).slice(2,8) + '">';
 
   assetRows.forEach(function(r) {
     html += '<tr style="border-bottom:1px solid var(--border);">'
@@ -760,7 +760,7 @@ function renderAssetOwnerReport(user) {
       +   '<span style="font-size:11px;font-weight:600;padding:3px 9px;border-radius:10px;background:' + r.col + '22;color:' + r.col + ';white-space:nowrap;">' + r.status + '</span>'
       + '</td>'
       + '<td style="padding:10px 8px;text-align:center;">'
-      +   '<button class="btn btn-secondary btn-sm" onclick="openAssetWizardFromLibrary(\'' + r.a.id + '\')" style="font-size:11px;padding:4px 10px;">Open ' + sspLabel + ' →</button>'
+      +   '<button class="btn btn-secondary btn-sm" onclick="openAssetWizardFromLibrary(\'' + escapeHTML(String(r.a.id).replace(/'/g, "\\'")) + '\')" style="font-size:11px;padding:4px 10px;">Open ' + sspLabel + ' →</button>'
       + '</td>'
       + '</tr>';
   });
@@ -779,7 +779,7 @@ function shouldShowISPApprovalCallout(user) {
   if (p.status !== 'Under Review') return false;
   if (!state.currentUserId) return true;
   if (!user) return false;
-  if (user.role === 'ciso' || user.role === 'admin') return true;
+  if (user.role === 'ciso') return true;
   var sub = String(p.submittedTo || '').trim().toLowerCase();
   if (sub && String(user.name || '').trim().toLowerCase() === sub) return true;
   return false;
@@ -1191,7 +1191,7 @@ function renderReports() {
   var user = state.currentUserId ? (state.users||[]).find(function(u){ return u.id === state.currentUserId; }) : null;
   var printBtn = document.getElementById('reportsPrintBtn');
   if (printBtn) printBtn.style.display = (user && user.role === 'approver') ? 'none' : '';
-  var isScoped = !!user && user.role !== 'admin';
+  var isScoped = !!user;
   var showMyView = isScoped; // always scoped for non-admin, always full for admin
 
   const controls = showMyView ? getScopedControls() : getActiveControls();
@@ -1246,7 +1246,7 @@ function renderReports() {
   if (!user && state.cisoComplete) {
     postSetupCallout = '<div style="background:linear-gradient(135deg,#ecfdf5,#f0fdf4);border:1px solid #86efac;border-radius:12px;padding:18px 22px;margin-bottom:22px;max-width:920px;">'
       + '<div style="font-size:15px;font-weight:800;color:#14532d;margin-bottom:8px;">Program setup is complete</div>'
-      + '<div style="font-size:13px;color:#166534;line-height:1.6;margin-bottom:14px;">Choose a <strong>workspace</strong> in the sidebar to build domain policies, document controls, manage assets, or run tests. This screen is your program-wide dashboard and reports.</div>'
+      + '<div style="font-size:13px;color:#166534;line-height:1.6;margin-bottom:14px;">Choose a <strong>workspace</strong> in the sidebar to build domain policies, document controls, or manage assets. This screen is your program-wide dashboard and reports.</div>'
       + '<div style="display:flex;flex-wrap:wrap;gap:10px;">'
       + '<button type="button" class="btn btn-primary" onclick="goToPoliciesHome()">Open domain policies</button>'
       + '<button type="button" class="btn btn-secondary" onclick="showTab(\'users\')">Users &amp; roles</button>'
@@ -1470,7 +1470,7 @@ function renderPolicyRoadmap(families) {
       + '<span style="font-size:12px;font-weight:700;color:var(--navy);">' + label + '</span>'
       + '<span style="font-size:10px;color:var(--text-muted);">' + countLabel + '</span>'
       + '</div>'
-      + '<div style="font-size:10px;color:var(--text-muted);margin-bottom:3px);font-family:monospace;">' + escapeHTML(famsLabel) + '</div>'
+      + '<div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;font-family:monospace;">' + escapeHTML(famsLabel) + '</div>'
       + '<div style="height:20px;background:rgba(15,31,61,0.08);border-radius:4px;overflow:hidden;">'
       + '<div style="height:100%;background:' + barColor + ';width:' + barWidth + '%;border-radius:3px;transition:width 0.4s;"></div>'
       + '</div>'
@@ -1623,7 +1623,7 @@ function renderReviewQueuePanel() {
     + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:700;color:var(--text-muted);">Status</th>'
     + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:700;color:var(--text-muted);">Date</th>'
     + '<th style="padding:8px 10px;text-align:right;font-size:11px;font-weight:700;color:var(--text-muted);">Action</th>'
-    + '</tr></thead><tbody id="tbod-${Math.random().toString(36).slice(2,8)}">' + rows + '</tbody></table></div>';
+    + '</tr></thead><tbody id="tbod-' + Math.random().toString(36).slice(2,8) + '">' + rows + '</tbody></table></div>';
 
   // Insert at the top of reports body, before metrics
   body.insertBefore(panel, body.firstChild);
@@ -1671,7 +1671,7 @@ function openControlReassignmentFromQueue(controlId) {
 function approveAllReviewQueue() {
   var queue = state.controlReviewQueue || [];
   var attestationOnly = queue.filter(function(r) {
-    return r.type !== 'baseline-elevation' && r.controlId;
+    return r.type !== 'baseline-elevation' && r.type !== 'ssp' && r.controlId;
   });
   if (!attestationOnly.length) return;
   if (!confirm('Approve all ' + attestationOnly.length + ' pending attestations?')) return;

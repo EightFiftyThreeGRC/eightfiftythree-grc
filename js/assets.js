@@ -854,7 +854,7 @@ function renderAssetHome() {
       return h;
     }
     h += '<div class="table-scroll"><table class="control-table" style="table-layout:fixed;">'
-      + '<thead><tr><th style="width:28%;">' + (isProc?'Process':'Asset') + '</th><th style="width:14%;">'+(isProc?'Category':'Type')+'</th><th style="width:14%;">Owner</th><th style="width:10%;">Controls</th><th style="width:18%;">Progress</th><th style="width:10%;">Status</th><th style="width:6%;"></th></tr></thead><tbody id="tbod-${Math.random().toString(36).slice(2,8)}">';
+      + '<thead><tr><th style="width:28%;">' + (isProc?'Process':'Asset') + '</th><th style="width:14%;">'+(isProc?'Category':'Type')+'</th><th style="width:14%;">Owner</th><th style="width:10%;">Controls</th><th style="width:18%;">Progress</th><th style="width:10%;">Status</th><th style="width:6%;"></th></tr></thead><tbody id="tbod-' + Math.random().toString(36).slice(2,8) + '">';
     items.forEach(function(item){ h += sspRow(item, isProc); });
     h += '</tbody></table></div>';
     return h;
@@ -1784,7 +1784,7 @@ function renderAssetSSPStep1() {
     + '<input class="form-input" value="' + _esc(asset.name||'') + '" placeholder="e.g. HR Management System"'
     + ' oninput="state.assets[' + idx + '].name=this.value;renderAssetWizardChrome(); window.markDirty();"></div>'
     + '<div class="form-group"><label class="form-label">Asset Type <span style="color:var(--red);">*</span></label>'
-    + '<select class="form-select" onchange="state.assets[' + idx + '].type=this.value;">'
+    + '<select class="form-select" onchange="state.assets[' + idx + '].type=this.value; window.markDirty();">'
     + buildAssetTypeOptions(asset.type)
     + '</select>'
     + '<div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Asset type determines which controls appear in the SSP when no explicit control mappings are set.</div>'
@@ -1896,7 +1896,7 @@ function renderAssetSSPStep4_Attestations() {
         + '</label>'
         + '<select style="width:100%;padding:7px 10px;border:1px solid ' + (statusVal?statusColor:'var(--border)') + ';border-radius:6px;font-size:13px;font-weight:' + (statusVal?'600':'400') + ';color:' + (statusVal?statusColor:'var(--text-muted)') + ';background:white;cursor:pointer;"'
         + (isSubmitted ? ' disabled' : '')
-        + ' onchange="setSSPAttestation(\'' + asset.id + '\',\'' + c.id + '\',\'status\',this.value);renderAssetSSPStep4_Attestations();">'
+        + ' onchange="setSSPAttestation(\'' + asset.id + '\',\'' + c.id + '\',\'status\',this.value);setTimeout(renderAssetSSPStep4_Attestations,0);">'
         + '<option value="">— Select status —</option>'
         + SSP_STATUSES.map(function(s){ return '<option value="' + s + '"' + (statusVal===s?' selected':'') + ' style="color:' + (SSP_STATUS_COLORS[s]||'inherit') + ';">' + s + '</option>'; }).join('')
         + '</select></div>'
@@ -2626,7 +2626,7 @@ function applySSPFieldBulkToSelected() {
 }
 
 function submitSSP() {
-  if (blockActionIfDemoPlaceholders()) return;
+  if (typeof blockActionIfDemoPlaceholders === 'function' && blockActionIfDemoPlaceholders()) return;
   clearScopedUndoStack('SSP submit');
   var asset = (state.assets||[]).find(function(a){ return String(a.id) === String(state._selectedAssetId); });
   if (!asset) return;
@@ -2672,8 +2672,8 @@ function submitSSP() {
   markDirty();
   showToast('✅ SSP submitted for ' + asset.name);
   renderAssetSSPStep5_SignOff();
-  updateNotificationBadges();
-  showTab('reports');
+  if (typeof updateNotificationBadges === 'function') updateNotificationBadges();
+  if (typeof showTab === 'function') showTab('reports');
 }
 
 // ─── ASSET MANAGEMENT ────────────────────────────────────────────────────────
@@ -2685,7 +2685,11 @@ function removeAsset(assetId) {
   state.assets = state.assets.filter(function(a){ return String(a.id)!==String(assetId); });
   if (state.sspAttestations) delete state.sspAttestations[assetId];
   if (state.sspSignoffs)     delete state.sspSignoffs[assetId];
+  if (state.sspInterconnections) delete state.sspInterconnections[assetId];
+  if (state.assetCategorization) delete state.assetCategorization[assetId];
   if (state.assetMappings)   Object.keys(state.assetMappings).forEach(function(cid){ state.assetMappings[cid] = (state.assetMappings[cid]||[]).filter(function(id){ return String(id)!==String(assetId); }); });
+  if (state.controlReviewQueue) state.controlReviewQueue = state.controlReviewQueue.filter(function(r){ return r && String(r.assetId || r.scopeId || '') !== String(assetId); });
+  if (state.authBoundaries) state.authBoundaries.forEach(function(b){ if (b.assetIds) b.assetIds = b.assetIds.filter(function(id){ return String(id)!==String(assetId); }); });
   markDirty();
   renderAssetHome();
   renderSidebarAssets();
@@ -2698,6 +2702,8 @@ function removeProcess(procId) {
   state.processes = state.processes.filter(function(p){ return String(p.id)!==String(procId); });
   if (state.sspAttestations) delete state.sspAttestations[procId];
   if (state.sspSignoffs)     delete state.sspSignoffs[procId];
+  if (state.sspInterconnections) delete state.sspInterconnections[procId];
+  if (state.authBoundaries) state.authBoundaries.forEach(function(b){ if (b.processIds) b.processIds = b.processIds.filter(function(id){ return String(id)!==String(procId); }); });
   markDirty();
   renderAssetHome();
 }
@@ -2813,7 +2819,7 @@ function renderProcessSSPStep1() {
     + '<input class="form-input" value="' + _esc(proc.name||'') + '" placeholder="e.g. Vulnerability Management Program"'
     + ' oninput="state.processes[' + idx + '].name=this.value;renderAssetWizardChrome(); window.markDirty();"></div>'
     + '<div class="form-group"><label class="form-label">Process Category <span style="color:var(--red);">*</span></label>'
-    + '<select class="form-select" onchange="state.processes[' + idx + '].category=this.value;">'
+    + '<select class="form-select" onchange="state.processes[' + idx + '].category=this.value; window.markDirty();">'
     + PROCESS_CATEGORIES.map(function(c){ return '<option value="' + c.id + '"' + (proc.category===c.id?' selected':'') + '>' + c.label + '</option>'; }).join('')
     + '</select>'
     + '<div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Category determines which control families appear in the process SSP attestations.'
@@ -2910,7 +2916,7 @@ function renderProcessSSPStep4_Attestations() {
         + '</label>'
         + '<select style="width:100%;padding:7px 10px;border:1px solid ' + (statusVal?statusColor:'var(--border)') + ';border-radius:6px;font-size:13px;font-weight:' + (statusVal?'600':'400') + ';color:' + (statusVal?statusColor:'var(--text-muted)') + ';background:white;cursor:pointer;"'
         + (isSubmitted ? ' disabled' : '')
-        + ' onchange="setSSPAttestation(\'' + proc.id + '\',\'' + c.id + '\',\'status\',this.value);renderProcessSSPStep4_Attestations();">'
+        + ' onchange="setSSPAttestation(\'' + proc.id + '\',\'' + c.id + '\',\'status\',this.value);setTimeout(renderProcessSSPStep4_Attestations,0);">'
         + '<option value="">— Select status —</option>'
         + SSP_STATUSES.map(function(s){ return '<option value="' + s + '"' + (statusVal===s?' selected':'') + ' style="color:' + (SSP_STATUS_COLORS[s]||'inherit') + ';">' + s + '</option>'; }).join('')
         + '</select></div>'
@@ -3024,7 +3030,7 @@ function renderProcessSSPStep5_SignOff() {
 }
 
 function submitProcessSSP() {
-  if (blockActionIfDemoPlaceholders()) return;
+  if (typeof blockActionIfDemoPlaceholders === 'function' && blockActionIfDemoPlaceholders()) return;
   clearScopedUndoStack('Process SSP submit');
   var proc = (state.processes||[]).find(function(p){ return String(p.id)===String(state._selectedProcessId); });
   if (!proc) return;
@@ -3070,8 +3076,8 @@ function submitProcessSSP() {
   markDirty();
   showToast('✅ Process SSP submitted for ' + proc.name);
   renderProcessSSPStep5_SignOff();
-  updateNotificationBadges();
-  showTab('reports');
+  if (typeof updateNotificationBadges === 'function') updateNotificationBadges();
+  if (typeof showTab === 'function') showTab('reports');
 }
 
 // Legacy stubs (keep so old snapshots don't break)

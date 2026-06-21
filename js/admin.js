@@ -828,7 +828,9 @@ function renderUsersTab() {
 }
 
 function renderNewUserAssignments() {
-  const role = document.getElementById('newUserRole').value;
+  var roleEl = document.getElementById('newUserRole');
+  if (!roleEl) return;
+  const role = roleEl.value;
   const container = document.getElementById('newUserAssignments');
   if (!container) return;
   if (!role || role === 'ciso') { container.innerHTML = ''; return; }
@@ -899,6 +901,7 @@ function removeUser(id) {
   if (isUsersReadOnlyForCurrentUser()) { showToast('Read-only: AO cannot modify users.', true); return; }
   state.users = (state.users || []).filter(function(u){ return u.id !== id; });
   if (state.currentUserId === id) applyRoleView('admin');
+  markDirty();
   renderUsersTab();
   showToast('User removed');
 }

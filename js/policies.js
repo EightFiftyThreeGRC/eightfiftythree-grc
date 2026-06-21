@@ -589,7 +589,7 @@ function renderISSMWorkspace(user) {
     + '<th style="padding:10px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);text-align:left;">Owner</th>'
     + '<th style="padding:10px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);text-align:left;">Status</th>'
     + '</tr></thead>'
-    + '<tbody id="tbod-${Math.random().toString(36).slice(2,8)}">' + libRows + '</tbody></table></div>';
+    + '<tbody id="tbod-' + Math.random().toString(36).slice(2,8) + '">' + libRows + '</tbody></table></div>';
 
   html += '</div>';
   body.innerHTML = html;
@@ -916,7 +916,7 @@ function renderPolicyList() {
     + '<th style="padding:10px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);text-align:left;">Owner</th>'
     + '<th style="padding:10px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);text-align:left;">Status</th>'
     + '</tr></thead>'
-    + '<tbody id="tbod-${Math.random().toString(36).slice(2,8)}">' + libRows + '</tbody>'
+    + '<tbody id="tbod-' + Math.random().toString(36).slice(2,8) + '">' + libRows + '</tbody>'
     + '</table>'
     + '</div>'
     + '</div>';
@@ -1615,7 +1615,7 @@ function renderPolicyStep1() {
               <div style="font-size:12px; color:var(--text-muted); margin-bottom:10px;">No owner assigned yet. Suggest one for the CISO to approve:</div>
               <div style="display:flex; flex-direction:column; gap:8px;">
                 <input class="form-input" style="font-size:13px; font-weight:600;" placeholder="Suggested owner name" value="${escapeHTML((state._suggestedOwner||{})[fam]||'')}"
-                  oninput="if(!state._suggestedOwner)state._suggestedOwner={};state._suggestedOwner['${fam}']=this.value;; window.markDirty();">
+                  oninput="if(!state._suggestedOwner)state._suggestedOwner={};state._suggestedOwner['${fam}']=this.value; window.markDirty();">
                 <div style="font-size:11px; color:var(--text-muted);">This suggestion will be visible to the CISO on the dashboard.</div>
               </div>
             ` : `
@@ -1705,6 +1705,7 @@ function setPolicyCustodian(fam, field, value) {
   var prev = state.policyCustodians[fam][field];
   state.policyCustodians[fam][field] = value;
   logFieldChange('policyCustodians.' + fam + '.' + field, prev, value);
+  markDirty();
 }
 
 function getCustodian(fam) {
@@ -1757,6 +1758,7 @@ function confirmReturnToCISO(fam) {
     });
     if (!stillAssigned.length) state._policyOwnerFilter = '';
   }
+  markDirty();
   var ownerTitle = state.programOwnerTitle || 'Program Owner';
   addAuditEntry('policy', fam, 'Policy returned to ' + ownerTitle + ' by ' + previousOwner);
   showToast('\u21A9 Policy returned to ' + ownerTitle + '. Switch to Admin view \u2192 Program Setup Step 5 to reassign.');
@@ -1974,9 +1976,11 @@ function toggleDomainControl(fam, ctrlId, checked) {
   if (!state.policySelectedControls[fam]) state.policySelectedControls[fam] = [];
   if (checked && !state.policySelectedControls[fam].includes(ctrlId)) state.policySelectedControls[fam].push(ctrlId);
   if (!checked) state.policySelectedControls[fam] = state.policySelectedControls[fam].filter(function(id){ return id !== ctrlId; });
+  markDirty();
   const sel = state.policySelectedControls[fam];
+  const allFams = typeof getPolicyAllFamilies === 'function' ? getPolicyAllFamilies(fam) : [fam];
   const baselineCount = CONTROLS.filter(function(c){
-    return c.f === fam && (c.bl.includes(state.baseline) || (state.privacyOverlay && c.bl.includes('P')));
+    return allFams.includes(c.f) && (c.bl.includes(state.baseline) || (state.privacyOverlay && c.bl.includes('P')));
   }).length;
   const fc  = document.getElementById('policy-step-2-count');
   const fcs = document.getElementById('policy-step-2-count-side');
@@ -2000,6 +2004,7 @@ function selectAllDomainControls(fam, mode) {
   else                     state.policySelectedControls[fam] = [];
   // Auto-populate control owners from domain owner for newly selected controls
   if (mode !== 'none') autoPopulateControlOwnersFromDomain(fam);
+  markDirty();
   const sel = state.policySelectedControls[fam];
   document.querySelectorAll('.domain-cb').forEach(function(cb){
     cb.checked = sel.includes(cb.dataset.id||'');
@@ -2017,6 +2022,7 @@ function selectPolicyProcControls(fam) {
   const p1 = CONTROLS.filter(function(c){ return allFams.includes(c.f) && c.id.match(/-1$/); }).map(function(c){ return c.id; });
   if (!state.policySelectedControls) state.policySelectedControls = {};
   state.policySelectedControls[fam] = p1;
+  markDirty();
   renderPolicyStep2();
 }
 
@@ -2328,7 +2334,7 @@ function _renderDomainReferences(fam, dp) {
     const urlPart = ref.internal ? '' :
       '<div style="margin-top:6px;display:flex;align-items:center;gap:6px;">' +
         '<span style="font-size:11px;color:var(--text-muted);white-space:nowrap;">URL:</span>' +
-        '<input class="form-input" style="font-size:12px;padding:3px 8px;flex:1;" placeholder="https://…" value="'+escapeHTML(ref.url||'')+'" oninput="state.domainPolicies[\''+esc_fam+'\'].references['+ri+'].url=this.value;renderPolicyStep3();; window.markDirty();">' +
+        '<input class="form-input" style="font-size:12px;padding:3px 8px;flex:1;" placeholder="https://…" value="'+escapeHTML(ref.url||'')+'" oninput="state.domainPolicies[\''+esc_fam+'\'].references['+ri+'].url=this.value;renderPolicyStep3(); window.markDirty();">' +
         (ref.url ? '<a href="'+escapeHTML(ref.url)+'" target="_blank" style="font-size:11px;color:var(--primary);text-decoration:none;white-space:nowrap;padding:3px 8px;border:1px solid var(--primary);border-radius:4px;">🔗 Open</a>' : '') +
       '</div>';
     const internalBtn = ref.internal ?
@@ -2336,8 +2342,8 @@ function _renderDomainReferences(fam, dp) {
     return '<div style="background:var(--bg-alt);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px;display:flex;gap:10px;align-items:flex-start;">' +
       '<span style="font-size:18px;padding-top:2px;">📄</span>' +
       '<div style="flex:1;min-width:0;">' +
-        '<input class="form-input" style="font-size:13px;font-weight:600;border:none;border-bottom:1px solid var(--border);border-radius:0;padding:2px 0 5px;background:transparent;width:100%;" value="'+escapeHTML(ref.title||'')+'" oninput="state.domainPolicies[\''+esc_fam+'\'].references['+ri+'].title=this.value;; window.markDirty();" placeholder="Reference title">' +
-        '<textarea class="form-input" rows="1" style="font-size:12px;color:var(--text-muted);border:none;border-radius:0;padding:3px 0;background:transparent;width:100%;margin-top:3px;resize:none;overflow:hidden;line-height:1.5;" oninput="state.domainPolicies[\''+esc_fam+'\'].references['+ri+'].description=this.value;this.style.height=\'auto\';this.style.height=this.scrollHeight+\'px\';; window.markDirty();" onfocus="this.style.height=\'auto\';this.style.height=this.scrollHeight+\'px\';" placeholder="Description">'+escapeHTML(ref.description||'')+'</textarea>' +
+        '<input class="form-input" style="font-size:13px;font-weight:600;border:none;border-bottom:1px solid var(--border);border-radius:0;padding:2px 0 5px;background:transparent;width:100%;" value="'+escapeHTML(ref.title||'')+'" oninput="state.domainPolicies[\''+esc_fam+'\'].references['+ri+'].title=this.value; window.markDirty();" placeholder="Reference title">' +
+        '<textarea class="form-input" rows="1" style="font-size:12px;color:var(--text-muted);border:none;border-radius:0;padding:3px 0;background:transparent;width:100%;margin-top:3px;resize:none;overflow:hidden;line-height:1.5;" oninput="state.domainPolicies[\''+esc_fam+'\'].references['+ri+'].description=this.value;this.style.height=\'auto\';this.style.height=this.scrollHeight+\'px\'; window.markDirty();" onfocus="this.style.height=\'auto\';this.style.height=this.scrollHeight+\'px\';" placeholder="Description">'+escapeHTML(ref.description||'')+'</textarea>' +
         urlPart + internalBtn +
       '</div>' +
       '<button style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:18px;line-height:1;padding:0;opacity:0.5;" onclick="removeDomainRef(\''+esc_fam+'\','+ri+')" title="Remove">×</button>' +
@@ -2350,11 +2356,12 @@ function _renderDomainReferences(fam, dp) {
 function addDomainRef(fam) {
   if (!state.domainPolicies[fam].references) state.domainPolicies[fam].references = [];
   state.domainPolicies[fam].references.push({ title:'', description:'', url:'', internal:false });
+  markDirty();
   renderPolicyStep3();
 }
 
 function removeDomainRef(fam, i) {
-  if(confirm('Delete this reference?')) state.domainPolicies[fam].references.splice(i, 1);
+  if(confirm('Delete this reference?')) { state.domainPolicies[fam].references.splice(i, 1); markDirty(); }
   renderPolicyStep3();
 }
 
@@ -2580,7 +2587,7 @@ function goToCISOPolicyEditor() {
       ispHTML += '<div style="margin-bottom:20px;">'
         + '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:8px;">🕑 Revision History</div>'
         + '<table style="width:100%;border-collapse:collapse;font-size:13px;">'
-        + '<thead><tr style="border-bottom:2px solid var(--border);"><th style="text-align:left;padding:5px 8px;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Version</th><th style="text-align:left;padding:5px 8px;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Date</th><th style="text-align:left;padding:5px 8px;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Author</th><th style="text-align:left;padding:5px 8px;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Changes</th></tr></thead><tbody id="tbod-${Math.random().toString(36).slice(2,8)}">';
+        + '<thead><tr style="border-bottom:2px solid var(--border);"><th style="text-align:left;padding:5px 8px;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Version</th><th style="text-align:left;padding:5px 8px;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Date</th><th style="text-align:left;padding:5px 8px;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Author</th><th style="text-align:left;padding:5px 8px;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Changes</th></tr></thead><tbody id="tbod-' + Math.random().toString(36).slice(2,8) + '">';
       (isp.revisionHistory||[]).slice().reverse().forEach(function(r) {
         ispHTML += '<tr style="border-bottom:1px solid var(--border);">'
           + '<td style="padding:6px 8px;font-family:monospace;font-weight:700;color:var(--teal);">v' + _esc(r.version||'') + '</td>'
@@ -2630,7 +2637,7 @@ function goToCISOPolicyEditor() {
       + '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:8px;">✅ Review & Approval Log</div>';
     if (logRows.length) {
       ispHTML += '<table style="width:100%;border-collapse:collapse;font-size:13px;">'
-        + '<thead><tr style="border-bottom:2px solid var(--border);"><th style="text-align:left;padding:5px 8px;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Event</th><th style="text-align:left;padding:5px 8px;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Date</th><th style="text-align:left;padding:5px 8px;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);">By</th><th style="text-align:left;padding:5px 8px;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Notes</th></tr></thead><tbody id="tbod-${Math.random().toString(36).slice(2,8)}">';
+        + '<thead><tr style="border-bottom:2px solid var(--border);"><th style="text-align:left;padding:5px 8px;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Event</th><th style="text-align:left;padding:5px 8px;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Date</th><th style="text-align:left;padding:5px 8px;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);">By</th><th style="text-align:left;padding:5px 8px;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Notes</th></tr></thead><tbody id="tbod-' + Math.random().toString(36).slice(2,8) + '">';
       logRows.forEach(function(r) {
         ispHTML += '<tr style="border-bottom:1px solid var(--border);">'
           + '<td style="padding:6px 8px;font-weight:600;color:var(--navy);">' + _esc(r.event) + '</td>'
@@ -2697,7 +2704,7 @@ function goToCISOPolicyEditor() {
       ispHTML += '<table style="width:100%;border-collapse:collapse;font-size:13px;">'
         + '<thead><tr style="border-bottom:2px solid var(--border);"><th style="text-align:left;padding:5px 8px;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Date</th><th style="text-align:left;padding:5px 8px;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Suggested By</th><th style="text-align:left;padding:5px 8px;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Summary</th><th style="text-align:left;padding:5px 8px;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Status</th>'
         + (!state.currentUserId ? '<th style="text-align:left;padding:5px 8px;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Actions</th>' : '')
-        + '</tr></thead><tbody id="tbod-${Math.random().toString(36).slice(2,8)}">';
+        + '</tr></thead><tbody id="tbod-' + Math.random().toString(36).slice(2,8) + '">';
       state.infoSecPolicySuggestions.slice().reverse().forEach(function(s) {
         var sid = String(s.id || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
         var act = '';
@@ -3162,7 +3169,7 @@ function renderPolicyStep3() {
     } else if (sec.type === 'revision-history') {
       content = _renderDomainRevisionHistory(fam, dp);
     } else if (sec.type === 'custom') {
-      content = '<div style="margin-bottom:8px;"><input class="form-input" style="font-size:14px;font-weight:600;border:none;border-bottom:1px solid var(--border);border-radius:0;padding:4px 0;background:transparent;" value="'+escapeHTML(sec.title)+'" oninput="state.domainPolicies[\''+esc_fam+'\'].sections['+si+'].title=this.value;renderPolicyStep3();; window.markDirty();" placeholder="Section title"></div>' +
+      content = '<div style="margin-bottom:8px;"><input class="form-input" style="font-size:14px;font-weight:600;border:none;border-bottom:1px solid var(--border);border-radius:0;padding:4px 0;background:transparent;" value="'+escapeHTML(sec.title)+'" oninput="state.domainPolicies[\''+esc_fam+'\'].sections['+si+'].title=this.value;renderPolicyStep3(); window.markDirty();" placeholder="Section title"></div>' +
         '<textarea class="form-input" rows="5" style="font-size:13px;line-height:1.7;resize:vertical;" oninput="state.domainPolicies[\''+esc_fam+'\'].sections['+si+'].content=this.value; window.markDirty();" placeholder="Enter section content…">'+(sec.content||'')+'</textarea>';
     }
     return '<div class="isp-section" data-section-idx="'+si+'" '+dragAttr+' style="margin-bottom:28px;padding:4px 4px 4px 4px;border-radius:6px;transition:background 0.15s;">'+hdr+content+'</div>';
@@ -3196,7 +3203,7 @@ function renderPolicyStep3() {
       '</div>' +
       '<div>' +
         '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:6px;">Review Cycle</div>' +
-        '<select class="form-select" style="font-size:12px;" onchange="state.domainPolicies[\''+fam+'\'].reviewCycle=this.value">' +
+        '<select class="form-select" style="font-size:12px;" onchange="state.domainPolicies[\''+fam+'\'].reviewCycle=this.value; markDirty();">' +
           '<option'+(dp.reviewCycle==='Annual'?' selected':'')+'>Annual</option>' +
           '<option'+(dp.reviewCycle==='Semi-Annual'?' selected':'')+'>Semi-Annual</option>' +
           '<option'+(dp.reviewCycle==='Quarterly'?' selected':'')+'>Quarterly</option>' +
@@ -3263,7 +3270,7 @@ function _renderDomainRoles(fam, dp) {
     (role.responsibilities||[]).forEach(function(r, rsi) {
       html += '<div style="display:flex;align-items:flex-start;gap:6px;margin-bottom:4px;">' +
         '<span style="color:var(--text-muted);font-size:16px;line-height:1;margin-top:7px;">·</span>' +
-        '<textarea class="form-input" rows="1" style="font-size:12px;flex:1;resize:none;overflow:hidden;line-height:1.5;" placeholder="Responsibility…" oninput="state.domainPolicies[\''+esc_fam+'\'].roles['+ri+'].responsibilities['+rsi+']=this.value;this.style.height=\'auto\';this.style.height=this.scrollHeight+\'px\';; window.markDirty();" onfocus="this.style.height=\'auto\';this.style.height=this.scrollHeight+\'px\';">'+escapeHTML(r)+'</textarea>' +
+        '<textarea class="form-input" rows="1" style="font-size:12px;flex:1;resize:none;overflow:hidden;line-height:1.5;" placeholder="Responsibility…" oninput="state.domainPolicies[\''+esc_fam+'\'].roles['+ri+'].responsibilities['+rsi+']=this.value;this.style.height=\'auto\';this.style.height=this.scrollHeight+\'px\'; window.markDirty();" onfocus="this.style.height=\'auto\';this.style.height=this.scrollHeight+\'px\';">'+escapeHTML(r)+'</textarea>' +
         '<button style="background:none;border:none;color:var(--red);cursor:pointer;font-size:12px;margin-top:6px;" onclick="removeDomainResp(\''+esc_fam+'\','+ri+','+rsi+')">✕</button>' +
       '</div>';
     });
@@ -3331,6 +3338,7 @@ function _renderDomainRequirements(fam, dp, selected) {
 
 function addDomainRole(fam) {
   state.domainPolicies[fam].roles.push({name:'New Role', title:'', responsibilities:['']});
+  markDirty();
   renderPolicyStep3();
 }
 function removeDomainRole(fam, i) {
@@ -3353,10 +3361,12 @@ function moveDomainRole(fam, i, dir) {
 }
 function addDomainResp(fam, ri) {
   state.domainPolicies[fam].roles[ri].responsibilities.push('');
+  markDirty();
   renderPolicyStep3();
 }
 function removeDomainResp(fam, ri, rsi) {
   state.domainPolicies[fam].roles[ri].responsibilities.splice(rsi,1);
+  markDirty();
   renderPolicyStep3();
 }
 function addDomainReq(fam) {
@@ -3364,6 +3374,7 @@ function addDomainReq(fam) {
   const n = (dp.requirements||[]).length;
   if (!dp.requirements) dp.requirements = [];
   dp.requirements.push({ id: fam+'-REQ-'+(n+1), controls: [], text: '' });
+  markDirty();
   renderPolicyStep3();
 }
 function removeDomainReq(fam, qi) {
@@ -3383,22 +3394,24 @@ function addDomainReqCtrl(fam, qi) {
   const req = state.domainPolicies[fam].requirements[qi];
   if (!req.controls) req.controls = [];
   if (!req.controls.includes(cid)) req.controls.push(cid);
+  markDirty();
   renderPolicyStep3();
 }
 function removeDomainReqCtrl(fam, qi, cid) {
   const req = state.domainPolicies[fam].requirements[qi];
   req.controls = (req.controls||[]).filter(function(c){ return c!==cid; });
+  markDirty();
   renderPolicyStep3();
 }
 function moveDomainReq(fam, i, dir) {
   const reqs = state.domainPolicies[fam].requirements;
   const j = i+dir;
-  if (j>=0 && j<reqs.length) { const tmp=reqs[i]; reqs[i]=reqs[j]; reqs[j]=tmp; renumberDomainReqs(fam); renderPolicyStep3(); }
+  if (j>=0 && j<reqs.length) { const tmp=reqs[i]; reqs[i]=reqs[j]; reqs[j]=tmp; renumberDomainReqs(fam); markDirty(); renderPolicyStep3(); }
 }
 function moveDomainSection(fam, i, dir) {
   const secs = state.domainPolicies[fam].sections;
   const j = i+dir;
-  if (j>=0 && j<secs.length) { const tmp=secs[i]; secs[i]=secs[j]; secs[j]=tmp; renderPolicyStep3(); }
+  if (j>=0 && j<secs.length) { const tmp=secs[i]; secs[i]=secs[j]; secs[j]=tmp; markDirty(); renderPolicyStep3(); }
 }
 function removeDomainSection(fam, i) {
   var sec = state.domainPolicies[fam].sections[i];
@@ -3413,10 +3426,12 @@ function removeDomainSection(fam, i) {
     }
   });
   state.domainPolicies[fam].sections.splice(i,1);
+  markDirty();
   renderPolicyStep3();
 }
 function addDomainCustomSection(fam) {
   state.domainPolicies[fam].sections.push({ type:'custom', title:'New Section', content:'' });
+  markDirty();
   renderPolicyStep3();
 }
 
@@ -3432,6 +3447,7 @@ function dpDrop(e, fam, targetIdx) {
   const item = secs.splice(_dpDragIdx,1)[0];
   secs.splice(targetIdx,0,item);
   _dpDragFam=null; _dpDragIdx=null;
+  markDirty();
   renderPolicyStep3();
 }
 
@@ -3685,6 +3701,7 @@ function setCtrlOwner(ctrlId, field, value) {
     delete state.controlOwners[ctrlId].isDemoPlaceholder;
   }
   logFieldChange(path, prev, value);
+  markDirty();
   // Refresh assignment count in left panel
   const fam = state._policyDomain;
   const selected = (state.policySelectedControls||{})[fam]||[];

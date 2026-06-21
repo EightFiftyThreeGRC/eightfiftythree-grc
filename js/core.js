@@ -1134,6 +1134,9 @@ const state = {
   customAssetTypes: [],     // user-defined asset types added by control owners
   customAssetTypeGroups: {}, // { 'OT Device':'Infrastructure', ... }
   customAssetTypeHeaders: [], // user-defined group headers shown in asset coverage
+  removedBuiltInAssetTypeKeys: [],   // built-in asset type keys user has removed
+  removedBuiltInAssetTypeGroups: [], // built-in asset type groups user has removed
+  sspInterconnections: {},           // { assetId|procId: [{ ... }] } SSP interconnection records
   cisoComplete: false,
   infoSecPolicy: null,
   policySelectedControls: null,  // { 'AC': ['AC-1', 'AC-2', ...] }
@@ -1156,6 +1159,10 @@ const state = {
   _controlLibraryColFilters: {},  // { control:'', name:'', owner:'', impl:'', asset:'', compliance:'', lifecycle:'' }
   _assetLibraryMode: false,    // true = show global asset library, false = asset workspace
   _assetTypeLibraryMode: false, // true = show asset type library, false = asset workspace
+  _selectedAssetId: null,       // currently selected asset in wizard
+  _selectedProcessId: null,     // currently selected process in wizard
+  _selectedCtrl: null,          // currently selected control
+  _reportsMyView: null,         // reports dashboard view state
   _sspReviewerReadOnly: false,  // true = AO/ISSM viewing submitted SSP in read-only package view (not owner wizard)
   _sspReadOnlyExitTab: null,     // 'reports' | 'library' — where Back returns after read-only SSP view
   assetTypeRequests: [],        // [{id, action, typeName, reason, requestedBy, requestedAt, status, reviewedBy, reviewedAt, reviewReason}]
@@ -1164,6 +1171,7 @@ const state = {
   currentUserId: null,           // null = admin mode; string id = logged-in user
 
   // NEW FEATURES: Deadlines, Versioning, Workflow, Asset Mapping
+  controlDesignSubmission: null,  // { submittedAt, submitterName, designedCount, totalCount, notes }
   controlDeadlines: {},          // { 'AC-1': 'YYYY-MM-DD' } implementation deadline per control
   controlWorkflowState: {},      // { 'AC-1': 'draft'|'in-progress'|'awaiting-review'|'approved' }
   controlReviewQueue: [],        // [{ controlId, owner, status, submittedAt }] pending reviews
@@ -1189,8 +1197,10 @@ const state = {
   _reportsProgramReadinessHidden: false, // true = collapse Program Readiness panel in Reports
   _reportsMySummaryHidden: false, // true = collapse "My dashboard" summary card in Reports
   _reportsPhase1BannerHidden: false, // true = collapse Phase 1 completion banner in Reports
-  activeFrameworks: { iso27001: true, soc2: true, hipaa: true }, // which cross-framework lenses to track
+  activeFrameworks: { iso27001: true, soc2: true, cisv8: true }, // which cross-framework lenses to track
   sharePointConfig: { enabled: false, siteUrl: '', libraryName: 'Evidence', defaultFolder: 'GRC/Evidence' },
+  googleDriveConfig: { enabled: false, folderUrl: '' },
+  oneDriveConfig: { enabled: false, folderUrl: '' },
   entraConfig: { enabled: false, clientId: '', tenantId: 'organizations', redirectUri: '' },
   entraSession: null, // { email, name, oid, matchedUserId, signedInAt } when signed in via Entra
   _frameworkFilter: '',
@@ -1216,17 +1226,22 @@ const SNAPSHOTS_KEY = 'eightfiftythree-grc-snapshots';
       var LEGACY_STATE = pfx + '-v1';
       var LEGACY_TS = pfx + '-v1-ts';
       var LEGACY_SNAPS = pfx + '-snapshots';
+      var copied = false;
       if (!localStorage.getItem(STORAGE_KEY) && localStorage.getItem(LEGACY_STATE)) {
         localStorage.setItem(STORAGE_KEY, localStorage.getItem(LEGACY_STATE));
         var ts = localStorage.getItem(LEGACY_TS);
         if (ts) localStorage.setItem(STORAGE_KEY + '-ts', ts);
+        copied = true;
       }
       if (!localStorage.getItem(SNAPSHOTS_KEY) && localStorage.getItem(LEGACY_SNAPS)) {
         localStorage.setItem(SNAPSHOTS_KEY, localStorage.getItem(LEGACY_SNAPS));
+        copied = true;
       }
-      localStorage.removeItem(LEGACY_STATE);
-      localStorage.removeItem(LEGACY_TS);
-      localStorage.removeItem(LEGACY_SNAPS);
+      if (copied) {
+        localStorage.removeItem(LEGACY_STATE);
+        localStorage.removeItem(LEGACY_TS);
+        localStorage.removeItem(LEGACY_SNAPS);
+      }
     }
   } catch (e) { /* storage unavailable (private mode) — safe to ignore */ }
 })();
@@ -1362,6 +1377,14 @@ function seedXmplAtoDemoDataIfMissing() {
   };
 }
 
+function migrateHipaaToCisV8() {
+  var af = state.activeFrameworks;
+  if (af && typeof af === 'object' && ('hipaa' in af) && !('cisv8' in af)) {
+    af.cisv8 = af.hipaa;
+    delete af.hipaa;
+  }
+}
+
 function applyLoadedState(saved) {
   if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return false;
   STATE_ALLOWED_KEYS.forEach(function(k) {
@@ -1373,6 +1396,7 @@ function applyLoadedState(saved) {
   migrateLegacySingleLetterOwnerNames();
   migrateAtoStateShape();
   seedXmplAtoDemoDataIfMissing();
+  migrateHipaaToCisV8();
   return true;
 }
 
@@ -1386,6 +1410,7 @@ function addAuditEntry(category, refId, message) {
     msg: (message || '').toString()
   });
   if (state.auditTrail.length > 800) state.auditTrail = state.auditTrail.slice(-800);
+  markDirty();
 }
 
 // ── Field-level change log (NotebookLM Task 2) ─────────────────────────────
@@ -1561,6 +1586,7 @@ function validateProgramShape(parsed) {
     if (!(k in parsed)) return;
     var exp = valType(STATE_DEFAULTS[k]);
     var got = valType(parsed[k]);
+    if (exp === 'null' || got === 'null') return;
     if (exp !== got) {
       errors.push('Field "' + k + '" must be ' + exp + ', got ' + got);
     }
@@ -1573,7 +1599,8 @@ function validateProgramShape(parsed) {
 }
 
 function escapeHTML(str) {
-  if (!str) return '';
+  if (str == null) return '';
+  if (typeof str !== 'string') str = String(str);
   return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 const _esc = escapeHTML;
@@ -1636,8 +1663,9 @@ function exportProgramJson() {
       a.download = base + '-export.json';
       document.body.appendChild(a);
       a.click();
+      var href = a.href;
       a.remove();
-      URL.revokeObjectURL(a.href);
+      setTimeout(function() { URL.revokeObjectURL(href); }, 200);
       showToast('JSON export downloaded — keep it as a backup outside the browser.');
     } catch (e) {
       showToast('Export failed.', true);
@@ -1803,7 +1831,7 @@ function pruneAutoRestoreSnapshots() {
   var auto = [];
   var rest = [];
   snaps.forEach(function(s) {
-    if (s && s.name && String(s.name).indexOf('Auto-backup before restore') === 0) auto.push(s);
+    if (s && s.name && (String(s.name).indexOf('Auto-backup before restore') === 0 || String(s.name).indexOf('Pre-import backup') === 0)) auto.push(s);
     else rest.push(s);
   });
   auto.sort(function(a, b) { return String(b.saved).localeCompare(String(a.saved)); });

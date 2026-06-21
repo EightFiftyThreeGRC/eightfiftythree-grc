@@ -127,7 +127,7 @@ function applyEntraSignIn(account, silent) {
   var overlay = document.getElementById('rolePickerOverlay');
   if (overlay) overlay.style.display = 'none';
   if (typeof maybePromptProfileSetup === 'function') maybePromptProfileSetup(matched);
-  if (!silent) showToast('Signed in with Microsoft as ' + getOwnerDisplayName(matched));
+  if (!silent) showToast('Signed in with Microsoft as ' + (typeof getOwnerDisplayName === 'function' ? getOwnerDisplayName(matched) : (matched.name || matched.email || 'user')));
   return true;
 }
 
@@ -246,7 +246,7 @@ function renderEntraAdminSetupHtml() {
     + '<div class="entra-setup-head">'
     + '<div><div class="entra-setup-title">Microsoft Entra ID sign-in</div>'
     + '<div class="entra-setup-sub">Replace demo profile picking with real work-account login. Register a single-page app in Entra and paste the Application (client) ID below.</div></div>'
-    + '<label class="fw-toggle" onclick="event.stopPropagation();"><input type="checkbox"' + (cfg.enabled ? ' checked' : '') + (readOnly ? ' disabled' : '') + ' onchange="setEntraConfigField(\'enabled\',this.checked);renderUsersTab();"><span class="fw-toggle-track"></span></label>'
+    + '<label class="fw-toggle" onclick="event.stopPropagation();"><input type="checkbox"' + (cfg.enabled ? ' checked' : '') + (readOnly ? ' disabled' : '') + ' onchange="setEntraConfigField(\'enabled\',this.checked);setTimeout(renderUsersTab,0);"><span class="fw-toggle-track"></span></label>'
     + '</div>'
     + (cfg.enabled
       ? '<div class="entra-setup-fields">'

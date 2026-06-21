@@ -279,11 +279,11 @@ function renderReviewCycleCard(policyKey, label) {
     + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">'
     + '<div class="form-group" style="margin-bottom:0;">'
     + '<label class="form-label" style="font-size:11px;">Last Reviewed</label>'
-    + '<input class="form-input" type="date" style="font-size:12px;" value="' + (rc.lastReviewed||'') + '" oninput="state.policyReviewCycle[\'' + escKey + '\'].lastReviewed=this.value; autoSetNextReview(\'' + escKey + '\');; window.markDirty();">'
+    + '<input class="form-input" type="date" style="font-size:12px;" value="' + (rc.lastReviewed||'') + '" oninput="state.policyReviewCycle[\'' + escKey + '\'].lastReviewed=this.value; autoSetNextReview(\'' + escKey + '\'); window.markDirty();">'
     + '</div>'
     + '<div class="form-group" style="margin-bottom:0;">'
     + '<label class="form-label" style="font-size:11px;">Next Review Due</label>'
-    + '<input class="form-input" type="date" style="font-size:12px;border-color:' + rs.color + ';" value="' + (rc.nextReviewDue||'') + '" oninput="state.policyReviewCycle[\'' + escKey + '\'].nextReviewDue=this.value;; window.markDirty();">'
+    + '<input class="form-input" type="date" style="font-size:12px;border-color:' + rs.color + ';" value="' + (rc.nextReviewDue||'') + '" oninput="state.policyReviewCycle[\'' + escKey + '\'].nextReviewDue=this.value; window.markDirty();">'
     + '</div>'
     + '<div class="form-group" style="margin-bottom:0;">'
     + '<label class="form-label" style="font-size:11px;">Approved By</label>'
@@ -291,7 +291,7 @@ function renderReviewCycleCard(policyKey, label) {
     + '</div>'
     + '<div class="form-group" style="margin-bottom:0;">'
     + '<label class="form-label" style="font-size:11px;">Approval Date</label>'
-    + '<input class="form-input" type="date" style="font-size:12px;" value="' + (rc.approvalDate||'') + '" oninput="state.policyReviewCycle[\'' + escKey + '\'].approvalDate=this.value;; window.markDirty();">'
+    + '<input class="form-input" type="date" style="font-size:12px;" value="' + (rc.approvalDate||'') + '" oninput="state.policyReviewCycle[\'' + escKey + '\'].approvalDate=this.value; window.markDirty();">'
     + '</div>'
     + '</div>'
     + '<div style="font-size:10px;color:var(--text-muted);margin-top:10px;">NIST 800-53 requires policies be reviewed at least annually. Auditors will ask: &ldquo;When was this last reviewed and by whom?&rdquo;</div>'
@@ -1122,7 +1122,12 @@ function closeWizardVideo() {
 document.addEventListener('keydown', function(ev) {
   if (ev.key !== 'Escape') return;
   var ov = document.getElementById('wizardVideoOverlay');
-  if (ov && ov.classList.contains('is-visible')) closeWizardVideo();
+  if (ov && ov.classList.contains('is-visible')) { closeWizardVideo(); return; }
+  var modalIds = ['poamModalOverlay', 'atoDecisionOverlay', 'returnCtrlOverlay', 'deselectCtrlOverlay', 'snapshotOverlay', 'snapshotRestoreConfirmOverlay'];
+  for (var i = 0; i < modalIds.length; i++) {
+    var m = document.getElementById(modalIds[i]);
+    if (m) { m.remove(); return; }
+  }
 });
 
 function maybeShowWelcomeIntro() {
@@ -1170,7 +1175,7 @@ document.addEventListener('DOMContentLoaded', function() {
     try { applySetupFocusMode(); } catch (e) { console.warn('applySetupFocusMode:', e); }
     try {
       if (state.cisoComplete) showTab('home');
-      else showTab('home');
+      else showTab('ciso');
     } catch (e) { console.warn('showTab:', e); }
   });
   try { setupMobileNav(); } catch (e) { console.warn('setupMobileNav:', e); }

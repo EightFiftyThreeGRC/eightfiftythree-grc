@@ -1128,7 +1128,7 @@ function renderBulkDesignSourceModalBody() {
     + '  <div><label class="form-label" style="font-size:10px;">Search</label>'
     + '    <input class="form-input" style="font-size:12px;" placeholder="Filter by control ID or name" value="' + escapeHTML(st.search || '') + '" oninput="window._bulkDesignSourceState.search=this.value;renderBulkDesignSourceModalBody();"></div>'
     + '  <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--navy);white-space:nowrap;padding-bottom:8px;">'
-    + '    <input type="checkbox" ' + (st.overwrite ? 'checked' : '') + ' onchange="window._bulkDesignSourceState.overwrite=this.checked;renderBulkDesignSourceModalBody();" style="accent-color:var(--teal);">'
+    + '    <input type="checkbox" ' + (st.overwrite ? 'checked' : '') + ' onchange="window._bulkDesignSourceState.overwrite=this.checked;setTimeout(renderBulkDesignSourceModalBody,0);" style="accent-color:var(--teal);">'
     + '    Overwrite existing external-source fields'
     + '  </label>'
     + '</div>'
@@ -1351,7 +1351,7 @@ function buildEvidenceArtifactSectionHTML(ctrl) {
   var g = FAMILY_EVIDENCE_GUIDANCE[ctrl.f];
   var hint = g && g.evidence ? '<div style="font-size:11px;color:var(--text-muted);margin-bottom:10px;line-height:1.5;"><strong>Examples for ' + escapeHTML(g.label || ctrl.f) + ':</strong> ' + escapeHTML(g.evidence.slice(0, 3).join(' · ')) + '</div>' : '';
   var rows = ev.map(function(evRow, idx) {
-    var kind = evRow.kind === 'image' ? 'image' : (evRow.kind === 'sharepoint' ? 'sharepoint' : 'ref');
+    var kind = evRow.kind === 'image' ? 'image' : (evRow.kind === 'sharepoint' ? 'sharepoint' : (evRow.kind === 'gdrive' ? 'gdrive' : (evRow.kind === 'onedrive' ? 'onedrive' : 'ref')));
     var refPart = kind === 'sharepoint'
       ? '<div style="margin-top:8px;">'
         + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">'
@@ -1363,6 +1363,28 @@ function buildEvidenceArtifactSectionHTML(ctrl) {
         + '<input class="form-input" style="font-size:12px;margin-bottom:8px;" placeholder="Or paste full SharePoint link" value="' + escapeHTML(evRow.url || evRow.ref || '') + '" oninput="setEvidenceField(\'' + cid + '\',' + idx + ',\'url\',this.value)">'
         + '<input class="form-input" style="font-size:12px;" placeholder="How this document proves the control" value="' + escapeHTML(evRow.description || '') + '" oninput="setEvidenceField(\'' + cid + '\',' + idx + ',\'description\',this.value)">'
         + (evRow.url && isSharePointUrl(evRow.url) ? '<a href="' + escapeHTML(evRow.url) + '" target="_blank" rel="noopener noreferrer" class="sp-evidence-link">Open in SharePoint ↗</a>' : '')
+        + '</div>'
+      : kind === 'gdrive'
+      ? '<div style="margin-top:8px;">'
+        + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">'
+        + '<span class="sp-evidence-badge" style="background:#e8f5e9;color:#1b5e20;border-color:#a5d6a7;">Google Drive</span>'
+        + (typeof openGoogleDriveFolder === 'function' ? '<button type="button" class="btn btn-secondary btn-sm" style="font-size:10px;padding:4px 10px;" onclick="openGoogleDriveFolder()">Open folder</button>' : '')
+        + '</div>'
+        + '<input class="form-input" style="font-size:12px;margin-bottom:8px;" placeholder="Document name (e.g., AC-2 Access Review Q1 2026)" value="' + escapeHTML(evRow.title || '') + '" oninput="setEvidenceField(\'' + cid + '\',' + idx + ',\'title\',this.value)">'
+        + '<input class="form-input" style="font-size:12px;margin-bottom:8px;" placeholder="Paste Google Drive link (e.g., https://drive.google.com/file/d/...)" value="' + escapeHTML(evRow.url || '') + '" oninput="setEvidenceField(\'' + cid + '\',' + idx + ',\'url\',this.value)">'
+        + '<input class="form-input" style="font-size:12px;" placeholder="How this document proves the control" value="' + escapeHTML(evRow.description || '') + '" oninput="setEvidenceField(\'' + cid + '\',' + idx + ',\'description\',this.value)">'
+        + (evRow.url && isGoogleDriveUrl(evRow.url) ? '<a href="' + escapeHTML(evRow.url) + '" target="_blank" rel="noopener noreferrer" class="sp-evidence-link" style="color:#1b5e20;">Open in Google Drive ↗</a>' : '')
+        + '</div>'
+      : kind === 'onedrive'
+      ? '<div style="margin-top:8px;">'
+        + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">'
+        + '<span class="sp-evidence-badge" style="background:#e3f2fd;color:#0d47a1;border-color:#90caf9;">OneDrive</span>'
+        + (typeof openOneDriveFolder === 'function' ? '<button type="button" class="btn btn-secondary btn-sm" style="font-size:10px;padding:4px 10px;" onclick="openOneDriveFolder()">Open folder</button>' : '')
+        + '</div>'
+        + '<input class="form-input" style="font-size:12px;margin-bottom:8px;" placeholder="Document name (e.g., AC-2 Access Review Q1 2026)" value="' + escapeHTML(evRow.title || '') + '" oninput="setEvidenceField(\'' + cid + '\',' + idx + ',\'title\',this.value)">'
+        + '<input class="form-input" style="font-size:12px;margin-bottom:8px;" placeholder="Paste OneDrive link" value="' + escapeHTML(evRow.url || '') + '" oninput="setEvidenceField(\'' + cid + '\',' + idx + ',\'url\',this.value)">'
+        + '<input class="form-input" style="font-size:12px;" placeholder="How this document proves the control" value="' + escapeHTML(evRow.description || '') + '" oninput="setEvidenceField(\'' + cid + '\',' + idx + ',\'description\',this.value)">'
+        + (evRow.url && isOneDriveUrl(evRow.url) ? '<a href="' + escapeHTML(evRow.url) + '" target="_blank" rel="noopener noreferrer" class="sp-evidence-link" style="color:#0d47a1;">Open in OneDrive ↗</a>' : '')
         + '</div>'
       : kind === 'ref'
       ? '<div style="display:grid;grid-template-columns:130px 1fr;gap:8px;margin-top:8px;">'
@@ -1390,7 +1412,9 @@ function buildEvidenceArtifactSectionHTML(ctrl) {
       + '<div style="display:flex;gap:6px;align-items:center;">'
       + '<select class="form-select" style="font-size:11px;padding:3px 8px;" onchange="setEvidenceKind(\'' + cid + '\',' + idx + ',this.value)">'
       + '<option value="ref"' + (kind === 'ref' ? ' selected' : '') + '>Document / reference</option>'
-      + (getSharePointConfig().enabled ? '<option value="sharepoint"' + (kind === 'sharepoint' ? ' selected' : '') + '>SharePoint link</option>' : '')
+      + (typeof getSharePointConfig === 'function' && getSharePointConfig().enabled ? '<option value="sharepoint"' + (kind === 'sharepoint' ? ' selected' : '') + '>SharePoint link</option>' : '')
+      + (typeof getGoogleDriveConfig === 'function' && getGoogleDriveConfig().enabled ? '<option value="gdrive"' + (kind === 'gdrive' ? ' selected' : '') + '>Google Drive link</option>' : '')
+      + (typeof getOneDriveConfig === 'function' && getOneDriveConfig().enabled ? '<option value="onedrive"' + (kind === 'onedrive' ? ' selected' : '') + '>OneDrive link</option>' : '')
       + '<option value="image"' + (kind === 'image' ? ' selected' : '') + '>Screenshot (PNG/JPEG)</option>'
       + '</select>'
       + '<button type="button" class="btn btn-sm" style="font-size:10px;padding:2px 8px;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;" onclick="openBulkEvidenceRowModal(\'' + cid + '\',' + idx + ')">Apply to controls…</button>'
@@ -1404,7 +1428,7 @@ function buildEvidenceArtifactSectionHTML(ctrl) {
   return '<div class="evidence-card">'
     + '<div class="evidence-card-head">'
     + '<div><div class="evidence-card-title">Evidence</div>'
-    + '<div class="evidence-card-sub">' + (spEnabled ? 'Link to SharePoint or attach small screenshots. Files live in your document library — we store pointers only.' : 'Attach references or small screenshots. Images stay in-browser only — max 100 KB each.') + '</div>'
+    + '<div class="evidence-card-sub">' + (spEnabled || (typeof getGoogleDriveConfig === 'function' && getGoogleDriveConfig().enabled) || (typeof getOneDriveConfig === 'function' && getOneDriveConfig().enabled) ? 'Link to your cloud storage or attach small screenshots. Files live in your document library — we store pointers only.' : 'Attach references or small screenshots. Images stay in-browser only — max 100 KB each.') + '</div>'
     + (fwBadges ? '<div class="evidence-fw-badges" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;">' + fwBadges + '</div>' : '')
     + '</div></div>'
     + hint
@@ -1412,6 +1436,8 @@ function buildEvidenceArtifactSectionHTML(ctrl) {
     + '<div class="evidence-actions">'
     + '<button type="button" class="btn btn-secondary btn-sm" onclick="addCtrlEvidence(\'' + cid + '\')">Add reference</button>'
     + (spEnabled ? '<button type="button" class="btn btn-primary btn-sm" onclick="addSharePointEvidence(\'' + cid + '\')">Link from SharePoint</button>' : '')
+    + (typeof getGoogleDriveConfig === 'function' && getGoogleDriveConfig().enabled ? '<button type="button" class="btn btn-primary btn-sm" style="background:#1b5e20;border-color:#1b5e20;" onclick="addGoogleDriveEvidence(\'' + cid + '\')">Link from Google Drive</button>' : '')
+    + (typeof getOneDriveConfig === 'function' && getOneDriveConfig().enabled ? '<button type="button" class="btn btn-primary btn-sm" style="background:#0d47a1;border-color:#0d47a1;" onclick="addOneDriveEvidence(\'' + cid + '\')">Link from OneDrive</button>' : '')
     + '</div>'
     + '</div>';
 }
@@ -1438,6 +1464,17 @@ function setEvidenceKind(ctrlId, idx, kind) {
     delete row.dataUrl;
     delete row.mime;
     delete row.caption;
+  } else if (kind === 'gdrive' || kind === 'onedrive') {
+    row.kind = kind;
+    row.type = row.type || 'Document';
+    row.title = row.title != null ? row.title : '';
+    row.description = row.description != null ? row.description : '';
+    row.url = row.url != null ? row.url : '';
+    delete row.dataUrl;
+    delete row.mime;
+    delete row.caption;
+    delete row.spPath;
+    delete row.ref;
   } else {
     row.kind = 'ref';
     row.type = row.type || 'Policy';
@@ -1450,7 +1487,7 @@ function setEvidenceKind(ctrlId, idx, kind) {
     delete row.caption;
   }
   markDirty();
-  renderControlStep2();
+  setTimeout(renderControlStep2, 0);
 }
 
 function handleEvidenceImageUpload(ctrlId, idx, input) {
@@ -1817,7 +1854,8 @@ function setCtrlStatus(ctrlId, status) {
   state.controlStatus[ctrlId].status = status;
   logFieldChange('controlStatus.' + ctrlId + '.status', oldStatus, status);
   if (oldStatus !== status) addAuditEntry('control', ctrlId, 'Status changed: ' + oldStatus + ' → ' + status);
-  renderControlStep2();
+  markDirty();
+  setTimeout(renderControlStep2, 0);
 }
 
 var __CTRL_FIELD_LOG_SKIP = { approach: 1, narrative: 1, notes: 1, naJustification: 1, externalDocSummary: 1 };
@@ -1848,6 +1886,7 @@ function addCtrlEvidence(ctrlId) {
 }
 
 function removeCtrlEvidence(ctrlId, idx) {
+  if (!state.controlStatus[ctrlId] || !state.controlStatus[ctrlId].evidence) return;
   state.controlStatus[ctrlId].evidence.splice(idx, 1);
   markDirty();
   renderControlStep2();
@@ -3206,6 +3245,9 @@ function renderControlStep4() {
       <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#166534;">
         ✅ Last submitted: ${state.controlDesignSubmission.submittedAt} by ${escapeHTML(state.controlDesignSubmission.submitterName||'—')} — ${state.controlDesignSubmission.designedCount} of ${state.controlDesignSubmission.totalCount} controls designed.
       </div>` : ''}
+      <button class="btn btn-primary" onclick="submitControlDesign()" style="width:100%;padding:12px;font-size:14px;font-weight:700;" ${selectedForSubmit.length === 0 ? 'disabled title="Select at least one eligible control above"' : ''}>
+        📤 Submit ${selectedForSubmit.length} Control${selectedForSubmit.length === 1 ? '' : 's'} for Review
+      </button>
     </div>`;
 }
 
@@ -3308,4 +3350,5 @@ function saveAttestDraft() {}
 function setControlField(id, field, value) {
   if (!state.controlStatus[id]) state.controlStatus[id] = {};
   state.controlStatus[id][field] = value;
+  markDirty();
 }

@@ -50,11 +50,11 @@ function renderOnboardingHome() {
     + '</div>'
     + (hasStarted
       ? '<p class="onboard-resume">You\'re on step ' + progress.step + ' — <strong>' + escapeHTML(progress.label) + '</strong>. Pick up where you left off.</p>'
-      : '<p class="onboard-resume">Most teams finish setup in 15–20 minutes. Integrations (SharePoint, Entra, ISO/SOC 2/HIPAA) are optional.</p>')
+      : '<p class="onboard-resume">Most teams finish setup in 15–20 minutes. Integrations (evidence storage, Entra ID, ISO/SOC 2/CIS) are optional.</p>')
     + '</div>'
     + '<div class="onboard-features">'
     + '<div class="onboard-feature"><span>📋</span><div><strong>Policies</strong><p>Build AC, AU, SC, and the rest after setup.</p></div></div>'
-    + '<div class="onboard-feature"><span>🔧</span><div><strong>Controls</strong><p>Design obligations and link SharePoint evidence.</p></div></div>'
+    + '<div class="onboard-feature"><span>🔧</span><div><strong>Controls</strong><p>Design obligations and link evidence from cloud storage.</p></div></div>'
     + '<div class="onboard-feature"><span>🖥️</span><div><strong>Assets &amp; SSP</strong><p>Inventory systems and submit attestation packages.</p></div></div>'
     + '</div>';
 }
@@ -83,8 +83,8 @@ function getNextActions() {
   });
 
   (state.poamItems || []).forEach(function(p) {
-    if (p.dueDate && p.dueDate < today && p.status !== 'Closed' && p.status !== 'Mitigated') {
-      actions.push({ priority: 0, icon: '⚠️', label: 'Overdue POA&M', desc: p.finding.slice(0, 60), action: "showTab('poam');" });
+    if (p.dueDate && p.dueDate < today && p.status !== 'Closed' && p.status !== 'Mitigated' && p.status !== 'Risk Accepted') {
+      actions.push({ priority: 0, icon: '⚠️', label: 'Overdue POA&M', desc: (p.finding || '').slice(0, 60), action: "showTab('poam');" });
     }
   });
 
@@ -129,9 +129,9 @@ function renderHomeTab() {
     });
   }
   var implPct = ctrlTotal ? Math.round((implemented / ctrlTotal) * 100) : 0;
-  var ownerCount = countUniquePolicyOwnerEmails();
-  var domainsAssigned = countAssignedPolicyDomains();
-  var domainTotal = getMasterPolicyFamilies().length;
+  var ownerCount = typeof countUniquePolicyOwnerEmails === 'function' ? countUniquePolicyOwnerEmails() : 0;
+  var domainsAssigned = typeof countAssignedPolicyDomains === 'function' ? countAssignedPolicyDomains() : 0;
+  var domainTotal = typeof getMasterPolicyFamilies === 'function' ? getMasterPolicyFamilies().length : 0;
   var actions = getNextActions();
 
   var actionHtml = actions.length
@@ -149,7 +149,7 @@ function renderHomeTab() {
     { icon: '🔧', label: 'Controls', desc: 'Implementation design', fn: 'goToControlWorkspace()' },
     { icon: '🖥️', label: 'Assets & SSP', desc: 'Inventory & attestations', fn: 'goToAssetWorkspace()' },
     { icon: '📊', label: 'Reports', desc: 'Program dashboard', fn: "showTab('reports')" },
-    { icon: '◇', label: 'Frameworks', desc: 'ISO / SOC 2 / HIPAA', fn: "showTab('frameworks')" },
+    { icon: '◇', label: 'Frameworks', desc: 'ISO / SOC 2 / CIS v8', fn: "showTab('frameworks')" },
     { icon: '📝', label: 'POA&M', desc: 'Findings & remediation', fn: "showTab('poam')" }
   ];
 

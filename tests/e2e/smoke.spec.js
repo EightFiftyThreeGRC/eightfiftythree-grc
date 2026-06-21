@@ -74,7 +74,7 @@ test.describe('EightFiftyThree GRC smoke', function() {
       if (window.state) { window.state.baseline = 'L'; window.state.cisoComplete = true; }
       window.renderFrameworksTab();
     });
-    await expect(page.locator('#frameworks-body')).toContainText(/ISO 27001|SOC 2|HIPAA/i);
+    await expect(page.locator('#frameworks-body')).toContainText(/ISO 27001|SOC 2|CIS Controls/i);
   });
 
 });
