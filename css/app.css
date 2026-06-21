@@ -2711,3 +2711,51 @@
       border-radius: 999px;
       padding: 4px 12px;
     }
+
+    /* Magic-link form inside the cloud sign-in gate */
+    .cloud-gate-magic {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .cloud-gate-email {
+      width: 100%;
+      padding: 12px 14px;
+      font-size: 15px;
+      border: 1.5px solid #d8dee9;
+      border-radius: 11px;
+      box-sizing: border-box;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .cloud-gate-email:focus {
+      border-color: var(--teal, #0d9488);
+      box-shadow: 0 0 0 3px rgba(13,148,136,0.12);
+    }
+    .cloud-signin-primary {
+      color: #fff;
+      background: var(--teal, #0d9488);
+      border-color: var(--teal, #0d9488);
+      justify-content: center;
+    }
+    .cloud-signin-primary:hover {
+      background: #0b8076;
+      border-color: #0b8076;
+      box-shadow: 0 4px 14px rgba(13,148,136,0.30);
+    }
+    .cloud-gate-divider {
+      display: flex;
+      align-items: center;
+      text-align: center;
+      color: #94a3b8;
+      font-size: 12px;
+      margin: 6px 0;
+    }
+    .cloud-gate-divider::before,
+    .cloud-gate-divider::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: #e5e9f0;
+    }
+    .cloud-gate-divider span { padding: 0 12px; }

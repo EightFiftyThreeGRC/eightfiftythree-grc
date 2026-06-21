@@ -101,15 +101,47 @@ function getCloudSessionName() {
 }
 
 // ── sign-in gate UI ──────────────────────────────────────────────────────────
+// Show only the sign-in methods that are turned on in CLOUD_CONFIG.
+function renderCloudGateMethods() {
+  var cfg = (typeof CLOUD_CONFIG === 'object' && CLOUD_CONFIG) || {};
+  var magic = cfg.enableMagicLink !== false;
+  var ms = !!cfg.enableMicrosoft;
+  var gg = !!cfg.enableGoogle;
+  var elMagic = document.getElementById('cloudGateMagicLink');
+  if (elMagic) elMagic.style.display = magic ? '' : 'none';
+  var elMs = document.getElementById('cloudGateMsBtn');
+  if (elMs) elMs.style.display = ms ? '' : 'none';
+  var elGg = document.getElementById('cloudGateGoogleBtn');
+  if (elGg) elGg.style.display = gg ? '' : 'none';
+  var elBtns = document.getElementById('cloudGateButtons');
+  if (elBtns) elBtns.style.display = (ms || gg) ? '' : 'none';
+  var elDiv = document.getElementById('cloudGateDivider');
+  if (elDiv) elDiv.style.display = (magic && (ms || gg)) ? '' : 'none';
+}
+
 function showCloudSignInGate(message) {
   var gate = document.getElementById('cloudSignInGate');
   if (!gate) return;
+  renderCloudGateMethods();
   var msg = document.getElementById('cloudGateMessage');
   if (msg) {
+    // Reset inline styles so the CSS warning style applies.
+    msg.style.color = '';
+    msg.style.background = '';
     if (message) { msg.textContent = message; msg.style.display = ''; }
     else { msg.textContent = ''; msg.style.display = 'none'; }
   }
   gate.style.display = 'flex';
+}
+
+// Friendly (non-warning) confirmation inside the gate, e.g. "check your email".
+function showCloudGateInfo(text) {
+  var msg = document.getElementById('cloudGateMessage');
+  if (!msg) return;
+  msg.textContent = text;
+  msg.style.display = '';
+  msg.style.color = '#065f46';
+  msg.style.background = '#d1fae5';
 }
 
 function hideCloudSignInGate() {
@@ -153,6 +185,37 @@ async function signInWithProvider(provider) {
 }
 function signInWithMicrosoft() { return signInWithProvider('azure'); }
 function signInWithGoogle() { return signInWithProvider('google'); }
+
+// Passwordless email sign-in — no OAuth app registration required.
+async function sendMagicLink() {
+  var sb = getCloudClient();
+  if (!sb) {
+    if (typeof showToast === 'function') showToast('Cloud sign-in is not configured.', true);
+    return;
+  }
+  var input = document.getElementById('cloudGateEmail');
+  var email = String((input && input.value) || '').trim();
+  if (!email || email.indexOf('@') < 1 || email.indexOf('.') < 0) {
+    if (typeof showToast === 'function') showToast('Enter a valid email address.', true);
+    return;
+  }
+  try {
+    setCloudGateBusy(true, 'Sending your sign-in link…');
+    var res = await sb.auth.signInWithOtp({
+      email: email,
+      options: { emailRedirectTo: getCloudRedirectUri() }
+    });
+    if (res && res.error) throw res.error;
+    setCloudGateBusy(false);
+    showCloudGateInfo('Check ' + email + ' for a sign-in link, then open it on this device. You can close this tab in the meantime.');
+  } catch (err) {
+    setCloudGateBusy(false);
+    console.warn('sendMagicLink', err);
+    if (typeof showToast === 'function') {
+      showToast('Could not send the link: ' + ((err && err.message) || 'unknown error'), true);
+    }
+  }
+}
 
 async function signOutCloud() {
   var sb = getCloudClient();
@@ -388,6 +451,7 @@ if (typeof window !== 'undefined') {
   window.isCloudLocked = isCloudLocked;
   window.signInWithMicrosoft = signInWithMicrosoft;   // overrides the legacy Entra one
   window.signInWithGoogle = signInWithGoogle;
+  window.sendMagicLink = sendMagicLink;
   window.signOutCloud = signOutCloud;
   window.showCloudAccountMenu = showCloudAccountMenu;
   window.cloudPushDebounced = cloudPushDebounced;

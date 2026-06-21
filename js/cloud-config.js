@@ -4,17 +4,27 @@
 // its own — every read/write is enforced server-side by Row-Level Security
 // (see supabase/schema.sql). Never put the service_role key here.
 //
-// Leave BOTH fields blank to keep the app in single-user local/demo mode
-// (data stays in this browser's localStorage, exactly as before). Fill them in
-// to turn on real sign-in + cross-computer sync.
+// Leave supabaseUrl / supabaseAnonKey blank to keep the app in single-user
+// local/demo mode (data stays in this browser). Fill them in to turn on real
+// sign-in + cross-computer sync.
 //
 // Where to find these: Supabase dashboard → Project Settings → API.
-//   • supabaseUrl    = "Project URL"     e.g. https://abcd1234.supabase.co
+//   • supabaseUrl     = "Project URL"     e.g. https://abcd1234.supabase.co
 //   • supabaseAnonKey = "anon public" key (starts with "eyJ...")
 //
-// See MULTI_USER_SETUP.md for the full one-time setup (schema + OAuth providers).
+// Sign-in methods (turn on whichever you've configured in Supabase):
+//   • enableMagicLink  — passwordless email link. Works with ZERO extra setup
+//                        (Supabase email auth is on by default). Recommended.
+//   • enableGoogle     — requires a Google OAuth app + the Google provider
+//                        enabled in Supabase.
+//   • enableMicrosoft  — requires an Entra app + the Azure provider enabled.
+//
+// See MULTI_USER_SETUP.md for full setup.
 // ----------------------------------------------------------------------------
 var CLOUD_CONFIG = {
   supabaseUrl: '',
-  supabaseAnonKey: ''
+  supabaseAnonKey: '',
+  enableMagicLink: true,
+  enableGoogle: false,
+  enableMicrosoft: false
 };
