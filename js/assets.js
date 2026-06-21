@@ -1896,7 +1896,7 @@ function renderAssetSSPStep4_Attestations() {
         + '</label>'
         + '<select style="width:100%;padding:7px 10px;border:1px solid ' + (statusVal?statusColor:'var(--border)') + ';border-radius:6px;font-size:13px;font-weight:' + (statusVal?'600':'400') + ';color:' + (statusVal?statusColor:'var(--text-muted)') + ';background:white;cursor:pointer;"'
         + (isSubmitted ? ' disabled' : '')
-        + ' onchange="setSSPAttestation(\'' + asset.id + '\',\'' + c.id + '\',\'status\',this.value);renderAssetSSPStep4_Attestations();">'
+        + ' onchange="setSSPAttestation(\'' + asset.id + '\',\'' + c.id + '\',\'status\',this.value);setTimeout(renderAssetSSPStep4_Attestations,0);">'
         + '<option value="">— Select status —</option>'
         + SSP_STATUSES.map(function(s){ return '<option value="' + s + '"' + (statusVal===s?' selected':'') + ' style="color:' + (SSP_STATUS_COLORS[s]||'inherit') + ';">' + s + '</option>'; }).join('')
         + '</select></div>'
@@ -2916,7 +2916,7 @@ function renderProcessSSPStep4_Attestations() {
         + '</label>'
         + '<select style="width:100%;padding:7px 10px;border:1px solid ' + (statusVal?statusColor:'var(--border)') + ';border-radius:6px;font-size:13px;font-weight:' + (statusVal?'600':'400') + ';color:' + (statusVal?statusColor:'var(--text-muted)') + ';background:white;cursor:pointer;"'
         + (isSubmitted ? ' disabled' : '')
-        + ' onchange="setSSPAttestation(\'' + proc.id + '\',\'' + c.id + '\',\'status\',this.value);renderProcessSSPStep4_Attestations();">'
+        + ' onchange="setSSPAttestation(\'' + proc.id + '\',\'' + c.id + '\',\'status\',this.value);setTimeout(renderProcessSSPStep4_Attestations,0);">'
         + '<option value="">— Select status —</option>'
         + SSP_STATUSES.map(function(s){ return '<option value="' + s + '"' + (statusVal===s?' selected':'') + ' style="color:' + (SSP_STATUS_COLORS[s]||'inherit') + ';">' + s + '</option>'; }).join('')
         + '</select></div>'
