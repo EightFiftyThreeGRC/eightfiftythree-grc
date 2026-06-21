@@ -631,6 +631,30 @@
 </main>
 
 <!-- ROLE PICKER OVERLAY -->
+<!-- CLOUD SIGN-IN GATE (multi-user mode only; hidden unless cloud is configured) -->
+<div id="cloudSignInGate" role="dialog" aria-modal="true" aria-labelledby="cloudGateTitle" style="display:none;">
+  <div class="cloud-gate-card">
+    <div class="cloud-gate-brand">EightFiftyThree GRC</div>
+    <div class="cloud-gate-title" id="cloudGateTitle">Sign in to your program</div>
+    <p class="cloud-gate-sub">Use your work account. Your access and role are tied to your identity — no profile picking.</p>
+    <div id="cloudGateMessage" class="cloud-gate-message" style="display:none;"></div>
+    <div id="cloudGateButtons" class="cloud-gate-buttons">
+      <button type="button" class="cloud-signin-btn" onclick="signInWithMicrosoft()">
+        <svg width="20" height="20" viewBox="0 0 21 21" aria-hidden="true"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg>
+        <span>Sign in with Microsoft</span>
+      </button>
+      <button type="button" class="cloud-signin-btn" onclick="signInWithGoogle()">
+        <svg width="20" height="20" viewBox="0 0 18 18" aria-hidden="true"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.8.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.97 10.72a5.4 5.4 0 0 1 0-3.44V4.95H.96a9 9 0 0 0 0 8.1l3.01-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z"/></svg>
+        <span>Sign in with Google</span>
+      </button>
+    </div>
+    <div id="cloudGateStatus" class="cloud-gate-status" style="display:none;"></div>
+    <div class="cloud-gate-foot">
+      <button type="button" class="btn-link" onclick="continueAsLocalDemo()">Continue without an account (local demo)</button>
+    </div>
+  </div>
+</div>
+
 <div id="rolePickerOverlay" role="dialog" aria-modal="true" aria-labelledby="rolePickerTitle">
   <div class="role-picker-card">
     <div class="role-picker-header">
@@ -640,7 +664,7 @@
         <div id="rolePickerSubtitle" class="role-picker-subtitle">Choose a profile to enter the right workspace.</div>
       </div>
       <div class="role-picker-actions">
-        <button type="button" class="btn btn-secondary btn-sm role-picker-action-btn" onclick="selectUserProfile('admin')">🔑 Admin mode</button>
+        <button type="button" id="rolePickerAdminBtn" class="btn btn-secondary btn-sm role-picker-action-btn" onclick="selectUserProfile('admin')">🔑 Admin mode</button>
         <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('rolePickerOverlay').style.display='none'">Close</button>
       </div>
     </div>
@@ -689,6 +713,11 @@
 <script src="js/hub.js"></script>
 <script src="js/reports.js"></script>
 <script src="js/admin.js"></script>
+<!-- Multi-user (cloud) mode: real OAuth sign-in + cross-computer sync.
+     No-ops unless js/cloud-config.js is filled in. See MULTI_USER_SETUP.md. -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/cloud-config.js"></script>
+<script src="js/cloud-auth.js"></script>
 <script src="js/app.js"></script>
 
 </body>

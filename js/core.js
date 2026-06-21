@@ -1608,6 +1608,10 @@ function saveToStorage() {
     localStorage.setItem(STORAGE_KEY + '-ts', new Date().toISOString());
     _updateSaveIndicator(true);
     window.isDirty = false;
+    // In multi-user (cloud) mode, also push the program to the shared backend.
+    if (typeof cloudPushDebounced === 'function' && typeof isCloudSessionActive === 'function' && isCloudSessionActive()) {
+      cloudPushDebounced();
+    }
   } catch (e) {
     console.warn('saveToStorage', e);
     showToast('Could not save to browser storage (quota or private mode). Use Export JSON for a file backup.', true);
