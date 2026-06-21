@@ -354,10 +354,19 @@ function submitISPForApproval(silent) {
       version: (state.infoSecPolicy && state.infoSecPolicy.version) || '1.0'
     };
     try { addAuditEntry('policy', 'ISP', 'ISP submitted for approval — routed to ' + approverName + (approverRole ? ' (' + approverRole + ')' : '')); } catch (e) { console.warn('audit log failed:', e); }
+    var cloudActive = typeof isCloudSessionActive === 'function' && isCloudSessionActive();
     var willEmail = justSubmitted && isCustom && approverEmail
       && typeof sendISPApprovalRequestEmail === 'function'
-      && typeof isCloudSessionActive === 'function' && isCloudSessionActive();
-    if (!silent && !willEmail) showToast('📨 ISP submitted to ' + approverName + ' for review.');
+      && cloudActive;
+    if (!silent && !willEmail) {
+      if (isCustom && approverEmail && !cloudActive) {
+        showToast('ISP submitted to ' + approverName + '. Sign in (cloud mode) to email ' + approverEmail + ' a sign-up link.', true);
+      } else if (isCustom && approverEmail && !justSubmitted) {
+        showToast('ISP already under review — routed to ' + approverName + '. No new sign-up email sent.', true);
+      } else {
+        showToast('📨 ISP submitted to ' + approverName + ' for review.');
+      }
+    }
   }
 
   if (justSubmitted && isCustom && approverEmail && typeof sendISPApprovalRequestEmail === 'function') {
@@ -371,9 +380,10 @@ function submitISPForApproval(silent) {
         if (!silent) showToast('📨 ISP submitted to ' + approverName + '. Sign-up email sent to ' + approverEmail + '.');
         try { addAuditEntry('policy', 'ISP', 'Approval request email sent to ' + approverEmail); } catch (e) { /* ignore */ }
       } else if (res && res.reason === 'not_cloud') {
-        if (!silent) showToast('📨 ISP submitted to ' + approverName + ' for review.');
+        if (!silent) showToast('ISP submitted to ' + approverName + '. Sign in (cloud mode) to email ' + approverEmail + ' a sign-up link.', true);
       } else if (!silent) {
-        showToast('ISP submitted, but the sign-up email could not be sent. Ask ' + approverName + ' to open the app and register with ' + approverEmail + '.', true);
+        var detail = (res && res.reason) ? (' (' + res.reason + ')') : '';
+        showToast('ISP submitted, but the sign-up email could not be sent' + detail + '. Deploy send-isp-approval-request + RESEND_API_KEY, or ask ' + approverName + ' to register at the app with ' + approverEmail + '.', true);
       }
     });
   }
