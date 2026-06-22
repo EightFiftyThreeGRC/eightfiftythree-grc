@@ -111,7 +111,7 @@ function renderProfileButtonContent(user) {
   }
   var displayName = user ? (userNeedsProfileSetup(user) ? (user.email || user.name) : getOwnerDisplayName(user)) : 'Admin mode';
   var icon = user ? (state.entraSession ? '◆' : '👤') : '🔑';
-  var sub = state.entraSession ? 'Microsoft · Switch profile' : 'Switch role / impersonate';
+  var sub = state.entraSession ? 'Microsoft · Switch profile' : 'Switch role / preview';
   return ''
     + '<span class="profile-btn-line">'
     + '<span>' + icon + '</span>'
@@ -286,8 +286,8 @@ function applyRoleView(userId) {
   const btn = document.getElementById('profileBtn');
   if (btn) {
     btn.innerHTML = renderProfileButtonContent(user);
-    btn.title = 'Switch role or impersonate another user profile';
-    btn.setAttribute('aria-label', 'Switch role or impersonate another user profile');
+    btn.title = 'Switch role or preview another user profile';
+    btn.setAttribute('aria-label', 'Switch role or preview another user profile');
   }
 
   // Admin: show all tabs and clear any impersonation context

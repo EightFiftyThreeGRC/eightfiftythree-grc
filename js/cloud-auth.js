@@ -59,6 +59,10 @@ function isCloudLocked() {
   return !!__cloudLocked;
 }
 
+function isCloudProgramOwner() {
+  return !!(__cloudProgramOwnerId && __cloudSession && __cloudProgramOwnerId === __cloudSession.user.id);
+}
+
 function getCloudClient() {
   if (__sbClient) return __sbClient;
   if (!isCloudConfigured()) return null;
@@ -741,6 +745,7 @@ if (typeof window !== 'undefined') {
   window.isCloudEnabled = isCloudEnabled;
   window.isCloudSessionActive = isCloudSessionActive;
   window.isCloudLocked = isCloudLocked;
+  window.isCloudProgramOwner = isCloudProgramOwner;
   window.signInWithMicrosoft = signInWithMicrosoft;   // overrides the legacy Entra one
   window.signInWithGoogle = signInWithGoogle;
   window.signInWithPassword = signInWithPassword;
