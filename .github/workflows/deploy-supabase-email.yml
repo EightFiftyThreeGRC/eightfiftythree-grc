@@ -1,8 +1,7 @@
 name: Configure Supabase approver email
 
-# Default: Supabase built-in mail (any approver address, no domain, no Resend).
+# Default: Supabase built-in mail (any approver address, no domain).
 # Optional: SENDGRID_API_KEY + EMAIL_FROM for branded mail via verified Gmail.
-# Optional: RESEND_API_KEY + EMAIL_FROM on a verified domain.
 
 on:
   workflow_dispatch:
@@ -21,11 +20,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Configure approver email (Supabase default or optional SendGrid/Resend)
+      - name: Configure approver email (Supabase default or optional SendGrid)
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
-          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           EMAIL_FROM: ${{ vars.EMAIL_FROM }}
           ENABLE_BRANDED_AUTH_HOOK: ${{ vars.ENABLE_BRANDED_AUTH_HOOK }}
         run: node scripts/configure-supabase-email.mjs

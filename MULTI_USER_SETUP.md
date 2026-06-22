@@ -85,9 +85,6 @@ When a CISO picks **Different approver** and advances past ISP Step 3, the app e
 |------|--------|------------------|
 | **Default — Supabase** | `SUPABASE_ACCESS_TOKEN` only | Generic (“Sign up to review…”) but works everywhere |
 | **Optional — SendGrid** | Verify your existing Gmail (free single-sender) | Yes — “Approve [Org]'s Info Sec Policy” |
-| **Optional — Resend** | Only if you already own a verified domain | Yes |
-
-Resend’s sandbox sender (`onboarding@resend.dev`) **cannot** mail external approvers — do not use it for this flow.
 
 #### Step 1 — Supabase redirect URL (one-time)
 
@@ -109,8 +106,8 @@ Without this, magic links in the email may not return users to the app.
 With **only** `SUPABASE_ACCESS_TOKEN`, the script:
 
 - Patches auth email templates with policy-invite copy
-- **Disables** the Send Email hook (so mail is not routed through a broken Resend sandbox)
-- Approver invites go through Supabase → **any inbox**
+- **Disables** the Send Email hook (default — mail goes through Supabase)
+- Approver invites deliver to **any inbox**
 
 **Or locally:**
 
@@ -140,16 +137,12 @@ node scripts/configure-supabase-email.mjs
 
 3. Re-run **Configure Supabase approver email** — deploys the auth hook + edge functions; branded copy goes through SendGrid.
 
-#### Optional — Resend (teams with an existing domain)
-
-Set `RESEND_API_KEY` + `EMAIL_FROM` on your **verified** domain, then re-run the configure workflow. Resend sandbox alone is rejected by the edge functions.
-
 #### Troubleshooting
 
 | Symptom | Fix |
 |---------|-----|
-| Mail only to your Resend login | Send Email hook still on Resend sandbox — re-run configure workflow with **no** `RESEND_API_KEY` / `SENDGRID_API_KEY` |
-| `Edge Function returned a non-2xx` | Same as above — disable hook; default path needs no edge functions |
+| Send Email hook errors | Re-run configure workflow with **no** `SENDGRID_API_KEY` to reset to built-in Supabase mail |
+| `Edge Function returned a non-2xx` | Same as above — default path needs no edge functions |
 | No mail at all | Supabase **Authentication → Logs**; confirm redirect URLs (Step 1) |
 | Generic “Confirm your email” | Expected on default path — still works; use SendGrid (optional) for branded subject |
 | Toast still shows errors | Hard-refresh app; check browser console for `sendISPApprovalRequestEmail` |
@@ -157,8 +150,8 @@ Set `RESEND_API_KEY` + `EMAIL_FROM` on your **verified** domain, then re-run the
 #### How the code sends mail
 
 1. App calls `signInWithOtp` for the approver email (org/CISO stored in user metadata).
-2. **Default:** Supabase sends the magic link directly — no Resend, no domain.
-3. **Optional:** Send Email hook → `auth-send-email` → SendGrid or Resend when those keys are configured.
+2. **Default:** Supabase sends the magic link directly — no domain, no third-party mail API.
+3. **Optional:** Send Email hook → `auth-send-email` → SendGrid when `SENDGRID_API_KEY` + `EMAIL_FROM` are set.
 
 
 ## How it works

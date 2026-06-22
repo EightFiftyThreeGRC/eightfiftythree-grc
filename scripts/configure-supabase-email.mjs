@@ -7,8 +7,6 @@
 // OPTIONAL branded mail (no domain purchase): SendGrid + Single Sender Verification
 //   on your Gmail/work email. Set SENDGRID_API_KEY + EMAIL_FROM in GitHub.
 //
-// OPTIONAL branded mail (teams with a domain): Resend + verified domain + EMAIL_FROM.
-//
 // Requires: SUPABASE_ACCESS_TOKEN (sbp_...)
 
 import fs from 'node:fs';
@@ -20,7 +18,6 @@ import path from 'node:path';
 const API = 'https://api.supabase.com';
 const TOKEN = process.env.SUPABASE_ACCESS_TOKEN;
 const SENDGRID = process.env.SENDGRID_API_KEY || '';
-const RESEND = process.env.RESEND_API_KEY || '';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 if (!TOKEN || !TOKEN.startsWith('sbp_')) {
@@ -81,16 +78,19 @@ const AUTH_TEMPLATE_PATCH = {
 async function main() {
   const ref = readProjectRef();
   const emailFrom = (process.env.EMAIL_FROM || process.env.SENDER_EMAIL || '').trim();
-  const hasSendGrid = !!SENDGRID && !!emailFrom;
-  const hasResendProd = !!RESEND && !!emailFrom && emailFrom.indexOf('resend.dev') < 0;
-  const useBrandedHook = process.env.ENABLE_BRANDED_AUTH_HOOK === 'true' || hasSendGrid || hasResendProd;
+  const useBrandedHook = process.env.ENABLE_BRANDED_AUTH_HOOK === 'true' || (!!SENDGRID && !!emailFrom);
 
   console.log('Project ref:', ref);
   console.log('Mail mode:', useBrandedHook
-    ? (hasSendGrid ? 'SendGrid branded hook' : 'Resend branded hook')
+    ? 'SendGrid branded hook'
     : 'Supabase built-in (default — any approver email)');
 
   if (useBrandedHook) {
+    if (!SENDGRID || !emailFrom) {
+      console.error('ERROR: Branded hook requires SENDGRID_API_KEY and EMAIL_FROM.');
+      process.exit(1);
+    }
+
     let hookSecret = process.env.SEND_EMAIL_HOOK_SECRET || '';
     if (!hookSecret) {
       try {
@@ -102,10 +102,11 @@ async function main() {
 
     run('npx', ['--yes', 'supabase@2', 'link', '--project-ref', ref], { SUPABASE_ACCESS_TOKEN: TOKEN });
 
-    const secretLines = ['SEND_EMAIL_HOOK_SECRET=' + hookSecret];
-    if (SENDGRID) secretLines.push('SENDGRID_API_KEY=' + SENDGRID);
-    if (RESEND) secretLines.push('RESEND_API_KEY=' + RESEND);
-    if (emailFrom) secretLines.push('EMAIL_FROM=' + emailFrom);
+    const secretLines = [
+      'SEND_EMAIL_HOOK_SECRET=' + hookSecret,
+      'SENDGRID_API_KEY=' + SENDGRID,
+      'EMAIL_FROM=' + emailFrom,
+    ];
 
     const secretsFile = path.join(ROOT, '.supabase-email-secrets.tmp');
     fs.writeFileSync(secretsFile, secretLines.join('\n'), 'utf8');
@@ -124,7 +125,7 @@ async function main() {
       hook_send_email_uri: hookUrl,
       hook_send_email_secrets: hookSecret,
     }));
-    console.log('\nDone. Branded approver email enabled via', hasSendGrid ? 'SendGrid' : 'Resend');
+    console.log('\nDone. Branded approver email enabled via SendGrid.');
   } else {
     await api('PATCH', '/v1/projects/' + ref + '/config/auth', Object.assign({}, AUTH_TEMPLATE_PATCH, {
       hook_send_email_enabled: false,
@@ -132,10 +133,6 @@ async function main() {
       hook_send_email_secrets: '',
     }));
     console.log('\nDone. Send Email hook OFF — approver invites use Supabase mail (works for any address).');
-    if (RESEND && !emailFrom) console.log('Note: RESEND_API_KEY is set but EMAIL_FROM is missing — Resend was not enabled.');
-    if (RESEND && emailFrom.indexOf('resend.dev') >= 0) {
-      console.log('Note: onboarding@resend.dev cannot mail external approvers — use SendGrid or disable hook (current default).');
-    }
   }
 }
 

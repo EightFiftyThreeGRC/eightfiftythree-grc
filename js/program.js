@@ -305,7 +305,7 @@ function cisoNext(fromStep) {
 }
 
 // Auto-submits the ISP to the assigned approver when the CISO advances past Step 3.
-// options.forceEmail — resend approver invite when leaving ISP step (even if already Under Review).
+// options.forceEmail — re-send approver invite when leaving ISP step (even if already Under Review).
 function submitISPForApproval(silent, options) {
   options = options || {};
   var forceEmail = !!options.forceEmail;

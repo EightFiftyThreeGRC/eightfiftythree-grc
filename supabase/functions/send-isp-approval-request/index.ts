@@ -1,4 +1,4 @@
-// ISP approver invite — branded copy + magic link (SendGrid or Resend).
+// ISP approver invite — branded copy + magic link (SendGrid).
 // Optional: default path uses Supabase built-in mail with hook disabled.
 
 import { createClient } from 'npm:@supabase/supabase-js@2';

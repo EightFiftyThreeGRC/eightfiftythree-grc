@@ -107,7 +107,7 @@ async function sendISPApprovalRequestEmail(opts) {
     if (typeof err === 'string') return err;
     var msg = err.message || err.msg || err.error_description || err.code || '';
     if (msg && String(msg) !== '{}') return String(msg);
-    return 'sign-in email failed — disable Authentication → Hooks → Send Email if Resend was misconfigured';
+    return 'sign-in email failed — disable Authentication → Hooks → Send Email if the hook is misconfigured';
   }
 
   try {
@@ -138,8 +138,8 @@ async function sendISPApprovalRequestEmail(opts) {
 function formatApproverEmailFailure(reason) {
   var r = String(reason || '').toLowerCase();
   if (r.indexOf('only send testing') >= 0 || r.indexOf('your own email') >= 0
-      || r.indexOf('resend.dev') >= 0 || r.indexOf('validation_error') >= 0) {
-    return 'Send Email hook is routing through Resend sandbox. Re-run the deploy workflow (no SendGrid/Resend secrets) to use Supabase built-in mail, or set up SendGrid with your verified Gmail.';
+      || r.indexOf('validation_error') >= 0 || r.indexOf('sendgrid') >= 0) {
+    return 'Send Email hook may be misconfigured. Re-run Configure Supabase approver email (no SendGrid secrets) to use built-in mail, or set up SendGrid with your verified Gmail.';
   }
   if (r.indexOf('rate limit') >= 0 || r.indexOf('too many') >= 0) {
     return 'Email rate limit — wait a minute and try again.';

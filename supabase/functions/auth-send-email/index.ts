@@ -1,4 +1,4 @@
-// Supabase Auth Send Email Hook — optional branded mail via SendGrid or Resend.
+// Supabase Auth Send Email Hook — optional branded mail via SendGrid.
 // Default app path uses Supabase built-in mail (hook disabled) — no domain required.
 
 import { Webhook } from 'https://esm.sh/standardwebhooks@1.0.0';
