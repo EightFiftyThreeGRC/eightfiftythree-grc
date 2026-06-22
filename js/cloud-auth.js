@@ -63,6 +63,45 @@ function isCloudProgramOwner() {
   return !!(__cloudProgramOwnerId && __cloudSession && __cloudProgramOwnerId === __cloudSession.user.id);
 }
 
+/** Local demo admin (role picker) — not signed in via cloud. */
+function isLocalDemoAdminMode() {
+  return !state.currentUserId && !isCloudSessionActive();
+}
+
+/** Cloud sign-in as program owner (full oversight, no role picker). */
+function isCloudOwnerSession() {
+  return !state.currentUserId && isCloudProgramOwner();
+}
+
+/** Best display name for attestations / submissions in the current session. */
+function getSessionActorName(fallback) {
+  if (state.currentUserId && state.users) {
+    var u = state.users.find(function(x) { return x.id === state.currentUserId; });
+    if (u && u.name) return u.name;
+  }
+  if (isCloudSessionActive()) {
+    var cn = getCloudSessionName();
+    if (cn) return cn;
+    var ce = getCloudSessionEmail();
+    if (ce) return ce.split('@')[0];
+  }
+  return fallback || state.programOwner || 'Program Owner';
+}
+
+function getControlWorkspaceTitle() {
+  if (state.currentUserId) return 'My Controls';
+  if (isCloudOwnerSession()) return 'Control design queue';
+  if (isLocalDemoAdminMode()) return 'Control Library';
+  return 'Controls';
+}
+
+function canReassignProgramWork() {
+  if (!state.currentUserId) return true;
+  var user = (state.users || []).find(function(u) { return u.id === state.currentUserId; });
+  if (!user) return false;
+  return user.role === 'ciso' || user.role === 'admin';
+}
+
 function getCloudClient() {
   if (__sbClient) return __sbClient;
   if (!isCloudConfigured()) return null;
@@ -746,6 +785,11 @@ if (typeof window !== 'undefined') {
   window.isCloudSessionActive = isCloudSessionActive;
   window.isCloudLocked = isCloudLocked;
   window.isCloudProgramOwner = isCloudProgramOwner;
+  window.isLocalDemoAdminMode = isLocalDemoAdminMode;
+  window.isCloudOwnerSession = isCloudOwnerSession;
+  window.getSessionActorName = getSessionActorName;
+  window.getControlWorkspaceTitle = getControlWorkspaceTitle;
+  window.canReassignProgramWork = canReassignProgramWork;
   window.signInWithMicrosoft = signInWithMicrosoft;   // overrides the legacy Entra one
   window.signInWithGoogle = signInWithGoogle;
   window.signInWithPassword = signInWithPassword;

@@ -126,17 +126,9 @@ function getPolicyPendingReviewerDisplay(policyKey) {
 // POLICY OWNER TAB
 // ============================================================
 
-function isLocalDemoAdminMode() {
-  return !state.currentUserId && (typeof isCloudSessionActive !== 'function' || !isCloudSessionActive());
-}
-
-function isCloudOwnerSession() {
-  return !state.currentUserId && typeof isCloudProgramOwner === 'function' && isCloudProgramOwner();
-}
-
 function canDraftDomainPoliciesFromList() {
   if (state.currentUserId) return true;
-  if (isCloudOwnerSession()) return true;
+  if (typeof isCloudOwnerSession === 'function' && isCloudOwnerSession()) return true;
   return false;
 }
 
@@ -789,8 +781,8 @@ function renderPolicyList() {
     }
   }
 
-  const isLocalDemoAdmin = isLocalDemoAdminMode();
-  const isCloudOwner = isCloudOwnerSession();
+  const isLocalDemoAdmin = typeof isLocalDemoAdminMode === 'function' && isLocalDemoAdminMode();
+  const isCloudOwner = typeof isCloudOwnerSession === 'function' && isCloudOwnerSession();
   const canDraft = canDraftDomainPoliciesFromList();
 
   // Resolve the list of master families to render cards for

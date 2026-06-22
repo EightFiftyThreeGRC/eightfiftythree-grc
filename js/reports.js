@@ -579,11 +579,11 @@ function renderProgramDashboard(controls, families) {
 }
 
 function openReturnedPolicyReassignment(fam) {
-  var user = state.currentUserId ? (state.users || []).find(function(u){ return u.id === state.currentUserId; }) : null;
-  var canReassign = !user || user.role === 'ciso' || user.role === 'admin';
+  var canReassign = typeof canReassignProgramWork === 'function'
+    ? canReassignProgramWork()
+    : (!state.currentUserId || ((state.users || []).find(function(u){ return u.id === state.currentUserId; }) || {}).role === 'ciso');
   if (!canReassign) {
-    showToast('Switch to CISO/Admin mode to reassign returned policies.', true);
-    if (typeof showRolePicker === 'function') showRolePicker();
+    showToast('Only the CISO or program owner can reassign returned policies.', true);
     return;
   }
   var hintOwner = ((state.domainOwners || {})[fam] || {}).name || '';

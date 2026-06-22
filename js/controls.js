@@ -224,9 +224,14 @@ function renderControlStep1() {
     return d >= now && d <= soon && (state.controlStatus[c.id]||{}).status !== 'Implemented';
   }).length;
 
+  const workspaceTitle = typeof getControlWorkspaceTitle === 'function' ? getControlWorkspaceTitle() : (state.currentUserId ? 'My Controls' : 'Controls');
+  const workspaceSubtitle = (typeof isCloudOwnerSession === 'function' && isCloudOwnerSession() && !state.currentUserId)
+    ? 'Program owner view — design any control in scope or assign owners in Domain policies.'
+    : (controls.length + ' controls in your design queue — ' + (state.baseline==='L'?'Low':state.baseline==='M'?'Moderate':'High') + ' baseline' + (state.privacyOverlay?' + Privacy Overlay':''));
+
   body.innerHTML = `
-    <div class="section-title">${state.currentUserId ? 'My Controls' : 'Control Library'}</div>
-    <div class="section-subtitle">${controls.length} controls in your design queue — ${state.baseline==='L'?'Low':state.baseline==='M'?'Moderate':'High'} baseline${state.privacyOverlay?' + Privacy Overlay':''}</div>
+    <div class="section-title">${workspaceTitle}</div>
+    <div class="section-subtitle">${workspaceSubtitle}</div>
 
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px;">
       ${[
@@ -563,7 +568,9 @@ function confirmReturnControl(ctrlId) {
   if (!state.controlReviewQueue) state.controlReviewQueue = [];
   var family = String(ctrlId || '').split('-')[0] || '';
   var currentUser = state.currentUserId ? (state.users || []).find(function(u){ return u.id === state.currentUserId; }) : null;
-  var returnedBy = (currentUser && currentUser.name) ? currentUser.name : (state.programOwner || 'Control Owner');
+  var returnedBy = (typeof getSessionActorName === 'function')
+    ? getSessionActorName(state.programOwner || 'Control Owner')
+    : ((currentUser && currentUser.name) ? currentUser.name : (state.programOwner || 'Control Owner'));
   state.controlStatus[ctrlId].returnedToPolicyOwner = true;
   state.controlStatus[ctrlId].returnReason  = reason;
   state.controlStatus[ctrlId].returnedAt    = new Date().toLocaleDateString();
@@ -3196,7 +3203,7 @@ function renderControlStep4() {
         </div>
       </div>
       <div style="background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:11px;color:var(--text-muted);">
-        Submitter is captured from your active user profile: <strong>${escapeHTML(((state.users||[]).find(u=>u.id===state.currentUserId)||{}).name || 'Current user')}</strong>.
+        Submitter is captured from your signed-in identity: <strong>${escapeHTML(typeof getSessionActorName === 'function' ? getSessionActorName('Current user') : (((state.users||[]).find(u=>u.id===state.currentUserId)||{}).name || 'Current user'))}</strong>.
       </div>
       <div style="margin-bottom:14px;">
         <label class="form-label" style="font-size:11px;">Notes for Policy Owner (optional)</label>
@@ -3213,7 +3220,9 @@ function submitControlDesign() {
   if (blockActionIfDemoPlaceholders()) return;
   clearScopedUndoStack('control design submit');
   const currentUser = state.currentUserId ? (state.users||[]).find(u=>u.id===state.currentUserId) : null;
-  const name = (currentUser && currentUser.name) ? currentUser.name : 'Control Owner';
+  const name = typeof getSessionActorName === 'function'
+    ? getSessionActorName('Control Owner')
+    : ((currentUser && currentUser.name) ? currentUser.name : 'Control Owner');
   const title = (currentUser && currentUser.title) ? currentUser.title : '';
   const notes = document.getElementById('designSubmitNotes')?.value.trim() || '';
 

@@ -503,7 +503,7 @@ function renderAssetTypeLibrary() {
     + '</div>'
     + (canApprove
       ? '<div style="display:flex;gap:8px;"><input id="newAssetTypeHeader" class="form-input" style="font-size:12px;" placeholder="Add header group (e.g. Operational Technology)"><button class="btn btn-secondary btn-sm" onclick="(function(){var v=(document.getElementById(\'newAssetTypeHeader\').value||\'\').trim();if(!v)return;var all=getAllAssetTypeGroups().map(function(x){return x.toLowerCase();});if(all.includes(v.toLowerCase())){showToast(\'Header already exists.\',true);return;}if(!state.customAssetTypeHeaders)state.customAssetTypeHeaders=[];state.customAssetTypeHeaders.push(v);markDirty();renderAssetTypeLibrary();})()">+ Add Header</button></div>'
-      : '<div style="font-size:11px;color:var(--text-muted);">Only program owner/admin can edit header groups.</div>')
+      : '<div style="font-size:11px;color:var(--text-muted);">Only the program owner can edit header groups.</div>')
     + '</div>'
     + '</div></div>'
     + '<div style="background:white;border:1px solid var(--border);border-radius:10px;padding:14px;">'
@@ -808,6 +808,7 @@ function renderAssetHome() {
   // When logged in as an asset-owner, only show their assigned assets/processes
   var myAssetIds = getCurrentPersonAssetIds();
   var isAssetOwner = !!myAssetIds;
+  var isCloudOwner = typeof isCloudOwnerSession === 'function' && isCloudOwnerSession();
 
   var assets    = (state.assets    || []).filter(function(a){ return !myAssetIds || myAssetIds.includes(String(a.id)); });
   var processes = (state.processes || []).filter(function(p){ return !myAssetIds || myAssetIds.includes(String(p.id)); });
@@ -860,7 +861,11 @@ function renderAssetHome() {
     return h;
   }
 
-  body.innerHTML = sectionTable(assets, false, '🖥️', 'Assets', 'No assets registered yet. Click Register to add a system, application, or infrastructure component.')
+  body.innerHTML = (isCloudOwner
+      ? '<div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;padding:12px 14px;margin-bottom:20px;font-size:13px;color:#0c4a6e;line-height:1.5;">'
+        + '<strong>Program owner.</strong> Register systems and processes, or open any row to complete SSP attestations.</div>'
+      : '')
+    + sectionTable(assets, false, '🖥️', 'Assets', 'No assets registered yet. Click Register to add a system, application, or infrastructure component.')
     + sectionTable(processes, true, '⚙️', 'Processes', 'No processes registered yet. Click Register to add an operational process in scope for this program.');
 }
 
@@ -2139,6 +2144,7 @@ function renderAssetSSPStep5_SignOff() {
 }
 
 function getSignerName() {
+  if (typeof getSessionActorName === 'function') return getSessionActorName('');
   if (!state.currentUserId) return '';
   var u = (state.users||[]).find(function(u){ return u.id === state.currentUserId; });
   return u ? u.name : '';
@@ -2283,7 +2289,10 @@ function buildSspReviewerAddPersonRowHtml(scopeJs, disabled) {
 
 function openSspAddReviewerModal(scopeId) {
   if (typeof isUsersReadOnlyForCurrentUser === 'function' && isUsersReadOnlyForCurrentUser()) {
-    showToast('Read-only: switch to Admin or CISO to add users.', true);
+    var roMsg = (typeof isCloudOwnerSession === 'function' && isCloudOwnerSession())
+      ? 'Read-only in this role — program owner can add users under Administration → Users & roles.'
+      : 'Read-only in this role — program owner or CISO can add users under Administration → Users & roles.';
+    showToast(roMsg, true);
     return;
   }
   var old = document.getElementById('sspAddReviewerOverlay');
@@ -2326,7 +2335,7 @@ function closeSspAddReviewerModal() {
 
 function saveSspReviewerNewUser() {
   if (typeof isUsersReadOnlyForCurrentUser === 'function' && isUsersReadOnlyForCurrentUser()) {
-    showToast('Read-only: you cannot add users.', true);
+    showToast('Read-only in this role — add users under Administration → Users & roles.', true);
     return;
   }
   var hid = document.getElementById('sspAddReviewerScopeId');
