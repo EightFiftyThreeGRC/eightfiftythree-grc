@@ -5,7 +5,8 @@ name: Provision Supabase
 # internet (the Claude sandbox does not), so this is how provisioning happens.
 #
 # Requires a repo secret: SUPABASE_ACCESS_TOKEN (a Supabase personal access
-# token, sbp_...). GitHub masks the secret in logs. Delete the token after.
+# token, sbp_...). Keep it in GitHub Actions secrets for deploy workflows;
+# revoke in the Supabase dashboard only if the token was exposed.
 
 on:
   # Runs when I push the dedicated "provision-supabase" branch (no default-branch
