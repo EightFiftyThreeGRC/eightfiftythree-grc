@@ -3,3 +3,6 @@
 
 [functions.send-isp-approval-request]
 verify_jwt = true
+
+[functions.auth-send-email]
+verify_jwt = false

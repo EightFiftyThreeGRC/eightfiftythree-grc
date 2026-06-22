@@ -388,7 +388,12 @@ function submitISPForApproval(silent) {
       });
     }).then(function(res) {
       if (res && res.ok) {
-        if (!silent) showToast('📨 ISP submitted to ' + approverName + '. Sign-in link sent to ' + approverEmail + ' — open it to register and approve.');
+        if (!silent) {
+          var via = res.method === 'custom'
+            ? 'Approval email sent to ' + approverEmail + '.'
+            : 'Sign-in link sent to ' + approverEmail + ' (generic Supabase template — deploy the email function for branded copy).';
+          showToast('📨 ISP submitted to ' + approverName + '. ' + via);
+        }
         try { addAuditEntry('policy', 'ISP', 'Approver sign-in link sent to ' + approverEmail); } catch (e) { /* ignore */ }
       } else if (res && res.reason === 'not_cloud') {
         if (!silent) showToast('ISP submitted to ' + approverName + '. Sign in (cloud mode) to email ' + approverEmail + ' a sign-up link.', true);

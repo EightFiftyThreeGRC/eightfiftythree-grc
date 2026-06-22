@@ -77,16 +77,25 @@ Commit, push, and GitHub Pages redeploys. Done.
 
 ### 5. ISP approver emails
 When a CISO routes the Tier-1 ISP to a **different approver** while signed in (cloud mode),
-the app emails them a **Supabase magic sign-in link** to `app.html`. No edge function or
-Resend setup is required — Supabase Auth sends the message using your project's built-in
-email settings (Dashboard → Authentication → Email).
+the app emails them a branded message:
 
-The approver opens the link, creates/signs into their account with **the same email** you
-entered in the Policy Review card, and lands in the app with the **approver** role from
-your roster.
+- **Subject:** `Approve [Organization]'s Info Sec Policy`
+- **Body:** `[CISO name] requested you to approve. Sign up to review.` + sign-in link
 
-Optional: deploy `supabase/functions/send-isp-approval-request` with `RESEND_API_KEY` if
-you prefer a custom-branded message instead of the default Supabase magic-link template.
+This uses a Supabase **Send Email** auth hook (`auth-send-email`) plus [Resend](https://resend.com).
+One-time setup (GitHub Actions can do this for you):
+
+1. Add repo secrets: `SUPABASE_ACCESS_TOKEN`, `RESEND_API_KEY`
+2. Run the **Deploy Supabase email functions** workflow (or push changes under `supabase/functions/`)
+
+```bash
+# Or locally:
+RESEND_API_KEY=re_... SUPABASE_ACCESS_TOKEN=sbp_... node scripts/configure-supabase-email.mjs
+```
+
+Until that deploy runs, approvers still receive Supabase's default confirmation email
+(magic link works; copy is generic). The approver must register using the **same email**
+you entered in the Policy Review card.
 
 ---
 

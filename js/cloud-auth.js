@@ -86,14 +86,12 @@ function getCloudAppUrl() {
   return getCloudRedirectUri();
 }
 
-// Notify a custom ISP approver to sign up and open the app (cloud mode only).
-// Uses Supabase Auth magic links — no edge function or Resend required.
+// Notify a custom ISP approver (cloud mode). Tries branded edge-function email first,
+// then falls back to Supabase Auth magic link (generic template).
 async function sendISPApprovalRequestEmail(opts) {
   if (!isCloudSessionActive()) return { ok: false, reason: 'not_cloud' };
   var sb = getCloudClient();
-  if (!sb || !sb.auth || typeof sb.auth.signInWithOtp !== 'function') {
-    return { ok: false, reason: 'no_client' };
-  }
+  if (!sb) return { ok: false, reason: 'no_client' };
   opts = opts || {};
   var approverEmail = String(opts.approverEmail || '').trim().toLowerCase();
   if (!approverEmail || approverEmail.indexOf('@') < 0) return { ok: false, reason: 'no_email' };
@@ -101,6 +99,37 @@ async function sendISPApprovalRequestEmail(opts) {
   var programOwnerName = String(opts.programOwnerName || '').trim();
   var orgName = String(opts.orgName || '').trim();
   var appUrl = getCloudAppUrl();
+  var payload = {
+    approverEmail: approverEmail,
+    approverName: approverName,
+    programOwnerName: programOwnerName,
+    orgName: orgName,
+    appUrl: appUrl
+  };
+
+  if (sb.functions && typeof sb.functions.invoke === 'function') {
+    try {
+      var edge = await sb.functions.invoke('send-isp-approval-request', { body: payload });
+      if (!edge.error && edge.data && edge.data.ok) {
+        return { ok: true, method: 'custom' };
+      }
+      var edgeErr = (edge.data && edge.data.error) || (edge.error && edge.error.message) || '';
+      var edgeDetail = (edge.data && edge.data.detail) || '';
+      var notDeployed = String(edgeErr).toLowerCase().indexOf('not found') >= 0
+        || String(edgeDetail).toLowerCase().indexOf('not found') >= 0;
+      var noResend = String(edgeErr).indexOf('RESEND') >= 0;
+      if (!notDeployed && !noResend && edgeErr) {
+        console.warn('sendISPApprovalRequestEmail edge', edgeErr, edgeDetail);
+        return { ok: false, reason: edgeErr };
+      }
+    } catch (e) {
+      console.warn('sendISPApprovalRequestEmail edge invoke', e);
+    }
+  }
+
+  if (!sb.auth || typeof sb.auth.signInWithOtp !== 'function') {
+    return { ok: false, reason: 'no_client' };
+  }
   try {
     var res = await sb.auth.signInWithOtp({
       email: approverEmail,

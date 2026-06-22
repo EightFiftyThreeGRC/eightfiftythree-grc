@@ -1,6 +1,6 @@
-// Supabase Edge Function — notify ISP approver to sign up and review the policy.
+// Supabase Edge Function — ISP approver invite with branded copy + magic sign-in link.
 // Deploy: supabase functions deploy send-isp-approval-request
-// Secrets: RESEND_API_KEY (required), EMAIL_FROM (optional, e.g. "EightFiftyThree GRC <noreply@yourdomain.com>")
+// Secrets: RESEND_API_KEY (required), EMAIL_FROM (optional)
 
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
@@ -15,6 +15,14 @@ function escapeHtml(s: string) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+}
+
+function formatOrgPossessive(org: string): string {
+  const name = String(org || '').trim();
+  if (!name) return "your organization's";
+  if (/['']s$/i.test(name)) return name;
+  if (name.endsWith('s')) return `${name}'`;
+  return `${name}'s`;
 }
 
 Deno.serve(async (req: Request) => {
@@ -33,11 +41,13 @@ Deno.serve(async (req: Request) => {
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+
+    const userClient = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } },
     });
 
-    const { data: userData, error: userError } = await supabase.auth.getUser();
+    const { data: userData, error: userError } = await userClient.auth.getUser();
     if (userError || !userData?.user) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
@@ -49,7 +59,8 @@ Deno.serve(async (req: Request) => {
     const approverEmail = String(body.approverEmail || '').trim().toLowerCase();
     const programOwnerName = String(body.programOwnerName || '').trim();
     const orgName = String(body.orgName || '').trim();
-    const appUrl = String(body.appUrl || '').trim();
+    const appUrl = String(body.appUrl || '').trim()
+      || 'https://eightfiftythreegrc.github.io/eightfiftythree-grc/app.html';
 
     if (!approverEmail || !approverEmail.includes('@')) {
       return new Response(JSON.stringify({ error: 'Invalid approver email' }), {
@@ -66,19 +77,57 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    if (!serviceRoleKey) {
+      return new Response(JSON.stringify({ error: 'Service role not available' }), {
+        status: 503,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const admin = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+
+    const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
+      type: 'magiclink',
+      email: approverEmail,
+      options: {
+        redirectTo: appUrl,
+        data: {
+          isp_approver_invite: true,
+          invited_by: programOwnerName,
+          org_name: orgName,
+        },
+      },
+    });
+
+    const magicLink = linkData?.properties?.action_link;
+    if (linkError || !magicLink) {
+      return new Response(JSON.stringify({
+        error: 'Could not generate sign-in link',
+        detail: linkError?.message || 'no action_link',
+      }), {
+        status: 502,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const owner = programOwnerName || 'Your program owner';
-    const org = orgName || 'your organization';
-    const link = appUrl || 'https://eightfiftythreegrc.github.io/eightfiftythree-grc/app.html';
-    const subject = owner + ' asked you to approve the ISP for ' + org;
+    const orgPoss = formatOrgPossessive(orgName);
+    const subject = `Approve ${orgPoss} Info Sec Policy`;
     const text =
-      owner + ' has asked you to approve the Information Security Policy for ' + org + '.\n\n'
-      + 'Sign up to approve the policy:\n' + link + '\n\n'
-      + 'Use this email address when you create your account: ' + approverEmail;
+      `${owner} requested you to approve. Sign up to review.\n\n`
+      + `${magicLink}\n\n`
+      + `Use this email when you sign in: ${approverEmail}`;
     const html =
-      '<p>' + escapeHtml(owner) + ' has asked you to approve the Information Security Policy for '
-      + '<strong>' + escapeHtml(org) + '</strong>.</p>'
-      + '<p><a href="' + escapeHtml(link) + '">Sign up to approve the policy</a></p>'
-      + '<p>Use this email address when you create your account: <strong>' + escapeHtml(approverEmail) + '</strong></p>';
+      `<div style="font-family:system-ui,-apple-system,sans-serif;max-width:520px;color:#0f172a;line-height:1.5;">`
+      + `<p style="font-size:15px;margin:0 0 16px;">${escapeHtml(owner)} requested you to approve. Sign up to review.</p>`
+      + `<p style="margin:0 0 20px;"><a href="${escapeHtml(magicLink)}" `
+      + `style="display:inline-block;background:#0d9488;color:#fff;text-decoration:none;font-weight:700;`
+      + `padding:12px 20px;border-radius:8px;">Sign up to review</a></p>`
+      + `<p style="font-size:13px;color:#64748b;margin:0;">Use this email when you sign in: `
+      + `<strong>${escapeHtml(approverEmail)}</strong></p>`
+      + `</div>`;
 
     const from = Deno.env.get('EMAIL_FROM') || 'EightFiftyThree GRC <onboarding@resend.dev>';
     const emailRes = await fetch('https://api.resend.com/emails', {
