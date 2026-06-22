@@ -75,27 +75,26 @@ nothing on its own; all access is enforced by the RLS policies from step 2.
 
 Commit, push, and GitHub Pages redeploys. Done.
 
-### 5. ISP approver emails
-When a CISO routes the Tier-1 ISP to a **different approver** while signed in (cloud mode),
-the app emails them a branded message:
+### 5. ISP approver emails (invite a real person to sign up and approve)
 
-- **Subject:** `Approve [Organization]'s Info Sec Policy`
-- **Body:** `[CISO name] requested you to approve. Sign up to review.` + sign-in link
+When a CISO routes the ISP to a **different approver** while signed in, the app emails them a
+**magic sign-in link** to `app.html`. They create an account with that same address and land as
+the **approver** from your roster.
 
-This uses a Supabase **Send Email** auth hook (`auth-send-email`) plus [Resend](https://resend.com).
-One-time setup (GitHub Actions can do this for you):
+**Default (after deploy):** Supabase sends the email — works for **any** approver address
+(e.g. `nistcsftool@gmail.com`). Subject/body are Supabase’s standard confirmation template.
 
-1. Add repo secrets: `SUPABASE_ACCESS_TOKEN`, `RESEND_API_KEY`
-2. Run the **Deploy Supabase email functions** workflow (or push changes under `supabase/functions/`)
+**Optional branded mail** (`Approve [Org]'s Info Sec Policy` / `[CISO] requested you to approve…`):
 
-```bash
-# Or locally:
-RESEND_API_KEY=re_... SUPABASE_ACCESS_TOKEN=sbp_... node scripts/configure-supabase-email.mjs
-```
+1. Verify your domain in [Resend](https://resend.com)
+2. Set GitHub repo **Variable** `EMAIL_FROM` = `EightFiftyThree GRC <noreply@yourdomain.com>`
+3. Re-run **Deploy Supabase email functions** with `ENABLE_BRANDED_AUTH_HOOK=true` in workflow env,
+   or locally:  
+   `EMAIL_FROM="..." ENABLE_BRANDED_AUTH_HOOK=true RESEND_API_KEY=... SUPABASE_ACCESS_TOKEN=... node scripts/configure-supabase-email.mjs`
 
-Until that deploy runs, approvers still receive Supabase's default confirmation email
-(magic link works; copy is generic). The approver must register using the **same email**
-you entered in the Policy Review card.
+If approver email fails after a branded deploy, **disable** the Send Email hook so real invites
+work again: Supabase Dashboard → **Authentication** → **Hooks** → **Send Email** → off.
+Then re-run the deploy workflow (it now disables the hook by default unless `EMAIL_FROM` is set).
 
 ---
 

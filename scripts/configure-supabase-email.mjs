@@ -90,6 +90,8 @@ async function main() {
   }
   if (!hookSecret) hookSecret = generateHookSecret();
   const emailFrom = process.env.EMAIL_FROM || 'EightFiftyThree GRC <onboarding@resend.dev>';
+  const useBrandedHook = process.env.ENABLE_BRANDED_AUTH_HOOK === 'true'
+    || (process.env.EMAIL_FROM && emailFrom.indexOf('resend.dev') < 0);
 
   console.log('Project ref:', ref);
 

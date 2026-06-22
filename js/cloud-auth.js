@@ -86,8 +86,8 @@ function getCloudAppUrl() {
   return getCloudRedirectUri();
 }
 
-// Notify a custom ISP approver (cloud mode). Tries branded edge-function email first,
-// then falls back to Supabase Auth OTP (auth-send-email hook or default template).
+// Notify a custom ISP approver (cloud mode). Magic link via Supabase Auth first
+// (delivers to any address when the Send Email hook is off). Branded Resend path second.
 async function sendISPApprovalRequestEmail(opts) {
   if (!isCloudSessionActive()) return { ok: false, reason: 'not_cloud' };
   var sb = getCloudClient();
@@ -106,7 +106,6 @@ async function sendISPApprovalRequestEmail(opts) {
     orgName: orgName,
     appUrl: appUrl
   };
-  var lastEdgeFailure = '';
 
   function parseInvokeData(raw) {
     if (!raw) return null;
@@ -136,10 +135,10 @@ async function sendISPApprovalRequestEmail(opts) {
       var s = JSON.stringify(err);
       if (s && s !== '{}') return s;
     } catch (e) { /* ignore */ }
-    return 'sign-in email failed (check Supabase Auth hook / Resend logs)';
+    return 'sign-in email failed (check Supabase Auth → Hooks → Send Email)';
   }
 
-  async function invokeIspApproverEdgeFunction(sb, body) {
+  async function invokeIspApproverEdgeFunction(body) {
     var cfg = (typeof CLOUD_CONFIG === 'object' && CLOUD_CONFIG) ? CLOUD_CONFIG : {};
     var baseUrl = String(cfg.supabaseUrl || '').replace(/\/$/, '');
     var anonKey = String(cfg.supabaseAnonKey || '').trim();
@@ -165,54 +164,56 @@ async function sendISPApprovalRequestEmail(opts) {
     }
   }
 
-  var edgeResult = await invokeIspApproverEdgeFunction(sb, payload);
-  if (edgeResult.ok) return edgeResult;
-  lastEdgeFailure = edgeResult.reason || '';
-  if (lastEdgeFailure) console.warn('sendISPApprovalRequestEmail edge (will try OTP fallback):', lastEdgeFailure);
-
-  if (!sb.auth || typeof sb.auth.signInWithOtp !== 'function') {
-    return { ok: false, reason: lastEdgeFailure || 'no_client' };
-  }
-  try {
-    var res = await sb.auth.signInWithOtp({
-      email: approverEmail,
-      options: {
-        emailRedirectTo: appUrl,
-        shouldCreateUser: true,
-        data: {
-          isp_approver_invite: true,
-          approver_name: approverName,
-          org_name: orgName,
-          invited_by: programOwnerName
+  // Primary: Supabase Auth magic link (works for any approver when Send Email hook is off).
+  if (sb.auth && typeof sb.auth.signInWithOtp === 'function') {
+    try {
+      var res = await sb.auth.signInWithOtp({
+        email: approverEmail,
+        options: {
+          emailRedirectTo: appUrl,
+          shouldCreateUser: true,
+          data: {
+            isp_approver_invite: true,
+            approver_name: approverName,
+            org_name: orgName,
+            invited_by: programOwnerName
+          }
         }
+      });
+      if (!res || !res.error) {
+        return { ok: true, method: 'magic_link' };
       }
-    });
-    if (res && res.error) {
       console.warn('sendISPApprovalRequestEmail signInWithOtp', res.error);
       var otpReason = formatAuthError(res.error);
-      if (lastEdgeFailure) otpReason = lastEdgeFailure + ' · OTP: ' + otpReason;
-      return { ok: false, reason: otpReason };
+      // Branded Resend path (requires verified sending domain in Resend).
+      var edgeResult = await invokeIspApproverEdgeFunction(payload);
+      if (edgeResult.ok) return edgeResult;
+      var edgeReason = edgeResult.reason || '';
+      return { ok: false, reason: otpReason + (edgeReason ? ' · Branded: ' + edgeReason : '') };
+    } catch (e) {
+      console.warn('sendISPApprovalRequestEmail signInWithOtp', e);
     }
-    return { ok: true, method: 'magic_link' };
-  } catch (e) {
-    console.warn('sendISPApprovalRequestEmail', e);
-    var reason = String(e && e.message ? e.message : e);
-    if (lastEdgeFailure) reason = lastEdgeFailure + ' · OTP: ' + reason;
-    return { ok: false, reason: reason };
   }
+
+  var edgeOnly = await invokeIspApproverEdgeFunction(payload);
+  if (edgeOnly.ok) return edgeOnly;
+  return { ok: false, reason: edgeOnly.reason || 'no_client' };
 }
 
 function formatApproverEmailFailure(reason) {
   var r = String(reason || '').toLowerCase();
   if (r.indexOf('only send testing') >= 0 || r.indexOf('your own email') >= 0
       || r.indexOf('verify a domain') >= 0 || r.indexOf('validation_error') >= 0) {
-    return 'Resend sandbox: approver email must match your Resend account email (nistcsftool@gmail.com may be blocked). Verify a domain in Resend + set EMAIL_FROM, or use your Resend signup email as approver for testing.';
+    return 'Resend cannot deliver to external addresses until you verify a sending domain. Disable Auth → Hooks → Send Email to use Supabase mail for now, or verify your domain in Resend and set EMAIL_FROM.';
   }
   if (r.indexOf('rate limit') >= 0 || r.indexOf('too many') >= 0) {
     return 'Email rate limit — wait a minute and try again.';
   }
   if (r.indexOf('redirect') >= 0 && r.indexOf('url') >= 0) {
     return 'Sign-in redirect URL not allowed — add app.html to Supabase Auth → URL configuration → Redirect URLs.';
+  }
+  if (r.indexOf('hook') >= 0) {
+    return 'Supabase Send Email hook may be misconfigured — try disabling it under Authentication → Hooks so approver invites use built-in Supabase mail.';
   }
   return reason || 'unknown error';
 }
