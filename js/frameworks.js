@@ -330,9 +330,9 @@ function getCustomRegMeta(entry) {
 }
 
 function applySectorRegMappingSuggestions(force) {
+  if (!force) return false;
   var key = getOrgRegProfileKey();
   if (!key) return false;
-  if (state._regMappingInitialized && !force) return false;
   var sug = getRegSuggestionsForProfile(key);
   if (!state.activeFrameworks) state.activeFrameworks = {};
   if (!state.activeComplianceLaws) state.activeComplianceLaws = {};
@@ -417,7 +417,7 @@ function renderCustomRegAddFormHtml() {
 function getActiveFrameworkIds() {
   var af = state && state.activeFrameworks;
   var ids = Object.keys(FRAMEWORK_META).filter(function(k) {
-    return !af || typeof af !== 'object' ? true : !!af[k];
+    return af && typeof af === 'object' ? !!af[k] : false;
   });
   getCustomRegFrameworks('standard').forEach(function(c) {
     if (c.active) ids.push(c.id);
@@ -498,8 +498,8 @@ function toggleActiveFramework(fwId) {
     toggleCustomRegFramework(fwId);
     return;
   }
-  if (!state.activeFrameworks) state.activeFrameworks = { iso27001: true, soc2: true, cis: true };
-  var current = state.activeFrameworks[fwId] !== false;
+  if (!state.activeFrameworks) state.activeFrameworks = {};
+  var current = !!state.activeFrameworks[fwId];
   state.activeFrameworks[fwId] = !current;
   state._regMappingInitialized = true;
   markDirty();
@@ -551,12 +551,10 @@ function renderFrameworksTab() {
   var filterFw = state._frameworkFilter || '';
   var search = (state._frameworkSearch || '').toLowerCase();
 
-  var cards = active.map(function(fw) {
-    var meta = resolveFrameworkMeta(fw);
+  var cards = Object.keys(FRAMEWORK_META).map(function(fw) {
+    var meta = FRAMEWORK_META[fw];
     if (!meta) return '';
-    var on = String(fw).indexOf('custom-') === 0
-      ? !!(state.customRegFrameworks || []).find(function(c) { return c.id === fw && c.active; })
-      : !!(state.activeFrameworks || {})[fw];
+    var on = !!(state.activeFrameworks || {})[fw];
     var cov = computeFrameworkCoverage(fw);
     var customNote = meta.custom ? '<div class="fw-coverage-stats" style="opacity:0.75;">Custom — tracked in your program; add control crosswalks as needed.</div>' : '';
     return '<div class="fw-coverage-card' + (on ? '' : ' fw-coverage-card-off') + '" style="--fw-color:' + meta.color + ';">'
@@ -573,6 +571,21 @@ function renderFrameworksTab() {
           + '</div>'
           + '<button type="button" class="btn btn-secondary btn-sm" onclick="state._frameworkFilter=\'' + fw + '\';renderFrameworksTab();">View mapping →</button>'
         : (on ? customNote : '<div class="fw-coverage-stats" style="opacity:0.6;">Tracking off — enable to include in posture</div>'))
+      + '</div>';
+  }).join('');
+  cards += getCustomRegFrameworks('standard').map(function(c) {
+    var meta = getCustomRegMeta(c);
+    var on = !!c.active;
+    var cov = computeFrameworkCoverage(c.id);
+    var customNote = '<div class="fw-coverage-stats" style="opacity:0.75;">Custom — tracked in your program; add control crosswalks as needed.</div>';
+    return '<div class="fw-coverage-card' + (on ? '' : ' fw-coverage-card-off') + '" style="--fw-color:' + meta.color + ';">'
+      + '<div class="fw-coverage-head">'
+      + '<div><div class="fw-coverage-title">' + escapeHTML(meta.label) + '</div>'
+      + '<div class="fw-coverage-sub">' + escapeHTML(meta.subtitle) + '</div></div>'
+      + '<label class="fw-toggle" onclick="event.stopPropagation();"><input type="checkbox"' + (on ? ' checked' : '') + ' onchange="toggleActiveFramework(\'' + c.id + '\')"><span class="fw-toggle-track"></span></label>'
+      + '</div>'
+      + (on ? customNote : '<div class="fw-coverage-stats" style="opacity:0.6;">Tracking off — enable to include in posture</div>')
+      + '<button type="button" class="btn btn-secondary btn-sm" onclick="removeCustomRegFramework(\'' + c.id + '\')">Remove</button>'
       + '</div>';
   }).join('');
 
@@ -679,56 +692,63 @@ function renderFrameworkSetupSectionHtml() {
   var af = state.activeFrameworks || {};
   var profileKey = getOrgRegProfileKey();
   var sug = profileKey ? getRegSuggestionsForProfile(profileKey) : null;
-  var chips = Object.keys(FRAMEWORK_META).map(function(fwId) {
+  var rows = Object.keys(FRAMEWORK_META).map(function(fwId) {
     var meta = FRAMEWORK_META[fwId];
-    var on = af[fwId] !== false;
+    var on = !!af[fwId];
     var suggested = sug && sug.frameworks.indexOf(fwId) >= 0;
-    return renderRegSetupChip(meta, on, suggested, 'toggleActiveFramework(\'' + fwId + '\')', null);
+    return renderRegSetupRow(meta, on, suggested, 'toggleActiveFramework(\'' + fwId + '\')', null);
   }).join('');
-  chips += getCustomRegFrameworks('standard').map(function(c) {
+  rows += getCustomRegFrameworks('standard').map(function(c) {
     var meta = getCustomRegMeta(c);
-    return renderRegSetupChip(meta, !!c.active, false, 'toggleActiveFramework(\'' + c.id + '\')', 'removeCustomRegFramework(\'' + c.id + '\')');
+    return renderRegSetupRow(meta, !!c.active, false, 'toggleActiveFramework(\'' + c.id + '\')', 'removeCustomRegFramework(\'' + c.id + '\')');
   }).join('');
   var sectorHint = isOrgClassificationComplete()
-    ? '<div class="form-hint" style="margin-bottom:12px;"><strong>' + escapeHTML(getOrgClassificationSummary()) + '</strong> — highlighted chips are typical for your profile.</div>'
+    ? '<div class="form-hint" style="margin-bottom:12px;"><strong>' + escapeHTML(getOrgClassificationSummary()) + '</strong> — use the switches to enable lenses; <span class="fw-setup-suggested-inline">Suggested</span> items fit your profile.</div>'
     : '<div class="form-hint" style="margin-bottom:12px;">Complete organization type, level, and sector in Step 1 to see tailored suggestions.</div>';
   return '<div class="fw-setup-section">'
     + '<div class="section-title" style="margin-bottom:4px;">Voluntary standards &amp; frameworks</div>'
     + '<div class="section-subtitle" style="margin-bottom:8px;">NIST 800-53 is your anchor — enable other lenses to see crosswalks on every control.</div>'
     + sectorHint
-    + '<div class="fw-setup-chips">' + chips + '</div>'
+    + '<div class="fw-setup-list">' + rows + '</div>'
     + '</div>';
 }
 
-function renderRegSetupChip(meta, on, suggested, toggleFn, removeFn) {
-  return '<button type="button" class="fw-setup-chip' + (on ? ' fw-setup-chip-on' : '') + (suggested ? ' fw-setup-chip-suggested' : '') + (meta.custom ? ' fw-setup-chip-custom' : '') + '" style="--fw-color:' + meta.color + ';" onclick="' + toggleFn + '">'
-    + '<span class="fw-setup-chip-dot"></span>'
-    + escapeHTML(meta.label)
-    + (removeFn ? '<span class="fw-setup-chip-remove" title="Remove" onclick="event.stopPropagation();' + removeFn + '">×</span>' : '')
-    + '</button>';
+function renderRegSetupRow(meta, on, suggested, toggleFn, removeFn) {
+  return '<div class="fw-setup-row' + (on ? ' fw-setup-row-on' : '') + (suggested ? ' fw-setup-row-suggested' : '') + (meta.custom ? ' fw-setup-row-custom' : '') + '" style="--fw-color:' + meta.color + ';">'
+    + '<div class="fw-setup-row-info">'
+    + '<div class="fw-setup-row-label">' + escapeHTML(meta.label) + '</div>'
+    + (meta.subtitle ? '<div class="fw-setup-row-sub">' + escapeHTML(meta.subtitle) + '</div>' : '')
+    + (suggested ? '<span class="fw-setup-suggested-tag">Suggested</span>' : '')
+    + '</div>'
+    + '<div class="fw-setup-row-actions">'
+    + (removeFn ? '<button type="button" class="btn btn-secondary btn-sm fw-setup-row-remove" onclick="' + removeFn + '">Remove</button>' : '')
+    + '<label class="fw-toggle fw-setup-toggle" title="' + (on ? 'Enabled' : 'Off') + '">'
+    + '<input type="checkbox"' + (on ? ' checked' : '') + ' onchange="' + toggleFn + '">'
+    + '<span class="fw-toggle-track"></span></label>'
+    + '</div></div>';
 }
 
 function renderComplianceLawSetupSectionHtml() {
   var laws = state.activeComplianceLaws || {};
   var profileKey = getOrgRegProfileKey();
   var sug = profileKey ? getRegSuggestionsForProfile(profileKey) : null;
-  var chips = Object.keys(COMPLIANCE_LAW_META).map(function(lawId) {
+  var rows = Object.keys(COMPLIANCE_LAW_META).map(function(lawId) {
     var meta = COMPLIANCE_LAW_META[lawId];
     var on = !!laws[lawId];
     var suggested = sug && sug.laws.indexOf(lawId) >= 0;
-    return renderRegSetupChip(meta, on, suggested, 'toggleActiveComplianceLaw(\'' + lawId + '\')', null);
+    return renderRegSetupRow(meta, on, suggested, 'toggleActiveComplianceLaw(\'' + lawId + '\')', null);
   }).join('');
-  chips += getCustomRegFrameworks('law').map(function(c) {
+  rows += getCustomRegFrameworks('law').map(function(c) {
     var meta = getCustomRegMeta(c);
-    return renderRegSetupChip(meta, !!c.active, false, 'toggleActiveComplianceLaw(\'' + c.id + '\')', 'removeCustomRegFramework(\'' + c.id + '\')');
+    return renderRegSetupRow(meta, !!c.active, false, 'toggleActiveComplianceLaw(\'' + c.id + '\')', 'removeCustomRegFramework(\'' + c.id + '\')');
   }).join('');
   var applyBtn = isOrgClassificationComplete()
-    ? '<button type="button" class="btn btn-secondary btn-sm" style="margin-top:10px;" onclick="applySectorRegMappingSuggestions(true);if(typeof refreshCurrentCisoStep===\'function\')refreshCurrentCisoStep();">Apply suggestions for ' + escapeHTML(getOrgClassificationSummary()) + '</button>'
+    ? '<button type="button" class="btn btn-secondary btn-sm" style="margin-top:12px;" onclick="applySectorRegMappingSuggestions(true);if(typeof refreshCurrentCisoStep===\'function\')refreshCurrentCisoStep();">Apply suggestions for ' + escapeHTML(getOrgClassificationSummary()) + '</button>'
     : '';
   return '<div class="fw-setup-section" style="margin-top:24px;">'
     + '<div class="section-title" style="margin-bottom:4px;">Compliance frameworks (laws &amp; regulations)</div>'
     + '<div class="section-subtitle" style="margin-bottom:12px;">Separate from voluntary standards — track statutory and regulatory obligations (including MARS-E for Medicare SLG integrators).</div>'
-    + '<div class="fw-setup-chips">' + chips + '</div>'
+    + '<div class="fw-setup-list">' + rows + '</div>'
     + applyBtn
     + '</div>';
 }

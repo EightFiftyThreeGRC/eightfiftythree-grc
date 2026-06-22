@@ -2119,6 +2119,40 @@
     .fw-map-row:hover { background: #f5f5f7; }
     .fw-badge { display: inline-block; font-size: 10px; font-weight: 600; padding: 3px 8px; border-radius: 6px; }
     .fw-setup-section { margin: 20px 0; padding: 20px; background: #f5f5f7; border-radius: 14px; }
+    .fw-setup-list {
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .fw-setup-row {
+      display: flex; align-items: center; justify-content: space-between; gap: 16px;
+      padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px;
+      background: var(--white); transition: border-color 0.18s ease, box-shadow 0.18s ease;
+    }
+    .fw-setup-row-on {
+      border-color: color-mix(in srgb, var(--fw-color) 35%, var(--border));
+      background: color-mix(in srgb, var(--fw-color) 5%, white);
+    }
+    .fw-setup-row-suggested {
+      box-shadow: inset 3px 0 0 color-mix(in srgb, var(--fw-color) 55%, transparent);
+    }
+    .fw-setup-row-custom { border-style: dashed; }
+    .fw-setup-row-info { flex: 1; min-width: 0; }
+    .fw-setup-row-label { font-size: 14px; font-weight: 700; letter-spacing: -0.01em; }
+    .fw-setup-row-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+    .fw-setup-row-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+    .fw-setup-row-remove { font-size: 11px; padding: 6px 10px; }
+    .fw-setup-suggested-tag {
+      display: inline-block; margin-top: 6px; font-size: 10px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.04em; padding: 2px 8px; border-radius: 99px;
+      background: color-mix(in srgb, var(--fw-color) 12%, white);
+      color: var(--fw-color);
+    }
+    .fw-setup-suggested-inline {
+      font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;
+      color: var(--accent);
+    }
+    .fw-setup-toggle input:checked + .fw-toggle-track {
+      background: var(--fw-color, var(--accent));
+    }
     .fw-setup-chips { display: flex; flex-wrap: wrap; gap: 10px; }
     .fw-setup-chip {
       display: inline-flex; align-items: center; gap: 8px;

@@ -1193,7 +1193,7 @@ const state = {
   _reportsProgramReadinessHidden: false, // true = collapse Program Readiness panel in Reports
   _reportsMySummaryHidden: false, // true = collapse "My dashboard" summary card in Reports
   _reportsPhase1BannerHidden: false, // true = collapse Phase 1 completion banner in Reports
-  activeFrameworks: { iso27001: true, soc2: true, cis: true }, // voluntary standards crosswalk lenses
+  activeFrameworks: {}, // voluntary standards crosswalk lenses (off until user enables)
   activeComplianceLaws: {}, // laws & regulations (HIPAA, GLBA, …) tracked separately
   _regMappingInitialized: false,
   sharePointConfig: { enabled: false, siteUrl: '', libraryName: 'Evidence', defaultFolder: 'GRC/Evidence' },
@@ -1272,9 +1272,6 @@ function migrateRegMappingStateShape() {
   if (state.activeFrameworks.hipaa) {
     if (state.activeComplianceLaws.hipaa !== false) state.activeComplianceLaws.hipaa = true;
     delete state.activeFrameworks.hipaa;
-  }
-  if (state.activeFrameworks.cis === undefined) {
-    state.activeFrameworks.cis = state.activeFrameworks.iso27001 !== false;
   }
   if (state._regMappingInitialized === undefined) state._regMappingInitialized = false;
   if (!Array.isArray(state.customRegFrameworks)) state.customRegFrameworks = [];

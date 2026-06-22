@@ -1061,7 +1061,6 @@ function renderCISOStep2Baseline() {
 function renderCISOStep3Integrations() {
   const body = document.getElementById('ciso-step-3-body');
   if (!body) return;
-  if (typeof applySectorRegMappingSuggestions === 'function') applySectorRegMappingSuggestions(false);
 
   body.innerHTML = `
     ${cisoStepProgressHtml(3, 'Reg mapping')}
