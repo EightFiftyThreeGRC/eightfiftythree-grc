@@ -363,6 +363,7 @@ function submitISPForApproval(silent, options) {
   var current = (state.policyStatus.ISP || {}).status;
   var justSubmitted = false;
   var wantApproverEmail = isCustom && approverEmail && current !== 'Approved' && (forceEmail || current !== 'Under Review');
+  if (current === 'Returned' && !forceEmail) return;
   if (current !== 'Approved') {
     justSubmitted = current !== 'Under Review';
     state.policyStatus.ISP = {
