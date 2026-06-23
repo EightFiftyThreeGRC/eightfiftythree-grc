@@ -86,6 +86,8 @@ const DOMAIN_DEFAULT_GENERIC = {
 function getISPStatus() {
   var s = ((state.policyStatus || {}).ISP || {});
   var explicit = (s.status || '').trim();
+  if (explicit === 'Published') return 'Approved';
+  if (explicit === 'Returned' || (s.returnedDate && explicit !== 'Approved' && explicit !== 'Under Review')) return 'Returned';
   if (explicit) return explicit;
   if (s.approvedDate || s.approvedAt) return 'Approved';
   if (s.returnedDate) return 'Returned';
@@ -1012,6 +1014,15 @@ function stripRequirementNistRef(text) {
   return raw.replace(/\s*\[NIST\s*800-53:[^\]]+\]\s*$/i, '').trim();
 }
 
+function formatRequirementExportLine(req) {
+  var id = (req && req.id) ? req.id : 'REQ';
+  var text = stripRequirementNistRef((req && (req.text || req.requirement)) || '');
+  var controls = getRequirementControlIds(req);
+  var line = id + ': ' + text;
+  if (controls.length) line += '\nMapped NIST 800-53 controls: ' + controls.join(', ');
+  return line;
+}
+
 function buildRequirementControlBadgeHtml(controlIds, maxVisible) {
   var ids = controlIds || [];
   if (!ids.length) return '';
@@ -1182,7 +1193,7 @@ function _buildISPExportPayload() {
     sections.push({ heading: 'Roles & Responsibilities', content: rolesText });
   }
   if ((isp.requirements || []).length) {
-    sections.push({ heading: 'Policy Requirements', content: (isp.requirements || []).map(function(r) { return (r.id || 'REQ') + ': ' + stripRequirementNistRef(r.text || r.requirement || ''); }).join('\n\n') });
+    sections.push({ heading: 'Policy Requirements', content: (isp.requirements || []).map(formatRequirementExportLine).join('\n\n') });
   }
   if ((isp.documents || []).length) {
     sections.push({ heading: 'Referenced Documents', content: (isp.documents || []).map(function(d) { return (d.title || 'Document') + (d.url ? ' — ' + d.url : '') + (d.desc ? '\n' + d.desc : ''); }).join('\n\n') });
@@ -1206,7 +1217,7 @@ function _buildDomainExportPayload(fam) {
     }).join('\n\n') });
   }
   if ((dp.requirements || []).length) {
-    sections.push({ heading: 'Policy Requirements', content: (dp.requirements || []).map(function(r) { return (r.id || 'REQ') + ': ' + stripRequirementNistRef(r.text || r.requirement || ''); }).join('\n\n') });
+    sections.push({ heading: 'Policy Requirements', content: (dp.requirements || []).map(formatRequirementExportLine).join('\n\n') });
   }
   if ((dp.references || []).length) {
     sections.push({ heading: 'References', content: (dp.references || []).map(function(r) { return (r.title || 'Reference') + (r.url ? ' — ' + r.url : '') + (r.description ? '\n' + r.description : ''); }).join('\n\n') });
@@ -2678,7 +2689,7 @@ function renderISPPolicyViewerPanel() {
       logRows.push({
         event: 'Returned for revision',
         date: ispStatusLog.returnedDate || '',
-        actor: ispRcLog.approvedBy || 'Approver',
+        actor: ispStatusLog.returnedBy || ispRcLog.approvedBy || 'Approver',
         notes: ispStatusLog.notes || ''
       });
     }
@@ -2709,8 +2720,16 @@ function renderISPPolicyViewerPanel() {
     }
     ispHTML += '</div>';
     ispHTML += '</div>';
+    if (ispViewStatus === 'Returned') {
+      var returnNotes = String((((state.policyStatus || {}).ISP || {}).notes) || '').trim();
+      ispHTML += '<div style="margin:16px 0;padding:14px 16px;background:#fffbeb;border:1px solid rgba(245,158,11,0.35);border-radius:10px;">'
+        + '<div style="font-size:12px;font-weight:700;color:#b45309;margin-bottom:6px;">Returned for revision</div>'
+        + '<div style="font-size:13px;color:#78350f;line-height:1.6;">'
+        + (returnNotes ? _esc(returnNotes) : 'No return comments were recorded.')
+        + '</div></div>';
+    }
     var viewerUser = state.currentUserId ? (state.users||[]).find(function(u){ return u.id === state.currentUserId; }) : null;
-    var ispSt2 = ((state.policyStatus||{}).ISP || {}).status || 'Under Review';
+    var ispSt2 = ispViewStatus || ((state.policyStatus||{}).ISP || {}).status || 'Under Review';
     var viewerCanApproveISP = typeof canSessionApproveISP === 'function' && canSessionApproveISP();
     ispHTML += '<div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap;align-items:flex-start;">';
     ispHTML += '<button class="btn btn-secondary btn-sm" onclick="exitISPPolicyViewer()">← Back</button>';
