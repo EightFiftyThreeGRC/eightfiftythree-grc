@@ -2532,9 +2532,17 @@ function renderISPPolicyViewerPanel() {
     if (listPanel) listPanel.style.display = '';
     if (wizPanel) wizPanel.style.display = 'none';
     var hdr = listPanel ? listPanel.querySelector('.page-header') : null;
+    var ispViewStatus = getISPStatus();
+    var ispHdrSub = ispViewStatus === 'Approved'
+      ? 'Tier 1 organizational policy — approved and owned by the CISO.'
+      : ispViewStatus === 'Under Review'
+      ? 'Tier 1 organizational policy — submitted and awaiting approver sign-off.'
+      : ispViewStatus === 'Returned'
+      ? 'Tier 1 organizational policy — returned to the program owner for revision.'
+      : 'Tier 1 organizational policy — owned by the CISO.';
     if (hdr) hdr.innerHTML = '<div class="role-badge">📋 Policy</div>'
       + '<h1>Information Security Policy</h1>'
-      + '<p>Tier 1 organizational policy — approved and owned by the CISO.</p>';
+      + '<p>' + ispHdrSub + '</p>';
     var body = document.getElementById('policy-list-body');
     if (!body) return;
     var isp = state.infoSecPolicy;
@@ -2549,7 +2557,7 @@ function renderISPPolicyViewerPanel() {
       + '<span style="font-size:22px;">📋</span>'
       + '<div style="flex:1;"><div style="font-size:15px;font-weight:700;color:var(--navy);">Information Security Policy</div>'
       + '<div style="font-size:12px;color:var(--text-muted);">Tier 1 · Owned by ' + _esc(state.programOwner||'CISO') + '</div></div>'
-      + '<span class="chip chip-green" style="margin-right:10px;">Published</span>'
+      + '<span style="margin-right:10px;">' + chipHTML(ispViewStatus) + '</span>'
       + '<span id="isp-doc-chevron" style="font-size:12px;color:var(--primary);font-weight:600;">▼ View policy</span>'
       + '</div>';
     // Expandable document body
