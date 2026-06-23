@@ -2,6 +2,10 @@
 // Globals only; load after js/core.js and before js/app.js.
 
 function openISPSuggestionModal() {
+  if (typeof getISPStatus === 'function' && getISPStatus() !== 'Approved') {
+    if (typeof showToast === 'function') showToast('Proposed changes are only available after the ISP is formally approved.', true);
+    return;
+  }
   var overlay = document.createElement('div');
   overlay.id = 'ispSuggestionOverlay';
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';

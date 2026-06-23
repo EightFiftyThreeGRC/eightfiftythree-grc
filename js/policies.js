@@ -2743,12 +2743,13 @@ function renderISPPolicyViewerPanel() {
     }
     var viewerUser = state.currentUserId ? (state.users||[]).find(function(u){ return u.id === state.currentUserId; }) : null;
     var ispSt2 = ispViewStatus || ((state.policyStatus||{}).ISP || {}).status || 'Under Review';
+    var ispIsApproved = ispViewStatus === 'Approved';
     var viewerCanApproveISP = typeof canSessionApproveISP === 'function' && canSessionApproveISP();
     ispHTML += '<div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap;align-items:flex-start;">';
     ispHTML += '<button class="btn btn-secondary btn-sm" onclick="exitISPPolicyViewer()">← Back</button>';
     ispHTML += '<button class="btn btn-secondary btn-sm" onclick="printPolicyDocument(\'isp\')">🖨️ Print / Save PDF</button>';
     ispHTML += '<button class="btn btn-secondary btn-sm" onclick="exportPolicyDocumentDocx(\'isp\')">⬇ Export Word (.docx)</button>';
-    if (!state.currentUserId) {
+    if (!state.currentUserId && ispIsApproved) {
       ispHTML += '<button class="btn btn-primary btn-sm" onclick="openISPSuggestionModal()">📝 Propose Change</button>';
     }
     if (viewerCanApproveISP) {
@@ -2773,7 +2774,7 @@ function renderISPPolicyViewerPanel() {
     }
     // Annual review working draft (kickoff — promoted from approved suggestions)
     var ispDraft = state.infoSecPolicyReviewDraft;
-    if (ispDraft && ispDraft.content) {
+    if (ispIsApproved && ispDraft && ispDraft.content) {
       ispHTML += '<div style="margin-top:16px;border-top:1px solid var(--border);padding-top:16px;">'
         + '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:8px;">📋 Annual Review Working Draft</div>'
         + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">Draft <strong>v' + _esc(String(ispDraft.version != null ? ispDraft.version : '1')) + '</strong>'
@@ -2782,7 +2783,8 @@ function renderISPPolicyViewerPanel() {
         + '<div style="font-size:12px;color:var(--text-muted);margin-top:8px;">Use this consolidated text when you open the next formal review in the CISO wizard (copy into sections or attach as change notes).</div>'
         + '</div>';
     }
-    // Suggested changes log (post-publication draft queue)
+    // Suggested changes log (post-approval draft queue — only after formal CIO sign-off)
+    if (ispIsApproved) {
     if (!state.infoSecPolicySuggestions) state.infoSecPolicySuggestions = [];
     var hasApprovedSug = state.infoSecPolicySuggestions.some(function(s){ return s.status === 'Approved'; });
     ispHTML += '<div style="margin-top:16px;border-top:1px solid var(--border);padding-top:16px;">'
@@ -2824,6 +2826,7 @@ function renderISPPolicyViewerPanel() {
       ispHTML += '<div style="color:var(--text-muted);font-size:13px;font-style:italic;">No suggested changes have been logged yet.</div>';
     }
     ispHTML += '</div>';
+    }
     ispHTML += '</div>';
     ispHTML += '</div>';
     body.innerHTML = ispHTML;
