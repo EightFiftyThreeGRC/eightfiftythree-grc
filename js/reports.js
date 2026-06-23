@@ -793,7 +793,7 @@ function renderISPApprovalCallout(user) {
     + '<div style="font-size:15px;font-weight:700;color:var(--navy);margin-top:4px;">' + escapeHTML(title) + ' is awaiting your approval</div>'
     + '<div style="font-size:12px;color:var(--text-muted);margin-top:4px;">' + escapeHTML(title)
     + (p.submittedAt ? ' · Routed for review on ' + escapeHTML(p.submittedAt) : '') + '</div></div>'
-    + '<button type="button" class="btn btn-primary btn-sm" onclick="showTab(\'policy\');goToCISOPolicyEditor();">Review & approve →</button>'
+    + '<button type="button" class="btn btn-primary btn-sm" onclick="goToCISOPolicyEditor();">Review & approve →</button>'
     + '</div>';
 }
 
@@ -913,9 +913,18 @@ function approveISP() {
   }
   try { addAuditEntry('policy', 'ISP', 'ISP approved by ' + approverName); } catch(e) {}
   markDirty();
+  try { if (typeof saveToStorage === 'function') saveToStorage(); } catch (e) { /* ignore */ }
   var approvedTitle = ((state.infoSecPolicy && state.infoSecPolicy.title) ? String(state.infoSecPolicy.title).trim() : '') || (typeof getDefaultISPTitle === 'function' ? getDefaultISPTitle() : 'Information Security Policy');
   showToast('\u2705 ' + approvedTitle + ' approved.');
-  goToCISOPolicyEditor();
+  var afterApprove = function() {
+    if (typeof exitISPPolicyViewer === 'function') exitISPPolicyViewer();
+    else showTab('reports');
+  };
+  if (typeof cloudPushNow === 'function' && typeof isCloudSessionActive === 'function' && isCloudSessionActive()) {
+    cloudPushNow().finally(afterApprove);
+  } else {
+    afterApprove();
+  }
 }
 
 function returnISPToEditor() {
@@ -931,9 +940,14 @@ function returnISPToEditor() {
   if (!notes) { showToast('Please add return comments before returning the policy.', true); return; }
   if (!state.policyStatus) state.policyStatus = {};
   var prev = state.policyStatus.ISP || {};
+  var rc = (state.policyReviewCycle || {}).ISP || {};
+  var approverUser = state.currentUserId ? (state.users || []).find(function(u) { return u.id === state.currentUserId; }) : null;
+  var returnedBy = approverUser ? approverUser.name
+    : (typeof getSessionActorName === 'function' ? getSessionActorName(rc.approvedBy || 'Approver') : (rc.approvedBy || 'Approver'));
   state.policyStatus.ISP = {
     status: 'Returned',
     returnedDate: new Date().toISOString().slice(0,10),
+    returnedBy: returnedBy,
     notes: notes,
     submittedAt: prev.submittedAt || '',
     // Always route returned ISP work back to the CISO/program owner editor queue.
@@ -941,10 +955,28 @@ function returnISPToEditor() {
     submittedToRole: (state.programOwnerTitle || '').trim() || prev.submittedToRole || '',
     submittedToEmail: (state.programOwnerEmail || '').trim() || prev.submittedToEmail || ''
   };
+  if (state.infoSecPolicy) {
+    if (!state.infoSecPolicy.revisionHistory) state.infoSecPolicy.revisionHistory = [];
+    state.infoSecPolicy.revisionHistory.push({
+      version: 'R' + (state.infoSecPolicy.revisionHistory.length + 1),
+      date: new Date().toISOString().slice(0, 10),
+      author: returnedBy,
+      changes: 'Returned for revision. Notes: ' + notes
+    });
+  }
   try { addAuditEntry('policy', 'ISP', 'ISP returned with comments: ' + notes); } catch(e) {}
   markDirty();
+  try { if (typeof saveToStorage === 'function') saveToStorage(); } catch (e) { /* ignore */ }
   showToast('\u21A9 ISP returned to editor with comments.');
-  goToCISOPolicyEditor();
+  var afterReturn = function() {
+    if (typeof exitISPPolicyViewer === 'function') exitISPPolicyViewer();
+    else showTab('reports');
+  };
+  if (typeof cloudPushNow === 'function' && typeof isCloudSessionActive === 'function' && isCloudSessionActive()) {
+    cloudPushNow().finally(afterReturn);
+  } else {
+    afterReturn();
+  }
 }
 
 function renderReturnedWorkCallout(user) {
@@ -1132,7 +1164,7 @@ function renderAoSspApprovalQueueHtml(user) {
 // ── Approver-role dashboard ────────────────────────────────────────────────
 function renderApproverDashboard(user) {
   var isp = state.infoSecPolicy;
-  var ispSt = ((state.policyStatus||{}).ISP || {}).status || (isp && isp.title ? 'Under Review' : 'Not Started');
+  var ispSt = typeof getISPStatus === 'function' ? getISPStatus() : (((state.policyStatus||{}).ISP || {}).status || (isp && isp.title ? 'Under Review' : 'Not Started'));
   var rc = (state.policyReviewCycle||{}).ISP || {};
   var submittedBy = rc.submittedTo ? '' : (state.programOwner || 'CISO');
   var approvedDate = ((state.policyStatus||{}).ISP || {}).approvedDate || '';
