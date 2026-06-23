@@ -1273,6 +1273,8 @@ function migrateRegMappingStateShape() {
     if (state.activeComplianceLaws.hipaa !== false) state.activeComplianceLaws.hipaa = true;
     delete state.activeFrameworks.hipaa;
   }
+  if (state.activeFrameworks.cis) delete state.activeFrameworks.cis;
+  if (state.activeComplianceLaws.mar_e) delete state.activeComplianceLaws.mar_e;
   if (state._regMappingInitialized === undefined) state._regMappingInitialized = false;
   if (!Array.isArray(state.customRegFrameworks)) state.customRegFrameworks = [];
   // Legacy flat orgSector → hierarchical orgOwnership / orgGovLevel / orgSector

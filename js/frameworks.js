@@ -1,9 +1,8 @@
-// js/frameworks.js — NIST crosswalk to voluntary standards (ISO, SOC 2, CIS) and compliance laws
+// js/frameworks.js — NIST crosswalk to voluntary standards (ISO, SOC 2) and compliance laws
 
 var FRAMEWORK_META = {
   iso27001: { id: 'iso27001', label: 'ISO 27001', subtitle: 'Annex A (2022)', color: '#5856D6', bg: '#f5f3ff' },
-  soc2:     { id: 'soc2',     label: 'SOC 2',     subtitle: 'Trust Services Criteria', color: '#FF9500', bg: '#fff7ed' },
-  cis:      { id: 'cis',      label: 'CIS Controls', subtitle: 'IG1 (v8)', color: '#007AFF', bg: '#eff6ff' }
+  soc2:     { id: 'soc2',     label: 'SOC 2',     subtitle: 'Trust Services Criteria', color: '#FF9500', bg: '#fff7ed' }
 };
 
 var COMPLIANCE_LAW_META = {
@@ -12,7 +11,6 @@ var COMPLIANCE_LAW_META = {
   ferpa:         { id: 'ferpa',         label: 'FERPA',              subtitle: 'Student records', color: '#6366f1', bg: '#eef2ff' },
   sox:           { id: 'sox',           label: 'SOX',                subtitle: 'IT general controls', color: '#b45309', bg: '#fffbeb' },
   fisma:         { id: 'fisma',         label: 'FISMA',              subtitle: 'Federal systems', color: '#7c3aed', bg: '#f5f3ff' },
-  mar_e:         { id: 'mar_e',         label: 'MARS-E',             subtitle: 'CMS Medicare / SLG systems', color: '#0891b2', bg: '#ecfeff' },
   state_privacy: { id: 'state_privacy', label: 'State privacy laws', subtitle: 'CCPA / CPRA / similar', color: '#64748b', bg: '#f8fafc' }
 };
 
@@ -49,35 +47,27 @@ var SLG_SECTOR_OPTIONS = [
   { id: '', label: 'Select sector…' },
   { id: 'general', label: 'General / multi-purpose' },
   { id: 'healthcare', label: 'Healthcare (non-Medicare)' },
-  { id: 'medicare_integrator', label: 'Medicare / CMS integrator (MARS-E)' },
+  { id: 'medicare_integrator', label: 'Medicare / CMS integrator' },
   { id: 'education', label: 'Education / K-12 / higher ed' },
   { id: 'justice_public_safety', label: 'Justice / public safety' }
 ];
 
 // Keys: private:<sector> | government:<federal|slg>:<sector>
 var REG_SUGGESTION_MAP = {
-  'private:commercial':         { frameworks: ['iso27001', 'soc2', 'cis'], laws: ['state_privacy'] },
-  'private:healthcare':         { frameworks: ['iso27001', 'soc2', 'cis'], laws: ['hipaa'] },
-  'private:financial':          { frameworks: ['iso27001', 'soc2', 'cis'], laws: ['glba', 'sox'] },
-  'private:education':          { frameworks: ['iso27001', 'soc2', 'cis'], laws: ['ferpa'] },
-  'private:critical_infra':     { frameworks: ['iso27001', 'soc2', 'cis'], laws: [] },
-  'government:federal:defense':           { frameworks: ['iso27001', 'cis'], laws: ['fisma'] },
-  'government:federal:civilian':          { frameworks: ['iso27001', 'cis'], laws: ['fisma'] },
-  'government:federal:intelligence':      { frameworks: ['iso27001', 'cis'], laws: ['fisma'] },
-  'government:federal:law_enforcement':   { frameworks: ['iso27001', 'cis'], laws: ['fisma'] },
-  'government:slg:general':               { frameworks: ['iso27001', 'soc2', 'cis'], laws: ['fisma', 'state_privacy'] },
-  'government:slg:healthcare':            { frameworks: ['iso27001', 'soc2', 'cis'], laws: ['hipaa', 'fisma'] },
-  'government:slg:medicare_integrator':   { frameworks: ['iso27001', 'soc2', 'cis'], laws: ['hipaa', 'mar_e', 'fisma'] },
-  'government:slg:education':             { frameworks: ['iso27001', 'soc2', 'cis'], laws: ['ferpa', 'fisma'] },
-  'government:slg:justice_public_safety': { frameworks: ['iso27001', 'soc2', 'cis'], laws: ['fisma'] }
-};
-
-var CIS_BY_FAMILY = {
-  AC: ['5.1','6.1','6.2','6.3','6.8'], AT: ['14.1','14.2'], AU: ['8.1','8.2','8.3'],
-  CA: ['1.1','7.1'], CM: ['2.1','4.1','4.2'], CP: ['11.1','11.2'], IA: ['5.1','6.3'],
-  IR: ['17.1','17.2'], MA: ['1.1','7.1'], MP: ['3.1','3.3'], PE: ['4.1','4.2'],
-  PL: ['5.1','14.1'], PM: ['5.1','14.1'], PS: ['14.1','14.2'], PT: ['1.1','3.1'],
-  RA: ['7.1','7.2'], SA: ['15.1','15.2'], SC: ['4.1','12.1','13.1'], SI: ['7.1','7.4'], SR: ['15.1','15.3']
+  'private:commercial':         { frameworks: ['iso27001', 'soc2'], laws: ['state_privacy'] },
+  'private:healthcare':         { frameworks: ['iso27001', 'soc2'], laws: ['hipaa'] },
+  'private:financial':          { frameworks: ['iso27001', 'soc2'], laws: ['glba', 'sox'] },
+  'private:education':          { frameworks: ['iso27001', 'soc2'], laws: ['ferpa'] },
+  'private:critical_infra':     { frameworks: ['iso27001', 'soc2'], laws: [] },
+  'government:federal:defense':           { frameworks: ['iso27001'], laws: ['fisma'] },
+  'government:federal:civilian':          { frameworks: ['iso27001'], laws: ['fisma'] },
+  'government:federal:intelligence':      { frameworks: ['iso27001'], laws: ['fisma'] },
+  'government:federal:law_enforcement':   { frameworks: ['iso27001'], laws: ['fisma'] },
+  'government:slg:general':               { frameworks: ['iso27001', 'soc2'], laws: ['fisma', 'state_privacy'] },
+  'government:slg:healthcare':            { frameworks: ['iso27001', 'soc2'], laws: ['hipaa', 'fisma'] },
+  'government:slg:medicare_integrator':   { frameworks: ['iso27001', 'soc2'], laws: ['hipaa', 'fisma'] },
+  'government:slg:education':             { frameworks: ['iso27001', 'soc2'], laws: ['ferpa', 'fisma'] },
+  'government:slg:justice_public_safety': { frameworks: ['iso27001', 'soc2'], laws: ['fisma'] }
 };
 
 var GENERIC_LAW_REF = {
@@ -85,7 +75,6 @@ var GENERIC_LAW_REF = {
   ferpa: 'FERPA §99.31',
   sox: 'SOX ITGC',
   fisma: 'FISMA / NIST RMF',
-  mar_e: 'CMS MARS-E v2',
   state_privacy: 'State privacy statute'
 };
 
@@ -141,7 +130,6 @@ var CONTROL_FRAMEWORK_OVERRIDES = {
       if (lawId === 'hipaa') return;
       if (GENERIC_LAW_REF[lawId]) FAMILY_LAW_REFS[fam][lawId] = [GENERIC_LAW_REF[lawId]];
     });
-    row.cis = (CIS_BY_FAMILY[fam] || ['1.1']).slice();
     delete row.hipaa;
   });
   Object.keys(CONTROL_FRAMEWORK_OVERRIDES).forEach(function(ctrlId) {
@@ -151,7 +139,6 @@ var CONTROL_FRAMEWORK_OVERRIDES = {
       if (lawId === 'hipaa') return;
       if (GENERIC_LAW_REF[lawId]) CONTROL_LAW_OVERRIDES[ctrlId][lawId] = [GENERIC_LAW_REF[lawId]];
     });
-    row.cis = (CIS_BY_FAMILY[(ctrlId || '').split('-')[0]] || ['1.1']).slice(0, 2);
     delete row.hipaa;
   });
 })();
@@ -197,7 +184,7 @@ function getOrgClassificationSummary() {
 }
 
 function getRegSuggestionsForProfile(key) {
-  return REG_SUGGESTION_MAP[key] || { frameworks: ['iso27001', 'soc2', 'cis'], laws: [] };
+  return REG_SUGGESTION_MAP[key] || { frameworks: ['iso27001', 'soc2'], laws: [] };
 }
 
 function isOrgClassificationComplete() {
@@ -256,7 +243,7 @@ function renderOrgClassificationFieldsHtml() {
           return '<option value="' + escapeHTML(opt.id) + '"' + ((state.orgGovLevel || '') === opt.id ? ' selected' : '') + '>' + escapeHTML(opt.label) + '</option>';
         }).join('')
         + '</select>'
-        + '<div class="form-hint">Federal vs state &amp; local (SLG) — SLG includes Medicare integrators subject to MARS-E.</div>'
+        + '<div class="form-hint">Federal vs state &amp; local (SLG).</div>'
         + '</div>'
       : '')
     + (showSector
@@ -267,7 +254,7 @@ function renderOrgClassificationFieldsHtml() {
           return '<option value="' + escapeHTML(opt.id) + '"' + ((state.orgSector || '') === opt.id ? ' selected' : '') + '>' + escapeHTML(opt.label) + '</option>';
         }).join('')
         + '</select>'
-        + '<div class="form-hint">Drives Step 3 suggestions — e.g., Medicare SLG integrators get MARS-E.</div>'
+        + '<div class="form-hint">Drives tailored suggestions in Step 3.</div>'
         + '</div>'
       : '');
 }
@@ -635,7 +622,7 @@ function renderFrameworksTab() {
 
   body.innerHTML = ''
     + '<div class="fw-intro">'
-    + '<p>EightFiftyThree maps your NIST 800-53 program to voluntary standards (<strong>ISO 27001</strong>, <strong>SOC 2</strong>, <strong>CIS Controls</strong>) and, separately, to <strong>laws &amp; regulations</strong> you enable. Coverage updates as control owners mark implementation.</p>'
+    + '<p>EightFiftyThree maps your NIST 800-53 program to voluntary standards (<strong>ISO 27001</strong>, <strong>SOC 2</strong>) and, separately, to <strong>laws &amp; regulations</strong> you enable. Coverage updates as control owners mark implementation.</p>'
     + '</div>'
     + '<div class="fw-coverage-grid">' + cards + '</div>'
     + (typeof renderComplianceLawCoverageCardsHtml === 'function' ? renderComplianceLawCoverageCardsHtml() : '')
@@ -742,14 +729,10 @@ function renderComplianceLawSetupSectionHtml() {
     var meta = getCustomRegMeta(c);
     return renderRegSetupRow(meta, !!c.active, false, 'toggleActiveComplianceLaw(\'' + c.id + '\')', 'removeCustomRegFramework(\'' + c.id + '\')');
   }).join('');
-  var applyBtn = isOrgClassificationComplete()
-    ? '<button type="button" class="btn btn-secondary btn-sm" style="margin-top:12px;" onclick="applySectorRegMappingSuggestions(true);if(typeof refreshCurrentCisoStep===\'function\')refreshCurrentCisoStep();">Apply suggestions for ' + escapeHTML(getOrgClassificationSummary()) + '</button>'
-    : '';
   return '<div class="fw-setup-section" style="margin-top:24px;">'
     + '<div class="section-title" style="margin-bottom:4px;">Compliance frameworks (laws &amp; regulations)</div>'
-    + '<div class="section-subtitle" style="margin-bottom:12px;">Separate from voluntary standards — track statutory and regulatory obligations (including MARS-E for Medicare SLG integrators).</div>'
+    + '<div class="section-subtitle" style="margin-bottom:12px;">Separate from voluntary standards — track statutory and regulatory obligations.</div>'
     + '<div class="fw-setup-list">' + rows + '</div>'
-    + applyBtn
     + '</div>';
 }
 
