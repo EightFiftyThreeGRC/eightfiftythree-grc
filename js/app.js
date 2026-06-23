@@ -673,6 +673,7 @@ function goToDomainOwnersFromDashboard() {
 }
 
 function showTab(tabId) {
+  if (tabId !== 'policy' && state._ispReviewView) state._ispReviewView = false;
   if (tabId !== 'asset' && state._sspReviewerReadOnly) {
     state._sspReviewerReadOnly = false;
     state._sspReadOnlyExitTab = null;
@@ -685,7 +686,7 @@ function showTab(tabId) {
     if (cu) {
       var vis = getPersonVisibleTabIds(cu);
       var allowLibraryTab =
-        (tabId === 'policy' && (state._policyLibraryMode || state._policyDocView || !!state._policyDomain)) ||
+        (tabId === 'policy' && (state._policyLibraryMode || state._policyDocView || !!state._policyDomain || state._ispReviewView)) ||
         (tabId === 'control' && state._controlLibraryMode) ||
         (tabId === 'asset' && (state._assetTypeLibraryMode || state._assetLibraryMode));
       if (vis.length && vis.indexOf(tabId) === -1 && !allowLibraryTab) {

@@ -1172,7 +1172,7 @@ function renderApproverDashboard(user) {
       html += '<div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">Submitted by ' + escapeHTML(state.programOwner||'CISO') + (rc.submittedDate ? ' on ' + rc.submittedDate : '') + '</div>';
     }
 
-    html += '<button class="btn btn-secondary btn-sm" style="margin-bottom:16px;" onclick="showTab(\'policy\');goToCISOPolicyEditor();">📋 View Full Policy →</button>';
+    html += '<button class="btn btn-secondary btn-sm" style="margin-bottom:16px;" onclick="goToCISOPolicyEditor()">📋 View Full Policy →</button>';
 
     if (ispSt === 'Under Review') {
       var canApprove = typeof canSessionApproveISP === 'function' && canSessionApproveISP();

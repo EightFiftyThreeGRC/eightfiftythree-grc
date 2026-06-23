@@ -139,6 +139,10 @@ function renderPolicyTab() {
     renderPolicyLibraryCatalog();
     return;
   }
+  if (state._ispReviewView) {
+    renderISPPolicyViewerPanel();
+    return;
+  }
   // Doc viewer takes priority — show read-only policy document
   if (state._policyDocView && state._policyDomain && !state._policyWizardMode) {
     renderPolicyDocViewer(state._policyDomain);
@@ -2495,11 +2499,34 @@ function _renderDomainRevisionHistory(fam, dp) {
     + '</div>';
 }
 
-// Navigate to ISP — always shows document viewer (admin gets Edit button inside)
+// Navigate to ISP — read-only document viewer (admin, approver, library links).
 function goToCISOPolicyEditor() {
-    state._policyLibraryMode = false;
-    state._policyDocView = false;
-    showTab('policy');
+  state._policyLibraryMode = false;
+  state._policyDocView = false;
+  state._ispReviewView = true;
+  showTab('policy');
+}
+
+function exitISPPolicyViewer() {
+  state._ispReviewView = false;
+  var user = state.currentUserId && state.users
+    ? state.users.find(function(u) { return u.id === state.currentUserId; })
+    : null;
+  if (user && typeof getPersonVisibleTabIds === 'function') {
+    var vis = getPersonVisibleTabIds(user);
+    if (vis.indexOf('policy') === -1) {
+      showTab(vis.indexOf('reports') !== -1 ? 'reports' : (vis[0] || 'reports'));
+      return;
+    }
+  }
+  if (!state.currentUserId) {
+    renderPolicyTab();
+    return;
+  }
+  showTab('reports');
+}
+
+function renderISPPolicyViewerPanel() {
     var listPanel = document.getElementById('policy-list-panel');
     var hdr = listPanel ? listPanel.querySelector('.page-header') : null;
     if (hdr) hdr.innerHTML = '<div class="role-badge">📋 Policy</div>'
@@ -2675,7 +2702,7 @@ function goToCISOPolicyEditor() {
     var ispSt2 = ((state.policyStatus||{}).ISP || {}).status || 'Under Review';
     var viewerCanApproveISP = typeof canSessionApproveISP === 'function' && canSessionApproveISP();
     ispHTML += '<div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap;align-items:flex-start;">';
-    ispHTML += '<button class="btn btn-secondary btn-sm" onclick="renderPolicyTab()">← Back to Policies</button>';
+    ispHTML += '<button class="btn btn-secondary btn-sm" onclick="exitISPPolicyViewer()">← Back</button>';
     ispHTML += '<button class="btn btn-secondary btn-sm" onclick="printPolicyDocument(\'isp\')">🖨️ Print / Save PDF</button>';
     ispHTML += '<button class="btn btn-secondary btn-sm" onclick="exportPolicyDocumentDocx(\'isp\')">⬇ Export Word (.docx)</button>';
     if (!state.currentUserId) {
