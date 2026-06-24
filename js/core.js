@@ -1160,6 +1160,7 @@ const state = {
   _controlLibraryAssetTypeFilter: '',
   _controlLibrarySearch: '',
   _controlLibraryColFilters: {},  // { control:'', name:'', owner:'', impl:'', asset:'', compliance:'', lifecycle:'' }
+  _controlQueueFilters: {},       // design queue step 1 column filters
   _assetLibraryMode: false,    // true = show global asset library, false = asset workspace
   _assetTypeLibraryMode: false, // true = show asset type library, false = asset workspace
   _sspReviewerReadOnly: false,  // true = AO/ISSM viewing submitted SSP in read-only package view (not owner wizard)

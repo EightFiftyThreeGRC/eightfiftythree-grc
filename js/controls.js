@@ -201,6 +201,12 @@ function renderControlStep1() {
   const returnedControls = allControls.filter(c => (state.controlStatus[c.id]||{}).returnedToPolicyOwner);
   const deselectControls = allControls.filter(c => (state.controlStatus[c.id]||{}).recommendedDeselect);
   const families = [...new Set(controls.map(c => c.f).filter(Boolean))];
+  const ownerOptions = getControlQueueOwnerFilterOptions(controls);
+  if (!state._controlQueueFilters) state._controlQueueFilters = {};
+  const cqf = state._controlQueueFilters;
+  const cqFi = 'style="width:100%;box-sizing:border-box;padding:3px 6px;font-size:11px;border:1px solid var(--border);border-radius:5px;background:var(--bg);color:var(--navy);font-family:inherit;" onclick="event.stopPropagation()"';
+  const cqSel = cqFi.replace('background:var(--bg)', 'background:white') + ' class="form-select"';
+  function cqVal(k) { return escapeHTML(cqf[k] || ''); }
 
   if (allControls.length === 0) {
     body.innerHTML = `<div class="empty-state"><div class="es-icon">📋</div><div class="es-title">No Controls Assigned</div><p>The CISO must assign controls to you before you can document implementation.</p><button class="btn btn-primary" onclick="goToProgramSetupOrDashboard()" style="margin-top:16px;">${state.cisoComplete ? 'Go to Dashboard →' : 'View CISO Setup →'}</button></div>`;
@@ -270,20 +276,8 @@ function renderControlStep1() {
       <strong>💡 Tip:</strong> Use <strong>↩ Return</strong> if a control was assigned to you in error. Use <strong>✗ Propose De-select</strong> if you believe a control should not be in scope — both go back to the policy owner for action.
     </div>
 
-    <div class="filter-bar">
-      <input type="text" id="ctrlSearch" placeholder="🔍  Search by ID or name…" oninput="filterControlList()">
-      <select id="ctrlFamilyFilter" onchange="filterControlList()">
-        <option value="">All Families</option>
-        ${families.map(f=>`<option value="${f}">${f} — ${FAMILIES[f]||f}</option>`).join('')}
-      </select>
-      <select id="ctrlStatusFilter" onchange="filterControlList()">
-        <option value="">All Statuses</option>
-        <option>Not Started</option><option>Planned</option><option>In Progress</option><option>Implemented</option><option>Not Applicable</option>
-      </select>
-      <select id="ctrlDeselectFilter" onchange="filterControlList()" title="Filter by baseline de-selection status">
-        <option value="">All scope states</option>
-        <option value="deselected">De-selected (baseline) only</option>
-      </select>
+    <div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
+      <span id="controlQueueFilterCount" style="font-size:11px;color:var(--text-muted);">${controls.length} shown</span>
     </div>
 
     <div class="table-scroll">
@@ -300,6 +294,17 @@ function renderControlStep1() {
             <th style="width:120px;">Status</th>
             <th style="width:150px;">Actions</th>
           </tr>
+          <tr style="background:var(--bg);">
+            <th style="padding:4px 6px;"><input id="cqFilterControl" ${cqFi} placeholder="Filter ID…" value="${cqVal('control')}" oninput="setControlQueueFilter('control',this.value)"></th>
+            <th style="padding:4px 6px;"><input id="cqFilterName" ${cqFi} placeholder="Filter name…" value="${cqVal('name')}" oninput="setControlQueueFilter('name',this.value)"></th>
+            <th style="padding:4px 6px;"><select id="cqFilterFamily" ${cqSel} onchange="setControlQueueFilter('family',this.value)"><option value="">All</option>${families.map(f=>'<option value="'+f+'"'+(cqf.family===f?' selected':'')+'>'+f+'</option>').join('')}</select></th>
+            <th style="padding:4px 6px;"></th>
+            <th style="padding:4px 6px;"></th>
+            <th style="padding:4px 6px;"><select id="cqFilterOwner" ${cqSel} onchange="setControlQueueFilter('owner',this.value)"><option value="">All owners</option>${ownerOptions.map(function(o){ return '<option value="'+escapeHTML(o.value)+'"'+(cqf.owner===o.value?' selected':'')+'>'+escapeHTML(o.label)+'</option>'; }).join('')}</select></th>
+            <th style="padding:4px 6px;"></th>
+            <th style="padding:4px 6px;"><select id="cqFilterStatus" ${cqSel} onchange="setControlQueueFilter('status',this.value)"><option value="">All</option>${['Not Started','Planned','In Progress','Implemented','Not Applicable'].map(function(s){ return '<option'+(cqf.status===s?' selected':'')+'>'+s+'</option>'; }).join('')}</select></th>
+            <th style="padding:4px 6px;"><select id="cqFilterScope" ${cqSel} title="Baseline de-selection" onchange="setControlQueueFilter('scope',this.value)"><option value="">All scope</option><option value="deselected"${cqf.scope==='deselected'?' selected':''}>De-selected</option></select></th>
+          </tr>
         </thead>
         <tbody id="ctrlMainTbody">
           ${controls.map(c => {
@@ -315,7 +320,9 @@ function renderControlStep1() {
               : `<span style="font-size:11px;color:var(--text-muted);font-style:italic;">—</span>`;
             const cid = c.id.replace(/'/g,"\\'");
             const deselBaseline = cs.deselectDecision === 'Approved' && c.bl && (c.bl.includes(state.baseline) || (state.privacyOverlay && c.bl.includes('P')));
-            return `<tr data-id="${c.id}" data-family="${c.f}" data-status="${st}" data-deselected="${deselBaseline?'1':'0'}" class="${deselBaseline?'tr-deselected-baseline':''}" style="cursor:pointer;" onmouseover="this.style.background='rgba(13,148,136,0.04)'" onmouseout="this.style.background=''" onclick="goToControlDetail('${cid}')">
+            const ownerKey = getControlOwnerFilterKey(co);
+            const nameAttr = (c.n || '').replace(/"/g, '&quot;');
+            return `<tr data-id="${c.id}" data-name="${nameAttr}" data-family="${c.f}" data-status="${st}" data-owner="${ownerKey}" data-deselected="${deselBaseline?'1':'0'}" class="${deselBaseline?'tr-deselected-baseline':''}" style="cursor:pointer;" onmouseover="this.style.background='rgba(13,148,136,0.04)'" onmouseout="this.style.background=''" onclick="goToControlDetail('${cid}')">
               <td><span class="control-id">${c.id}</span></td>
               <td style="font-size:13px;">${c.n}</td>
               <td><span class="family-badge">${c.f}</span></td>
@@ -396,20 +403,62 @@ function renderControlStep1() {
           <tbody>${outsideQueue.map(c => `<tr style="opacity:0.62;"><td><span class="control-id" style="opacity:0.8;">${c.id}</span></td><td style="font-size:13px;color:var(--text-muted);">${c.n}</td><td><span class="family-badge" style="opacity:0.65;">${c.f}</span></td><td style="font-size:11px;color:#334155;font-weight:600;">${escapeHTML(c.queueReason)}</td></tr>`).join('')}</tbody>
           </table></div></details>`;
     })()}`;
+  setTimeout(filterControlList, 0);
+}
+
+function getControlOwnerFilterKey(co) {
+  co = co || {};
+  var email = typeof normalizeOwnerEmail === 'function' ? normalizeOwnerEmail(co.email) : String(co.email || '').trim().toLowerCase();
+  if (email) return 'email:' + email;
+  var name = (co.name || '').trim().toLowerCase();
+  if (name && !isSuggestedRoleBucketLabel(co.name)) return 'name:' + name;
+  return '__unassigned__';
+}
+
+function getControlQueueOwnerFilterOptions(controls) {
+  var byKey = {};
+  (controls || []).forEach(function(c) {
+    var co = (state.controlOwners || {})[c.id] || {};
+    var key = getControlOwnerFilterKey(co);
+    if (!byKey[key]) {
+      byKey[key] = key === '__unassigned__' ? 'Unassigned' : getControlOwnerDisplayName(co);
+    }
+  });
+  return Object.keys(byKey).sort(function(a, b) {
+    if (a === '__unassigned__') return 1;
+    if (b === '__unassigned__') return -1;
+    return byKey[a].localeCompare(byKey[b]);
+  }).map(function(k) { return { value: k, label: byKey[k] }; });
+}
+
+function setControlQueueFilter(key, value) {
+  if (!state._controlQueueFilters) state._controlQueueFilters = {};
+  state._controlQueueFilters[key] = value;
+  filterControlList();
 }
 
 function filterControlList() {
-  const q   = (document.getElementById('ctrlSearch')?.value||'').toLowerCase();
-  const fam = document.getElementById('ctrlFamilyFilter')?.value||'';
-  const st  = document.getElementById('ctrlStatusFilter')?.value||'';
-  const des = document.getElementById('ctrlDeselectFilter')?.value||'';
-  document.querySelectorAll('#controlInventoryTable tbody tr').forEach(row => {
-    const matchQ = !q   || (row.dataset.id||'').toLowerCase().includes(q) || (row.cells[1]?.textContent||'').toLowerCase().includes(q);
+  var filters = state._controlQueueFilters || {};
+  var q = (document.getElementById('cqFilterControl')?.value ?? filters.control ?? '').toLowerCase();
+  var nameQ = (document.getElementById('cqFilterName')?.value ?? filters.name ?? '').toLowerCase();
+  var fam = document.getElementById('cqFilterFamily')?.value ?? filters.family ?? '';
+  var owner = document.getElementById('cqFilterOwner')?.value ?? filters.owner ?? '';
+  var st = document.getElementById('cqFilterStatus')?.value ?? filters.status ?? '';
+  var des = document.getElementById('cqFilterScope')?.value ?? filters.scope ?? '';
+  var visible = 0;
+  document.querySelectorAll('#controlInventoryTable tbody tr').forEach(function(row) {
+    const matchQ = !q || (row.dataset.id||'').toLowerCase().includes(q);
+    const matchName = !nameQ || (row.dataset.name||'').toLowerCase().includes(nameQ) || (row.cells[1]?.textContent||'').toLowerCase().includes(nameQ);
     const matchF = !fam || row.dataset.family===fam;
-    const matchS = !st  || row.dataset.status===st;
+    const matchOwner = !owner || row.dataset.owner===owner;
+    const matchS = !st || row.dataset.status===st;
     const matchD = !des || (des === 'deselected' && row.dataset.deselected === '1');
-    row.style.display = (matchQ && matchF && matchS && matchD) ? '' : 'none';
+    const show = matchQ && matchName && matchF && matchOwner && matchS && matchD;
+    row.style.display = show ? '' : 'none';
+    if (show) visible++;
   });
+  var countEl = document.getElementById('controlQueueFilterCount');
+  if (countEl) countEl.textContent = visible + ' shown';
 }
 
 function goToControlDetail(ctrlId) {
