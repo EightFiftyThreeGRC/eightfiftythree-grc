@@ -278,6 +278,39 @@ function canSessionApproveISP() {
   return approverName && user.name && user.name.trim().toLowerCase() === approverName;
 }
 
+/** True when the signed-in viewer is the CISO/program owner who should revise a returned ISP. */
+function canSessionReviseReturnedISP() {
+  if (typeof getISPStatus === 'function' && getISPStatus() !== 'Returned') return false;
+  if (isCloudOwnerSession()) return true;
+  if (isLocalDemoAdminMode()) return true;
+
+  var ownerName = String(state.programOwner || '').trim().toLowerCase();
+  var ownerEmail = typeof normalizeOwnerEmail === 'function'
+    ? normalizeOwnerEmail(state.programOwnerEmail)
+    : String(state.programOwnerEmail || '').trim().toLowerCase();
+
+  if (isCloudSessionActive()) {
+    var sessionEmail = getSessionEmailForApproval();
+    if (sessionEmail && ownerEmail && sessionEmail === ownerEmail) return true;
+    var sessionName = String(getCloudSessionName() || '').trim().toLowerCase();
+    if (sessionName && ownerName && sessionName === ownerName) return true;
+  }
+
+  if (state.currentUserId && state.users) {
+    var personIds = state._currentPersonIds || [state.currentUserId];
+    for (var i = 0; i < personIds.length; i++) {
+      var u = state.users.find(function(x) { return x.id === personIds[i]; });
+      if (!u) continue;
+      if (u.role === 'ciso') return true;
+      if (ownerName && String(u.name || '').trim().toLowerCase() === ownerName) return true;
+      var uEm = typeof normalizeOwnerEmail === 'function'
+        ? normalizeOwnerEmail(u.email) : String(u.email || '').trim().toLowerCase();
+      if (ownerEmail && uEm && uEm === ownerEmail) return true;
+    }
+  }
+  return false;
+}
+
 function validateISPApproverAssignment(rc, silent) {
   rc = rc || (state.policyReviewCycle || {}).ISP || {};
   if (!rc._customApprover) {
@@ -1062,6 +1095,7 @@ if (typeof window !== 'undefined') {
   window.getISPDesignatedApproverEmail = getISPDesignatedApproverEmail;
   window.getISPDesignatedApproverName = getISPDesignatedApproverName;
   window.canSessionApproveISP = canSessionApproveISP;
+  window.canSessionReviseReturnedISP = canSessionReviseReturnedISP;
   window.ispApproverViolatesSeparationOfDuties = ispApproverViolatesSeparationOfDuties;
   window.validateISPApproverAssignment = validateISPApproverAssignment;
   window.requestPasswordReset = requestPasswordReset;

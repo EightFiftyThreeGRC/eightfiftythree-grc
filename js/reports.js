@@ -982,9 +982,7 @@ function returnISPToEditor() {
 
 function renderReturnedWorkCallout(user) {
   var cards = [];
-  var ispStatus = ((state.policyStatus || {}).ISP || {}).status || '';
-  var isCisoViewer = !user || user.role === 'ciso' || (user && state.programOwner && String(user.name || '').trim().toLowerCase() === String(state.programOwner || '').trim().toLowerCase());
-  if (ispStatus === 'Returned' && isCisoViewer) {
+  if (typeof canSessionReviseReturnedISP === 'function' && canSessionReviseReturnedISP()) {
     cards.push(
       '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:#fff;border:1px solid rgba(220,38,38,0.25);border-radius:10px;padding:12px 14px;">'
       + '<div><div style="font-size:13px;font-weight:700;color:#991b1b;">ISP returned for revision</div>'

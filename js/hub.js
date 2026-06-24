@@ -116,6 +116,22 @@ function getNextActions() {
     }
   }
 
+  if (typeof canSessionReviseReturnedISP === 'function' && canSessionReviseReturnedISP()) {
+    var returnedIspTitle = ((state.infoSecPolicy && state.infoSecPolicy.title) ? String(state.infoSecPolicy.title).trim() : '')
+      || (typeof getDefaultISPTitle === 'function' ? getDefaultISPTitle() : 'Information Security Policy');
+    var returnedNotes = String(((state.policyStatus || {}).ISP || {}).notes || '').trim();
+    var returnedDesc = returnedNotes
+      ? 'Returned with comments: ' + returnedNotes.slice(0, 80) + (returnedNotes.length > 80 ? '\u2026' : '')
+      : 'Tier 1 Information Security Policy was returned for your revision.';
+    actions.push({
+      priority: 0,
+      icon: '\u21A9',
+      label: 'Revise ISP: ' + returnedIspTitle,
+      desc: returnedDesc,
+      action: 'goToCISOPolicyEditor();'
+    });
+  }
+
   (state.assets || []).forEach(function(a) {
     var signoff = (state.sspSignoffs || {})[a.id] || {};
     if (signoff.status === 'Submitted') {
