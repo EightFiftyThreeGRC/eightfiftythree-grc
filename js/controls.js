@@ -1195,27 +1195,41 @@ function normalizeControlDesignState(ctrlId) {
   if (!Array.isArray(cs.evidence)) cs.evidence = [];
   cs.evidence = cs.evidence.map(function(ev) {
     var e = Object.assign({}, ev);
-    if (e.dataUrl && String(e.dataUrl).indexOf('data:image') === 0) {
-      e.kind = 'image';
-    }
-    if (e.kind === 'image') {
-      e.caption = e.caption != null ? String(e.caption) : (e.ref != null ? String(e.ref) : '');
-      if (e.mime !== 'image/png' && e.mime !== 'image/jpeg') {
-        e.mime = String(e.dataUrl || '').indexOf('image/png') !== -1 ? 'image/png' : 'image/jpeg';
-      }
-      delete e.type;
-      delete e.ref;
-    } else {
+    // Legacy in-browser screenshots → external reference pointers (no binary retention).
+    if (e.kind === 'image' || (e.dataUrl && String(e.dataUrl).indexOf('data:image') === 0)) {
       e.kind = 'ref';
-      e.type = e.type || 'Policy';
-      e.title = e.title != null ? String(e.title) : '';
-      e.description = e.description != null ? String(e.description) : '';
-      e.url = e.url != null ? String(e.url) : (e.ref != null ? String(e.ref) : '');
+      e.type = e.type || 'Screenshot';
+      e.title = String(e.title || e.caption || 'Screenshot').trim();
+      e.description = String(e.description || '').trim()
+        || 'Previously attached in-browser — link to where this screenshot is stored.';
+      e.url = String(e.url || e.ref || '').trim();
       e.ref = e.ref != null ? String(e.ref) : e.url;
       delete e.dataUrl;
       delete e.mime;
       delete e.caption;
+      return e;
     }
+    if (e.kind === 'sharepoint') {
+      e.title = e.title != null ? String(e.title) : '';
+      e.description = e.description != null ? String(e.description) : '';
+      e.url = e.url != null ? String(e.url) : (e.ref != null ? String(e.ref) : '');
+      e.ref = e.ref != null ? String(e.ref) : e.url;
+      e.spPath = e.spPath != null ? String(e.spPath) : '';
+      delete e.dataUrl;
+      delete e.mime;
+      delete e.caption;
+      return e;
+    }
+    e.kind = 'ref';
+    e.type = e.type || 'Policy';
+    e.title = e.title != null ? String(e.title) : '';
+    e.description = e.description != null ? String(e.description) : '';
+    e.programDocRef = e.programDocRef != null ? String(e.programDocRef) : '';
+    e.url = e.url != null ? String(e.url) : (e.ref != null ? String(e.ref) : '');
+    e.ref = e.ref != null ? String(e.ref) : e.url;
+    delete e.dataUrl;
+    delete e.mime;
+    delete e.caption;
     return e;
   });
 }
@@ -1638,7 +1652,62 @@ function toggleCtrlProcessLink(ctrlId, processId, checked) {
   if (state._selectedCtrl === ctrlId) renderControlStep2();
 }
 
-var __EVIDENCE_IMAGE_MAX_BYTES = 100 * 1024;
+function getProgramEvidenceDocumentOptions() {
+  var opts = [];
+  var isp = state.infoSecPolicy || {};
+  var ispTitle = String(isp.title || '').trim()
+    || (typeof getDefaultISPTitle === 'function' ? getDefaultISPTitle() : 'Information Security Policy');
+  opts.push({ id: 'isp', label: 'ISP — ' + ispTitle, title: ispTitle, type: 'Policy', hint: 'Program Setup → Information Security Policy' });
+  Object.keys(state.domainPolicies || {}).sort().forEach(function(fam) {
+    var dp = state.domainPolicies[fam];
+    if (!dp) return;
+    var title = String(dp.title || '').trim()
+      || (typeof getPolicyMergedTitle === 'function' ? getPolicyMergedTitle(fam) : fam);
+    opts.push({ id: 'policy:' + fam, label: fam + ' — ' + title, title: title, type: 'Policy', hint: 'Domain policy — ' + fam });
+  });
+  return opts;
+}
+
+function getProgramDocRefLabel(ref) {
+  if (!ref) return '';
+  var match = getProgramEvidenceDocumentOptions().find(function(o) { return o.id === ref; });
+  return match ? match.label : ref;
+}
+
+function buildEvidenceProgramDocPickerHtml(cid, idx, evRow) {
+  var opts = getProgramEvidenceDocumentOptions();
+  if (!opts.length) return '';
+  var current = (evRow && evRow.programDocRef) ? String(evRow.programDocRef) : '';
+  return '<select class="form-select" style="font-size:11px;margin-bottom:6px;" onchange="applyEvidenceProgramDocPick(\'' + cid + '\',' + idx + ',this.value)">'
+    + '<option value=""' + (!current ? ' selected' : '') + '>Custom — external storage location</option>'
+    + opts.map(function(o) {
+        return '<option value="' + escapeHTML(o.id) + '"' + (current === o.id ? ' selected' : '') + '>' + escapeHTML(o.label) + '</option>';
+      }).join('')
+    + '</select>';
+}
+
+function applyEvidenceProgramDocPick(ctrlId, idx, pickId) {
+  if (!state.controlStatus[ctrlId] || !state.controlStatus[ctrlId].evidence || !state.controlStatus[ctrlId].evidence[idx]) return;
+  var row = state.controlStatus[ctrlId].evidence[idx];
+  if (!pickId) {
+    var prevRef = row.programDocRef || '';
+    row.programDocRef = '';
+    logFieldChange('controlStatus.' + ctrlId + '.evidence[' + idx + '].programDocRef', prevRef, '');
+    markDirty();
+    setTimeout(function() { renderControlStep2(); }, 0);
+    return;
+  }
+  var match = getProgramEvidenceDocumentOptions().find(function(o) { return o.id === pickId; });
+  if (!match) return;
+  var prevRef = row.programDocRef || '';
+  row.programDocRef = pickId;
+  row.title = match.title;
+  row.type = match.type || 'Policy';
+  if (match.hint && !String(row.description || '').trim()) row.description = 'Authoritative program document (' + match.hint + ').';
+  logFieldChange('controlStatus.' + ctrlId + '.evidence[' + idx + '].programDocRef', prevRef, pickId);
+  markDirty();
+  setTimeout(function() { renderControlStep2(); }, 0);
+}
 
 function buildEvidenceArtifactSectionHTML(ctrl) {
   normalizeControlDesignState(ctrl.id);
@@ -1648,7 +1717,10 @@ function buildEvidenceArtifactSectionHTML(ctrl) {
   var g = FAMILY_EVIDENCE_GUIDANCE[ctrl.f];
   var hint = g && g.evidence ? '<div style="font-size:11px;color:var(--text-muted);margin-bottom:10px;line-height:1.5;"><strong>Examples for ' + escapeHTML(g.label || ctrl.f) + ':</strong> ' + escapeHTML(g.evidence.slice(0, 3).join(' · ')) + '</div>' : '';
   var rows = ev.map(function(evRow, idx) {
-    var kind = evRow.kind === 'image' ? 'image' : (evRow.kind === 'sharepoint' ? 'sharepoint' : 'ref');
+    var kind = evRow.kind === 'sharepoint' ? 'sharepoint' : 'ref';
+    var programBadge = evRow.programDocRef
+      ? '<span class="sp-evidence-badge" style="background:#ede9fe;color:#5b21b6;">Program document</span>'
+      : '';
     var refPart = kind === 'sharepoint'
       ? '<div style="margin-top:8px;">'
         + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">'
@@ -1661,35 +1733,30 @@ function buildEvidenceArtifactSectionHTML(ctrl) {
         + '<input class="form-input" style="font-size:12px;" placeholder="How this document proves the control" value="' + escapeHTML(evRow.description || '') + '" oninput="setEvidenceField(\'' + cid + '\',' + idx + ',\'description\',this.value)">'
         + (evRow.url && isSharePointUrl(evRow.url) ? '<a href="' + escapeHTML(evRow.url) + '" target="_blank" rel="noopener noreferrer" class="sp-evidence-link">Open in SharePoint ↗</a>' : '')
         + '</div>'
-      : kind === 'ref'
-      ? '<div style="display:grid;grid-template-columns:130px 1fr;gap:8px;margin-top:8px;">'
+      : '<div style="margin-top:8px;">'
+        + buildEvidenceProgramDocPickerHtml(cid, idx, evRow)
+        + (programBadge ? '<div style="margin-bottom:8px;">' + programBadge + ' <span style="font-size:11px;color:var(--text-muted);">' + escapeHTML(getProgramDocRefLabel(evRow.programDocRef)) + '</span></div>' : '')
+        + '<div style="display:grid;grid-template-columns:130px 1fr;gap:8px;">'
         + '<select class="form-select" style="font-size:11px;" onchange="setEvidenceField(\'' + cid + '\',' + idx + ',\'type\',this.value)">'
         + ['Policy', 'Procedure', 'Screenshot', 'Log excerpt', 'Report', 'Ticket', 'Other'].map(function(tp) {
           return '<option' + ((evRow.type || '') === tp ? ' selected' : '') + '>' + tp + '</option>';
         }).join('')
         + '</select>'
-        + buildEvidenceProgramDocPickerHtml(cid, idx)
-        + '<input class="form-input" style="font-size:12px;" placeholder="Evidence name (e.g., CP Procedure v2.1)" value="' + escapeHTML(evRow.title || '') + '" oninput="setEvidenceField(\'' + cid + '\',' + idx + ',\'title\',this.value)">'
+        + '<input class="form-input" style="font-size:12px;" placeholder="Reference label (e.g., ISP, AC-2 access review)" value="' + escapeHTML(evRow.title || '') + '" oninput="setEvidenceField(\'' + cid + '\',' + idx + ',\'title\',this.value)">'
         + '</div>'
         + '<div style="margin-top:8px;">'
-        + '<input class="form-input" style="font-size:12px;margin-bottom:8px;" placeholder="Description / context" value="' + escapeHTML(evRow.description || '') + '" oninput="setEvidenceField(\'' + cid + '\',' + idx + ',\'description\',this.value)">'
-        + '<input class="form-input" style="font-size:12px;" placeholder="URL, path, or reference ID" value="' + escapeHTML(evRow.url || evRow.ref || '') + '" oninput="setEvidenceField(\'' + cid + '\',' + idx + ',\'url\',this.value)">'
+        + '<input class="form-input" style="font-size:12px;margin-bottom:8px;" placeholder="Description / how this proves the control" value="' + escapeHTML(evRow.description || '') + '" oninput="setEvidenceField(\'' + cid + '\',' + idx + ',\'description\',this.value)">'
+        + '<input class="form-input" style="font-size:12px;" placeholder="Where evidence is stored — URL, SharePoint path, file share, or ticket link" value="' + escapeHTML(evRow.url || evRow.ref || '') + '" oninput="setEvidenceField(\'' + cid + '\',' + idx + ',\'url\',this.value)">'
+        + (evRow.url ? '<a href="' + escapeHTML(evRow.url) + '" target="_blank" rel="noopener noreferrer" class="sp-evidence-link" style="display:inline-block;margin-top:6px;font-size:11px;">Open location ↗</a>' : '')
         + '</div>'
-      : '<div style="margin-top:8px;">'
-        + '<input class="form-input" style="font-size:11px;margin-bottom:6px;" placeholder="Caption / context" value="' + escapeHTML(evRow.caption || '') + '" oninput="setEvidenceField(\'' + cid + '\',' + idx + ',\'caption\',this.value)">'
-        + '<input type="file" accept="image/png,image/jpeg" style="font-size:11px;margin-bottom:6px;" onchange="handleEvidenceImageUpload(\'' + cid + '\',' + idx + ',this)">'
-        + (evRow.dataUrl
-          ? '<div style="display:flex;align-items:center;gap:10px;"><img src="' + evRow.dataUrl + '" alt="" style="max-height:72px;border-radius:6px;border:1px solid var(--border);cursor:zoom-in;" onclick="openEvidenceImageViewerAt(\'' + cid + '\',' + idx + ')"><span style="font-size:10px;color:var(--text-muted);">Click preview for full size</span></div>'
-          : '<div style="font-size:10px;color:var(--text-muted);">No image yet — choose PNG/JPEG up to 100 KB.</div>')
         + '</div>';
     return '<div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px;background:#fafbff;">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;">'
       + '<div style="font-size:10px;font-weight:700;color:var(--navy);text-transform:uppercase;">Evidence row ' + (idx + 1) + '</div>'
       + '<div style="display:flex;gap:6px;align-items:center;">'
       + '<select class="form-select" style="font-size:11px;padding:3px 8px;" onchange="setEvidenceKind(\'' + cid + '\',' + idx + ',this.value)">'
-      + '<option value="ref"' + (kind === 'ref' ? ' selected' : '') + '>Document / reference</option>'
-      + (getSharePointConfig().enabled ? '<option value="sharepoint"' + (kind === 'sharepoint' ? ' selected' : '') + '>SharePoint link</option>' : '')
-      + '<option value="image"' + (kind === 'image' ? ' selected' : '') + '>Screenshot (PNG/JPEG)</option>'
+      + '<option value="ref"' + (kind === 'ref' ? ' selected' : '') + '>Reference pointer</option>'
+      + (getSharePointConfig().enabled ? '<option value="sharepoint"' + (kind === 'sharepoint' ? ' selected' : '') + '>SharePoint pointer</option>' : '')
       + '</select>'
       + '<button type="button" class="btn btn-sm" style="font-size:10px;padding:2px 8px;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;" onclick="openBulkEvidenceRowModal(\'' + cid + '\',' + idx + ')">Apply to controls…</button>'
       + '<button type="button" class="btn btn-sm" style="font-size:10px;padding:2px 8px;background:#fee2e2;color:#b91c1c;border:1px solid #fecaca;" onclick="removeCtrlEvidence(\'' + cid + '\',' + idx + ')">Remove</button>'
@@ -1699,17 +1766,20 @@ function buildEvidenceArtifactSectionHTML(ctrl) {
   }).join('');
   var spEnabled = typeof getSharePointConfig === 'function' && getSharePointConfig().enabled;
   var fwBadges = typeof renderFrameworkBadgesHtml === 'function' ? renderFrameworkBadgesHtml(ctrl.id, false) : '';
+  var sub = spEnabled
+    ? 'Record where evidence lives (SharePoint, file share, ticket system, or program policy). This tool stores pointers only — not files.'
+    : 'Record where evidence lives (URL, path, ticket link, or program policy). This tool stores pointers only — not files.';
   return '<div class="evidence-card">'
     + '<div class="evidence-card-head">'
     + '<div><div class="evidence-card-title">Evidence</div>'
-    + '<div class="evidence-card-sub">' + (spEnabled ? 'Link to SharePoint or attach small screenshots. Files live in your document library — we store pointers only.' : 'Attach references or small screenshots. Images stay in-browser only — max 100 KB each.') + '</div>'
+    + '<div class="evidence-card-sub">' + sub + '</div>'
     + (fwBadges ? '<div class="evidence-fw-badges" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;">' + fwBadges + '</div>' : '')
     + '</div></div>'
     + hint
-    + (rows || '<div class="evidence-empty">No evidence yet — add a link or screenshot below.</div>')
+    + (rows || '<div class="evidence-empty">No evidence pointers yet — add a reference to where artifacts are stored.</div>')
     + '<div class="evidence-actions">'
-    + '<button type="button" class="btn btn-secondary btn-sm" onclick="addCtrlEvidence(\'' + cid + '\')">Add reference</button>'
-    + (spEnabled ? '<button type="button" class="btn btn-primary btn-sm" onclick="addSharePointEvidence(\'' + cid + '\')">Link from SharePoint</button>' : '')
+    + '<button type="button" class="btn btn-secondary btn-sm" onclick="addCtrlEvidence(\'' + cid + '\')">Add evidence pointer</button>'
+    + (spEnabled ? '<button type="button" class="btn btn-primary btn-sm" onclick="addSharePointEvidence(\'' + cid + '\')">Add SharePoint pointer</button>' : '')
     + '</div>'
     + '</div>';
 }
@@ -1717,15 +1787,7 @@ function buildEvidenceArtifactSectionHTML(ctrl) {
 function setEvidenceKind(ctrlId, idx, kind) {
   if (!state.controlStatus[ctrlId] || !state.controlStatus[ctrlId].evidence || !state.controlStatus[ctrlId].evidence[idx]) return;
   var row = state.controlStatus[ctrlId].evidence[idx];
-  if (kind === 'image') {
-    row.kind = 'image';
-    row.mime = row.mime || 'image/png';
-    row.caption = row.caption != null ? row.caption : '';
-    row.dataUrl = row.dataUrl || '';
-    delete row.type;
-    delete row.ref;
-    delete row.spPath;
-  } else if (kind === 'sharepoint') {
+  if (kind === 'sharepoint') {
     row.kind = 'sharepoint';
     row.type = row.type || 'Document';
     row.title = row.title != null ? row.title : '';
@@ -1733,6 +1795,7 @@ function setEvidenceKind(ctrlId, idx, kind) {
     row.url = row.url != null ? row.url : '';
     row.ref = row.ref != null ? row.ref : row.url;
     row.spPath = row.spPath != null ? row.spPath : '';
+    delete row.programDocRef;
     delete row.dataUrl;
     delete row.mime;
     delete row.caption;
@@ -1741,60 +1804,16 @@ function setEvidenceKind(ctrlId, idx, kind) {
     row.type = row.type || 'Policy';
     row.title = row.title != null ? row.title : '';
     row.description = row.description != null ? row.description : '';
-    row.url = row.url != null ? row.url : (row.ref != null ? row.ref : (row.caption || ''));
+    row.programDocRef = row.programDocRef != null ? row.programDocRef : '';
+    row.url = row.url != null ? row.url : (row.ref != null ? row.ref : '');
     row.ref = row.ref != null ? row.ref : row.url;
+    delete row.spPath;
     delete row.dataUrl;
     delete row.mime;
     delete row.caption;
   }
   markDirty();
   renderControlStep2();
-}
-
-function handleEvidenceImageUpload(ctrlId, idx, input) {
-  var f = input.files && input.files[0];
-  if (!f) return;
-  if (f.type !== 'image/png' && f.type !== 'image/jpeg') {
-    showToast('Only PNG or JPEG images are allowed for evidence screenshots.', true);
-    input.value = '';
-    return;
-  }
-  if (f.size > __EVIDENCE_IMAGE_MAX_BYTES) {
-    showToast('Image too large — max ' + Math.round(__EVIDENCE_IMAGE_MAX_BYTES / 1024) + ' KB per screenshot.', true);
-    input.value = '';
-    return;
-  }
-  var reader = new FileReader();
-  reader.onload = function() {
-    if (!state.controlStatus[ctrlId] || !state.controlStatus[ctrlId].evidence || !state.controlStatus[ctrlId].evidence[idx]) return;
-    var url = reader.result;
-    var prev = state.controlStatus[ctrlId].evidence[idx].dataUrl;
-    state.controlStatus[ctrlId].evidence[idx].kind = 'image';
-    state.controlStatus[ctrlId].evidence[idx].dataUrl = url;
-    state.controlStatus[ctrlId].evidence[idx].mime = f.type;
-    logFieldChange('controlStatus.' + ctrlId + '.evidence[' + idx + '].image', prev ? '(replaced)' : '(none)', '(binary)');
-    markDirty();
-    renderControlStep2();
-    showToast('Image attached — use Save now to persist.');
-  };
-  reader.onerror = function() { showToast('Could not read image file.', true); };
-  reader.readAsDataURL(f);
-  input.value = '';
-}
-
-function openEvidenceImageViewerAt(ctrlId, idx) {
-  var row = ((state.controlStatus[ctrlId] || {}).evidence || [])[idx];
-  if (!row || !row.dataUrl) return;
-  var overlay = document.createElement('div');
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.82);z-index:10100;display:flex;align-items:center;justify-content:center;padding:20px;';
-  overlay.innerHTML = '<div style="position:relative;max-width:96vw;max-height:96vh;">'
-    + '<button type="button" id="evFullClose" style="position:absolute;top:-44px;right:0;background:white;border:none;padding:8px 14px;border-radius:8px;font-weight:700;cursor:pointer;">Close</button>'
-    + '<img alt="Evidence" style="max-width:92vw;max-height:88vh;border-radius:8px;box-shadow:0 12px 40px rgba(0,0,0,0.5);">'
-    + '</div>';
-  document.body.appendChild(overlay);
-  overlay.querySelector('img').src = row.dataUrl;
-  document.getElementById('evFullClose').onclick = function() { overlay.remove(); };
-  overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
 }
 
 // ── CONTROL DETAIL FORM (Step 2 right panel) ──────────────────────────────────
@@ -2121,7 +2140,7 @@ function setCtrlOwnerField(ctrlId, field, value) {
 function addCtrlEvidence(ctrlId) {
   if (!state.controlStatus[ctrlId]) state.controlStatus[ctrlId] = {};
   if (!state.controlStatus[ctrlId].evidence) state.controlStatus[ctrlId].evidence = [];
-  state.controlStatus[ctrlId].evidence.push({ kind: 'ref', type: 'Policy', title: '', description: '', url: '', ref: '' });
+  state.controlStatus[ctrlId].evidence.push({ kind: 'ref', type: 'Policy', title: '', description: '', url: '', ref: '', programDocRef: '' });
   markDirty();
   renderControlStep2();
 }
@@ -2150,42 +2169,6 @@ function getBulkEvidenceEligibleControls(sourceCtrlId) {
     if (cs.returnedToPolicyOwner || cs.recommendedDeselect) return false;
     return true;
   });
-}
-
-function getProgramEvidenceDocumentOptions() {
-  var opts = [];
-  var isp = state.infoSecPolicy || {};
-  var ispTitle = String(isp.title || '').trim()
-    || (typeof getDefaultISPTitle === 'function' ? getDefaultISPTitle() : 'Information Security Policy');
-  opts.push({ id: 'isp', label: 'ISP — ' + ispTitle, title: ispTitle, type: 'Policy' });
-  Object.keys(state.domainPolicies || {}).sort().forEach(function(fam) {
-    var dp = state.domainPolicies[fam];
-    if (!dp) return;
-    var title = String(dp.title || '').trim()
-      || (typeof getPolicyMergedTitle === 'function' ? getPolicyMergedTitle(fam) : fam);
-    opts.push({ id: 'policy:' + fam, label: fam + ' — ' + title, title: title, type: 'Policy' });
-  });
-  return opts;
-}
-
-function buildEvidenceProgramDocPickerHtml(cid, idx) {
-  var opts = getProgramEvidenceDocumentOptions();
-  if (!opts.length) return '';
-  return '<select class="form-select" style="font-size:11px;margin-bottom:6px;" onchange="applyEvidenceProgramDocPick(\'' + cid + '\',' + idx + ',this.value);this.value=\'\';">'
-    + '<option value="">Link to program document…</option>'
-    + opts.map(function(o) {
-        return '<option value="' + escapeHTML(o.id) + '">' + escapeHTML(o.label) + '</option>';
-      }).join('')
-    + '</select>';
-}
-
-function applyEvidenceProgramDocPick(ctrlId, idx, pickId) {
-  if (!pickId) return;
-  var match = getProgramEvidenceDocumentOptions().find(function(o) { return o.id === pickId; });
-  if (!match) return;
-  setEvidenceField(ctrlId, idx, 'title', match.title);
-  if (match.type) setEvidenceField(ctrlId, idx, 'type', match.type);
-  setTimeout(function() { renderControlStep2(); }, 0);
 }
 
 function getBulkEvidenceRowFilteredControls(st) {
@@ -2254,23 +2237,37 @@ function bulkEvidenceSelectMinus1() {
   renderBulkEvidenceRowModalBody();
 }
 
+function evidenceRowHasContent(row) {
+  if (!row) return false;
+  if (row.kind === 'sharepoint') {
+    return !!(String(row.title || '').trim() || String(row.spPath || '').trim() || String(row.url || row.ref || '').trim());
+  }
+  if (String(row.programDocRef || '').trim()) return true;
+  var title = String(row.title || '').trim();
+  var loc = String(row.url || row.ref || '').trim();
+  var desc = String(row.description || '').trim();
+  return !!(title && (loc || desc));
+}
+
 function buildEvidenceRowSignature(row) {
   if (!row) return '';
-  var kind = row.kind === 'image' ? 'image' : 'ref';
-  if (kind === 'image') {
-    return 'image|' + String(row.caption || '').trim() + '|' + String(row.dataUrl || '').trim();
+  if (row.kind === 'sharepoint') {
+    return 'sharepoint|' + String(row.title || '').trim() + '|' + String(row.spPath || '').trim() + '|' + String(row.url || row.ref || '').trim() + '|' + String(row.description || '').trim();
   }
-  return 'ref|' + String(row.type || '').trim() + '|' + String(row.title || '').trim() + '|' + String(row.url || row.ref || '').trim() + '|' + String(row.description || '').trim();
+  return 'ref|' + String(row.type || '').trim() + '|' + String(row.programDocRef || '').trim() + '|' + String(row.title || '').trim() + '|' + String(row.url || row.ref || '').trim() + '|' + String(row.description || '').trim();
 }
 
 function cloneEvidenceRowForCopy(row) {
   if (!row) return null;
-  if (row.kind === 'image') {
+  if (row.kind === 'sharepoint') {
     return {
-      kind: 'image',
-      caption: String(row.caption || ''),
-      dataUrl: String(row.dataUrl || ''),
-      mime: String(row.mime || (String(row.dataUrl || '').indexOf('image/jpeg') !== -1 ? 'image/jpeg' : 'image/png'))
+      kind: 'sharepoint',
+      type: String(row.type || 'Document'),
+      title: String(row.title || ''),
+      description: String(row.description || ''),
+      url: String(row.url || row.ref || ''),
+      ref: String(row.url || row.ref || ''),
+      spPath: String(row.spPath || '')
     };
   }
   return {
@@ -2278,6 +2275,7 @@ function cloneEvidenceRowForCopy(row) {
     type: String(row.type || 'Policy'),
     title: String(row.title || ''),
     description: String(row.description || ''),
+    programDocRef: String(row.programDocRef || ''),
     url: String(row.url || row.ref || ''),
     ref: String(row.url || row.ref || '')
   };
@@ -2293,8 +2291,8 @@ function openBulkEvidenceRowModal(sourceCtrlId, rowIdx) {
     return;
   }
   var sourceSignature = buildEvidenceRowSignature(sourceRow);
-  if (!sourceSignature) {
-    showToast('Complete the evidence row first before bulk apply.', true);
+  if (!evidenceRowHasContent(sourceRow)) {
+    showToast('Complete the evidence pointer first (program document, title, or storage location).', true);
     return;
   }
   var eligible = getBulkEvidenceEligibleControls(sourceCtrlId);
@@ -2387,7 +2385,7 @@ function renderBulkEvidenceRowModalBody() {
     + '    <button type="button" class="btn btn-secondary btn-sm" onclick="bulkEvidenceSelectFiltered(false)">Clear</button>'
     + '  </div>'
     + '</div>'
-    + '<div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;">Evidence is appended; duplicate rows (same type+reference or same image+caption) are skipped.</div>'
+    + '<div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;">Pointers are copied; duplicate rows (same document reference or location) are skipped.</div>'
     + '<div style="border:1px solid var(--border);border-radius:10px;max-height:360px;overflow:auto;">'
     + '  <table class="control-table" style="margin:0;">'
     + '    <thead><tr>'
@@ -2451,8 +2449,8 @@ function applyBulkEvidenceRowToSelected() {
     return;
   }
   var sourceSig = buildEvidenceRowSignature(copiedRow);
-  if (!sourceSig) {
-    showToast('Complete the source evidence row first.', true);
+  if (!evidenceRowHasContent(copiedRow)) {
+    showToast('Complete the source evidence pointer first.', true);
     return;
   }
   var selectedIds = getBulkEvidenceEligibleControls(st.sourceCtrlId)

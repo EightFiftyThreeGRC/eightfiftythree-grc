@@ -1822,24 +1822,16 @@ function buildPersistedPayload() {
   return payload;
 }
 
-function totalEvidenceImageDataUrlChars() {
-  var total = 0;
+function stripLegacyEvidenceImages() {
+  if (typeof normalizeControlDesignState !== 'function') return;
   Object.keys(state.controlStatus || {}).forEach(function(ctrlId) {
-    var ev = (state.controlStatus[ctrlId] || {}).evidence;
-    if (!Array.isArray(ev)) return;
-    ev.forEach(function(row) {
-      if (row && row.kind === 'image' && row.dataUrl) total += String(row.dataUrl).length;
-    });
+    normalizeControlDesignState(ctrlId);
   });
-  return total;
 }
 
 function saveToStorage() {
   try {
-    var imgChars = totalEvidenceImageDataUrlChars();
-    if (imgChars > 3 * 1024 * 1024) {
-      showToast('Warning: evidence images total ~' + (imgChars / 1024 / 1024).toFixed(1) + ' MB encoded — may hit browser storage limits.', true);
-    }
+    stripLegacyEvidenceImages();
     localStorage.setItem(STORAGE_KEY, JSON.stringify(buildPersistedPayload()));
     localStorage.setItem(STORAGE_KEY + '-ts', new Date().toISOString());
     _updateSaveIndicator(true);
