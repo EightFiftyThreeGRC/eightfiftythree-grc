@@ -1110,6 +1110,7 @@ function renderControlStep2() {
       body.innerHTML = `<div class="empty-state"><div class="es-icon">📋</div><div class="es-title">No Controls to Design</div><p>No controls are in your design queue yet.</p><button class="btn btn-secondary" onclick="goToStep('control',1)" style="margin-top:12px;">← Back to My Controls</button></div>`;
     }
     updateControlStep2SidebarSubnav([]);
+    updateControlStep2FooterNav();
     return;
   }
 
@@ -1687,6 +1688,48 @@ function setCtrlAssetTypeStatus(ctrlId, typeKey, value) {
   markDirty();
 }
 
+function controlStatusRequiresScope(status) {
+  return ['Implemented', 'Inherited', 'In Progress'].indexOf(String(status || '')) !== -1;
+}
+
+function getControlScopeEntries(ctrlId) {
+  var cs = state.controlStatus[ctrlId] || {};
+  var entries = [];
+  getCtrlCoveredAssetTypes(ctrlId).forEach(function(t) {
+    entries.push({
+      kind: 'Asset type',
+      label: t.label,
+      reqKey: t.label,
+      heading: 'Asset type: ' + t.label
+    });
+  });
+  (cs.linkedAssets || []).forEach(function(aid) {
+    var a = (state.assets || []).find(function(x) { return String(x.id) === String(aid) || String(x.name) === String(aid); });
+    var label = a ? String(a.name || a.id) : String(aid);
+    entries.push({
+      kind: 'Asset',
+      label: label,
+      reqKey: 'Asset: ' + label,
+      heading: 'Asset: ' + label
+    });
+  });
+  (cs.linkedProcesses || []).forEach(function(pid) {
+    var p = (state.processes || []).find(function(x) { return String(x.id) === String(pid) || String(x.name) === String(pid); });
+    var label = p ? String(p.name || p.id) : String(pid);
+    entries.push({
+      kind: 'Process',
+      label: label,
+      reqKey: 'Process: ' + label,
+      heading: 'Process: ' + label
+    });
+  });
+  return entries;
+}
+
+function controlHasAssetProcessScope(ctrlId) {
+  return getControlScopeEntries(ctrlId).length > 0;
+}
+
 function getCtrlCoveredAssetTypes(ctrlId) {
   var cs = state.controlStatus[ctrlId] || {};
   var coverage = cs.assetCoverage || {};
@@ -2114,6 +2157,10 @@ function renderControlDetailForm(ctrl) {
         <button type="button" class="btn btn-secondary btn-sm" style="font-size:10px;padding:2px 8px;" onclick="openBulkControlFieldModal('${cid}','implementationStatus')">Apply to controls…</button>
       </div>
       <div style="font-size:11px;color:var(--text-muted);margin-bottom:12px;">Set the overall status. If asset types are in scope, you can also track status per asset type to reflect partial rollout.</div>
+      ${controlStatusRequiresScope(st) && !controlHasAssetProcessScope(ctrl.id) ? `
+      <div style="background:#fff7ed;border:1px solid #fdba74;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:11px;color:#92400e;line-height:1.5;">
+        <strong>Assets/processes in scope required.</strong> Statuses Implemented, In Progress, and Inherited require you to identify scope in <strong>Asset &amp; Process Scope</strong> above (asset types and/or linked inventory).
+      </div>` : ''}
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:${coveredTypes.length>0?'14px':'0'};">
         <div>
@@ -2188,9 +2235,15 @@ function renderControlDetailForm(ctrl) {
 function setCtrlStatus(ctrlId, status) {
   if (!state.controlStatus[ctrlId]) state.controlStatus[ctrlId] = {};
   var oldStatus = state.controlStatus[ctrlId].status || 'Not Started';
+  if (controlStatusRequiresScope(status) && !controlHasAssetProcessScope(ctrlId)) {
+    showToast('Set assets/processes in scope in Step 2 (asset types or inventory links) before marking this control ' + status + '.', true);
+    setTimeout(function() { renderControlStep2(); }, 0);
+    return;
+  }
   state.controlStatus[ctrlId].status = status;
   logFieldChange('controlStatus.' + ctrlId + '.status', oldStatus, status);
   if (oldStatus !== status) addAuditEntry('control', ctrlId, 'Status changed: ' + oldStatus + ' → ' + status);
+  markDirty();
   renderControlStep2();
 }
 
@@ -3061,7 +3114,9 @@ function renderControlStep3() {
       (r.requirement && r.requirement.trim()) || (r.evidenceNeeded && r.evidenceNeeded.trim())
     );
   }).length;
-  const uniqueTypes = [...new Set(designedControls.flatMap(c => getCtrlCoveredAssetTypes(c.id).map(t => t.label)))].length;
+  const uniqueTypes = [...new Set(designedControls.flatMap(function(c) {
+    return getControlScopeEntries(c.id).map(function(e) { return e.heading; });
+  }))].length;
 
   body.innerHTML = `
     <div class="section-title">Asset-Type Requirements &amp; Required Evidence</div>
@@ -3099,69 +3154,56 @@ function renderControlStep3() {
       ${shown.map(c => {
         normalizeControlDesignState(c.id);
         const cs       = state.controlStatus[c.id] || {};
-        const covTypes = getCtrlCoveredAssetTypes(c.id);
+        const scopeEntries = getControlScopeEntries(c.id);
+        const hasScope = scopeEntries.length > 0;
+        const ctrlStatus = cs.status || 'Not Started';
         const pReqs    = getControlPolicyReqs(c.id);
         const existing = cs.assetOwnerRequirements || [];
         const cid      = c.id.replace(/'/g,"\\'");
 
-        const typeBlocks = covTypes.length > 0 ? covTypes.map(t => {
-          const req   = existing.find(r => r.assetType === t.label) || { assetType: t.label, requirement: '', evidenceNeeded: '', acceptanceCriteria: '' };
-          const tlabel = escapeHTML(t.label).replace(/'/g,"\\'");
+        const typeBlocks = !hasScope ? `
+        <div style="background:#fff7ed;border:1px solid #fdba74;border-radius:8px;padding:12px 14px;font-size:12px;color:#92400e;line-height:1.55;">
+          <strong>No assets or processes in scope.</strong> Link inventory items or check asset types in Step 2 before defining requirements here.
+          <button type="button" class="btn btn-secondary btn-sm" style="font-size:10px;margin-left:8px;vertical-align:middle;" onclick="goToControlDetail('${cid}')">Open in Step 2 →</button>
+          ${controlStatusRequiresScope(ctrlStatus) ? '<div style="margin-top:8px;">This control is <strong>' + escapeHTML(ctrlStatus) + '</strong> — scope must be set in Step 2 first.</div>' : ''}
+        </div>` : scopeEntries.map(function(entry) {
+          const reqKey = entry.reqKey.replace(/'/g, "\\'");
+          const req   = existing.find(function(r) { return r.assetType === entry.reqKey; }) || { assetType: entry.reqKey, requirement: '', evidenceNeeded: '', acceptanceCriteria: '', procedureRefs: '' };
           return `<div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:10px;">
-            <div style="background:#f8fafc;padding:8px 12px;border-bottom:1px solid var(--border);font-size:11px;font-weight:700;color:var(--navy);">📦 ${escapeHTML(t.label)}</div>
+            <div style="background:#f8fafc;padding:8px 12px;border-bottom:1px solid var(--border);font-size:12px;font-weight:700;color:var(--navy);">${escapeHTML(entry.heading)}</div>
             <div style="padding:10px 12px;display:grid;grid-template-columns:1fr 1fr;gap:10px;">
               <div>
                 <label class="form-label" style="font-size:10px;">Required implementation actions <span class="required">*</span></label>
-                <textarea class="form-input" rows="3" style="font-size:11px;line-height:1.6;resize:vertical;" placeholder="e.g. Review all service accounts quarterly, revoke stale accounts, and document manager approval before reactivation." oninput="setAssetOwnerReq('${cid}','${tlabel}','requirement',this.value)">${escapeHTML(req.requirement||'')}</textarea>
+                <textarea class="form-input" rows="3" style="font-size:11px;line-height:1.6;resize:vertical;" placeholder="e.g. Review all service accounts quarterly, revoke stale accounts, and document manager approval before reactivation." oninput="setAssetOwnerReq('${cid}','${reqKey}','requirement',this.value)">${escapeHTML(req.requirement||'')}</textarea>
               </div>
               <div>
                 <label class="form-label" style="font-size:10px;">Required evidence artifacts</label>
-                <textarea class="form-input" rows="3" style="font-size:11px;line-height:1.6;resize:vertical;" placeholder="e.g. Signed review report, identity export with timestamps, workflow ticket showing approver and closure." oninput="setAssetOwnerReq('${cid}','${tlabel}','evidenceNeeded',this.value)">${escapeHTML(req.evidenceNeeded||'')}</textarea>
+                <textarea class="form-input" rows="3" style="font-size:11px;line-height:1.6;resize:vertical;" placeholder="e.g. Signed review report, identity export with timestamps, workflow ticket showing approver and closure." oninput="setAssetOwnerReq('${cid}','${reqKey}','evidenceNeeded',this.value)">${escapeHTML(req.evidenceNeeded||'')}</textarea>
               </div>
               <div style="grid-column:1 / -1;">
                 <label class="form-label" style="font-size:10px;">Evidence acceptance criteria</label>
-                <textarea class="form-input" rows="2" style="font-size:11px;line-height:1.6;resize:vertical;" placeholder="e.g. Must be from current quarter, include asset owner + approver names, and show closure of all exceptions." oninput="setAssetOwnerReq('${cid}','${tlabel}','acceptanceCriteria',this.value)">${escapeHTML(req.acceptanceCriteria||'')}</textarea>
+                <textarea class="form-input" rows="2" style="font-size:11px;line-height:1.6;resize:vertical;" placeholder="e.g. Must be from current quarter, include asset owner + approver names, and show closure of all exceptions." oninput="setAssetOwnerReq('${cid}','${reqKey}','acceptanceCriteria',this.value)">${escapeHTML(req.acceptanceCriteria||'')}</textarea>
               </div>
               <div style="grid-column:1 / -1;">
                 <label class="form-label" style="font-size:10px;">Procedure / standard references</label>
-                <textarea class="form-input" rows="2" style="font-size:11px;line-height:1.6;resize:vertical;" placeholder="e.g. CP Policy v2.1 §4.3, BCP SOP-07, DR Test Runbook 2026-Q2" oninput="setAssetOwnerReq('${cid}','${tlabel}','procedureRefs',this.value)">${escapeHTML(req.procedureRefs||'')}</textarea>
+                <textarea class="form-input" rows="2" style="font-size:11px;line-height:1.6;resize:vertical;" placeholder="e.g. CP Policy v2.1 §4.3, BCP SOP-07, DR Test Runbook 2026-Q2" oninput="setAssetOwnerReq('${cid}','${reqKey}','procedureRefs',this.value)">${escapeHTML(req.procedureRefs||'')}</textarea>
               </div>
             </div>
           </div>`;
-        }).join('') : `
-        <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;">
-          <div style="background:#f8fafc;padding:8px 12px;border-bottom:1px solid var(--border);font-size:11px;font-weight:700;color:var(--navy);">General Compliance Requirements <span style="font-size:10px;font-weight:400;color:#d97706;">(no asset types identified — go to Step 2 to set asset coverage)</span></div>
-          <div style="padding:10px 12px;display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-            <div>
-              <label class="form-label" style="font-size:10px;">Required implementation actions</label>
-              <textarea class="form-input" rows="3" style="font-size:11px;line-height:1.6;resize:vertical;" placeholder="Describe compliance requirements for all asset owners…" oninput="setAssetOwnerReq('${cid}','General','requirement',this.value)">${escapeHTML((existing.find(r=>r.assetType==='General')||{}).requirement||'')}</textarea>
-            </div>
-            <div>
-              <label class="form-label" style="font-size:10px;">Required evidence artifacts</label>
-              <textarea class="form-input" rows="3" style="font-size:11px;line-height:1.6;resize:vertical;" placeholder="What evidence or documentation is needed to prove compliance…" oninput="setAssetOwnerReq('${cid}','General','evidenceNeeded',this.value)">${escapeHTML((existing.find(r=>r.assetType==='General')||{}).evidenceNeeded||'')}</textarea>
-            </div>
-            <div style="grid-column:1 / -1;">
-              <label class="form-label" style="font-size:10px;">Evidence acceptance criteria</label>
-              <textarea class="form-input" rows="2" style="font-size:11px;line-height:1.6;resize:vertical;" placeholder="Define what makes evidence acceptable for review." oninput="setAssetOwnerReq('${cid}','General','acceptanceCriteria',this.value)">${escapeHTML((existing.find(r=>r.assetType==='General')||{}).acceptanceCriteria||'')}</textarea>
-            </div>
-            <div style="grid-column:1 / -1;">
-              <label class="form-label" style="font-size:10px;">Procedure / standard references</label>
-              <textarea class="form-input" rows="2" style="font-size:11px;line-height:1.6;resize:vertical;" placeholder="e.g. Program SOP-12, control procedure wiki page, approved standard ID" oninput="setAssetOwnerReq('${cid}','General','procedureRefs',this.value)">${escapeHTML((existing.find(r=>r.assetType==='General')||{}).procedureRefs||'')}</textarea>
-            </div>
-          </div>
-        </div>`;
+        }).join('');
 
         return `<div style="background:white;border:1px solid var(--border);border-radius:10px;margin-bottom:18px;overflow:hidden;">
           <div style="background:#fafbfc;padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;">
-            <span class="control-id">${c.id}</span>
             <div style="flex:1;">
-              <div style="font-size:13px;font-weight:600;color:var(--navy);">${escapeHTML(c.n)}</div>
-              ${covTypes.length > 0
-                ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">${covTypes.map(t=>escapeHTML(t.label)).join(' · ')}</div>`
-                : `<div style="font-size:11px;color:#d97706;margin-top:2px;">⚠ No asset types identified — set coverage in Step 2</div>`}
+              ${hasScope
+                ? scopeEntries.map(function(e) {
+                    return '<div style="font-size:13px;font-weight:700;color:var(--navy);line-height:1.35;">' + escapeHTML(e.heading) + '</div>';
+                  }).join('')
+                : '<div style="font-size:12px;font-weight:700;color:#d97706;">⚠ No assets or processes in scope</div>'}
+              <div style="font-size:12px;color:var(--text-muted);margin-top:4px;"><span class="control-id" style="font-size:11px;">${c.id}</span> · ${escapeHTML(c.n)}</div>
             </div>
-            <button type="button" class="btn btn-secondary btn-sm" style="font-size:10px;padding:2px 8px;" onclick="openBulkAssetOwnerReqModal('${cid}')">Apply to controls…</button>
-            ${chipHTML(cs.status||'Not Started')}
+            ${hasScope ? '<button type="button" class="btn btn-secondary btn-sm" style="font-size:10px;padding:2px 8px;" onclick="openBulkAssetOwnerReqModal(\'' + cid + '\')">Apply to controls…</button>' : ''}
+            ${chipHTML(ctrlStatus)}
           </div>
           <div style="padding:16px 18px;">
             ${pReqs.length > 0 ? `<div style="background:#faf5ff;border:1px solid rgba(99,102,241,0.2);border-radius:6px;padding:8px 12px;margin-bottom:12px;font-size:11px;color:#6366f1;"><strong>Policy reqs:</strong> ${pReqs.map(r=>escapeHTML(r.reqId)).join(', ')} — ${escapeHTML(pReqs[0].policyTitle)}</div>` : ''}
