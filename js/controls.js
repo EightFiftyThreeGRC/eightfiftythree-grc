@@ -586,28 +586,10 @@ function renderControlStep1() {
     </div>` : ''}
 
     ${(function() {
-      const outsideQueue = [];
-      if (state.policySelectedControls) {
-        Object.keys(state.policySelectedControls).forEach(fam => {
-          const sel = state.policySelectedControls[fam];
-          const famControls = CONTROLS.filter(c => c.f === fam && (c.bl.includes(state.baseline) || (state.privacyOverlay && c.bl.includes('P'))));
-          famControls.forEach(c => {
-            if (sel.includes(c.id)) return;
-            const owner = (state.controlOwners || {})[c.id] || {};
-            const domainOwner = (state.domainOwners || {})[fam] || {};
-            let reason = 'Not selected in ' + fam + ' policy control set';
-            if (owner.name && domainOwner.name && owner.name.trim().toLowerCase() === domainOwner.name.trim().toLowerCase()) {
-              reason = 'Retained by domain policy owner';
-            } else if (owner.name) {
-              reason = 'Owned outside your queue — ' + owner.name;
-            }
-            outsideQueue.push({ ...c, deselFam: fam, queueReason: reason });
-          });
-        });
-      }
+      const outsideQueue = typeof getControlsOutsideSessionQueue === 'function' ? getControlsOutsideSessionQueue() : [];
       if (!outsideQueue.length) return '';
-      return `<details style="margin-top:16px;"><summary style="cursor:pointer;font-size:12px;font-weight:700;color:var(--text-muted);padding:8px 0;user-select:none;">▶ ${outsideQueue.length} controls outside your control-owner queue</summary>
-        <div style="font-size:11px;color:var(--text-muted);margin:4px 0 8px 0;">These controls are managed at the domain-policy level or routed to another owner; they are not removed from the overall program unless the domain policy owner formally de-selects them.</div>
+      return `<details style="margin-top:16px;"><summary style="cursor:pointer;font-size:12px;font-weight:700;color:var(--text-muted);padding:8px 0;user-select:none;">▶ ${outsideQueue.length} control${outsideQueue.length === 1 ? '' : 's'} assigned to you but not yet in your design queue</summary>
+        <div style="font-size:11px;color:var(--text-muted);margin:4px 0 8px 0;">These are still yours to implement once the policy gate clears, or they live in a different design group (e.g. XX-1 controls under ISP). They are not removed from the program unless a policy owner formally de-selects them.</div>
         <div class="table-scroll" style="margin-top:8px;">
           <table class="control-table"><thead><tr><th style="width:80px;">Control</th><th>Name</th><th style="width:70px;">Family</th><th style="width:220px;">Reason</th></tr></thead>
           <tbody>${outsideQueue.map(c => `<tr style="opacity:0.62;"><td><span class="control-id" style="opacity:0.8;">${c.id}</span></td><td style="font-size:13px;color:var(--text-muted);">${c.n}</td><td><span class="family-badge" style="opacity:0.65;">${c.f}</span></td><td style="font-size:11px;color:#334155;font-weight:600;">${escapeHTML(c.queueReason)}</td></tr>`).join('')}</tbody>
@@ -615,6 +597,38 @@ function renderControlStep1() {
     })()}`;
 
   setTimeout(function() { filterControlList(); }, 0);
+}
+
+function getControlOutsideQueueReason(ctrl) {
+  if (!ctrl || !ctrl.id) return 'Outside your design queue';
+  if (typeof isControlIspTier === 'function' && isControlIspTier(ctrl)) {
+    if (!isControlFamilyPolicyReady('ISP')) return 'Waiting on ISP approval in Program Setup';
+    return 'ISP-tier control — design under Step 2 · ISP group';
+  }
+  var fam = typeof getPolicyFamilyKeyForControl === 'function' ? getPolicyFamilyKeyForControl(ctrl) : ctrl.f;
+  if (!isControlFamilyPolicyReady(fam)) {
+    var famLabel = typeof getDesignGroupLabel === 'function' ? getDesignGroupLabel(fam) : fam;
+    return 'Waiting on ' + famLabel + ' policy';
+  }
+  if (typeof isControlSelectedInDomainPolicy === 'function' && !isControlSelectedInDomainPolicy(ctrl.id, fam)) {
+    return 'Not selected in ' + fam + ' domain policy control set';
+  }
+  return 'Assigned to you — waiting to enter design queue';
+}
+
+function getControlsOutsideSessionQueue() {
+  if (!state.currentUserId) return [];
+  var inQueueIds = {};
+  getMyDesignQueueControls().forEach(function(c) { inQueueIds[c.id] = true; });
+  var assigned = typeof getControlsAssignedToSessionUser === 'function' ? getControlsAssignedToSessionUser() : [];
+  return assigned.filter(function(c) {
+    if (inQueueIds[c.id]) return false;
+    var cs = state.controlStatus[c.id] || {};
+    if (cs.returnedToPolicyOwner || cs.recommendedDeselect) return false;
+    return true;
+  }).map(function(c) {
+    return Object.assign({}, c, { queueReason: getControlOutsideQueueReason(c) });
+  });
 }
 
 function getControlOwnerFilterKey(co) {
