@@ -1312,8 +1312,9 @@ function getDesignChecklist(ctrl) {
   var designSource = cs.designSource || 'inline';
   var nistParts = parseControlParts(ctrl.id);
   var coveredTypes = getCtrlCoveredAssetTypes(ctrl.id);
-  var linkedCount = (cs.linkedAssets || []).length + (cs.linkedProcesses || []).length;
-  var coverageReady = coveredTypes.length > 0 || linkedCount > 0;
+  var coverageReady = typeof controlHasAssetProcessScope === 'function'
+    ? controlHasAssetProcessScope(ctrl.id)
+    : (coveredTypes.length > 0 || linkedCount > 0);
   var policyReqs = getControlPolicyReqs(ctrl.id);
   var sourceReady = true;
   var sourceDetail = '';
