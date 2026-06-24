@@ -1732,6 +1732,13 @@ function buildEvidenceArtifactSectionHTML(ctrl) {
   var hint = g && g.evidence ? '<div style="font-size:11px;color:var(--text-muted);margin-bottom:10px;line-height:1.5;"><strong>Examples for ' + escapeHTML(g.label || ctrl.f) + ':</strong> ' + escapeHTML(g.evidence.slice(0, 3).join(' · ')) + '</div>' : '';
   var rows = ev.map(function(evRow, idx) {
     var kind = evRow.kind === 'sharepoint' ? 'sharepoint' : 'ref';
+    var spEnabled = typeof getSharePointConfig === 'function' && getSharePointConfig().enabled;
+    var kindSelector = spEnabled
+      ? '<select class="form-select" style="font-size:11px;padding:3px 8px;" onchange="setEvidenceKind(\'' + cid + '\',' + idx + ',this.value)">'
+        + '<option value="ref"' + (kind === 'ref' ? ' selected' : '') + '>Reference pointer</option>'
+        + '<option value="sharepoint"' + (kind === 'sharepoint' ? ' selected' : '') + '>SharePoint pointer</option>'
+        + '</select>'
+      : '';
     var programBadge = evRow.programDocRef
       ? '<span class="sp-evidence-badge" style="background:#ede9fe;color:#5b21b6;">Program document</span>'
       : '';
@@ -1768,10 +1775,7 @@ function buildEvidenceArtifactSectionHTML(ctrl) {
       + '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;">'
       + '<div style="font-size:10px;font-weight:700;color:var(--navy);text-transform:uppercase;">Evidence row ' + (idx + 1) + '</div>'
       + '<div style="display:flex;gap:6px;align-items:center;">'
-      + '<select class="form-select" style="font-size:11px;padding:3px 8px;" onchange="setEvidenceKind(\'' + cid + '\',' + idx + ',this.value)">'
-      + '<option value="ref"' + (kind === 'ref' ? ' selected' : '') + '>Reference pointer</option>'
-      + (getSharePointConfig().enabled ? '<option value="sharepoint"' + (kind === 'sharepoint' ? ' selected' : '') + '>SharePoint pointer</option>' : '')
-      + '</select>'
+      + kindSelector
       + '<button type="button" class="btn btn-sm" style="font-size:10px;padding:2px 8px;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;" onclick="openBulkEvidenceRowModal(\'' + cid + '\',' + idx + ')">Apply to controls…</button>'
       + '<button type="button" class="btn btn-sm" style="font-size:10px;padding:2px 8px;background:#fee2e2;color:#b91c1c;border:1px solid #fecaca;" onclick="removeCtrlEvidence(\'' + cid + '\',' + idx + ')">Remove</button>'
       + '</div></div>'
