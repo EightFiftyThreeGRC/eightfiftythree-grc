@@ -103,10 +103,11 @@ function getPersonIdentityKey(user) {
 function renderProfileButtonContent(user) {
   // Multi-user (cloud) mode: the button is the signed-in account, not a role picker.
   if (typeof isCloudLocked === 'function' && isCloudLocked()) {
-    var cn = (typeof getCloudSessionName === 'function') ? getCloudSessionName() : '';
-    var ce = (typeof getCloudSessionEmail === 'function') ? getCloudSessionEmail() : '';
+    var display = typeof getCloudSessionDisplayName === 'function'
+      ? getCloudSessionDisplayName()
+      : ((typeof getCloudSessionName === 'function' ? getCloudSessionName() : '') || (typeof getCloudSessionEmail === 'function' ? getCloudSessionEmail() : '') || 'Signed in');
     return ''
-      + '<span class="profile-btn-line"><span>👤</span><span>' + _esc(cn || ce || 'Signed in') + '</span></span>'
+      + '<span class="profile-btn-line"><span>👤</span><span>' + _esc(display) + '</span></span>'
       + '<span class="profile-btn-sub">Signed in · Sign out</span>';
   }
   var displayName = user ? (userNeedsProfileSetup(user) ? (user.email || user.name) : getOwnerDisplayName(user)) : 'Admin mode';

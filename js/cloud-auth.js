@@ -267,6 +267,40 @@ function getCloudSessionName() {
   } catch (e) { return 'User'; }
 }
 
+/** Rostered program identity for the signed-in cloud user (if matched). */
+function getMatchedCloudProgramUser() {
+  if (state.currentUserId && state.users) {
+    var cur = state.users.find(function(x) { return x.id === state.currentUserId; });
+    if (cur && !cur.isDemoPlaceholder) return cur;
+  }
+  if (typeof findProgramUserForEntraIdentity === 'function') {
+    return findProgramUserForEntraIdentity(getCloudSessionEmail(), getCloudSessionName());
+  }
+  return null;
+}
+
+/** Human-friendly name for UI — prefer rostered name (e.g. John Miller) over login id (nistcsftool). */
+function getCloudSessionDisplayName() {
+  var matched = getMatchedCloudProgramUser();
+  if (matched) {
+    var dn = typeof getOwnerDisplayName === 'function' ? getOwnerDisplayName(matched) : (matched.name || '').trim();
+    if (dn && dn !== '—') return dn;
+  }
+  var sessionEmail = typeof getSessionEmailForApproval === 'function' ? getSessionEmailForApproval() : '';
+  var approverEmail = typeof getISPDesignatedApproverEmail === 'function' ? getISPDesignatedApproverEmail() : '';
+  if (sessionEmail && approverEmail && sessionEmail === approverEmail) {
+    var approverName = typeof getISPDesignatedApproverName === 'function' ? getISPDesignatedApproverName() : '';
+    if (approverName) return approverName;
+  }
+  if (typeof isSessionProgramOwnerActor === 'function' && isSessionProgramOwnerActor()) {
+    var po = typeof resolveProgramOwnerActorName === 'function' ? resolveProgramOwnerActorName() : '';
+    if (po) return po;
+  }
+  var cn = getCloudSessionName();
+  if (cn && cn !== 'User') return cn;
+  return getCloudSessionEmail() || 'Signed in';
+}
+
 // ── ISP approver authorization (separation of duties) ─────────────────────────
 function getISPDesignatedApproverEmail() {
   var ps = (state.policyStatus || {}).ISP || {};
@@ -763,7 +797,7 @@ function showCloudAccountMenu() {
   var profiles = document.getElementById('rolePickerProfiles');
   if (profiles) {
     profiles.innerHTML = '<div class="cloud-account-card">'
-      + '<div class="cloud-account-name">' + escapeHTML(getCloudSessionName()) + '</div>'
+      + '<div class="cloud-account-name">' + escapeHTML(getCloudSessionDisplayName()) + '</div>'
       + '<div class="cloud-account-email">' + escapeHTML(getCloudSessionEmail()) + '</div>'
       + (roleLabel ? '<div class="cloud-account-role">' + escapeHTML(roleLabel) + '</div>' : '')
       + '<button type="button" class="btn btn-secondary btn-sm" style="margin-top:14px;" onclick="signOutCloud()">Sign out</button>'
@@ -861,7 +895,7 @@ function mapCloudIdentityToRoleView() {
     if (btn) {
       var u = state.currentUserId ? (state.users || []).find(function(x) { return x.id === state.currentUserId; }) : null;
       if (typeof renderProfileButtonContent === 'function') btn.innerHTML = renderProfileButtonContent(u);
-      btn.title = 'Signed in as ' + (getCloudSessionName() || getCloudSessionEmail()) + ' — click to sign out';
+      btn.title = 'Signed in as ' + (getCloudSessionDisplayName() || getCloudSessionEmail()) + ' — click to sign out';
       btn.setAttribute('aria-label', btn.title);
     }
   } catch (e) { /* ignore */ }
@@ -1130,7 +1164,8 @@ if (typeof window !== 'undefined') {
   window.sendISPApprovalRequestEmail = sendISPApprovalRequestEmail;
   window.formatApproverEmailFailure = formatApproverEmailFailure;
   window.getCloudAppUrl = getCloudAppUrl;
-  window.getISPDesignatedApproverEmail = getISPDesignatedApproverEmail;
+  window.getCloudSessionDisplayName = getCloudSessionDisplayName;
+  window.getMatchedCloudProgramUser = getMatchedCloudProgramUser;
   window.getISPDesignatedApproverName = getISPDesignatedApproverName;
   window.canSessionApproveISP = canSessionApproveISP;
   window.canSessionReviseReturnedISP = canSessionReviseReturnedISP;
