@@ -1614,6 +1614,13 @@ function hasRealControlOwner(co) {
   return isValidOwnerEmail(co.email);
 }
 
+/** True when a control owner can be invited to sign up (name + valid work email). */
+function isControlOwnerInviteReady(co) {
+  if (!co || co.isDemoPlaceholder) return false;
+  if (!(co.name || '').trim()) return false;
+  return isValidOwnerEmail(co.email);
+}
+
 /** NIST XX-1 policy-and-procedures controls — covered by the Tier 1 ISP, not domain policy pickers. */
 function isPolicyAndProceduresControl(ctrlId) {
   return /^[A-Z]{2}-1$/.test(String(ctrlId || '').trim());

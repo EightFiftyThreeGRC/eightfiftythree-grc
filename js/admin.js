@@ -665,17 +665,17 @@ function syncUsersFromState() {
     upsertUser({ name: d.name, email: d.email, role: 'custodian', families: d.families });
   });
 
-  // 4. Control Owners → control-owner (aggregate by name)
-  var ctrlByName = {};
+  // 4. Control Owners → control-owner (aggregate by work email for sign-up)
+  var ctrlByEmail = {};
   Object.keys(state.controlOwners || {}).forEach(function(ctrlId) {
     var o = state.controlOwners[ctrlId];
-    if (!o || !o.name) return;
-    var key = o.name.trim().toLowerCase();
-    if (!ctrlByName[key]) ctrlByName[key] = { name: o.name.trim(), email: o.email || '', controls: [] };
-    if (!ctrlByName[key].controls.includes(ctrlId)) ctrlByName[key].controls.push(ctrlId);
+    if (!o || !(o.name || '').trim() || !isValidOwnerEmail(o.email)) return;
+    var key = normalizeOwnerEmail(o.email);
+    if (!ctrlByEmail[key]) ctrlByEmail[key] = { name: o.name.trim(), email: o.email.trim(), controls: [] };
+    if (!ctrlByEmail[key].controls.includes(ctrlId)) ctrlByEmail[key].controls.push(ctrlId);
   });
-  Object.keys(ctrlByName).forEach(function(k) {
-    var d = ctrlByName[k];
+  Object.keys(ctrlByEmail).forEach(function(k) {
+    var d = ctrlByEmail[k];
     upsertUser({ name: d.name, email: d.email, role: 'control-owner', controls: d.controls });
   });
 
