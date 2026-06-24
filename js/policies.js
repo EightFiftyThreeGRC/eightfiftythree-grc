@@ -141,6 +141,55 @@ function canDraftDomainPoliciesFromList() {
   return false;
 }
 
+function canUserReviseReturnedDomainPolicy(fam) {
+  return typeof canSessionReviseReturnedDomainPolicy === 'function'
+    && canSessionReviseReturnedDomainPolicy(fam);
+}
+
+/** Resume editing a returned draft — mark as in-progress draft while keeping return metadata. */
+function beginReturnedDomainPolicyRevision(fam) {
+  if (!state.policyStatus) state.policyStatus = {};
+  if (!state.policyStatus[fam]) state.policyStatus[fam] = {};
+  var ps = state.policyStatus[fam];
+  if (ps.status === 'Returned') {
+    ps.status = 'Draft';
+    ps._wasReturnedRevision = true;
+    markDirty();
+  }
+}
+
+function getDomainPolicyPrimaryAction(fam, status) {
+  var esc = fam.replace(/'/g, "\\'");
+  if (status === 'Returned') {
+    if (typeof returnedDomainPolicyNeedsOwnerAssignment === 'function'
+        && returnedDomainPolicyNeedsOwnerAssignment(fam)
+        && typeof isSessionProgramOwnerActor === 'function'
+        && isSessionProgramOwnerActor()) {
+      return { label: 'Assign owner \u2192', handler: "openAssignDomainPolicyOwnerModal('" + esc + "')" };
+    }
+    if (canUserReviseReturnedDomainPolicy(fam)) {
+      return { label: 'Revise & resubmit \u2192', handler: "openReturnedDomainPolicyRevision('" + esc + "')" };
+    }
+    return { label: 'View returned draft \u2192', handler: "openPolicyDoc('" + esc + "')" };
+  }
+  if (status === 'Not Started') {
+    return {
+      label: canDraftDomainPoliciesFromList() ? 'Start Drafting \u2192' : 'Not Yet Drafted',
+      handler: canDraftDomainPoliciesFromList() ? "enterPolicyWizard('" + esc + "')" : '',
+      disabled: !canDraftDomainPoliciesFromList()
+    };
+  }
+  if (status === 'Approved') {
+    return { label: 'View Policy \u2192', handler: "openPolicyDoc('" + esc + "')" };
+  }
+  if (status === 'Draft' && ((state.policyStatus || {})[fam] || {})._wasReturnedRevision
+      && typeof isSessionDomainPolicyOwnerActor === 'function'
+      && isSessionDomainPolicyOwnerActor(fam)) {
+    return { label: 'Continue editing \u2192', handler: "openReturnedDomainPolicyRevision('" + esc + "')" };
+  }
+  return { label: 'View Draft \u2192', handler: "openPolicyDoc('" + esc + "')" };
+}
+
 function renderPolicyTab() {
   var policyNav = document.getElementById('nav-policy');
   if (policyNav) policyNav.classList.toggle('active', !state._policyLibraryMode);
@@ -437,6 +486,22 @@ function renderISSMWorkspace(user) {
       if (o.name && user.name && o.name.toLowerCase() === user.name.toLowerCase()) assignedFams.push(mf);
     });
   }
+  // 3) Program owner also owns domain policies — include domains rostered to them
+  var personRoles = [];
+  (state._currentPersonIds || [user.id]).forEach(function(pid) {
+    var rec = (state.users || []).find(function(u) { return u.id === pid; });
+    if (rec && personRoles.indexOf(rec.role) === -1) personRoles.push(rec.role);
+  });
+  if (state.cisoIsISSM && (user.role === 'ciso' || personRoles.indexOf('ciso') !== -1)) {
+    masterFams.forEach(function(mf) {
+      if (assignedFams.indexOf(mf) >= 0) return;
+      var eff = typeof resolveEffectiveDomainOwner === 'function' ? resolveEffectiveDomainOwner(mf) : (state.domainOwners[mf] || {});
+      var em = typeof normalizeOwnerEmail === 'function' ? normalizeOwnerEmail(eff.email) : String(eff.email || '').trim().toLowerCase();
+      var poEm = typeof normalizeOwnerEmail === 'function' ? normalizeOwnerEmail(state.programOwnerEmail) : String(state.programOwnerEmail || '').trim().toLowerCase();
+      if (em && poEm && em === poEm) assignedFams.push(mf);
+      else if (eff.name && user.name && eff.name.toLowerCase() === user.name.toLowerCase()) assignedFams.push(mf);
+    });
+  }
 
   if (!assignedFams.length) {
     body.innerHTML = '<div style="max-width:600px;margin:0 auto;text-align:center;padding:60px 24px;">'
@@ -497,7 +562,8 @@ function renderISSMWorkspace(user) {
     }
 
     var title = getPolicyMergedTitle(fam);
-    var btnLabel = status === 'Not Started' ? 'Start Policy →' : status === 'Approved' ? 'View Policy →' : 'Continue Editing →';
+    var primary = getDomainPolicyPrimaryAction(fam, status);
+    var btnLabel = primary.label;
     var returnNotes = status === 'Returned' ? String(((state.policyStatus || {})[fam] || {}).notes || '').trim() : '';
 
     // Owner assignment progress bar
@@ -527,7 +593,9 @@ function renderISSMWorkspace(user) {
       + '<div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">' + selected.length + ' controls selected · ' + ctrlCount + ' in baseline</div>'
       + '<div style="font-size:11px;display:flex;align-items:center;">' + reviewStatusDot(fam) + '<span style="color:' + getReviewStatus(fam).color + ';">' + getReviewStatus(fam).label + '</span></div>'
       + ownerBar
-      + '<button class="btn btn-primary btn-sm" style="width:100%;" onclick="enterPolicyWizard(\'' + fam + '\')">' + btnLabel + '</button>'
+      + (primary.handler
+        ? '<button class="btn btn-primary btn-sm" style="width:100%;" onclick="' + primary.handler + '">' + btnLabel + '</button>'
+        : '<button class="btn btn-secondary btn-sm" style="width:100%;opacity:0.45;" disabled>' + btnLabel + '</button>')
       + '</div>';
   });
 
@@ -819,9 +887,8 @@ function renderPolicyList() {
       }).length;
       const custodian = getCustodian(masterFam).name;
       const dd = DOMAIN_DEFAULTS[masterFam] || DOMAIN_DEFAULT_GENERIC;
-      const btnLabel = status === 'Not Started'
-        ? (canDraft ? 'Start Drafting \u2192' : 'Not Yet Drafted')
-        : status === 'Approved' ? 'View Policy \u2192' : 'View Draft \u2192';
+      const primary = getDomainPolicyPrimaryAction(masterFam, status);
+      const btnLabel = primary.label;
       // title: use merge label if known, else default title
       const mergedTitle = getPolicyMergedTitle(masterFam);
       // family badges: master + slaves
@@ -831,14 +898,11 @@ function renderPolicyList() {
 
       var cardDisabled = status === 'Not Started' && !canDraft;
       var cardCursor = cardDisabled ? 'default' : 'pointer';
-      var cardClick = cardDisabled ? '' : (status === 'Not Started' && canDraft
-        ? ' onclick="enterPolicyWizard(\'' + masterFam + '\')"'
-        : ' onclick="openPolicyDoc(\'' + masterFam + '\')"');
-      var actionBtn = cardDisabled
+      var cardHandler = cardDisabled || !primary.handler ? '' : primary.handler;
+      var cardClick = cardHandler ? ' onclick="' + cardHandler + '"' : '';
+      var actionBtn = cardDisabled || !primary.handler
         ? '<button class="btn btn-secondary btn-sm" style="width:100%;opacity:0.45;" disabled>' + btnLabel + '</button>'
-        : (status === 'Not Started' && canDraft
-          ? '<button class="btn btn-primary btn-sm" style="width:100%;" onclick="event.stopPropagation(); enterPolicyWizard(\'' + masterFam + '\')">' + btnLabel + '</button>'
-          : '<button class="btn btn-primary btn-sm" style="width:100%;" onclick="event.stopPropagation(); openPolicyDoc(\'' + masterFam + '\')">' + btnLabel + '</button>');
+        : '<button class="btn btn-primary btn-sm" style="width:100%;" onclick="event.stopPropagation(); ' + cardHandler + '">' + btnLabel + '</button>';
       cards += '<div style="background:white; border:1px solid var(--border); border-radius:12px; padding:20px; cursor:' + cardCursor + '; transition:box-shadow 0.2s, border-color 0.2s;"'
         + (cardDisabled ? '' : ' onmouseenter="this.style.boxShadow=\'0 4px 16px rgba(0,0,0,0.08)\'; this.style.borderColor=\'var(--teal)\';"')
         + (cardDisabled ? '' : ' onmouseleave="this.style.boxShadow=\'\'; this.style.borderColor=\'var(--border)\';"')
@@ -992,6 +1056,10 @@ function renderPolicyList() {
 // ─── POLICY DOCUMENT VIEWER ───────────────────────────────────────────────────
 // Opens a read-only policy document view from sidebar. Editors get an Edit button.
 function openPolicyDoc(fam) {
+  if ((state.policyStatus[fam] || {}).status === 'Returned' && canUserReviseReturnedDomainPolicy(fam)) {
+    openReturnedDomainPolicyRevision(fam);
+    return;
+  }
   state._policyLibraryMode = false;
   state._policyDomain    = fam;
   state._policyWizardMode = false;
@@ -1317,7 +1385,7 @@ function renderPolicyDocViewer(fam) {
     + '<div style="display:flex;gap:8px;align-items:center;">'
     + '<button class="btn btn-secondary btn-sm" onclick="printPolicyDocument(\'domain\',\''+fam+'\')">🖨️ Print / Save PDF</button>'
     + '<button class="btn btn-secondary btn-sm" onclick="exportPolicyDocumentDocx(\'domain\',\''+fam+'\')">⬇ Export Word (.docx)</button>'
-    + (canEdit ? '<button class="btn btn-secondary btn-sm" onclick="state._policyDocView=false;enterPolicyWizard(\''+fam+'\');">✏️ Edit Policy</button>' : '')
+    + (canEdit ? '<button class="btn btn-secondary btn-sm" onclick="state._policyDocView=false;' + (canUserReviseReturnedDomainPolicy(fam) ? "openReturnedDomainPolicyRevision('" + fam + "')" : "enterPolicyWizard('" + fam + "')") + '">✏️ Edit Policy</button>' : '')
     + '</div>'
     + '</div>';
 
@@ -1365,9 +1433,15 @@ function renderPolicyDocViewer(fam) {
       + '</div>';
   } else if (status === 'Returned') {
     html += '<div role="status" style="position:sticky;top:0;z-index:5;margin:0 0 2px 0;padding:14px 32px;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.45);border-radius:0 0 12px 12px;">'
+      + '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;">'
+      + '<div style="flex:1;min-width:220px;">'
       + '<div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.06em;color:#b45309;">Returned for revision</div>'
       + '<div style="font-size:14px;color:var(--navy);margin-top:5px;line-height:1.5;">' + escapeHTML(pSt.notes || 'Update the policy in the wizard and resubmit when ready.') + '</div>'
-      + '</div>';
+      + '</div>'
+      + (canUserReviseReturnedDomainPolicy(fam)
+        ? '<button class="btn btn-primary btn-sm" onclick="openReturnedDomainPolicyRevision(\'' + fam.replace(/'/g, "\\'") + '\')">Revise &amp; resubmit</button>'
+        : '')
+      + '</div></div>';
   }
 
   // ── Document body sections ────────────────────────────────────────────────
@@ -1458,6 +1532,10 @@ function renderPolicyDocViewer(fam) {
 }
 
 function enterPolicyWizard(fam) {
+  if ((state.policyStatus[fam] || {}).status === 'Returned' && canUserReviseReturnedDomainPolicy(fam)) {
+    openReturnedDomainPolicyRevision(fam);
+    return;
+  }
   state._policyLibraryMode = false;
   state._policyDomain = fam;
   state._policyWizardMode = true;
@@ -1536,6 +1614,7 @@ function openReturnedDomainPolicyRevision(fam) {
     openAssignDomainPolicyOwnerModal(fam);
     return;
   }
+  beginReturnedDomainPolicyRevision(fam);
   state._policyLibraryMode = false;
   state._policyDomain = fam;
   state._policyWizardMode = true;
