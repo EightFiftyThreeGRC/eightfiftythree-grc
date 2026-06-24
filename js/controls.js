@@ -877,6 +877,128 @@ function confirmReturnControl(ctrlId) {
 
 function closeReturnCtrlModal() { document.getElementById('returnCtrlOverlay')?.remove(); }
 
+function canReassignReturnedControl(ctrlId) {
+  if (!ctrlId) return false;
+  if (!state.currentUserId) return true;
+  if (typeof isSessionProgramOwnerActor === 'function' && isSessionProgramOwnerActor()) return true;
+  if (typeof canReassignProgramWork === 'function' && canReassignProgramWork()) return true;
+  var ctrl = CONTROLS.find(function(c) { return c.id === ctrlId; });
+  var fam = ctrl && typeof getPolicyFamilyKeyForControl === 'function'
+    ? getPolicyFamilyKeyForControl(ctrl)
+    : String(ctrlId).split('-')[0];
+  var user = (state.users || []).find(function(u) { return u.id === state.currentUserId; });
+  if (!user) return false;
+  if (user.role === 'ciso') return true;
+  if (user.role === 'issm') {
+    if (!user.families || !user.families.length) return true;
+    return user.families.indexOf(fam) !== -1 || (ctrl && user.families.indexOf(ctrl.f) !== -1);
+  }
+  var domainOwner = (state.domainOwners || {})[fam] || {};
+  var userEmail = typeof normalizeOwnerEmail === 'function' ? normalizeOwnerEmail(user.email) : String(user.email || '').trim().toLowerCase();
+  var ownerEmail = typeof normalizeOwnerEmail === 'function' ? normalizeOwnerEmail(domainOwner.email) : String(domainOwner.email || '').trim().toLowerCase();
+  if (userEmail && ownerEmail && userEmail === ownerEmail) return true;
+  if ((user.name || '').trim().toLowerCase() === (domainOwner.name || '').trim().toLowerCase()) return true;
+  return false;
+}
+
+function openControlReassignmentModal(ctrlId) {
+  if (!ctrlId) return;
+  if (!canReassignReturnedControl(ctrlId)) {
+    showToast('Only the domain policy owner or program leadership can reassign this control.', true);
+    return;
+  }
+  var ctrl = CONTROLS.find(function(c) { return c.id === ctrlId; });
+  var cs = (state.controlStatus || {})[ctrlId] || {};
+  var co = (state.controlOwners || {})[ctrlId] || {};
+  var queueItem = (state.controlReviewQueue || []).find(function(r) { return r && r.controlId === ctrlId; });
+  var fam = ctrl && typeof getPolicyFamilyKeyForControl === 'function'
+    ? getPolicyFamilyKeyForControl(ctrl)
+    : String(ctrlId).split('-')[0];
+  var famLabel = typeof getPolicyMergedTitle === 'function' ? getPolicyMergedTitle(fam) : (FAMILIES[fam] || fam);
+  var returnReason = String(cs.returnReason || (queueItem && queueItem.notes) || '').trim();
+  var returnedBy = String(cs.returnedBy || (queueItem && queueItem.submittedBy) || '').trim();
+  var escId = ctrlId.replace(/'/g, "\\'");
+  var existing = document.getElementById('reassignCtrlOwnerOverlay');
+  if (existing) existing.remove();
+
+  var overlay = document.createElement('div');
+  overlay.id = 'reassignCtrlOwnerOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:10060;display:flex;align-items:center;justify-content:center;padding:20px;';
+  overlay.innerHTML = ''
+    + '<div style="background:white;border-radius:16px;width:520px;max-width:100%;box-shadow:0 24px 80px rgba(0,0,0,0.2);overflow:hidden;">'
+    + '<div style="background:var(--navy);padding:18px 22px;">'
+    + '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:rgba(255,255,255,0.55);">Reassign control owner</div>'
+    + '<div style="font-size:18px;font-weight:800;color:white;margin-top:4px;"><span style="font-family:monospace;">' + escapeHTML(ctrlId) + '</span> · ' + escapeHTML(ctrl ? ctrl.n : '') + '</div>'
+    + '<div style="font-size:12px;color:rgba(255,255,255,0.75);margin-top:6px;">' + escapeHTML(famLabel) + '</div>'
+    + '</div>'
+    + '<div style="padding:22px;">'
+    + (returnedBy || returnReason ? '<div style="font-size:12px;color:#92400e;background:#fffbeb;border:1px solid rgba(245,158,11,0.35);border-radius:8px;padding:10px 12px;margin-bottom:16px;line-height:1.5;">'
+      + (returnedBy ? '<div><strong>Returned by:</strong> ' + escapeHTML(returnedBy) + '</div>' : '')
+      + (returnReason ? '<div style="margin-top:' + (returnedBy ? '6px' : '0') + ';"><strong>Reason:</strong> ' + escapeHTML(returnReason) + '</div>' : '')
+      + '</div>' : '')
+    + '<div style="font-size:13px;color:var(--text-muted);margin-bottom:16px;line-height:1.55;">Assign the correct control owner. This clears the return flag and puts the control back in their design queue — without opening the control wizard.</div>'
+    + '<div class="form-group" style="margin-bottom:12px;"><label class="form-label">Full name <span class="required">*</span></label>'
+    + '<input class="form-input" id="reassignCtrlOwnerName" autocomplete="name" value="' + escapeHTML(co.name || '') + '"></div>'
+    + '<div class="form-group" style="margin-bottom:12px;"><label class="form-label">Email <span class="required">*</span></label>'
+    + '<input class="form-input" id="reassignCtrlOwnerEmail" type="email" autocomplete="email" value="' + escapeHTML(co.email || '') + '"></div>'
+    + '<div class="form-group" style="margin-bottom:0;"><label class="form-label">Title / role</label>'
+    + '<input class="form-input" id="reassignCtrlOwnerRole" autocomplete="organization-title" value="' + escapeHTML(co.role || (DOMAIN_SUGGESTED_ROLES[ctrl ? ctrl.f : fam] || '')) + '"></div>'
+    + '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">'
+    + '<button type="button" class="btn btn-secondary" onclick="closeControlReassignmentModal()">Cancel</button>'
+    + '<button type="button" class="btn btn-navy" onclick="confirmReassignReturnedControl(\'' + escId + '\')">Assign owner</button>'
+    + '</div></div></div>';
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', function(e) { if (e.target === overlay) closeControlReassignmentModal(); });
+}
+
+function closeControlReassignmentModal() {
+  var overlay = document.getElementById('reassignCtrlOwnerOverlay');
+  if (overlay) overlay.remove();
+}
+
+function confirmReassignReturnedControl(ctrlId) {
+  var name = (document.getElementById('reassignCtrlOwnerName') || {}).value;
+  var email = (document.getElementById('reassignCtrlOwnerEmail') || {}).value;
+  var role = (document.getElementById('reassignCtrlOwnerRole') || {}).value;
+  name = String(name || '').trim();
+  email = String(email || '').trim();
+  role = String(role || '').trim();
+  if (!name) {
+    showToast('Enter the new control owner name.', true);
+    return;
+  }
+  if (typeof isValidOwnerEmail === 'function' && !isValidOwnerEmail(email)) {
+    showToast('Enter a valid work email for the control owner.', true);
+    return;
+  }
+  if (typeof setCtrlOwner === 'function') {
+    setCtrlOwner(ctrlId, 'name', name);
+    setCtrlOwner(ctrlId, 'email', email);
+    setCtrlOwner(ctrlId, 'role', role);
+  } else {
+    if (!state.controlOwners) state.controlOwners = {};
+    state.controlOwners[ctrlId] = { name: name, email: email, role: role };
+    if (typeof markControlPlannedIfAssigned === 'function') markControlPlannedIfAssigned(ctrlId);
+  }
+  if (!state.controlStatus[ctrlId]) state.controlStatus[ctrlId] = {};
+  state.controlStatus[ctrlId].returnedToPolicyOwner = false;
+  state.controlStatus[ctrlId].returnReason = '';
+  state.controlStatus[ctrlId].returnedBy = '';
+  state.controlStatus[ctrlId].returnedAt = '';
+  if (state.controlReviewQueue && state.controlReviewQueue.length) {
+    state.controlReviewQueue = state.controlReviewQueue.filter(function(r) {
+      return !(r && r.controlId === ctrlId && (r.type === 'control-return' || r.status === 'Returned to Policy Owner'));
+    });
+  }
+  markDirty();
+  addAuditEntry('control', ctrlId, 'Control owner reassigned to ' + name + ' after return to policy owner.');
+  closeControlReassignmentModal();
+  showToast('✅ ' + ctrlId + ' reassigned to ' + name + '.');
+  if (typeof renderHomeTab === 'function') renderHomeTab();
+  if (typeof renderReviewQueuePanel === 'function') renderReviewQueuePanel();
+  if (typeof renderControlStep1 === 'function' && document.getElementById('control-step-1-body')) renderControlStep1();
+}
+
 function unreturnControl(ctrlId) {
   if (!state.controlStatus[ctrlId]) return;
   state.controlStatus[ctrlId].returnedToPolicyOwner = false;
@@ -1314,7 +1436,7 @@ function getDesignChecklist(ctrl) {
   var coveredTypes = getCtrlCoveredAssetTypes(ctrl.id);
   var coverageReady = typeof controlHasAssetProcessScope === 'function'
     ? controlHasAssetProcessScope(ctrl.id)
-    : (coveredTypes.length > 0 || linkedCount > 0);
+    : coveredTypes.length > 0;
   var policyReqs = getControlPolicyReqs(ctrl.id);
   var sourceReady = true;
   var sourceDetail = '';

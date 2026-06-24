@@ -1780,6 +1780,10 @@ function reviewQueueAction(controlId, action) {
 }
 
 function openControlReassignmentFromQueue(controlId) {
+  if (typeof openControlReassignmentModal === 'function') {
+    openControlReassignmentModal(controlId);
+    return;
+  }
   var fam = String(controlId || '').split('-')[0] || '';
   showTab('policy');
   if (typeof enterPolicyWizard === 'function' && fam) {

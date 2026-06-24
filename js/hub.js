@@ -93,7 +93,13 @@ function getNextActions() {
 
   (state.controlReviewQueue || []).slice(0, 5).forEach(function(r) {
     if (!r || !r.controlId) return;
-    actions.push({ priority: 3, icon: '🔧', label: 'Review control: ' + r.controlId, desc: (r.status || 'Pending review'), action: "state._selectedCtrl='" + r.controlId.replace(/'/g, "\\'") + "';showTab('control');goToStep('control',2);" });
+    var cs = (state.controlStatus || {})[r.controlId] || {};
+    var isReturn = r.type === 'control-return' || r.status === 'Returned to Policy Owner' || !!cs.returnedToPolicyOwner;
+    var escId = r.controlId.replace(/'/g, "\\'");
+    var action = isReturn
+      ? "openControlReassignmentModal('" + escId + "');"
+      : "state._selectedCtrl='" + escId + "';showTab('control');goToStep('control',2);";
+    actions.push({ priority: 3, icon: isReturn ? '↩' : '🔧', label: (isReturn ? 'Reassign control: ' : 'Review control: ') + r.controlId, desc: (r.status || 'Pending review'), action: action });
   });
 
   (state.poamItems || []).forEach(function(p) {
