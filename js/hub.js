@@ -128,7 +128,7 @@ function getNextActions() {
       icon: '\u21A9',
       label: 'Revise ISP: ' + returnedIspTitle,
       desc: returnedDesc,
-      action: 'goToCISOPolicyEditor();'
+      action: 'openISPForRevision();'
     });
   }
 

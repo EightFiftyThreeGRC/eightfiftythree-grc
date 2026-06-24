@@ -987,7 +987,7 @@ function renderReturnedWorkCallout(user) {
       '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:#fff;border:1px solid rgba(220,38,38,0.25);border-radius:10px;padding:12px 14px;">'
       + '<div><div style="font-size:13px;font-weight:700;color:#991b1b;">ISP returned for revision</div>'
       + '<div style="font-size:12px;color:#7f1d1d;">' + escapeHTML((((state.infoSecPolicy || {}).title || '').trim()) || 'Information Security Policy') + ' is back in your queue.</div></div>'
-      + '<button class="btn btn-secondary btn-sm" onclick="showTab(\'ciso\');goToStep(\'ciso\',3);">Open ISP editor</button>'
+      + '<button class="btn btn-primary btn-sm" onclick="openISPForRevision()">✏️ Edit &amp; resubmit</button>'
       + '</div>'
     );
   }

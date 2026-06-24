@@ -2734,12 +2734,26 @@ function renderISPPolicyViewerPanel() {
     }
     ispHTML += '</div>';
     ispHTML += '</div>';
-    if (ispViewStatus === 'Returned') {
+    var viewerCanReviseISP = typeof canSessionReviseReturnedISP === 'function' && canSessionReviseReturnedISP();
+    if (ispViewStatus === 'Returned' && viewerCanReviseISP) {
       var returnNotes = String((((state.policyStatus || {}).ISP || {}).notes) || '').trim();
+      var returnedBy = String((((state.policyStatus || {}).ISP || {}).returnedBy) || '').trim();
+      ispHTML += '<div style="margin:16px 0;padding:18px 20px;background:linear-gradient(135deg,#fffbeb,#fef3c7);border:1px solid rgba(245,158,11,0.45);border-radius:12px;">'
+        + '<div style="font-size:14px;font-weight:700;color:#92400e;margin-bottom:8px;">↩ Action required — revise and resubmit</div>'
+        + (returnedBy ? '<div style="font-size:12px;color:#a16207;margin-bottom:8px;">Returned by ' + _esc(returnedBy) + '</div>' : '')
+        + '<div style="font-size:13px;color:#78350f;line-height:1.6;margin-bottom:14px;">'
+        + (returnNotes ? _esc(returnNotes) : 'Your approver returned this policy. Edit the content, then resubmit for sign-off.')
+        + '</div>'
+        + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
+        + '<button type="button" class="btn btn-primary btn-sm" onclick="openISPForRevision()">✏️ Edit policy</button>'
+        + '<button type="button" class="btn btn-sm" style="background:white;border:1px solid rgba(13,148,136,0.45);color:var(--teal);font-weight:600;" onclick="resubmitISPForApproval()">📨 Resubmit for approval</button>'
+        + '</div></div>';
+    } else if (ispViewStatus === 'Returned') {
+      var returnNotesReadOnly = String((((state.policyStatus || {}).ISP || {}).notes) || '').trim();
       ispHTML += '<div style="margin:16px 0;padding:14px 16px;background:#fffbeb;border:1px solid rgba(245,158,11,0.35);border-radius:10px;">'
         + '<div style="font-size:12px;font-weight:700;color:#b45309;margin-bottom:6px;">Returned for revision</div>'
         + '<div style="font-size:13px;color:#78350f;line-height:1.6;">'
-        + (returnNotes ? _esc(returnNotes) : 'No return comments were recorded.')
+        + (returnNotesReadOnly ? _esc(returnNotesReadOnly) : 'No return comments were recorded.')
         + '</div></div>';
     } else if (ispViewStatus === 'Under Review') {
       var pendingApprover = typeof getISPDesignatedApproverName === 'function' ? getISPDesignatedApproverName() : '';

@@ -313,11 +313,55 @@ function cisoNext(fromStep) {
   goToStep('ciso', fromStep+1);
 }
 
-// Auto-submits the ISP to the assigned approver when the CISO advances past Step 3.
+// Open the editable ISP wizard (CISO step 5) after the approver returned it for revision.
+function openISPForRevision() {
+  if (typeof canSessionReviseReturnedISP === 'function' && !canSessionReviseReturnedISP()) {
+    showToast('Only the program owner can edit a returned ISP.', true);
+    return;
+  }
+  state._ispReviewView = false;
+  state._policyLibraryMode = false;
+  state._ispRevisionMode = true;
+  var cisoNav = document.getElementById('nav-ciso');
+  if (cisoNav) cisoNav.style.display = '';
+  showTab('ciso');
+  goToStep('ciso', 5);
+}
+
+function exitISPRevisionEditor(restoreNav) {
+  state._ispRevisionMode = false;
+  if (restoreNav !== false && typeof applyPostSetupNav === 'function') applyPostSetupNav();
+}
+
+// Resubmit a returned ISP to the designated CIO/approver after edits.
+function resubmitISPForApproval() {
+  if (typeof canSessionReviseReturnedISP === 'function' && !canSessionReviseReturnedISP()) {
+    showToast('Only the program owner can resubmit the ISP.', true);
+    return;
+  }
+  if (typeof getISPStatus === 'function' && getISPStatus() !== 'Returned') {
+    showToast('This policy is not awaiting resubmission.', true);
+    return;
+  }
+  submitISPForApproval(false, { forceResubmit: true });
+  exitISPRevisionEditor();
+  markDirty();
+  try { if (typeof saveToStorage === 'function') saveToStorage(); } catch (e) { /* ignore */ }
+  if (typeof isCloudSessionActive === 'function' && isCloudSessionActive() && typeof cloudPushNow === 'function') {
+    cloudPushNow().finally(function() {
+      if (typeof renderHomeTab === 'function') renderHomeTab();
+    });
+  }
+  showTab('home');
+}
+
+// Auto-submits the ISP to the assigned approver when the CISO advances past Step 5.
 // options.forceEmail — re-send approver invite when leaving ISP step (even if already Under Review).
+// options.forceResubmit — program owner resubmitting after approver returned the ISP.
 function submitISPForApproval(silent, options) {
   options = options || {};
   var forceEmail = !!options.forceEmail;
+  var forceResubmit = !!options.forceResubmit;
   if (!state.infoSecPolicy) return;
   if (!state.policyStatus) state.policyStatus = {};
   if (!state.policyReviewCycle) state.policyReviewCycle = {};
@@ -366,20 +410,35 @@ function submitISPForApproval(silent, options) {
   // Only (re)submit if the ISP isn't already approved. Approved policies shouldn't regress on re-edit.
   var current = (state.policyStatus.ISP || {}).status;
   var justSubmitted = false;
-  var wantApproverEmail = isCustom && approverEmail && current !== 'Approved' && (forceEmail || current !== 'Under Review');
-  if (current === 'Returned' && !forceEmail) return;
+  var wantApproverEmail = isCustom && approverEmail && current !== 'Approved' && (forceEmail || forceResubmit || current !== 'Under Review');
+  if (current === 'Returned' && !forceEmail && !forceResubmit) return;
   if (current !== 'Approved') {
-    justSubmitted = current !== 'Under Review';
+    justSubmitted = current !== 'Under Review' || forceResubmit;
+    if (forceResubmit && state.infoSecPolicy) {
+      if (!state.infoSecPolicy.revisionHistory) state.infoSecPolicy.revisionHistory = [];
+      var actor = typeof getSessionActorName === 'function'
+        ? getSessionActorName(state.programOwner || 'Program Owner')
+        : (state.programOwner || 'Program Owner');
+      state.infoSecPolicy.revisionHistory.push({
+        version: 'R' + (state.infoSecPolicy.revisionHistory.length + 1),
+        date: new Date().toISOString().slice(0, 10),
+        author: actor,
+        changes: 'Revised and resubmitted for approver review.'
+      });
+    }
     state.policyStatus.ISP = {
       status: 'Under Review',
       submittedTo: approverName,
       submittedToRole: approverRole,
       submittedToEmail: approverEmail,
-      submittedAt: new Date().toISOString().slice(0,10),
+      submittedAt: new Date().toISOString().slice(0, 10),
       lastUpdated: new Date().toLocaleDateString(),
       version: (state.infoSecPolicy && state.infoSecPolicy.version) || '1.0'
     };
-    try { addAuditEntry('policy', 'ISP', 'ISP submitted for approval — routed to ' + approverName + (approverRole ? ' (' + approverRole + ')' : '')); } catch (e) { console.warn('audit log failed:', e); }
+    var auditMsg = forceResubmit
+      ? 'ISP revised and resubmitted for approval — routed to ' + approverName + (approverRole ? ' (' + approverRole + ')' : '')
+      : 'ISP submitted for approval — routed to ' + approverName + (approverRole ? ' (' + approverRole + ')' : '');
+    try { addAuditEntry('policy', 'ISP', auditMsg); } catch (e) { console.warn('audit log failed:', e); }
     var cloudActive = typeof isCloudSessionActive === 'function' && isCloudSessionActive();
     var willEmail = wantApproverEmail
       && typeof sendISPApprovalRequestEmail === 'function'
@@ -389,6 +448,8 @@ function submitISPForApproval(silent, options) {
         showToast('ISP submitted to ' + approverName + '. Sign in (cloud mode) to email ' + approverEmail + ' a sign-up link.', true);
       } else if (isCustom && approverEmail && current === 'Approved') {
         showToast('ISP is already approved — no approver email sent.', true);
+      } else if (forceResubmit) {
+        showToast('📨 ISP resubmitted to ' + approverName + ' for review.');
       } else {
         showToast('📨 ISP submitted to ' + approverName + ' for review.');
       }
@@ -1702,6 +1763,18 @@ function renderCISOStep3() {
     <div id="isp-sections-container">
       ${sectionsHTML}
     </div>
+    ${(typeof getISPStatus === 'function' && getISPStatus() === 'Returned'
+      && typeof canSessionReviseReturnedISP === 'function' && canSessionReviseReturnedISP()) ? `
+    <div style="margin-top:28px;padding:18px 20px;background:linear-gradient(135deg,#fffbeb,#fef3c7);border:1px solid rgba(245,158,11,0.45);border-radius:12px;">
+      <div style="font-size:14px;font-weight:700;color:#92400e;margin-bottom:8px;">↩ Returned — revise and resubmit</div>
+      <div style="font-size:13px;color:#78350f;line-height:1.6;margin-bottom:14px;">
+        ${escapeHTML(String((((state.policyStatus || {}).ISP || {}).notes) || '').trim() || 'Your approver returned this policy. Update the sections above, then resubmit for sign-off.')}
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <button type="button" class="btn btn-primary btn-sm" onclick="resubmitISPForApproval()">📨 Resubmit for approval</button>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="exitISPRevisionEditor();if(typeof goToCISOPolicyEditor==='function')goToCISOPolicyEditor();else showTab('home');">← Back to policy view</button>
+      </div>
+    </div>` : ''}
   `;
   autoExpandTextareas(body);
 }

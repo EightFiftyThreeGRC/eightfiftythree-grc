@@ -691,6 +691,9 @@ function goToDomainOwnersFromDashboard() {
 }
 
 function showTab(tabId) {
+  if (tabId !== 'ciso' && state._ispRevisionMode && typeof exitISPRevisionEditor === 'function') {
+    exitISPRevisionEditor();
+  }
   if (tabId !== 'policy' && state._ispReviewView) state._ispReviewView = false;
   if (tabId !== 'asset' && state._sspReviewerReadOnly) {
     state._sspReviewerReadOnly = false;
@@ -707,7 +710,9 @@ function showTab(tabId) {
         (tabId === 'policy' && (state._policyLibraryMode || state._policyDocView || !!state._policyDomain || state._ispReviewView)) ||
         (tabId === 'control' && state._controlLibraryMode) ||
         (tabId === 'asset' && (state._assetTypeLibraryMode || state._assetLibraryMode));
-      if (vis.length && vis.indexOf(tabId) === -1 && !allowLibraryTab) {
+      var allowIspRevisionTab = tabId === 'ciso' && state._ispRevisionMode
+        && typeof canSessionReviseReturnedISP === 'function' && canSessionReviseReturnedISP();
+      if (vis.length && vis.indexOf(tabId) === -1 && !allowLibraryTab && !allowIspRevisionTab) {
         tabId = vis.indexOf('reports') !== -1 ? 'reports' : vis[0];
       }
     }

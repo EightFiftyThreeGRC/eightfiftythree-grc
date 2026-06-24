@@ -1151,6 +1151,7 @@ const state = {
   _policyWizardMode: false,      // true = wizard open, false = domain list
   _policyDocView: false,         // true = show read-only policy document viewer
   _ispReviewView: false,         // true = read-only Tier 1 ISP viewer (approvers without policy tab)
+  _ispRevisionMode: false,       // true = program owner editing returned ISP in CISO step 5
   _policyLibraryMode: false,     // true = show global policy library, false = policy workspace/home
   _policyOwnerFilter: '',        // selected owner name on landing page
   _controlLibraryMode: false,    // true = show global control library, false = control-owner workspace
