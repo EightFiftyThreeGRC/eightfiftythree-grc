@@ -371,75 +371,138 @@ function getMyControls(userId) {
 }
 
 // Returns the right control list for the current session:
-// - Control owners see only their assigned controls
-// - Admins and CISOs see all controls
+// - Control owners see only planned controls (assigned + policy ready)
+// - Admins in the workspace see the same planned queue (not the full baseline)
+var CONTROL_POLICY_READY = ['Draft', 'Under Review', 'Approved', 'Returned'];
+
+function isControlIspTier(ctrl) {
+  if (!ctrl || !ctrl.id) return false;
+  if (ctrl.f === 'PM') return !!(state.pmControls && state.pmControls[ctrl.id]);
+  return typeof isPolicyAndProceduresControl === 'function' && isPolicyAndProceduresControl(ctrl.id);
+}
+
+function getControlDesignGroup(ctrl) {
+  if (!ctrl) return '';
+  if (isControlIspTier(ctrl)) return 'ISP';
+  return ctrl.f;
+}
+
+function getDesignGroupLabel(group) {
+  if (group === 'ISP') return 'ISP — Information Security Policy';
+  return group + (FAMILIES[group] ? ' — ' + FAMILIES[group] : '');
+}
+
+function getPolicyFamilyKeyForControl(ctrl) {
+  if (!ctrl) return '';
+  if (isControlIspTier(ctrl)) return 'ISP';
+  var merges = state.policyMerges || {};
+  return merges[ctrl.f] || ctrl.f;
+}
+
 function isControlFamilyPolicyReady(fam) {
   if (!fam) return false;
-  var ready = ['Draft', 'Under Review', 'Approved', 'Returned'];
-  if (fam === 'PM') {
-    return ready.indexOf(((state.policyStatus || {}).ISP || {}).status) !== -1;
+  if (fam === 'ISP' || fam === 'PM') {
+    return CONTROL_POLICY_READY.indexOf(((state.policyStatus || {}).ISP || {}).status) !== -1;
   }
-  return ready.indexOf(((state.policyStatus || {})[fam] || {}).status) !== -1;
+  return CONTROL_POLICY_READY.indexOf(((state.policyStatus || {})[fam] || {}).status) !== -1;
+}
+
+function isPolicyReadyForControl(ctrl) {
+  if (!ctrl || !ctrl.id) return false;
+  var policyFam = getPolicyFamilyKeyForControl(ctrl);
+  if (!isControlFamilyPolicyReady(policyFam)) return false;
+  if (isControlIspTier(ctrl)) return true;
+  var sel = (state.policySelectedControls || {})[policyFam];
+  if (!sel || !Array.isArray(sel) || !sel.length) return false;
+  return sel.indexOf(ctrl.id) !== -1;
+}
+
+function markControlPlannedIfAssigned(ctrlId) {
+  if (!state.controlStatus) state.controlStatus = {};
+  if (!state.controlStatus[ctrlId]) state.controlStatus[ctrlId] = {};
+  var co = (state.controlOwners || {})[ctrlId] || {};
+  if (!hasRealControlOwner(co)) return;
+  var st = state.controlStatus[ctrlId].status || 'Not Started';
+  if (st === 'Not Started') {
+    state.controlStatus[ctrlId].status = 'Planned';
+    if (typeof logFieldChange === 'function') logFieldChange('controlStatus.' + ctrlId + '.status', 'Not Started', 'Planned');
+  }
+}
+
+function ensureIspTierControlOwners() {
+  var ownerEmail = (state.programOwnerEmail || '').trim();
+  var ownerName = (state.programOwner || '').trim();
+  var ownerRole = (state.programOwnerTitle || '').trim();
+  if (!ownerEmail && !ownerName) return;
+  if (!isControlFamilyPolicyReady('ISP')) return;
+  if (!state.controlOwners) state.controlOwners = {};
+  getActiveControls().forEach(function(c) {
+    if (!isControlIspTier(c)) return;
+    if (hasRealControlOwner(state.controlOwners[c.id])) {
+      markControlPlannedIfAssigned(c.id);
+      return;
+    }
+    state.controlOwners[c.id] = { name: ownerName, role: ownerRole, email: ownerEmail };
+    markControlPlannedIfAssigned(c.id);
+  });
+}
+
+function isControlAssignedToSessionUser(ctrlId, primaryUser, rosterControlIds) {
+  var co = (state.controlOwners || {})[ctrlId] || {};
+  if (!hasRealControlOwner(co)) return false;
+  if (!primaryUser) return true;
+  if ((rosterControlIds || []).indexOf(ctrlId) !== -1) return true;
+  var nameKey = (primaryUser.name || '').trim().toLowerCase();
+  var emailKey = (primaryUser.email || '').trim().toLowerCase();
+  if (emailKey && typeof normalizeOwnerEmail === 'function' && normalizeOwnerEmail(co.email) === emailKey) return true;
+  if (nameKey && (co.name || '').trim().toLowerCase() === nameKey) return true;
+  return false;
+}
+
+function getControlsAssignedToSessionUser() {
+  var primaryUser = state.currentUserId ? (state.users || []).find(function(u) { return u.id === state.currentUserId; }) : null;
+  var rosterIds = _sessionRosterControlIds();
+  return getActiveControls().filter(function(c) {
+    return isControlAssignedToSessionUser(c.id, primaryUser, rosterIds);
+  });
+}
+
+function isControlInPlannedQueue(ctrl) {
+  if (!ctrl || !ctrl.id) return false;
+  if (!getActiveControls().some(function(c) { return c.id === ctrl.id; })) return false;
+  if (!isPolicyReadyForControl(ctrl)) return false;
+  if (!isControlAssignedToSessionUser(ctrl.id, state.currentUserId ? (state.users || []).find(function(u) { return u.id === state.currentUserId; }) : null, _sessionRosterControlIds())) return false;
+  return true;
+}
+
+function _sessionRosterControlIds() {
+  if (!state.currentUserId) return [];
+  var primaryUser = (state.users || []).find(function(u) { return u.id === state.currentUserId; });
+  if (!primaryUser) return [];
+  var nameKey = (primaryUser.name || '').trim().toLowerCase();
+  var ids = [];
+  (state.users || []).filter(function(u) { return u.name && u.name.trim().toLowerCase() === nameKey; }).forEach(function(u) {
+    (u.controls || []).forEach(function(cid) { if (ids.indexOf(cid) === -1) ids.push(cid); });
+  });
+  return ids;
 }
 
 function isControlSelectedInDomainPolicy(ctrlId, fam) {
   var sel = (state.policySelectedControls || {})[fam];
-  if (!sel || !Array.isArray(sel) || !sel.length) return true;
+  if (!sel || !Array.isArray(sel) || !sel.length) return false;
   return sel.indexOf(ctrlId) !== -1;
 }
 
 function controlPassesPolicyGate(ctrl) {
-  if (!ctrl || !ctrl.id) return false;
-  if (!isControlFamilyPolicyReady(ctrl.f)) return false;
-  return isControlSelectedInDomainPolicy(ctrl.id, ctrl.f);
+  return isPolicyReadyForControl(ctrl);
 }
 
 function getAssignedControlsForCurrentUser() {
-  if (!state.currentUserId) return getActiveControls();
-  var primaryUser = (state.users || []).find(function(u) { return u.id === state.currentUserId; });
-  if (!primaryUser) return getActiveControls();
-  var nameKey = (primaryUser.name || '').trim().toLowerCase();
-  var emailKey = (primaryUser.email || '').trim().toLowerCase();
-  var allRecords = (state.users || []).filter(function(u) {
-    return u.name && u.name.trim().toLowerCase() === nameKey;
-  });
-
-  var roles = [];
-  var allFamilies = [];
-  var allControls = [];
-  allRecords.forEach(function(u) {
-    var recRoles = (u.roles && u.roles.length) ? u.roles : [u.role];
-    recRoles.forEach(function(r) { if (roles.indexOf(r) === -1) roles.push(r); });
-    (u.families || []).forEach(function(f) { if (allFamilies.indexOf(f) === -1) allFamilies.push(f); });
-    (u.controls || []).forEach(function(c) { if (allControls.indexOf(c) === -1) allControls.push(c); });
-  });
-
-  if (roles.indexOf('control-owner') !== -1) {
-    return getActiveControls().filter(function(c) {
-      var co = (state.controlOwners || {})[c.id] || {};
-      var nameMatch = co.name && nameKey && co.name.trim().toLowerCase() === nameKey;
-      var emailMatch = co.email && emailKey && co.email.trim().toLowerCase() === emailKey;
-      var listMatch = allControls.indexOf(c.id) !== -1;
-      return listMatch || nameMatch || emailMatch;
-    });
-  }
-  if (roles.indexOf('approver') !== -1 && roles.indexOf('ciso') === -1 && roles.indexOf('issm') === -1 && roles.indexOf('control-owner') === -1) {
-    return [];
-  }
-  if (roles.indexOf('issm') !== -1 || roles.indexOf('custodian') !== -1) {
-    if (allFamilies.length) return getActiveControls().filter(function(c) { return allFamilies.indexOf(c.f) !== -1; });
-  }
-  return getActiveControls();
+  return getActiveControls().filter(function(c) { return isControlInPlannedQueue(c); });
 }
 
 function getScopedControls() {
-  if (!state.currentUserId) return getActiveControls();
-  var assigned = getAssignedControlsForCurrentUser();
-  var primaryUser = (state.users || []).find(function(u) { return u.id === state.currentUserId; });
-  if (!primaryUser) return assigned;
-  var roles = (primaryUser.roles && primaryUser.roles.length) ? primaryUser.roles : [primaryUser.role];
-  if (roles.indexOf('control-owner') === -1) return assigned;
-  return assigned.filter(controlPassesPolicyGate);
+  return getAssignedControlsForCurrentUser();
 }
 
 function getMyAssets(userId) {

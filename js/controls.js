@@ -8,6 +8,7 @@ function renderControlTab() {
   var workspace = document.getElementById('control-workspace-panel');
   var library = document.getElementById('control-library-panel');
   var controlNav = document.getElementById('nav-control');
+  if (typeof ensureIspTierControlOwners === 'function') ensureIspTierControlOwners();
   if (controlNav) controlNav.classList.toggle('active', !state._controlLibraryMode);
   if (state._controlLibraryMode) {
     if (workspace) workspace.style.display = 'none';
@@ -217,11 +218,24 @@ function getMyDesignQueueControls() {
 }
 
 function getDesignFamiliesForQueue() {
-  return [...new Set(getMyDesignQueueControls().map(function(c) { return c.f; }).filter(Boolean))].sort();
+  var groups = [...new Set(getMyDesignQueueControls().map(function(c) {
+    return typeof getControlDesignGroup === 'function' ? getControlDesignGroup(c) : c.f;
+  }).filter(Boolean))];
+  var ordered = [];
+  if (groups.indexOf('ISP') !== -1) ordered.push('ISP');
+  groups.filter(function(g) { return g !== 'ISP'; }).sort().forEach(function(g) { ordered.push(g); });
+  return ordered;
+}
+
+function controlsInDesignGroup(group) {
+  return getMyDesignQueueControls().filter(function(c) {
+    var g = typeof getControlDesignGroup === 'function' ? getControlDesignGroup(c) : c.f;
+    return g === group;
+  });
 }
 
 function isControlFamilyDesignComplete(fam) {
-  var famCtrls = getMyDesignQueueControls().filter(function(c) { return c.f === fam; });
+  var famCtrls = controlsInDesignGroup(fam);
   if (!famCtrls.length) return true;
   return famCtrls.every(function(c) { return isControlDesigned(c.id); });
 }
@@ -240,7 +254,7 @@ function ensureControlDesignFamily() {
 
 function selectControlDesignFamily(fam) {
   state._controlDesignFamily = fam;
-  var famCtrls = getMyDesignQueueControls().filter(function(c) { return c.f === fam; });
+  var famCtrls = controlsInDesignGroup(fam);
   if (famCtrls.length && (!state._selectedCtrl || !famCtrls.some(function(c) { return c.id === state._selectedCtrl; }))) {
     state._selectedCtrl = famCtrls[0].id;
   }
@@ -256,19 +270,30 @@ function renderControlFamilyChipNav(designFams, activeFam, stepNum) {
   if (!designFams.length) return '';
   return designFams.map(function(fam, i) {
     var letter = String.fromCharCode(97 + i);
-    var famCtrls = getMyDesignQueueControls().filter(function(c) { return c.f === fam; });
+    var famCtrls = controlsInDesignGroup(fam);
     var done = famCtrls.filter(function(c) { return isControlDesigned(c.id); }).length;
     var complete = isControlFamilyDesignComplete(fam);
     var isActive = fam === activeFam;
     var famKey = fam.replace(/'/g, "\\'");
+    var famLabel = fam === 'ISP' ? 'ISP' : fam;
     return '<button type="button" class="ctrl-family-chip' + (isActive ? ' active' : '') + (complete ? ' complete' : '') + '" onclick="selectControlDesignFamily(\'' + famKey + '\')">'
-      + '<span class="ctrl-family-chip-label">' + stepNum + letter + ' · ' + fam + '</span>'
+      + '<span class="ctrl-family-chip-label">' + stepNum + letter + ' · ' + famLabel + '</span>'
       + '<span class="ctrl-family-chip-meta">' + (complete ? '✓' : (done + '/' + famCtrls.length)) + '</span>'
       + '</button>';
   }).join('');
 }
 
 function updateControlFamilySidebarSubnav(stepNum, designFams) {
+  if (stepNum !== 2) {
+    var legacy = document.getElementById('control-step-1-subnav');
+    if (legacy) {
+      legacy.innerHTML = '';
+      legacy.style.display = 'none';
+    }
+    var step1Name = document.querySelector('#control-step-item-1 .step-name');
+    if (step1Name) step1Name.textContent = 'My Controls';
+    return;
+  }
   var hostId = 'control-step-' + stepNum + '-subnav';
   var stepItemId = 'control-step-item-' + stepNum;
   var host = document.getElementById(hostId);
@@ -366,10 +391,13 @@ function renderCtrlQueueMsFilter(menuId, field, options, placeholder) {
 }
 
 function getPendingPolicyFamiliesForUser() {
-  var assigned = typeof getAssignedControlsForCurrentUser === 'function' ? getAssignedControlsForCurrentUser() : getScopedControls();
-  var fams = [...new Set(assigned.map(function(c) { return c.f; }).filter(Boolean))];
-  return fams.filter(function(fam) {
-    return !isControlFamilyPolicyReady(fam);
+  var assigned = typeof getControlsAssignedToSessionUser === 'function' ? getControlsAssignedToSessionUser() : [];
+  var groups = [...new Set(assigned.map(function(c) {
+    return typeof getControlDesignGroup === 'function' ? getControlDesignGroup(c) : c.f;
+  }).filter(Boolean))];
+  return groups.filter(function(group) {
+    if (group === 'ISP') return !isControlFamilyPolicyReady('ISP');
+    return !isControlFamilyPolicyReady(group);
   });
 }
 
@@ -381,8 +409,8 @@ function renderControlStep1() {
     return;
   }
   const allControls = getScopedControls();
-  const assignedBeforeGate = state.currentUserId && typeof getAssignedControlsForCurrentUser === 'function'
-    ? getAssignedControlsForCurrentUser() : allControls;
+  const assignedBeforeGate = typeof getControlsAssignedToSessionUser === 'function'
+    ? getControlsAssignedToSessionUser() : [];
   const controls = getMyDesignQueueControls();
   const returnedControls = allControls.filter(c => (state.controlStatus[c.id]||{}).returnedToPolicyOwner);
   const deselectControls = allControls.filter(c => (state.controlStatus[c.id]||{}).recommendedDeselect);
@@ -422,7 +450,7 @@ function renderControlStep1() {
   const workspaceTitle = typeof getControlWorkspaceTitle === 'function' ? getControlWorkspaceTitle() : (state.currentUserId ? 'My Controls' : 'Controls');
   const workspaceSubtitle = (typeof isCloudOwnerSession === 'function' && isCloudOwnerSession() && !state.currentUserId)
     ? 'Program owner view — design any control in scope or assign owners in Domain policies.'
-    : (controls.length + ' control' + (controls.length === 1 ? '' : 's') + ' in your design queue — ' + (state.baseline==='L'?'Low':state.baseline==='M'?'Moderate':'High') + ' baseline' + (state.privacyOverlay?' + Privacy Overlay':''));
+    : (controls.length + ' planned control' + (controls.length === 1 ? '' : 's') + ' in your design queue — ' + (state.baseline==='L'?'Low':state.baseline==='M'?'Moderate':'High') + ' baseline' + (state.privacyOverlay?' + Privacy Overlay':''));
 
   body.innerHTML = `
     <div class="section-title">${workspaceTitle}</div>
@@ -644,7 +672,8 @@ function goToControlDetail(ctrlId) {
   state._controlLibraryMode = false;
   state._selectedCtrl = ctrlId;
   var ctrl = (getScopedControls() || []).find(function(c) { return c.id === ctrlId; });
-  if (ctrl && ctrl.f) state._controlDesignFamily = ctrl.f;
+  if (ctrl && typeof getControlDesignGroup === 'function') state._controlDesignFamily = getControlDesignGroup(ctrl);
+  else if (ctrl && ctrl.f) state._controlDesignFamily = ctrl.f;
   showTab('control');
   goToStep('control', 2);
 }
@@ -1003,9 +1032,8 @@ function renderControlStep2() {
 
   const allQueue = getMyDesignQueueControls();
   if (!allQueue.length) {
-    var assignedBeforeGate = state.currentUserId && typeof getAssignedControlsForCurrentUser === 'function'
-      ? getAssignedControlsForCurrentUser() : [];
-    if (assignedBeforeGate.length) {
+    var assignedRaw = typeof getControlsAssignedToSessionUser === 'function' ? getControlsAssignedToSessionUser() : [];
+    if (assignedRaw.length) {
       body.innerHTML = `<div class="empty-state"><div class="es-icon">📜</div><div class="es-title">Waiting on Domain Policies</div><p>Your assigned controls will appear here once the domain policy owner drafts the relevant policies.</p><button class="btn btn-secondary" onclick="goToStep('control',1)" style="margin-top:12px;">← Back to My Controls</button></div>`;
     } else {
       body.innerHTML = `<div class="empty-state"><div class="es-icon">📋</div><div class="es-title">No Controls to Design</div><p>No controls are in your design queue yet.</p><button class="btn btn-secondary" onclick="goToStep('control',1)" style="margin-top:12px;">← Back to My Controls</button></div>`;
@@ -1016,7 +1044,8 @@ function renderControlStep2() {
 
   const designFams = getDesignFamiliesForQueue();
   const activeFam = ensureControlDesignFamily();
-  const controls = allQueue.filter(function(c) { return c.f === activeFam; });
+  const controls = controlsInDesignGroup(activeFam);
+  const groupLabel = typeof getDesignGroupLabel === 'function' ? getDesignGroupLabel(activeFam) : (FAMILIES[activeFam] || activeFam);
   controls.forEach(c => {
     if (!state.controlStatus[c.id]) state.controlStatus[c.id] = { status:'Not Started', approach:'', narrative:'', evidence:[], notes:'' };
     if (!state.controlStatus[c.id].evidence) state.controlStatus[c.id].evidence = [];
@@ -1037,9 +1066,9 @@ function renderControlStep2() {
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
           <div>
             <div style="font-size:13px;font-weight:700;color:var(--navy);">Step 2 — Design by control family</div>
-            <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">${allQueue.length} control${allQueue.length === 1 ? '' : 's'} assigned to you · ${totalDesigned} designed overall</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">${allQueue.length} planned control${allQueue.length === 1 ? '' : 's'} in your queue · ${totalDesigned} designed overall</div>
           </div>
-          <div style="font-size:11px;color:var(--teal);font-weight:700;">${activeFam} — ${FAMILIES[activeFam] || activeFam}: ${famDesigned}/${controls.length} designed${famComplete ? ' ✓' : ''}</div>
+          <div style="font-size:11px;color:var(--teal);font-weight:700;">${groupLabel}: ${famDesigned}/${controls.length} designed${famComplete ? ' ✓' : ''}</div>
         </div>
         <div class="ctrl-family-subnav" style="display:flex;flex-wrap:wrap;gap:8px;">
           ${renderControlFamilyChipNav(designFams, activeFam, 2)}
@@ -1774,7 +1803,8 @@ function renderControlDetailForm(ctrl) {
   const co  = (state.controlOwners||{})[ctrl.id] || {};
   const st  = cs.status || 'Not Started';
   const pn  = (() => {
-    const ctrls = getMyDesignQueueControls().filter(function(c) { return c.f === ctrl.f; });
+    const group = typeof getControlDesignGroup === 'function' ? getControlDesignGroup(ctrl) : ctrl.f;
+    const ctrls = controlsInDesignGroup(group);
     const idx = ctrls.findIndex(c=>c.id===ctrl.id);
     return { prev: idx>0?ctrls[idx-1].id:null, next: idx<ctrls.length-1?ctrls[idx+1].id:null };
   })();

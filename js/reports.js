@@ -955,6 +955,7 @@ function approveISP() {
     state.infoSecPolicy.revisionHistory.push({ version: ver, date: new Date().toISOString().slice(0,10), author: approverName, changes: 'Approved.' + (notes ? ' Notes: ' + notes : '') });
   }
   try { addAuditEntry('policy', 'ISP', 'ISP approved by ' + approverName); } catch(e) {}
+  if (typeof ensureIspTierControlOwners === 'function') ensureIspTierControlOwners();
   markDirty();
   try { if (typeof saveToStorage === 'function') saveToStorage(); } catch (e) { /* ignore */ }
   var approvedTitle = ((state.infoSecPolicy && state.infoSecPolicy.title) ? String(state.infoSecPolicy.title).trim() : '') || (typeof getDefaultISPTitle === 'function' ? getDefaultISPTitle() : 'Information Security Policy');

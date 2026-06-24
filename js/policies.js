@@ -4101,6 +4101,7 @@ function setCtrlOwner(ctrlId, field, value) {
   logFieldChange(path, prev, value);
   if (field === 'name' || field === 'email') {
     _coCardUpdate(ctrlId);
+    if (typeof markControlPlannedIfAssigned === 'function') markControlPlannedIfAssigned(ctrlId);
   } else {
     step4RefreshAssignmentProgress();
   }
@@ -4118,6 +4119,7 @@ function runBulkControlOwnerAssign(fam, cidList, person, overwrite, onDone) {
       var prevName = (state.controlOwners[cid] || {}).name;
       state.controlOwners[cid] = { name: person.name, role: person.role, email: person.email };
       logFieldChange('controlOwners.' + cid + '.name', prevName, person.name);
+      if (typeof markControlPlannedIfAssigned === 'function') markControlPlannedIfAssigned(cid);
       count++;
     }
     if (i < cidList.length) requestAnimationFrame(chunk);

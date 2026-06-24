@@ -538,9 +538,9 @@ function cisoFinish() {
   }
   clearScopedUndoStack('program finalization');
 
-  // Auto-assign PM control owners to the CISO/program owner (Tier 1 ISP scope).
-  // Only fills unassigned controls — never overwrites a name already set.
-  (function() {
+  // Auto-assign ISP-tier controls (PM + XX-1) to the program owner when Tier 1 is in scope.
+  if (typeof ensureIspTierControlOwners === 'function') ensureIspTierControlOwners();
+  else (function() {
     var ownerEmail = (state.programOwnerEmail || '').trim();
     var ownerName  = (state.programOwner || '').trim() || getOwnerDisplayName({ email: ownerEmail, name: '' });
     var ownerRole  = (state.programOwnerTitle || '').trim();
@@ -2990,6 +2990,7 @@ function autoPopulateControlOwnersFromDomain(fam) {
       if (owner.isDemoPlaceholder) state.controlOwners[cid].isDemoPlaceholder = true;
       else delete state.controlOwners[cid].isDemoPlaceholder;
     }
+    if (typeof markControlPlannedIfAssigned === 'function') markControlPlannedIfAssigned(cid);
   });
 }
 
