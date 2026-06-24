@@ -330,40 +330,70 @@ function getMyControls(userId) {
 // Returns the right control list for the current session:
 // - Control owners see only their assigned controls
 // - Admins and CISOs see all controls
-function getScopedControls() {
+function isControlFamilyPolicyReady(fam) {
+  if (!fam) return false;
+  var ready = ['Draft', 'Under Review', 'Approved', 'Returned'];
+  if (fam === 'PM') {
+    return ready.indexOf(((state.policyStatus || {}).ISP || {}).status) !== -1;
+  }
+  return ready.indexOf(((state.policyStatus || {})[fam] || {}).status) !== -1;
+}
+
+function isControlSelectedInDomainPolicy(ctrlId, fam) {
+  var sel = (state.policySelectedControls || {})[fam];
+  if (!sel || !Array.isArray(sel) || !sel.length) return true;
+  return sel.indexOf(ctrlId) !== -1;
+}
+
+function controlPassesPolicyGate(ctrl) {
+  if (!ctrl || !ctrl.id) return false;
+  if (!isControlFamilyPolicyReady(ctrl.f)) return false;
+  return isControlSelectedInDomainPolicy(ctrl.id, ctrl.f);
+}
+
+function getAssignedControlsForCurrentUser() {
   if (!state.currentUserId) return getActiveControls();
-  // Collect all records for this person (handles dual roles)
-  var primaryUser = (state.users||[]).find(u => u.id === state.currentUserId);
+  var primaryUser = (state.users || []).find(function(u) { return u.id === state.currentUserId; });
   if (!primaryUser) return getActiveControls();
   var nameKey = (primaryUser.name || '').trim().toLowerCase();
-  var allRecords = (state.users||[]).filter(function(u){ return u.name && u.name.trim().toLowerCase() === nameKey; });
+  var emailKey = (primaryUser.email || '').trim().toLowerCase();
+  var allRecords = (state.users || []).filter(function(u) {
+    return u.name && u.name.trim().toLowerCase() === nameKey;
+  });
 
-  // Aggregate roles and families/controls across all records.
-  // Include rec.roles[] (merged array from upsertUser) in addition to rec.role (primary).
   var roles = [];
   var allFamilies = [];
   var allControls = [];
-  allRecords.forEach(function(u){
+  allRecords.forEach(function(u) {
     var recRoles = (u.roles && u.roles.length) ? u.roles : [u.role];
-    recRoles.forEach(function(r){ if (!roles.includes(r)) roles.push(r); });
-    (u.families||[]).forEach(function(f){ if (!allFamilies.includes(f)) allFamilies.push(f); });
-    (u.controls||[]).forEach(function(c){ if (!allControls.includes(c)) allControls.push(c); });
+    recRoles.forEach(function(r) { if (roles.indexOf(r) === -1) roles.push(r); });
+    (u.families || []).forEach(function(f) { if (allFamilies.indexOf(f) === -1) allFamilies.push(f); });
+    (u.controls || []).forEach(function(c) { if (allControls.indexOf(c) === -1) allControls.push(c); });
   });
 
-  if (roles.includes('control-owner')) {
-    // Control owner: filter by assigned controls list
-    var byList = allControls.length
-      ? getActiveControls().filter(c => allControls.includes(c.id))
-      : [];
-    if (byList.length) return byList;
-    // Secondary match: controls where this user is named as owner
-    return getActiveControls().filter(c => (state.controlOwners||{})[c.id]?.name === primaryUser.name);
+  if (roles.indexOf('control-owner') !== -1) {
+    return getActiveControls().filter(function(c) {
+      var co = (state.controlOwners || {})[c.id] || {};
+      var nameMatch = co.name && nameKey && co.name.trim().toLowerCase() === nameKey;
+      var emailMatch = co.email && emailKey && co.email.trim().toLowerCase() === emailKey;
+      var listMatch = allControls.indexOf(c.id) !== -1;
+      return listMatch || nameMatch || emailMatch;
+    });
   }
-  if (roles.includes('issm') || roles.includes('custodian')) {
-    // ISSM/custodian: filter by assigned families
-    if (allFamilies.length) return getActiveControls().filter(c => allFamilies.includes(c.f));
+  if (roles.indexOf('issm') !== -1 || roles.indexOf('custodian') !== -1) {
+    if (allFamilies.length) return getActiveControls().filter(function(c) { return allFamilies.indexOf(c.f) !== -1; });
   }
   return getActiveControls();
+}
+
+function getScopedControls() {
+  if (!state.currentUserId) return getActiveControls();
+  var assigned = getAssignedControlsForCurrentUser();
+  var primaryUser = (state.users || []).find(function(u) { return u.id === state.currentUserId; });
+  if (!primaryUser) return assigned;
+  var roles = (primaryUser.roles && primaryUser.roles.length) ? primaryUser.roles : [primaryUser.role];
+  if (roles.indexOf('control-owner') === -1) return assigned;
+  return assigned.filter(controlPassesPolicyGate);
 }
 
 function getMyAssets(userId) {

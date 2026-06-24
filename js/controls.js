@@ -184,11 +184,156 @@ function renderControlLibraryView() {
 function renderControlStep(step) {
   if (step===1) renderControlStep1();
   if (step===2) renderControlStep2();
+  else if (typeof updateControlStep2SidebarSubnav === 'function') updateControlStep2SidebarSubnav([]);
   if (step===3) renderControlStep3();
   if (step===4) renderControlStep4();
 }
 
 // ── STEP 1: MY CONTROLS ──────────────────────────────────────────────────────
+function ensureControlQueueFilters() {
+  if (!state._controlQueueFilters) state._controlQueueFilters = { search: '', families: [], owners: [], statuses: [] };
+  ['families', 'owners', 'statuses'].forEach(function(k) {
+    if (!Array.isArray(state._controlQueueFilters[k])) state._controlQueueFilters[k] = [];
+  });
+  if (typeof state._controlQueueFilters.search !== 'string') state._controlQueueFilters.search = '';
+  return state._controlQueueFilters;
+}
+
+function getMyDesignQueueControls() {
+  return getScopedControls().filter(function(c) {
+    return !(state.controlStatus[c.id] || {}).returnedToPolicyOwner &&
+      !(state.controlStatus[c.id] || {}).recommendedDeselect;
+  });
+}
+
+function getDesignFamiliesForQueue() {
+  return [...new Set(getMyDesignQueueControls().map(function(c) { return c.f; }).filter(Boolean))].sort();
+}
+
+function isControlFamilyDesignComplete(fam) {
+  var famCtrls = getMyDesignQueueControls().filter(function(c) { return c.f === fam; });
+  if (!famCtrls.length) return true;
+  return famCtrls.every(function(c) { return isControlDesigned(c.id); });
+}
+
+function ensureControlDesignFamily() {
+  var fams = getDesignFamiliesForQueue();
+  if (!fams.length) {
+    state._controlDesignFamily = null;
+    return null;
+  }
+  if (state._controlDesignFamily && fams.indexOf(state._controlDesignFamily) !== -1) return state._controlDesignFamily;
+  var firstOpen = fams.find(function(f) { return !isControlFamilyDesignComplete(f); });
+  state._controlDesignFamily = firstOpen || fams[0];
+  return state._controlDesignFamily;
+}
+
+function selectControlDesignFamily(fam) {
+  state._controlDesignFamily = fam;
+  var famCtrls = getMyDesignQueueControls().filter(function(c) { return c.f === fam; });
+  if (famCtrls.length && (!state._selectedCtrl || !famCtrls.some(function(c) { return c.id === state._selectedCtrl; }))) {
+    state._selectedCtrl = famCtrls[0].id;
+  }
+  renderControlStep2();
+}
+
+function updateControlStep2SidebarSubnav(designFams) {
+  var host = document.getElementById('control-step-2-subnav');
+  if (!host) {
+    var stepItem = document.getElementById('control-step-item-2');
+    if (!stepItem) return;
+    host = document.createElement('div');
+    host.id = 'control-step-2-subnav';
+    host.className = 'control-step-subnav';
+    stepItem.parentNode.insertBefore(host, stepItem.nextSibling);
+  }
+  if (!designFams || !designFams.length) {
+    host.innerHTML = '';
+    host.style.display = 'none';
+    var stepName = document.querySelector('#control-step-item-2 .step-name');
+    if (stepName) stepName.textContent = 'Design Controls';
+    return;
+  }
+  host.style.display = '';
+  var activeFam = state._controlDesignFamily || designFams[0];
+  var stepName = document.querySelector('#control-step-item-2 .step-name');
+  if (stepName) stepName.textContent = 'Design · ' + activeFam + (isControlFamilyDesignComplete(activeFam) ? ' ✓' : '');
+  host.innerHTML = designFams.map(function(fam, i) {
+    var letter = String.fromCharCode(97 + i);
+    var complete = isControlFamilyDesignComplete(fam);
+    var isActive = fam === activeFam;
+    var famKey = fam.replace(/'/g, "\\'");
+    return '<div class="control-substep-item' + (isActive ? ' active' : '') + (complete ? ' complete' : '') + '" onclick="goToStep(\'control\',2);selectControlDesignFamily(\'' + famKey + '\')">'
+      + '<span>2' + letter + ' ' + fam + '</span>'
+      + '<span class="control-substep-check">' + (complete ? '✓' : '') + '</span>'
+      + '</div>';
+  }).join('');
+}
+
+function toggleCtrlQueueFilterMenu(menuId, ev) {
+  if (ev) ev.stopPropagation();
+  var menu = document.getElementById(menuId);
+  if (!menu) return;
+  var open = menu.style.display !== 'none';
+  document.querySelectorAll('.ms-filter-menu').forEach(function(el) { el.style.display = 'none'; });
+  menu.style.display = open ? 'none' : 'block';
+}
+
+if (!window._ctrlQueueFilterClickBound) {
+  window._ctrlQueueFilterClickBound = true;
+  document.addEventListener('click', function() {
+    document.querySelectorAll('.ms-filter-menu').forEach(function(el) { el.style.display = 'none'; });
+  });
+}
+
+function toggleCtrlQueueFilter(field, value, checked) {
+  var fq = ensureControlQueueFilters();
+  var arr = fq[field] || [];
+  if (checked && arr.indexOf(value) === -1) arr.push(value);
+  if (!checked) arr = arr.filter(function(v) { return v !== value; });
+  fq[field] = arr;
+  markDirty();
+  renderControlStep1();
+}
+
+function clearCtrlQueueFilter(field) {
+  var fq = ensureControlQueueFilters();
+  fq[field] = [];
+  markDirty();
+  renderControlStep1();
+}
+
+function setCtrlQueueSearch(val) {
+  var fq = ensureControlQueueFilters();
+  fq.search = val || '';
+  filterControlList();
+}
+
+function renderCtrlQueueMsFilter(menuId, field, options, placeholder) {
+  var fq = ensureControlQueueFilters();
+  var selected = fq[field] || [];
+  var active = selected.length > 0;
+  var label = active ? (selected.length + ' selected') : placeholder;
+  return '<div class="ms-filter-wrap" style="position:relative;">'
+    + '<button type="button" class="ms-filter-btn' + (active ? ' active' : '') + '" onclick="toggleCtrlQueueFilterMenu(\'' + menuId + '\',event)">' + escapeHTML(label) + ' ▾</button>'
+    + '<div id="' + menuId + '" class="ms-filter-menu" style="display:none;">'
+    + options.map(function(opt) {
+        var val = String(opt.value).replace(/'/g, "\\'");
+        var checked = selected.indexOf(opt.value) !== -1;
+        return '<label class="ms-filter-option"><input type="checkbox" ' + (checked ? 'checked' : '') + ' onchange="toggleCtrlQueueFilter(\'' + field + '\',\'' + val + '\',this.checked)">' + escapeHTML(opt.label) + '</label>';
+      }).join('')
+    + (active ? '<button type="button" class="btn btn-sm ms-filter-clear" onclick="clearCtrlQueueFilter(\'' + field + '\')">Clear</button>' : '')
+    + '</div></div>';
+}
+
+function getPendingPolicyFamiliesForUser() {
+  var assigned = typeof getAssignedControlsForCurrentUser === 'function' ? getAssignedControlsForCurrentUser() : getScopedControls();
+  var fams = [...new Set(assigned.map(function(c) { return c.f; }).filter(Boolean))];
+  return fams.filter(function(fam) {
+    return !isControlFamilyPolicyReady(fam);
+  });
+}
+
 function renderControlStep1() {
   const body = document.getElementById('control-step-1-body');
   if (!body) return;
@@ -197,10 +342,23 @@ function renderControlStep1() {
     return;
   }
   const allControls = getScopedControls();
+  const assignedBeforeGate = state.currentUserId && typeof getAssignedControlsForCurrentUser === 'function'
+    ? getAssignedControlsForCurrentUser() : allControls;
   const controls    = allControls.filter(c => !(state.controlStatus[c.id]||{}).returnedToPolicyOwner && !(state.controlStatus[c.id]||{}).recommendedDeselect);
   const returnedControls = allControls.filter(c => (state.controlStatus[c.id]||{}).returnedToPolicyOwner);
   const deselectControls = allControls.filter(c => (state.controlStatus[c.id]||{}).recommendedDeselect);
   const families = [...new Set(controls.map(c => c.f).filter(Boolean))];
+  const ownerNames = [...new Set(controls.map(function(c) {
+    return ((state.controlOwners || {})[c.id] || {}).name || '';
+  }).filter(Boolean))].sort();
+  const statusOptions = ['Not Started', 'Planned', 'In Progress', 'Implemented', 'Not Applicable'];
+  var fq = ensureControlQueueFilters();
+
+  if (allControls.length === 0 && assignedBeforeGate.length > 0) {
+    var pendingFams = getPendingPolicyFamiliesForUser();
+    body.innerHTML = `<div class="empty-state"><div class="es-icon">📜</div><div class="es-title">Waiting on Domain Policies</div><p>You have ${assignedBeforeGate.length} control${assignedBeforeGate.length > 1 ? 's' : ''} assigned, but the domain policy owner must draft and submit policies before you can start designing.</p>${pendingFams.length ? '<p style="font-size:12px;color:var(--text-muted);margin-top:8px;">Pending families: <strong>' + pendingFams.map(function(f) { return f + ' — ' + (FAMILIES[f] || f); }).join(', ') + '</strong></p>' : ''}<button class="btn btn-primary" onclick="goToProgramSetupOrDashboard()" style="margin-top:16px;">Go to Dashboard →</button></div>`;
+    return;
+  }
 
   if (allControls.length === 0) {
     body.innerHTML = `<div class="empty-state"><div class="es-icon">📋</div><div class="es-title">No Controls Assigned</div><p>The CISO must assign controls to you before you can document implementation.</p><button class="btn btn-primary" onclick="goToProgramSetupOrDashboard()" style="margin-top:16px;">${state.cisoComplete ? 'Go to Dashboard →' : 'View CISO Setup →'}</button></div>`;
@@ -226,7 +384,7 @@ function renderControlStep1() {
 
   body.innerHTML = `
     <div class="section-title">${state.currentUserId ? 'My Controls' : 'Control Library'}</div>
-    <div class="section-subtitle">${controls.length} controls in your design queue — ${state.baseline==='L'?'Low':state.baseline==='M'?'Moderate':'High'} baseline${state.privacyOverlay?' + Privacy Overlay':''}</div>
+    <div class="section-subtitle">${controls.length} control${controls.length === 1 ? '' : 's'} assigned to you${state.currentUserId ? '' : ' (admin view)'} — ${state.baseline==='L'?'Low':state.baseline==='M'?'Moderate':'High'} baseline${state.privacyOverlay?' + Privacy Overlay':''}</div>
 
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px;">
       ${[
@@ -265,20 +423,8 @@ function renderControlStep1() {
       <strong>💡 Tip:</strong> Use <strong>↩ Return</strong> if a control was assigned to you in error. Use <strong>✗ Propose De-select</strong> if you believe a control should not be in scope — both go back to the policy owner for action.
     </div>
 
-    <div class="filter-bar">
-      <input type="text" id="ctrlSearch" placeholder="🔍  Search by ID or name…" oninput="filterControlList()">
-      <select id="ctrlFamilyFilter" onchange="filterControlList()">
-        <option value="">All Families</option>
-        ${families.map(f=>`<option value="${f}">${f} — ${FAMILIES[f]||f}</option>`).join('')}
-      </select>
-      <select id="ctrlStatusFilter" onchange="filterControlList()">
-        <option value="">All Statuses</option>
-        <option>Not Started</option><option>Planned</option><option>In Progress</option><option>Implemented</option><option>Not Applicable</option>
-      </select>
-      <select id="ctrlDeselectFilter" onchange="filterControlList()" title="Filter by baseline de-selection status">
-        <option value="">All scope states</option>
-        <option value="deselected">De-selected (baseline) only</option>
-      </select>
+    <div class="filter-bar" style="margin-bottom:12px;">
+      <input type="text" id="ctrlSearch" placeholder="🔍  Search by ID or name…" value="${escapeHTML(fq.search || '')}" oninput="setCtrlQueueSearch(this.value)">
     </div>
 
     <div class="table-scroll">
@@ -287,13 +433,20 @@ function renderControlStep1() {
           <tr>
             <th style="width:80px;">Control</th>
             <th>Name</th>
-            <th style="width:70px;">Family</th>
-            <th style="width:90px;">Baselines</th>
-            <th style="width:90px;">Policy Req.</th>
+            <th style="width:100px;">Family</th>
             <th style="width:140px;">Owner</th>
             <th style="width:95px;">Due Date</th>
             <th style="width:120px;">Status</th>
             <th style="width:150px;">Actions</th>
+          </tr>
+          <tr class="col-filter-row">
+            <th></th>
+            <th></th>
+            <th>${renderCtrlQueueMsFilter('ctrlQFamMenu', 'families', families.map(function(f) { return { value: f, label: f + ' — ' + (FAMILIES[f] || f) }; }), 'All families')}</th>
+            <th>${renderCtrlQueueMsFilter('ctrlQOwnerMenu', 'owners', ownerNames.map(function(n) { return { value: n, label: n }; }), 'All owners')}</th>
+            <th></th>
+            <th>${renderCtrlQueueMsFilter('ctrlQStatusMenu', 'statuses', statusOptions.map(function(s) { return { value: s, label: s }; }), 'All statuses')}</th>
+            <th></th>
           </tr>
         </thead>
         <tbody id="ctrlMainTbody">
@@ -301,22 +454,17 @@ function renderControlStep1() {
             const cs  = state.controlStatus[c.id] || {};
             const co  = (state.controlOwners||{})[c.id] || {};
             const st  = cs.status || 'Not Started';
+            const ownerName = co.name || 'Unassigned';
+            const ownerAttr = ownerName.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
             const dd  = co.dueDate;
             const isDueSoon = dd && new Date(dd)>=now && new Date(dd)<=soon && st!=='Implemented';
             const ddStr = dd ? new Date(dd).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit'}) : '—';
-            const pReqs = getControlPolicyReqs(c.id);
-            const pReqCell = pReqs.length
-              ? `<span title="${pReqs.map(r=>r.reqId).join(', ')}" style="font-family:monospace;font-size:10px;font-weight:700;background:rgba(99,102,241,0.1);color:#6366f1;padding:2px 6px;border-radius:4px;cursor:default;">${pReqs.length} req${pReqs.length>1?'s':''}</span>`
-              : `<span style="font-size:11px;color:var(--text-muted);font-style:italic;">—</span>`;
             const cid = c.id.replace(/'/g,"\\'");
-            const deselBaseline = cs.deselectDecision === 'Approved' && c.bl && (c.bl.includes(state.baseline) || (state.privacyOverlay && c.bl.includes('P')));
-            return `<tr data-id="${c.id}" data-family="${c.f}" data-status="${st}" data-deselected="${deselBaseline?'1':'0'}" class="${deselBaseline?'tr-deselected-baseline':''}" style="cursor:pointer;" onmouseover="this.style.background='rgba(13,148,136,0.04)'" onmouseout="this.style.background=''" onclick="goToControlDetail('${cid}')">
+            return `<tr data-id="${c.id}" data-family="${c.f}" data-status="${st}" data-owner="${ownerAttr}" style="cursor:pointer;" onmouseover="this.style.background='rgba(13,148,136,0.04)'" onmouseout="this.style.background=''" onclick="goToControlDetail('${cid}')">
               <td><span class="control-id">${c.id}</span></td>
               <td style="font-size:13px;">${c.n}</td>
               <td><span class="family-badge">${c.f}</span></td>
-              <td>${pillsHTML(c.bl)}</td>
-              <td>${pReqCell}</td>
-              <td style="font-size:12px;color:${co.name?'var(--navy)':'var(--text-muted)'};font-style:${co.name?'normal':'italic'};">${co.name||'Unassigned'}</td>
+              <td style="font-size:12px;color:${co.name?'var(--navy)':'var(--text-muted)'};font-style:${co.name?'normal':'italic'};">${escapeHTML(ownerName)}</td>
               <td style="font-size:12px;font-weight:${isDueSoon?'700':'400'};color:${isDueSoon?'#d97706':'var(--text-muted)'};">${ddStr}${isDueSoon?' ⚠️':''}</td>
               <td>${chipHTML(st)}</td>
               <td onclick="event.stopPropagation();" style="white-space:nowrap;">
@@ -391,25 +539,35 @@ function renderControlStep1() {
           <tbody>${outsideQueue.map(c => `<tr style="opacity:0.62;"><td><span class="control-id" style="opacity:0.8;">${c.id}</span></td><td style="font-size:13px;color:var(--text-muted);">${c.n}</td><td><span class="family-badge" style="opacity:0.65;">${c.f}</span></td><td style="font-size:11px;color:#334155;font-weight:600;">${escapeHTML(c.queueReason)}</td></tr>`).join('')}</tbody>
           </table></div></details>`;
     })()}`;
+
+  setTimeout(function() { filterControlList(); }, 0);
 }
 
 function filterControlList() {
-  const q   = (document.getElementById('ctrlSearch')?.value||'').toLowerCase();
-  const fam = document.getElementById('ctrlFamilyFilter')?.value||'';
-  const st  = document.getElementById('ctrlStatusFilter')?.value||'';
-  const des = document.getElementById('ctrlDeselectFilter')?.value||'';
-  document.querySelectorAll('#controlInventoryTable tbody tr').forEach(row => {
-    const matchQ = !q   || (row.dataset.id||'').toLowerCase().includes(q) || (row.cells[1]?.textContent||'').toLowerCase().includes(q);
-    const matchF = !fam || row.dataset.family===fam;
-    const matchS = !st  || row.dataset.status===st;
-    const matchD = !des || (des === 'deselected' && row.dataset.deselected === '1');
-    row.style.display = (matchQ && matchF && matchS && matchD) ? '' : 'none';
+  var fq = ensureControlQueueFilters();
+  var q = (fq.search || '').toLowerCase();
+  var fams = fq.families || [];
+  var owners = fq.owners || [];
+  var statuses = fq.statuses || [];
+  document.querySelectorAll('#controlInventoryTable tbody tr').forEach(function(row) {
+    var id = (row.dataset.id || '').toLowerCase();
+    var name = (row.cells[1] && row.cells[1].textContent || '').toLowerCase();
+    var rowFam = row.dataset.family || '';
+    var rowSt = row.dataset.status || '';
+    var rowOwner = row.dataset.owner || '';
+    var matchQ = !q || id.indexOf(q) !== -1 || name.indexOf(q) !== -1;
+    var matchF = !fams.length || fams.indexOf(rowFam) !== -1;
+    var matchO = !owners.length || owners.indexOf(rowOwner) !== -1;
+    var matchS = !statuses.length || statuses.indexOf(rowSt) !== -1;
+    row.style.display = (matchQ && matchF && matchO && matchS) ? '' : 'none';
   });
 }
 
 function goToControlDetail(ctrlId) {
   state._controlLibraryMode = false;
   state._selectedCtrl = ctrlId;
+  var ctrl = (getScopedControls() || []).find(function(c) { return c.id === ctrlId; });
+  if (ctrl && ctrl.f) state._controlDesignFamily = ctrl.f;
   showTab('control');
   goToStep('control', 2);
 }
@@ -764,10 +922,22 @@ function renderControlStep2() {
   var prevFormScrollTop = prevFormEl ? prevFormEl.scrollTop : 0;
   var prevPageScrollTop = window.scrollY || document.documentElement.scrollTop || 0;
 
-  const controls = getScopedControls().filter(c =>
-    !(state.controlStatus[c.id]||{}).returnedToPolicyOwner &&
-    !(state.controlStatus[c.id]||{}).recommendedDeselect
-  );
+  const allQueue = getMyDesignQueueControls();
+  if (!allQueue.length) {
+    var assignedBeforeGate = state.currentUserId && typeof getAssignedControlsForCurrentUser === 'function'
+      ? getAssignedControlsForCurrentUser() : [];
+    if (assignedBeforeGate.length) {
+      body.innerHTML = `<div class="empty-state"><div class="es-icon">📜</div><div class="es-title">Waiting on Domain Policies</div><p>Your assigned controls will appear here once the domain policy owner drafts the relevant policies.</p><button class="btn btn-secondary" onclick="goToStep('control',1)" style="margin-top:12px;">← Back to My Controls</button></div>`;
+    } else {
+      body.innerHTML = `<div class="empty-state"><div class="es-icon">📋</div><div class="es-title">No Controls to Design</div><p>No controls are in your design queue yet.</p><button class="btn btn-secondary" onclick="goToStep('control',1)" style="margin-top:12px;">← Back to My Controls</button></div>`;
+    }
+    updateControlStep2SidebarSubnav([]);
+    return;
+  }
+
+  const designFams = getDesignFamiliesForQueue();
+  const activeFam = ensureControlDesignFamily();
+  const controls = allQueue.filter(function(c) { return c.f === activeFam; });
   controls.forEach(c => {
     if (!state.controlStatus[c.id]) state.controlStatus[c.id] = { status:'Not Started', approach:'', narrative:'', evidence:[], notes:'' };
     if (!state.controlStatus[c.id].evidence) state.controlStatus[c.id].evidence = [];
@@ -776,13 +946,42 @@ function renderControlStep2() {
     state._selectedCtrl = controls[0]?.id || null;
   }
   const sel = controls.find(c=>c.id===state._selectedCtrl);
+  const famDesigned = controls.filter(function(c) { return isControlDesigned(c.id); }).length;
+  const famComplete = isControlFamilyDesignComplete(activeFam);
+  const totalDesigned = allQueue.filter(function(c) { return isControlDesigned(c.id); }).length;
+
+  updateControlStep2SidebarSubnav(designFams);
 
   body.innerHTML = `
-    <div style="display:flex;min-height:500px;height:calc(100vh - 320px);overflow:hidden;margin:-4px;">
+    <div style="display:flex;flex-direction:column;min-height:500px;height:calc(100vh - 320px);overflow:hidden;margin:-4px;">
+      <div style="padding:12px 16px;border-bottom:1px solid var(--border);background:white;flex-shrink:0;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
+          <div>
+            <div style="font-size:13px;font-weight:700;color:var(--navy);">Step 2 — Design by control family</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">${allQueue.length} control${allQueue.length === 1 ? '' : 's'} assigned to you · ${totalDesigned} designed overall</div>
+          </div>
+          <div style="font-size:11px;color:var(--teal);font-weight:700;">${activeFam} — ${FAMILIES[activeFam] || activeFam}: ${famDesigned}/${controls.length} designed${famComplete ? ' ✓' : ''}</div>
+        </div>
+        <div class="ctrl-family-subnav" style="display:flex;flex-wrap:wrap;gap:8px;">
+          ${designFams.map(function(fam, i) {
+            var letter = String.fromCharCode(97 + i);
+            var famCtrls = allQueue.filter(function(c) { return c.f === fam; });
+            var done = famCtrls.filter(function(c) { return isControlDesigned(c.id); }).length;
+            var complete = isControlFamilyDesignComplete(fam);
+            var isActive = fam === activeFam;
+            var famKey = fam.replace(/'/g, "\\'");
+            return '<button type="button" class="ctrl-family-chip' + (isActive ? ' active' : '') + (complete ? ' complete' : '') + '" onclick="selectControlDesignFamily(\'' + famKey + '\')">'
+              + '<span class="ctrl-family-chip-label">2' + letter + ' · ' + fam + '</span>'
+              + '<span class="ctrl-family-chip-meta">' + (complete ? '✓' : (done + '/' + famCtrls.length)) + '</span>'
+              + '</button>';
+          }).join('')}
+        </div>
+      </div>
+      <div style="display:flex;flex:1;overflow:hidden;">
       <!-- LEFT: control list -->
       <div style="width:260px;flex-shrink:0;border-right:1px solid var(--border);display:flex;flex-direction:column;background:#fafbfc;">
         <div style="padding:12px 14px;border-bottom:1px solid var(--border);">
-          <input type="text" class="form-input" style="font-size:12px;" placeholder="🔍  Filter controls…" id="ctrlDetailSearch" oninput="filterCtrlDetailList()">
+          <input type="text" class="form-input" style="font-size:12px;" placeholder="🔍  Filter ${activeFam} controls…" id="ctrlDetailSearch" oninput="filterCtrlDetailList()">
         </div>
         <div style="overflow-y:auto;flex:1;" id="ctrlDetailList">
           ${controls.map(c => {
@@ -806,6 +1005,7 @@ function renderControlStep2() {
       <!-- RIGHT: detail form -->
       <div style="flex:1;overflow-y:auto;padding:20px 24px;" id="ctrlDetailForm">
         ${sel ? renderControlDetailForm(sel) : '<div class="empty-state"><div class="es-title">Select a control from the list</div></div>'}
+      </div>
       </div>
     </div>`;
 
@@ -1506,9 +1706,7 @@ function renderControlDetailForm(ctrl) {
   const co  = (state.controlOwners||{})[ctrl.id] || {};
   const st  = cs.status || 'Not Started';
   const pn  = (() => {
-    const ctrls = getScopedControls().filter(c =>
-      !(state.controlStatus[c.id]||{}).returnedToPolicyOwner &&
-      !(state.controlStatus[c.id]||{}).recommendedDeselect);
+    const ctrls = getMyDesignQueueControls().filter(function(c) { return c.f === ctrl.f; });
     const idx = ctrls.findIndex(c=>c.id===ctrl.id);
     return { prev: idx>0?ctrls[idx-1].id:null, next: idx<ctrls.length-1?ctrls[idx+1].id:null };
   })();
@@ -1527,6 +1725,12 @@ function renderControlDetailForm(ctrl) {
   return `
     <!-- ① Control header -->
     <div style="background:var(--navy);color:white;border-radius:10px;padding:18px 20px;margin-bottom:20px;">
+      <div style="margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid rgba(255,255,255,0.18);">
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.55px;opacity:0.72;">Control Owner</div>
+        <div style="font-size:16px;font-weight:800;margin-top:4px;">${escapeHTML(co.name || 'Unassigned')}</div>
+        ${co.email ? '<div style="font-size:12px;opacity:0.88;margin-top:2px;">' + escapeHTML(co.email) + '</div>' : ''}
+        ${co.role ? '<div style="font-size:11px;opacity:0.7;margin-top:2px;">' + escapeHTML(co.role) + '</div>' : ''}
+      </div>
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
         <div>
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">

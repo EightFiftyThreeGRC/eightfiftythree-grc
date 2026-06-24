@@ -1127,6 +1127,133 @@
       box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
     }
 
+    .control-table .col-filter-row th {
+      padding: 6px 8px;
+      background: #f8fafc;
+      vertical-align: top;
+    }
+
+    .ms-filter-btn {
+      width: 100%;
+      text-align: left;
+      font-size: 10px;
+      padding: 4px 6px;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      background: white;
+      color: var(--navy);
+      cursor: pointer;
+    }
+
+    .ms-filter-btn.active {
+      border-color: var(--teal);
+      background: rgba(13, 148, 136, 0.06);
+      color: var(--teal);
+      font-weight: 600;
+    }
+
+    .ms-filter-menu {
+      position: absolute;
+      z-index: 50;
+      top: calc(100% + 4px);
+      left: 0;
+      right: 0;
+      min-width: 160px;
+      max-height: 200px;
+      overflow-y: auto;
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      box-shadow: 0 6px 18px rgba(15, 23, 42, 0.12);
+      padding: 6px;
+    }
+
+    .ms-filter-option {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 6px;
+      font-size: 11px;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+
+    .ms-filter-option:hover {
+      background: #f8fafc;
+    }
+
+    .ms-filter-clear {
+      width: 100%;
+      margin-top: 4px;
+      font-size: 10px;
+    }
+
+    .ctrl-family-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: #f8fafc;
+      font-size: 11px;
+      color: var(--navy);
+      cursor: pointer;
+    }
+
+    .ctrl-family-chip.active {
+      border-color: var(--teal);
+      background: rgba(13, 148, 136, 0.08);
+      color: var(--teal);
+      font-weight: 700;
+    }
+
+    .ctrl-family-chip.complete:not(.active) {
+      border-color: #86efac;
+      background: #f0fdf4;
+      color: #166534;
+    }
+
+    .ctrl-family-chip-meta {
+      font-weight: 700;
+      font-size: 10px;
+    }
+
+    .control-step-subnav {
+      margin: 4px 0 8px 38px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .control-substep-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 11px;
+      color: var(--text-muted);
+      padding: 4px 8px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    .control-substep-item:hover {
+      background: rgba(13, 148, 136, 0.06);
+      color: var(--navy);
+    }
+
+    .control-substep-item.active {
+      color: var(--teal);
+      font-weight: 700;
+      background: rgba(13, 148, 136, 0.08);
+    }
+
+    .control-substep-item.complete .control-substep-check {
+      color: #166534;
+      font-weight: 800;
+    }
+
     /* Metrics Grid */
     .metrics-grid {
       display: grid;
