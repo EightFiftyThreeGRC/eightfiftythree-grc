@@ -77,9 +77,17 @@ function getNextActions() {
 
   var polReview = (state.policyStatus || {});
   Object.keys(polReview).forEach(function(fam) {
+    if (fam === 'ISP') return;
     var st = (polReview[fam] || {}).status;
-    if (st === 'Submitted' || st === 'In Review') {
-      actions.push({ priority: 2, icon: '📋', label: 'Review policy: ' + fam, desc: 'Domain policy awaiting CISO approval.', action: "openCISOReview('" + fam.replace(/'/g, "\\'") + "');" });
+    if (st === 'Under Review' && typeof canSessionApproveDomainPolicy === 'function' && canSessionApproveDomainPolicy(fam)) {
+      var title = typeof getPolicyMergedTitle === 'function' ? getPolicyMergedTitle(fam) : fam;
+      actions.push({
+        priority: 2,
+        icon: '📋',
+        label: 'Approve policy: ' + title,
+        desc: 'Domain policy awaiting your sign-off.',
+        action: "openCISOReview('" + fam.replace(/'/g, "\\'") + "');"
+      });
     }
   });
 

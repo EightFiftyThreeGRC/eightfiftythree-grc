@@ -3998,7 +3998,11 @@ function confirmSubmitDomainPolicy() {
   const fam = state._policyDomain || getActiveFamilies().filter(f=>f!=='PM')[0];
   if (!state.policyStatus) state.policyStatus = {};
   if (!state.policyStatus[fam]) state.policyStatus[fam] = {};
-  var rc = (state.policyReviewCycle || {})[fam] || {};
+  if (!state.policyReviewCycle) state.policyReviewCycle = {};
+  var rc = state.policyReviewCycle[fam] || (state.policyReviewCycle[fam] = {});
+  if (typeof validateDomainApproverAssignment === 'function') {
+    if (!validateDomainApproverAssignment(fam, rc, false)) return;
+  }
   var useCustom = rc._customApprover && (rc.approvedBy || '').trim();
   var reviewerName = useCustom ? rc.approvedBy.trim() : (state.programOwner || '').trim();
   var reviewerRole = useCustom ? (rc.approverRole || '').trim() : (state.programOwnerTitle || 'CISO').trim();
@@ -4010,8 +4014,38 @@ function confirmSubmitDomainPolicy() {
   state.policyStatus[fam].status = 'Under Review';
   state.policyStatus[fam].lastUpdated = new Date().toLocaleDateString();
   state.policyStatus[fam].version = state.domainPolicies?.[fam]?.version||'1.0';
+  try {
+    addAuditEntry('policy', fam, 'Domain policy submitted for approval — routed to ' + reviewerName + (reviewerRole ? ' (' + reviewerRole + ')' : ''));
+  } catch (e) { /* ignore */ }
   document.getElementById('submitModalOverlay')?.remove();
-  showToast('\u2705 Policy submitted for CISO review — routed to ' + (reviewerName || 'program owner') + '.');
+  var cloudActive = typeof isCloudSessionActive === 'function' && isCloudSessionActive();
+  var wantApproverEmail = useCustom && reviewerEmail;
+  if (wantApproverEmail && typeof sendISPApprovalRequestEmail === 'function' && cloudActive) {
+    try { if (typeof syncUsersFromState === 'function') syncUsersFromState(); } catch (e) { /* ignore */ }
+    markDirty();
+    var pushThenEmail = typeof cloudPushNow === 'function' ? cloudPushNow().catch(function() {}) : Promise.resolve();
+    pushThenEmail.then(function() {
+      return sendISPApprovalRequestEmail({
+        approverEmail: reviewerEmail,
+        approverName: reviewerName,
+        programOwnerName: (state.programOwner || '').trim(),
+        orgName: state.orgName || 'your organization'
+      });
+    }).then(function(res) {
+      if (res && res.ok) {
+        showToast('\u2705 Policy submitted — sign-up link emailed to ' + reviewerName + '.');
+      } else if (res && res.reason) {
+        showToast('Policy submitted to ' + reviewerName + ', but the approver email could not be sent: '
+          + (typeof formatApproverEmailFailure === 'function' ? formatApproverEmailFailure(res.reason) : res.reason), true);
+      } else {
+        showToast('\u2705 Policy submitted for review — routed to ' + reviewerName + '.');
+      }
+    });
+  } else if (wantApproverEmail && !cloudActive) {
+    showToast('\u2705 Policy submitted to ' + reviewerName + '. Sign in (cloud mode) to email ' + reviewerEmail + ' a sign-up link.', true);
+  } else {
+    showToast('\u2705 Policy submitted for review — routed to ' + (reviewerName || 'program owner') + '.');
+  }
   markDirty();
   exitPolicyWizard();
 }

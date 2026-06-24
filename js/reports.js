@@ -17,6 +17,10 @@ function openCISOReview(fam) {
   const purpose = dp.purpose || ((DOMAIN_DEFAULTS[fam]||DOMAIN_DEFAULT_GENERIC).purpose || '');
   const scope = dp.scope || ((DOMAIN_DEFAULTS[fam]||DOMAIN_DEFAULT_GENERIC).scope || '');
   const requirements = dp.requirements || [];
+  const canDecide = typeof canSessionApproveDomainPolicy === 'function' && canSessionApproveDomainPolicy(fam);
+  const pendingApprover = typeof getDomainDesignatedApproverName === 'function' ? getDomainDesignatedApproverName(fam) : getPolicyPendingReviewerDisplay(fam);
+  const sodBlocked = !canDecide && typeof domainPolicyApproverViolatesSeparationOfDuties === 'function'
+    && domainPolicyApproverViolatesSeparationOfDuties(fam, typeof getSessionEmailForApproval === 'function' ? getSessionEmailForApproval() : '', '');
 
   const existingOverlay = document.getElementById('cisoReviewOverlay');
   if (existingOverlay) existingOverlay.remove();
@@ -64,13 +68,23 @@ function openCISOReview(fam) {
 
       <!-- Review Action Panel -->
       <div style="padding:24px 28px;">
+        ${canDecide ? `
         <div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:10px;">Review Notes</div>
         <textarea id="cisoReviewNotes" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:12px;font-size:13px;resize:vertical;min-height:80px;font-family:inherit;" placeholder="Add your review notes here — required when returning to submitter, optional when approving…"></textarea>
         <div style="display:flex;gap:10px;margin-top:16px;justify-content:flex-end;">
           <button onclick="document.getElementById('cisoReviewOverlay').remove()" style="padding:10px 20px;border:1px solid var(--border);border-radius:8px;background:white;cursor:pointer;font-size:13px;font-weight:600;color:var(--text-muted);">Cancel</button>
           <button onclick="cisoReturnPolicy('${fam}')" style="padding:10px 20px;border:1px solid rgba(239,68,68,0.4);border-radius:8px;background:white;cursor:pointer;font-size:13px;font-weight:600;color:var(--red);">↩ Return to ${escapeHTML(owner.name||'Submitter')}</button>
           <button onclick="cisoApprovePolicy('${fam}')" style="padding:10px 20px;border:none;border-radius:8px;background:var(--teal);cursor:pointer;font-size:13px;font-weight:700;color:white;">✓ Approve Policy</button>
+        </div>` : `
+        <div style="font-size:13px;color:var(--text-muted);line-height:1.6;background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.2);border-radius:10px;padding:14px 16px;">
+          This policy is awaiting approval from <strong>${escapeHTML(pendingApprover || 'the designated approver')}</strong>.
+          ${sodBlocked
+            ? ' You drafted this policy — a different person must approve it (separation of duties).'
+            : ' Only the designated approver can sign off from this screen.'}
         </div>
+        <div style="display:flex;gap:10px;margin-top:16px;justify-content:flex-end;">
+          <button onclick="document.getElementById('cisoReviewOverlay').remove()" style="padding:10px 20px;border:1px solid var(--border);border-radius:8px;background:white;cursor:pointer;font-size:13px;font-weight:600;color:var(--text-muted);">Close</button>
+        </div>`}
       </div>
     </div>`;
 
@@ -218,13 +232,20 @@ function viewISPModal() {
 }
 
 function cisoApprovePolicy(fam) {
+  if (typeof canSessionApproveDomainPolicy === 'function' && !canSessionApproveDomainPolicy(fam)) {
+    showToast('Only the designated approver can approve this policy. The drafter cannot approve their own work (separation of duties).', true);
+    return;
+  }
   if (!state.policyStatus) state.policyStatus = {};
   const notes = document.getElementById('cisoReviewNotes')?.value.trim() || '';
-  var approverTitle = state.programOwnerTitle || 'CISO';
+  var approverTitle = typeof getDomainDesignatedApproverName === 'function'
+    ? getDomainDesignatedApproverName(fam) : (state.programOwnerTitle || 'CISO');
+  var actorName = typeof getSessionActorName === 'function'
+    ? getSessionActorName(approverTitle) : approverTitle;
   var prev = state.policyStatus[fam] || {};
   state.policyStatus[fam] = {
     status: 'Approved',
-    approvedBy: state.programOwner || approverTitle,
+    approvedBy: actorName || approverTitle,
     approvedDate: new Date().toISOString().slice(0, 10),
     notes: notes,
     submittedAt: prev.submittedAt || '',
@@ -236,7 +257,7 @@ function cisoApprovePolicy(fam) {
   if (!state.domainPolicies) state.domainPolicies = {};
   if (!state.domainPolicies[fam]) state.domainPolicies[fam] = {};
   if (!state.domainPolicies[fam].revisionHistory) state.domainPolicies[fam].revisionHistory = [];
-  state.domainPolicies[fam].revisionHistory.push({ version: '1.0', date: new Date().toISOString().slice(0,10), author: state.programOwner||approverTitle, changes: 'Approved by ' + approverTitle + '.' + (notes ? ' Notes: ' + notes : '') });
+  state.domainPolicies[fam].revisionHistory.push({ version: '1.0', date: new Date().toISOString().slice(0,10), author: actorName||approverTitle, changes: 'Approved by ' + (actorName||approverTitle) + '.' + (notes ? ' Notes: ' + notes : '') });
   markDirty();
   document.getElementById('cisoReviewOverlay')?.remove();
   showToast('✅ Policy approved — ' + getPolicyMergedTitle(fam));
@@ -244,11 +265,17 @@ function cisoApprovePolicy(fam) {
 }
 
 function cisoReturnPolicy(fam) {
+  if (typeof canSessionApproveDomainPolicy === 'function' && !canSessionApproveDomainPolicy(fam)) {
+    showToast('Only the designated approver can return this policy for revision.', true);
+    return;
+  }
   const notes = document.getElementById('cisoReviewNotes')?.value.trim() || '';
   if (!notes) { showToast('Please add review notes before returning the policy.', true); return; }
   if (!state.policyStatus) state.policyStatus = {};
   var prevR = state.policyStatus[fam] || {};
-  var retBy = state.programOwner || (state.programOwnerTitle || 'CISO');
+  var retBy = typeof getSessionActorName === 'function'
+    ? getSessionActorName(typeof getDomainDesignatedApproverName === 'function' ? getDomainDesignatedApproverName(fam) : (state.programOwner || 'CISO'))
+    : (state.programOwner || (state.programOwnerTitle || 'CISO'));
   state.policyStatus[fam] = {
     status: 'Returned',
     returnedDate: new Date().toISOString().slice(0, 10),
@@ -400,7 +427,9 @@ function renderProgramDashboard(controls, families) {
       + '</div>'
       + (isReturnedToCiso
           ? '<button class="btn btn-secondary btn-sm" onclick="openReturnedPolicyReassignment(\'' + fam + '\')">Reassign →</button>'
-          : '<button class="btn btn-secondary btn-sm" onclick="openCISOReview(\'' + fam + '\')">Review →</button>')
+          : ((typeof canSessionApproveDomainPolicy === 'function' && canSessionApproveDomainPolicy(fam))
+              ? '<button class="btn btn-secondary btn-sm" onclick="openCISOReview(\'' + fam + '\')">Review →</button>'
+              : '<span style="font-size:11px;color:var(--text-muted);font-style:italic;">Awaiting designated approver</span>'))
       + '</div>';
   }).join('');
 

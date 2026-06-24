@@ -219,6 +219,15 @@ function toggleCustomApprover(policyKey, checkbox) {
     }
     return;
   }
+  if (policyKey !== 'ISP' && !isCustom
+      && typeof domainPolicyRequiresSeparateApprover === 'function'
+      && domainPolicyRequiresSeparateApprover(policyKey)) {
+    checkbox.checked = true;
+    if (typeof showToast === 'function') {
+      showToast('This domain policy must be approved by someone other than the policy drafter (separation of duties).', true);
+    }
+    return;
+  }
   rc._customApprover = isCustom;
   if (!isCustom) {
     // Domain policies are drafted by the ISSM but formally approved by the program owner (CISO) unless "Different approver" is used.
@@ -249,6 +258,12 @@ function renderReviewCycleCard(policyKey, label) {
   if (policyKey === 'ISP' && !rc._customApprover) {
     rc._customApprover = true;
   }
+  if (policyKey !== 'ISP'
+      && typeof domainPolicyRequiresSeparateApprover === 'function'
+      && domainPolicyRequiresSeparateApprover(policyKey)
+      && !rc._customApprover) {
+    rc._customApprover = true;
+  }
 
   // Legacy: domain cards used ISSM name as "Approved By" while the badge said Program Owner — realign to program owner when still the old mistaken value.
   if (policyKey !== 'ISP' && !rc._customApprover) {
@@ -269,10 +284,16 @@ function renderReviewCycleCard(policyKey, label) {
   // Always render both the default badge and the custom fields — the checkbox
   // toggles display:none/block on the custom div. No innerHTML swap needed.
   var isCustom = !!rc._customApprover;
+  var requiresSeparate = policyKey !== 'ISP'
+    && typeof domainPolicyRequiresSeparateApprover === 'function'
+    && domainPolicyRequiresSeparateApprover(policyKey);
   var approverHTML = '';
-  if (policyKey === 'ISP') {
+  if (policyKey === 'ISP' || requiresSeparate) {
+    var sodNote = policyKey === 'ISP'
+      ? 'The Tier 1 ISP must be approved by someone other than the program owner (separation of duties). Assign a senior reviewer below.'
+      : 'You are drafting this domain policy — it must be approved by someone other than you (separation of duties). Assign a separate reviewer below.';
     approverHTML = '<div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;line-height:1.45;">'
-      + 'The Tier 1 ISP must be approved by someone other than the program owner (separation of duties). Assign a senior reviewer below.</div>'
+      + sodNote + '</div>'
       + '<div id="custom-approver-' + policyKey + '" style="display:block;margin-top:0;">'
       + '<div style="display:flex;gap:4px;">'
       + '<input class="form-input" style="font-size:12px;width:33%;" placeholder="Approver name" autocomplete="off" value="' + escapeHTML(rc.approvedBy||'') + '" oninput="state.policyReviewCycle[\'' + escKey + '\'].approvedBy=this.value; window.markDirty();">'

@@ -402,6 +402,107 @@ function validateISPApproverAssignment(rc, silent) {
   return true;
 }
 
+// ── Domain policy approver authorization (separation of duties) ───────────────
+function getDomainPolicyOwnerIdentity(fam) {
+  var owner = ((state.domainOwners || {})[fam] || {});
+  return {
+    email: typeof normalizeOwnerEmail === 'function'
+      ? normalizeOwnerEmail(owner.email) : String(owner.email || '').trim().toLowerCase(),
+    name: (owner.name || '').trim().toLowerCase()
+  };
+}
+
+/** True when the domain owner is also the default approver (program owner). */
+function domainPolicyRequiresSeparateApprover(fam) {
+  var owner = getDomainPolicyOwnerIdentity(fam);
+  var poEmail = typeof normalizeOwnerEmail === 'function'
+    ? normalizeOwnerEmail(state.programOwnerEmail) : String(state.programOwnerEmail || '').trim().toLowerCase();
+  var poName = (state.programOwner || '').trim().toLowerCase();
+  if (owner.email && poEmail && owner.email === poEmail) return true;
+  if (owner.name && poName && owner.name === poName) return true;
+  return false;
+}
+
+function getDomainDesignatedApproverEmail(fam) {
+  var ps = (state.policyStatus || {})[fam] || {};
+  var rc = (state.policyReviewCycle || {})[fam] || {};
+  var email = (ps.submittedToEmail || rc.approverEmail || '').trim();
+  if (!email && !rc._customApprover) email = (state.programOwnerEmail || '').trim();
+  return typeof normalizeOwnerEmail === 'function' ? normalizeOwnerEmail(email) : String(email).trim().toLowerCase();
+}
+
+function getDomainDesignatedApproverName(fam) {
+  var ps = (state.policyStatus || {})[fam] || {};
+  var rc = (state.policyReviewCycle || {})[fam] || {};
+  var nm = (ps.submittedTo || rc.approvedBy || '').trim();
+  if (!nm && !rc._customApprover) nm = (state.programOwner || '').trim();
+  return nm;
+}
+
+function domainPolicyApproverViolatesSeparationOfDuties(fam, approverEmail, approverName) {
+  var owner = getDomainPolicyOwnerIdentity(fam);
+  var em = typeof normalizeOwnerEmail === 'function'
+    ? normalizeOwnerEmail(approverEmail) : String(approverEmail || '').trim().toLowerCase();
+  var nm = (approverName || '').trim().toLowerCase();
+  if (owner.email && em && owner.email === em) return true;
+  if (owner.name && nm && owner.name === nm) return true;
+  return false;
+}
+
+function validateDomainApproverAssignment(fam, rc, silent) {
+  rc = rc || (state.policyReviewCycle || {})[fam] || {};
+  if (domainPolicyRequiresSeparateApprover(fam) && !rc._customApprover) {
+    if (!silent && typeof showToast === 'function') {
+      showToast('This domain policy must be approved by someone other than the policy drafter. Turn on "Different approver" and assign a separate reviewer.', true);
+    }
+    return false;
+  }
+  var useCustom = !!rc._customApprover;
+  var approverEmail = useCustom ? (rc.approverEmail || '').trim() : (state.programOwnerEmail || '').trim();
+  var approverName = useCustom ? (rc.approvedBy || '').trim() : (state.programOwner || '').trim();
+  if (useCustom) {
+    if (typeof isValidOwnerEmail === 'function' && !isValidOwnerEmail(approverEmail)) {
+      if (!silent && typeof showToast === 'function') {
+        showToast('Enter a valid approver email — they will receive a sign-up link to review this policy.', true);
+      }
+      return false;
+    }
+    if (!approverName) {
+      if (!silent && typeof showToast === 'function') {
+        showToast('Enter the approver name in the Policy Review card.', true);
+      }
+      return false;
+    }
+  }
+  if (domainPolicyApproverViolatesSeparationOfDuties(fam, approverEmail, approverName)) {
+    if (!silent && typeof showToast === 'function') {
+      showToast('The policy approver must be a different person than the domain policy owner who drafted it (separation of duties).', true);
+    }
+    return false;
+  }
+  return true;
+}
+
+function canSessionApproveDomainPolicy(fam) {
+  var ps = (state.policyStatus || {})[fam] || {};
+  if (ps.status !== 'Under Review') return false;
+  var approverEmail = getDomainDesignatedApproverEmail(fam);
+  if (approverEmail) {
+    var sessionEmail = getSessionEmailForApproval();
+    if (domainPolicyApproverViolatesSeparationOfDuties(fam, sessionEmail, '')) return false;
+    if (sessionEmail && sessionEmail === approverEmail) return true;
+  }
+  if (isCloudSessionActive()) return false;
+  if (!state.currentUserId) {
+    return !domainPolicyApproverViolatesSeparationOfDuties(fam, state.programOwnerEmail, state.programOwner);
+  }
+  var user = (state.users || []).find(function(u) { return u.id === state.currentUserId; });
+  if (!user) return false;
+  if (domainPolicyApproverViolatesSeparationOfDuties(fam, user.email, user.name)) return false;
+  var approverName = getDomainDesignatedApproverName(fam).toLowerCase();
+  return approverName && user.name && user.name.trim().toLowerCase() === approverName;
+}
+
 // ── sign-in gate UI ──────────────────────────────────────────────────────────
 // Show only the sign-in methods that are turned on in CLOUD_CONFIG.
 function renderCloudGateMethods() {
@@ -1171,6 +1272,12 @@ if (typeof window !== 'undefined') {
   window.canSessionReviseReturnedISP = canSessionReviseReturnedISP;
   window.ispApproverViolatesSeparationOfDuties = ispApproverViolatesSeparationOfDuties;
   window.validateISPApproverAssignment = validateISPApproverAssignment;
+  window.domainPolicyRequiresSeparateApprover = domainPolicyRequiresSeparateApprover;
+  window.getDomainDesignatedApproverEmail = getDomainDesignatedApproverEmail;
+  window.getDomainDesignatedApproverName = getDomainDesignatedApproverName;
+  window.domainPolicyApproverViolatesSeparationOfDuties = domainPolicyApproverViolatesSeparationOfDuties;
+  window.validateDomainApproverAssignment = validateDomainApproverAssignment;
+  window.canSessionApproveDomainPolicy = canSessionApproveDomainPolicy;
   window.requestPasswordReset = requestPasswordReset;
   window.completePasswordReset = completePasswordReset;
   window.showCloudPasswordResetForm = showCloudPasswordResetForm;
