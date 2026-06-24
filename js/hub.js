@@ -153,7 +153,24 @@ function getNextActions() {
       icon: '\u21A9',
       label: 'Revise policy: ' + title,
       desc: domainDesc,
-      action: "showTab('policy');enterPolicyWizard('" + fam.replace(/'/g, "\\'") + "');"
+      action: "typeof openReturnedDomainPolicyRevision === 'function' ? openReturnedDomainPolicyRevision('" + fam.replace(/'/g, "\\'") + "') : showTab('policy');"
+    });
+  });
+
+  var returnedNeedOwner = typeof getSessionReturnedDomainPoliciesNeedingOwner === 'function'
+    ? getSessionReturnedDomainPoliciesNeedingOwner() : [];
+  returnedNeedOwner.forEach(function(fam) {
+    var title = typeof getPolicyMergedTitle === 'function' ? getPolicyMergedTitle(fam) : fam;
+    var domainNotes = String(((state.policyStatus || {})[fam] || {}).notes || '').trim();
+    var domainDesc = domainNotes
+      ? 'Returned — assign an owner before revision: ' + domainNotes.slice(0, 60) + (domainNotes.length > 60 ? '\u2026' : '')
+      : 'Returned domain policy has no owner assigned yet.';
+    actions.push({
+      priority: 0,
+      icon: '\ud83d\udc64',
+      label: 'Assign policy owner: ' + title,
+      desc: domainDesc,
+      action: "typeof openAssignDomainPolicyOwnerModal === 'function' ? openAssignDomainPolicyOwnerModal('" + fam.replace(/'/g, "\\'") + "') : showTab('policy');"
     });
   });
 
@@ -162,13 +179,15 @@ function getNextActions() {
       if (fam === 'ISP') return;
       var ps = state.policyStatus[fam] || {};
       if (ps.status !== 'Returned' || !ps.returnedForReassignment) return;
+      if (typeof returnedDomainPolicyNeedsOwnerAssignment === 'function'
+          && returnedDomainPolicyNeedsOwnerAssignment(fam)) return;
       var title = typeof getPolicyMergedTitle === 'function' ? getPolicyMergedTitle(fam) : fam;
       actions.push({
         priority: 1,
         icon: '\u21A9',
         label: 'Reassign policy: ' + title,
         desc: 'A domain owner returned this policy for reassignment.',
-        action: "typeof openReturnedPolicyReassignment === 'function' ? openReturnedPolicyReassignment('" + fam.replace(/'/g, "\\'") + "') : startProgramSetup();"
+        action: "typeof openAssignDomainPolicyOwnerModal === 'function' ? openAssignDomainPolicyOwnerModal('" + fam.replace(/'/g, "\\'") + "') : startProgramSetup();"
       });
     });
   }
@@ -229,7 +248,7 @@ function countImplementedControls() {
 
 function userHasPolicyDraftWork(user) {
   if (typeof canSessionReviseReturnedISP === 'function' && canSessionReviseReturnedISP()) return true;
-  if (typeof getSessionReturnedDomainPolicyFamilies === 'function' && getSessionReturnedDomainPolicyFamilies().length) return true;
+  if (typeof getSessionReturnedDomainPoliciesNeedingOwner === 'function' && getSessionReturnedDomainPoliciesNeedingOwner().length) return true;
   if (!user) {
     if (typeof getISPStatus === 'function' && getISPStatus() !== 'Approved') return true;
     var allFams = typeof getMasterPolicyFamilies === 'function' ? getMasterPolicyFamilies() : [];

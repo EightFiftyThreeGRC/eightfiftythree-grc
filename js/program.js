@@ -2681,11 +2681,70 @@ function renderCISOStep4b() {
 }
 
 function reassignReturnedPolicy(fam) {
+  if (typeof openAssignDomainPolicyOwnerModal === 'function') {
+    openAssignDomainPolicyOwnerModal(fam);
+    return;
+  }
   const input = document.getElementById('reassign-input-' + fam);
   const newEmail = (input ? input.value : '').trim();
   if (!isValidOwnerEmail(newEmail)) { showToast('Please enter a valid owner email.', true); return; }
   reassignReturnedPolicyByEmail(fam, newEmail);
   renderActiveCisoSetupStep();
+}
+
+/** Assign (or reassign) the policy owner for a returned domain — no wizard. */
+function assignOwnerToReturnedDomainPolicy(fam, meta) {
+  meta = meta || {};
+  var name = (meta.name || '').trim();
+  var email = (meta.email || '').trim();
+  var role = (meta.role || '').trim() || (DOMAIN_SUGGESTED_ROLES[fam] || 'Security Manager');
+  if (!isValidOwnerEmail(email)) {
+    showToast('Enter a valid owner email.', true);
+    return false;
+  }
+  if (!name) {
+    showToast('Enter the policy owner name.', true);
+    return false;
+  }
+  if (!state.domainOwners) state.domainOwners = {};
+  if (!state.policyStatus) state.policyStatus = {};
+  var merges = state.policyMerges || {};
+  var families = getActiveFamilies().filter(function(f) { return f !== 'PM'; });
+  var masterFam = merges[fam] || fam;
+  var relatedFams = [masterFam].concat(families.filter(function(f) { return merges[f] === masterFam; }));
+  var psMaster = state.policyStatus[masterFam] || {};
+  var keepReturned = psMaster.status === 'Returned'
+    && (psMaster.returnedForRevision || !psMaster.returnedForReassignment);
+  var policyTitle = typeof getPolicyMergedTitle === 'function' ? getPolicyMergedTitle(masterFam) : masterFam;
+
+  relatedFams.forEach(function(targetFam) {
+    state.domainOwners[targetFam] = { name: name, email: email, role: role };
+    delete state.domainOwners[targetFam].isDemoPlaceholder;
+    if (!state.policyStatus[targetFam]) state.policyStatus[targetFam] = {};
+    if (keepReturned) {
+      state.policyStatus[targetFam].status = 'Returned';
+      state.policyStatus[targetFam].returnedForRevision = true;
+      state.policyStatus[targetFam].submittedTo = name;
+      state.policyStatus[targetFam].submittedToEmail = email;
+      state.policyStatus[targetFam].submittedToRole = role;
+    } else {
+      state.policyStatus[targetFam].status = 'Not Started';
+      delete state.policyStatus[targetFam].returnedAt;
+      delete state.policyStatus[targetFam].returnedDate;
+      delete state.policyStatus[targetFam].returnedBy;
+      delete state.policyStatus[targetFam].returnedForReassignment;
+      delete state.policyStatus[targetFam].returnedForRevision;
+      delete state.policyStatus[targetFam].notes;
+    }
+    if (typeof autoPopulateControlOwnersFromDomain === 'function') {
+      autoPopulateControlOwnersFromDomain(targetFam);
+    }
+  });
+  if (typeof syncUsersFromState === 'function') syncUsersFromState();
+  addAuditEntry('policy', masterFam, 'Assigned policy owner ' + name + ' (' + email + ') for returned ' + policyTitle + '.');
+  markDirty();
+  showToast('\u2705 Policy owner assigned \u2014 ' + name);
+  return true;
 }
 
 function reassignReturnedPolicyByName(fam, newOwner) {

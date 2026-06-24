@@ -630,6 +630,10 @@ function renderProgramDashboard(controls, families) {
 }
 
 function openReturnedPolicyReassignment(fam) {
+  if (typeof openAssignDomainPolicyOwnerModal === 'function') {
+    openAssignDomainPolicyOwnerModal(fam);
+    return;
+  }
   var canReassign = typeof canReassignProgramWork === 'function'
     ? canReassignProgramWork()
     : (!state.currentUserId || ((state.users || []).find(function(u){ return u.id === state.currentUserId; }) || {}).role === 'ciso');
@@ -637,21 +641,7 @@ function openReturnedPolicyReassignment(fam) {
     showToast('Only the CISO or program owner can reassign returned policies.', true);
     return;
   }
-  var hintOwner = ((state.domainOwners || {})[fam] || {}).name || '';
-  var promptMsg = 'Reassign owner for ' + fam + ' policy' + (hintOwner ? ' (current: ' + hintOwner + ')' : '') + ':\nEnter full name';
-  var nextOwner = window.prompt(promptMsg, hintOwner);
-  if (nextOwner == null) return;
-  nextOwner = String(nextOwner || '').trim();
-  if (!nextOwner) {
-    showToast('Please enter a new owner name.', true);
-    return;
-  }
-  if (typeof reassignReturnedPolicyByName === 'function') {
-    var ok = reassignReturnedPolicyByName(fam, nextOwner);
-    if (ok) renderReports();
-    return;
-  }
-  showToast('Reassignment helper is unavailable. Open Program Setup Step 5 to reassign.', true);
+  showToast('Assignment modal is unavailable. Open Program Setup to reassign.', true);
 }
 
 function getScopedFamilies() {
@@ -1044,6 +1034,20 @@ function renderReturnedWorkCallout(user) {
     );
   }
 
+  if (typeof getSessionReturnedDomainPoliciesNeedingOwner === 'function') {
+    getSessionReturnedDomainPoliciesNeedingOwner().forEach(function(fam) {
+      var title = typeof getPolicyMergedTitle === 'function' ? getPolicyMergedTitle(fam) : fam;
+      var notes = String(((state.policyStatus || {})[fam] || {}).notes || '').trim();
+      cards.push(
+        '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:#fff;border:1px solid rgba(245,158,11,0.35);border-radius:10px;padding:12px 14px;">'
+        + '<div><div style="font-size:13px;font-weight:700;color:#92400e;">' + escapeHTML(title) + ' needs an owner</div>'
+        + '<div style="font-size:12px;color:#78350f;">' + escapeHTML(notes || 'Returned — assign a policy owner to continue.') + '</div></div>'
+        + '<button class="btn btn-primary btn-sm" onclick="typeof openAssignDomainPolicyOwnerModal===\'function\'?openAssignDomainPolicyOwnerModal(\'' + fam.replace(/'/g, "\\'") + '\'):goToPoliciesHome()">Assign owner</button>'
+        + '</div>'
+      );
+    });
+  }
+
   if (typeof getSessionReturnedDomainPolicyFamilies === 'function') {
     getSessionReturnedDomainPolicyFamilies().forEach(function(fam) {
       var title = typeof getPolicyMergedTitle === 'function' ? getPolicyMergedTitle(fam) : fam;
@@ -1052,7 +1056,7 @@ function renderReturnedWorkCallout(user) {
         '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:#fff;border:1px solid rgba(245,158,11,0.35);border-radius:10px;padding:12px 14px;">'
         + '<div><div style="font-size:13px;font-weight:700;color:#92400e;">' + escapeHTML(title) + ' returned for revision</div>'
         + '<div style="font-size:12px;color:#78350f;">' + escapeHTML(notes || 'Update the policy and resubmit when ready.') + '</div></div>'
-        + '<button class="btn btn-primary btn-sm" onclick="showTab(\'policy\');enterPolicyWizard(\'' + fam.replace(/'/g, "\\'") + '\')">✏️ Edit &amp; resubmit</button>'
+        + '<button class="btn btn-primary btn-sm" onclick="typeof openReturnedDomainPolicyRevision===\'function\'?openReturnedDomainPolicyRevision(\'' + fam.replace(/'/g, "\\'") + '\'):goToPoliciesHome()">&#x270f;&#xfe0f; Edit &amp; resubmit</button>'
         + '</div>'
       );
     });

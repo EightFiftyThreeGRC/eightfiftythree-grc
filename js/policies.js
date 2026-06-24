@@ -1468,6 +1468,86 @@ function enterPolicyWizard(fam) {
   goToStep('policy', 1);
 }
 
+/** Lightweight modal — assign policy owner for a returned domain (no wizard). */
+function openAssignDomainPolicyOwnerModal(fam) {
+  var canAssign = typeof isSessionProgramOwnerActor === 'function' && isSessionProgramOwnerActor();
+  if (!canAssign && typeof canReassignProgramWork === 'function') canAssign = canReassignProgramWork();
+  if (!canAssign) {
+    showToast('Only the program owner can assign a domain policy owner.', true);
+    return;
+  }
+  var existing = document.getElementById('assignPolicyOwnerOverlay');
+  if (existing) existing.remove();
+  var mergedTitle = typeof getPolicyMergedTitle === 'function' ? getPolicyMergedTitle(fam) : fam;
+  var ps = (state.policyStatus || {})[fam] || {};
+  var hint = typeof resolveEffectiveDomainOwner === 'function' ? resolveEffectiveDomainOwner(fam) : {};
+  var notes = (ps.notes || '').trim();
+  var escFam = fam.replace(/'/g, "\\'");
+
+  var overlay = document.createElement('div');
+  overlay.id = 'assignPolicyOwnerOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;';
+  overlay.innerHTML = ''
+    + '<div style="background:white;border-radius:16px;width:480px;max-width:100%;box-shadow:0 24px 80px rgba(0,0,0,0.2);overflow:hidden;">'
+    + '<div style="background:var(--navy);padding:18px 22px;">'
+    + '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:rgba(255,255,255,0.55);">Assign policy owner</div>'
+    + '<div style="font-size:18px;font-weight:800;color:white;margin-top:4px;">' + escapeHTML(mergedTitle) + '</div>'
+    + '</div>'
+    + '<div style="padding:22px;">'
+    + (notes ? '<div style="font-size:12px;color:#92400e;background:#fffbeb;border:1px solid rgba(245,158,11,0.35);border-radius:8px;padding:10px 12px;margin-bottom:16px;line-height:1.5;"><strong>Return notes:</strong> ' + escapeHTML(notes) + '</div>' : '')
+    + '<div style="font-size:13px;color:var(--text-muted);margin-bottom:16px;line-height:1.55;">Assign who owns this returned domain policy. They can revise and resubmit from their workspace — this does not open the policy wizard.</div>'
+    + '<div class="form-group" style="margin-bottom:12px;"><label class="form-label">Full name <span class="required">*</span></label>'
+    + '<input class="form-input" id="assignPolicyOwnerName" autocomplete="name" value="' + escapeHTML(hint.name || '') + '"></div>'
+    + '<div class="form-group" style="margin-bottom:12px;"><label class="form-label">Email <span class="required">*</span></label>'
+    + '<input class="form-input" id="assignPolicyOwnerEmail" type="email" autocomplete="email" value="' + escapeHTML(hint.email || '') + '"></div>'
+    + '<div class="form-group" style="margin-bottom:0;"><label class="form-label">Title / role</label>'
+    + '<input class="form-input" id="assignPolicyOwnerRole" autocomplete="organization-title" value="' + escapeHTML(hint.role || (DOMAIN_SUGGESTED_ROLES[fam] || '')) + '"></div>'
+    + '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">'
+    + '<button type="button" class="btn btn-secondary" onclick="document.getElementById(\'assignPolicyOwnerOverlay\').remove()">Cancel</button>'
+    + '<button type="button" class="btn btn-navy" onclick="confirmAssignDomainPolicyOwner(\'' + escFam + '\')">Assign owner</button>'
+    + '</div></div></div>';
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+}
+
+function confirmAssignDomainPolicyOwner(fam) {
+  var nameEl = document.getElementById('assignPolicyOwnerName');
+  var emailEl = document.getElementById('assignPolicyOwnerEmail');
+  var roleEl = document.getElementById('assignPolicyOwnerRole');
+  if (typeof assignOwnerToReturnedDomainPolicy !== 'function') {
+    showToast('Assignment helper is unavailable.', true);
+    return;
+  }
+  if (!assignOwnerToReturnedDomainPolicy(fam, {
+    name: nameEl ? nameEl.value : '',
+    email: emailEl ? emailEl.value : '',
+    role: roleEl ? roleEl.value : ''
+  })) return;
+  document.getElementById('assignPolicyOwnerOverlay')?.remove();
+  if (typeof renderHomeTab === 'function') renderHomeTab();
+  if (typeof renderPolicyList === 'function') renderPolicyList();
+  if (typeof renderReports === 'function') renderReports();
+}
+
+/** Open policy content step only when the assigned owner is revising a returned draft. */
+function openReturnedDomainPolicyRevision(fam) {
+  if (typeof returnedDomainPolicyNeedsOwnerAssignment === 'function'
+      && returnedDomainPolicyNeedsOwnerAssignment(fam)) {
+    openAssignDomainPolicyOwnerModal(fam);
+    return;
+  }
+  state._policyLibraryMode = false;
+  state._policyDomain = fam;
+  state._policyWizardMode = true;
+  state._policyDocView = false;
+  if (typeof showTab === 'function') showTab('policy');
+  var listPanel = document.getElementById('policy-list-panel');
+  var wizPanel = document.getElementById('policy-wizard-panel');
+  if (listPanel) listPanel.style.display = 'none';
+  if (wizPanel) wizPanel.style.display = 'flex';
+  goToStep('policy', 3);
+}
+
 function exitPolicyWizard() {
   state._policyWizardMode = false;
   state._policyDocView = false;

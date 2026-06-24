@@ -423,6 +423,8 @@ function canSessionReviseReturnedDomainPolicy(fam) {
   var ps = (state.policyStatus || {})[fam] || {};
   if (ps.status !== 'Returned') return false;
   if (ps.returnedForReassignment) return false;
+  if (typeof returnedDomainPolicyNeedsOwnerAssignment === 'function'
+      && returnedDomainPolicyNeedsOwnerAssignment(fam)) return false;
   if (isSessionDomainPolicyOwnerActor(fam)) return true;
   // Program owner also owns domain policies — approver returns should still land with them
   // even if the per-domain roster row was cleared.
@@ -438,6 +440,17 @@ function getSessionReturnedDomainPolicyFamilies() {
   var families = typeof getMasterPolicyFamilies === 'function' ? getMasterPolicyFamilies() : [];
   families.forEach(function(fam) {
     if (canSessionReviseReturnedDomainPolicy(fam)) out.push(fam);
+  });
+  return out;
+}
+
+function getSessionReturnedDomainPoliciesNeedingOwner() {
+  var out = [];
+  if (typeof returnedDomainPolicyNeedsOwnerAssignment !== 'function') return out;
+  if (!isSessionProgramOwnerActor()) return out;
+  var families = typeof getMasterPolicyFamilies === 'function' ? getMasterPolicyFamilies() : [];
+  families.forEach(function(fam) {
+    if (returnedDomainPolicyNeedsOwnerAssignment(fam)) out.push(fam);
   });
   return out;
 }
@@ -1344,6 +1357,7 @@ if (typeof window !== 'undefined') {
   window.isSessionDomainPolicyOwnerActor = isSessionDomainPolicyOwnerActor;
   window.canSessionReviseReturnedDomainPolicy = canSessionReviseReturnedDomainPolicy;
   window.getSessionReturnedDomainPolicyFamilies = getSessionReturnedDomainPolicyFamilies;
+  window.getSessionReturnedDomainPoliciesNeedingOwner = getSessionReturnedDomainPoliciesNeedingOwner;
   window.ispApproverViolatesSeparationOfDuties = ispApproverViolatesSeparationOfDuties;
   window.validateISPApproverAssignment = validateISPApproverAssignment;
   window.domainPolicyRequiresSeparateApprover = domainPolicyRequiresSeparateApprover;

@@ -1600,6 +1600,13 @@ function getDomainOwnerLabelOr(fam, fallback) {
   return label === '—' ? (fallback || '—') : label;
 }
 
+/** True when a returned policy has no rostered owner email (needs assignment before revision). */
+function returnedDomainPolicyNeedsOwnerAssignment(fam) {
+  var ps = (state.policyStatus || {})[fam] || {};
+  if (ps.status !== 'Returned') return false;
+  return !isValidOwnerEmail(((state.domainOwners || {})[fam] || {}).email);
+}
+
 function hasRealControlOwner(co) {
   if (!co) return false;
   var name = (co.name || '').trim();
