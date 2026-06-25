@@ -1079,6 +1079,7 @@ function exitAssetWizard() {
   if (typeof _restoreAssetWizardLayoutAfterReadOnly === 'function') _restoreAssetWizardLayoutAfterReadOnly();
   state._selectedAssetId   = null;
   state._selectedProcessId = null;
+  currentStep.asset = 1;
   renderAssetTab();
 }
 
