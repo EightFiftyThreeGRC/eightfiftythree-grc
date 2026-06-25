@@ -4111,24 +4111,33 @@ function getControlDesignPolicyFamily(ctrl) {
 function getControlDesignReviewRecipient(ctrl) {
   var fam = getControlDesignPolicyFamily(ctrl);
   if (!fam) return { name: '', email: '', role: '' };
+  var ovr = (state._controlDesignReviewOverrides || {})[fam];
+  if (ovr && (ovr.name || ovr.email)) return ovr;
+  if (typeof getDomainPolicyApproverMeta === 'function') {
+    var meta = getDomainPolicyApproverMeta(fam);
+    if (meta && meta.useCustom && (meta.name || meta.email)) {
+      return { name: meta.name || '', email: meta.email || '', role: meta.role || '' };
+    }
+  }
   if (typeof resolveEffectiveDomainOwner === 'function') return resolveEffectiveDomainOwner(fam);
   return (state.domainOwners || {})[fam] || {};
 }
 
-function controlDesignSubmitIsSelfReview(ctrl) {
+function controlDesignSubmitterIsDomainOwner(ctrl) {
   if (!ctrl) return false;
   var fam = getControlDesignPolicyFamily(ctrl);
   if (!fam) return false;
   if (typeof isSessionDomainPolicyOwnerActor === 'function' && isSessionDomainPolicyOwnerActor(fam)) return true;
-  var recipient = getControlDesignReviewRecipient(ctrl);
   var submitterEmail = typeof getSessionEmailForApproval === 'function' ? getSessionEmailForApproval() : '';
   var submitterName = typeof getSessionActorName === 'function' ? getSessionActorName('') : '';
   if (typeof domainPolicyApproverViolatesSeparationOfDuties === 'function') {
     return domainPolicyApproverViolatesSeparationOfDuties(fam, submitterEmail, submitterName);
   }
+  var owner = typeof resolveEffectiveDomainOwner === 'function'
+    ? resolveEffectiveDomainOwner(fam) : ((state.domainOwners || {})[fam] || {});
   var oEm = typeof normalizeOwnerEmail === 'function'
-    ? normalizeOwnerEmail(recipient.email) : String(recipient.email || '').trim().toLowerCase();
-  var oNm = (recipient.name || '').trim().toLowerCase();
+    ? normalizeOwnerEmail(owner.email) : String(owner.email || '').trim().toLowerCase();
+  var oNm = (owner.name || '').trim().toLowerCase();
   var sEm = typeof normalizeOwnerEmail === 'function'
     ? normalizeOwnerEmail(submitterEmail) : String(submitterEmail || '').trim().toLowerCase();
   var sNm = (submitterName || '').trim().toLowerCase();
@@ -4136,16 +4145,122 @@ function controlDesignSubmitIsSelfReview(ctrl) {
   return !!(sNm && oNm && sNm === oNm);
 }
 
+function controlDesignSubmitIsSelfReview(ctrl) {
+  if (!ctrl) return false;
+  var recipient = getControlDesignReviewRecipient(ctrl);
+  var submitterEmail = typeof getSessionEmailForApproval === 'function' ? getSessionEmailForApproval() : '';
+  var submitterName = typeof getSessionActorName === 'function' ? getSessionActorName('') : '';
+  var rEm = typeof normalizeOwnerEmail === 'function'
+    ? normalizeOwnerEmail(recipient.email) : String(recipient.email || '').trim().toLowerCase();
+  var rNm = (recipient.name || '').trim().toLowerCase();
+  var sEm = typeof normalizeOwnerEmail === 'function'
+    ? normalizeOwnerEmail(submitterEmail) : String(submitterEmail || '').trim().toLowerCase();
+  var sNm = (submitterName || '').trim().toLowerCase();
+  if (sEm && rEm && sEm === rEm) return true;
+  return !!(sNm && rNm && sNm === rNm);
+}
+
 function getControlDesignSelfReviewConflicts(selectedControls) {
   var conflicts = [];
   var seen = {};
   (selectedControls || []).forEach(function(c) {
     if (!c || !c.id || seen[c.id]) return;
-    if (!controlDesignSubmitIsSelfReview(c)) return;
+    if (!controlDesignSubmitterIsDomainOwner(c)) return;
     seen[c.id] = true;
     conflicts.push(c);
   });
   return conflicts;
+}
+
+function getControlDesignReviewerCandidates(fam) {
+  var submitterEmail = typeof getSessionEmailForApproval === 'function' ? getSessionEmailForApproval() : '';
+  var submitterName = String(typeof getSessionActorName === 'function' ? getSessionActorName('') : '').trim().toLowerCase();
+  var sEm = typeof normalizeOwnerEmail === 'function'
+    ? normalizeOwnerEmail(submitterEmail) : String(submitterEmail || '').trim().toLowerCase();
+  var list = [];
+  var seen = {};
+  function addCandidate(key, person) {
+    if (!person) return;
+    var name = String(person.name || '').trim();
+    var email = String(person.email || '').trim();
+    if (!name && !email) return;
+    var em = typeof normalizeOwnerEmail === 'function' ? normalizeOwnerEmail(email) : email.toLowerCase();
+    var nm = name.toLowerCase();
+    if (sEm && em && sEm === em) return;
+    if (submitterName && nm && submitterName === nm) return;
+    var dedupe = (em || ('name:' + nm));
+    if (seen[dedupe]) return;
+    seen[dedupe] = true;
+    var roleLabel = '';
+    if (person.role && typeof getProgramRoleMeta === 'function') {
+      roleLabel = getProgramRoleMeta(person.role).label || person.role;
+    } else if (person.role) {
+      roleLabel = String(person.role);
+    }
+    list.push({
+      key: key,
+      name: name,
+      email: email,
+      role: roleLabel || String(person.role || person.note || '').trim()
+    });
+  }
+  addCandidate('program-owner', {
+    name: state.programOwner,
+    email: state.programOwnerEmail,
+    role: state.programOwnerTitle || 'Program Owner'
+  });
+  (state.users || []).forEach(function(u) {
+    if (!u || u.isDemoPlaceholder) return;
+    addCandidate(u.id, u);
+  });
+  return list;
+}
+
+function getControlDesignReviewOverrideKey(fam) {
+  var ovr = (state._controlDesignReviewOverrides || {})[fam];
+  if (!ovr) return '__self__';
+  var poEm = typeof normalizeOwnerEmail === 'function'
+    ? normalizeOwnerEmail(state.programOwnerEmail) : String(state.programOwnerEmail || '').trim().toLowerCase();
+  var oEm = typeof normalizeOwnerEmail === 'function'
+    ? normalizeOwnerEmail(ovr.email) : String(ovr.email || '').trim().toLowerCase();
+  if (poEm && oEm && poEm === oEm) return 'program-owner';
+  var match = (state.users || []).find(function(u) {
+    if (!u) return false;
+    var uEm = typeof normalizeOwnerEmail === 'function' ? normalizeOwnerEmail(u.email) : String(u.email || '').trim().toLowerCase();
+    if (oEm && uEm && oEm === uEm) return true;
+    return String(u.name || '').trim().toLowerCase() === String(ovr.name || '').trim().toLowerCase();
+  });
+  return match ? match.id : '__custom__';
+}
+
+function setControlDesignReviewOverride(fam, key) {
+  if (!state._controlDesignReviewOverrides) state._controlDesignReviewOverrides = {};
+  if (!key || key === '__self__') {
+    state._controlDesignReviewOverrides[fam] = null;
+    markDirty();
+    setTimeout(function() { renderControlStep4(); }, 0);
+    return;
+  }
+  if (key === 'program-owner') {
+    state._controlDesignReviewOverrides[fam] = {
+      name: (state.programOwner || '').trim(),
+      email: (state.programOwnerEmail || '').trim(),
+      role: (state.programOwnerTitle || '').trim()
+    };
+    markDirty();
+    setTimeout(function() { renderControlStep4(); }, 0);
+    return;
+  }
+  var u = (state.users || []).find(function(x) { return x && x.id === key; });
+  if (u) {
+    state._controlDesignReviewOverrides[fam] = {
+      name: (u.name || '').trim(),
+      email: (u.email || '').trim(),
+      role: (u.role || u.note || '').trim()
+    };
+    markDirty();
+    setTimeout(function() { renderControlStep4(); }, 0);
+  }
 }
 
 function buildControlDesignSelfReviewWarningHtml(conflicts) {
@@ -4161,12 +4276,36 @@ function buildControlDesignSelfReviewWarningHtml(conflicts) {
     return f + (FAMILIES[f] ? ' — ' + FAMILIES[f] : '');
   }).join(', ');
   var actor = typeof getSessionActorName === 'function' ? getSessionActorName('you') : 'you';
+  var pickerHtml = fams.map(function(fam) {
+    var famLabel = fam === 'ISP' ? 'ISP (Information Security Policy)' : fam + (FAMILIES[fam] ? ' — ' + FAMILIES[fam] : '');
+    var candidates = getControlDesignReviewerCandidates(fam);
+    var selected = getControlDesignReviewOverrideKey(fam);
+    var escFam = fam.replace(/'/g, "\\'");
+    var opts = '<option value="__self__"' + (selected === '__self__' ? ' selected' : '') + '>Keep routing to me (self-review)</option>';
+    candidates.forEach(function(c) {
+      var label = c.name + (c.role ? ' — ' + c.role : '') + (c.email ? ' (' + c.email + ')' : '');
+      opts += '<option value="' + escapeHTML(c.key) + '"' + (selected === c.key ? ' selected' : '') + '>' + escapeHTML(label) + '</option>';
+    });
+    if (!candidates.length) {
+      opts += '<option value="" disabled>No other rostered reviewers — add users under Administration</option>';
+    }
+    var recipient = getControlDesignReviewRecipient({ f: fam, id: fam + '-1' });
+    var routeHint = selected === '__self__'
+      ? 'Will route to you for approval.'
+      : 'Will route to <strong>' + escapeHTML(typeof getOwnerDisplayName === 'function' ? getOwnerDisplayName(recipient) : (recipient.name || 'selected reviewer')) + '</strong>.';
+    return '<div style="margin-top:10px;">'
+      + '<label class="form-label" style="font-size:11px;margin-bottom:4px;display:block;">Reviewer for ' + escapeHTML(famLabel) + '</label>'
+      + '<select class="form-select" style="font-size:12px;max-width:100%;" onchange="setControlDesignReviewOverride(\'' + escFam + '\', this.value)">' + opts + '</select>'
+      + '<div style="font-size:10px;color:#78350f;margin-top:4px;line-height:1.45;">' + routeHint + '</div>'
+      + '</div>';
+  }).join('');
   return '<div style="background:#fff7ed;border:1px solid #fdba74;border-radius:8px;padding:12px 14px;margin-bottom:12px;font-size:11px;color:#92400e;line-height:1.55;">'
     + '<div style="font-weight:700;margin-bottom:4px;">⚠ Self-review: you are also the policy owner</div>'
     + 'You are submitting as <strong>' + escapeHTML(actor) + '</strong>, and you are the domain policy owner for '
-    + '<strong>' + escapeHTML(famLabels) + '</strong>. This routes the package back to you for approval'
+    + '<strong>' + escapeHTML(famLabels) + '</strong>'
     + (ids ? ' (' + escapeHTML(ids) + ')' : '') + '. '
-    + 'That may be fine in a small team, but assign a separate reviewer if your program requires segregation of duties.'
+    + 'Choose a different reviewer below if your program requires segregation of duties.'
+    + pickerHtml
     + '</div>';
 }
 
@@ -4191,6 +4330,27 @@ function renderControlStep4() {
   const submitEligibleControls = controls.filter(c => ((state.controlStatus[c.id]||{}).status || 'Not Started') !== 'Not Started');
   const selectedForSubmit = submitEligibleControls.filter(c => !!state._controlSubmitSelection[c.id]);
   const selfReviewConflicts = getControlDesignSelfReviewConflicts(selectedForSubmit);
+  if (selfReviewConflicts.length) {
+    if (!state._controlDesignReviewOverrides) state._controlDesignReviewOverrides = {};
+    var conflictFamSet = {};
+    selfReviewConflicts.forEach(function(c) {
+      var fam = getControlDesignPolicyFamily(c);
+      if (fam) conflictFamSet[fam] = true;
+    });
+    Object.keys(conflictFamSet).forEach(function(fam) {
+      if (state._controlDesignReviewOverrides[fam] !== undefined) return;
+      if (typeof getDomainPolicyApproverMeta === 'function') {
+        var meta = getDomainPolicyApproverMeta(fam);
+        if (meta && meta.useCustom && (meta.name || meta.email)) {
+          state._controlDesignReviewOverrides[fam] = {
+            name: meta.name || '',
+            email: meta.email || '',
+            role: meta.role || ''
+          };
+        }
+      }
+    });
+  }
   const notStartedCount = controls.length - submitEligibleControls.length;
   const families = [...new Set(controls.map(c=>c.f))];
 
@@ -4441,16 +4601,27 @@ function submitControlDesign() {
   if (!state.controlReviewQueue) state.controlReviewQueue = [];
   myControls.forEach(function(c) {
     const ex = state.controlReviewQueue.find(r=>r.controlId===c.id);
+    var recipient = getControlDesignReviewRecipient(c);
+    var reviewerName = typeof getOwnerDisplayName === 'function' ? getOwnerDisplayName(recipient) : (recipient.name || '');
+    var reviewerEmail = (recipient.email || '').trim();
+    var reviewerRole = (recipient.role || '').trim();
     if (ex) {
       ex.status='Design Submitted';
       ex.submittedAt=new Date().toISOString();
       ex.submittedBy=name;
       ex.notes = notes || '';
+      ex.policyOwner = reviewerName || ex.policyOwner || '';
+      ex.reviewerName = reviewerName;
+      ex.reviewerEmail = reviewerEmail;
+      ex.reviewerRole = reviewerRole;
     } else {
       state.controlReviewQueue.push({
         controlId:c.id,
         family:getControlDesignPolicyFamily(c) || c.f,
-        policyOwner: (typeof getOwnerDisplayName === 'function' ? getOwnerDisplayName(getControlDesignReviewRecipient(c)) : (getControlDesignReviewRecipient(c).name || '')) || '',
+        policyOwner: reviewerName || '',
+        reviewerName: reviewerName,
+        reviewerEmail: reviewerEmail,
+        reviewerRole: reviewerRole,
         submittedBy:name,
         submittedAt:new Date().toISOString(),
         status:'Design Submitted',

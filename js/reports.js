@@ -1681,6 +1681,19 @@ function filterAuditView(type) {
 }
 
 // ── Attestation Review Queue (for CISO / ISSM on Reports) ──────────────
+function controlDesignQueueMatchesReviewer(r) {
+  if (!r || r.type === 'baseline-elevation' || r.type === 'ssp') return false;
+  var reviewerEmail = typeof normalizeOwnerEmail === 'function'
+    ? normalizeOwnerEmail(r.reviewerEmail || r.policyOwnerEmail || '')
+    : String(r.reviewerEmail || '').trim().toLowerCase();
+  var reviewerName = String(r.reviewerName || r.policyOwner || '').trim().toLowerCase();
+  var sessionEmail = typeof getSessionEmailForApproval === 'function' ? getSessionEmailForApproval() : '';
+  var sessionName = String(typeof getSessionActorName === 'function' ? getSessionActorName('') : '').trim().toLowerCase();
+  if (sessionEmail && reviewerEmail && sessionEmail === reviewerEmail) return true;
+  if (sessionName && reviewerName && sessionName === reviewerName) return true;
+  return false;
+}
+
 function renderReviewQueuePanel() {
   var body = document.getElementById('reports-body');
   if (!body) return;
@@ -1690,16 +1703,17 @@ function renderReviewQueuePanel() {
   var queue = (state.controlReviewQueue || []).filter(function(r) {
     return r.type !== 'baseline-elevation' && r.type !== 'ssp';
   });
-  // Scope queue to current user's families if ISSM
+  // Scope queue to current user's families if ISSM, or designated reviewer if routed elsewhere.
   var user = state.currentUserId ? (state.users||[]).find(function(u){ return u.id === state.currentUserId; }) : null;
   if (user && user.role === 'issm' && user.families && user.families.length) {
     queue = queue.filter(function(r) {
       var fam = r.family || (r.controlId||'').replace(/-.*/, '');
-      return user.families.includes(fam);
+      return user.families.includes(fam) || controlDesignQueueMatchesReviewer(r);
     });
+  } else if (user && user.role !== 'ciso' && user.role !== 'issm') {
+    queue = queue.filter(controlDesignQueueMatchesReviewer);
+    if (!queue.length) return;
   }
-  // Only show for admin, ciso, issm
-  if (user && user.role !== 'ciso' && user.role !== 'issm') return;
   if (!queue.length) return;
 
   var panel = document.createElement('div');
@@ -1728,6 +1742,9 @@ function renderReviewQueuePanel() {
       + '<td style="padding:8px 10px;font-size:12px;">' + escapeHTML(ctrl ? ctrl.n : '') + '</td>'
       + '<td style="padding:8px 10px;font-size:12px;">'
       + escapeHTML(r.submittedBy || owner.name || '')
+      + (r.reviewerName && String(r.reviewerName).trim() && String(r.reviewerName).trim() !== String(r.submittedBy || '').trim()
+        ? '<div style="font-size:11px;color:#475569;margin-top:3px;line-height:1.35;"><strong>Reviewer:</strong> ' + escapeHTML(r.reviewerName) + '</div>'
+        : '')
       + (rowNotes ? '<div style="font-size:11px;color:#475569;margin-top:3px;line-height:1.35;"><strong>Notes:</strong> ' + escapeHTML(rowNotes) + '</div>' : '')
       + '</td>'
       + '<td style="padding:8px 10px;font-size:12px;color:' + statusColor + ';font-weight:600;">' + escapeHTML(statusLabel) + '</td>'
