@@ -2830,11 +2830,17 @@ function openReturnedSspForRevision(scopeId, isProcess) {
   state._sspReadOnlyExitTab = null;
   state._assetLibraryMode = false;
   state._assetTypeLibraryMode = false;
+  state._reportsLibraryView = null;
+  state._reportsLibraryPolicyFam = null;
   if (isProcess) {
-    if (typeof enterProcessSSP === 'function') enterProcessSSP(sid);
-    return;
+    state._selectedProcessId = sid;
+    state._selectedAssetId = null;
+  } else {
+    state._selectedAssetId = sid;
+    state._selectedProcessId = null;
   }
-  if (typeof enterAssetSSP === 'function') enterAssetSSP(sid);
+  currentStep.asset = 1;
+  if (typeof showTab === 'function') showTab('asset');
 }
 
 function renderReturnedSspWorkCallout(user) {
