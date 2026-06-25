@@ -19,8 +19,15 @@ function hubJsStringLiteral(s) {
 
 /** Command Center → open a queued SSP read-only (same path as Reports queue Open). */
 function hubOpenQueuedSsp(scopeId, isProcess) {
-  if (typeof aoOpenQueuedSsp === 'function') aoOpenQueuedSsp(scopeId, !!isProcess);
-  else showToast('Unable to open SSP package.', true);
+  if (typeof openSspReadOnlyFromQueue === 'function') {
+    openSspReadOnlyFromQueue(scopeId, !!isProcess, 'reports');
+    return;
+  }
+  if (typeof aoOpenQueuedSsp === 'function') {
+    aoOpenQueuedSsp(scopeId, !!isProcess);
+    return;
+  }
+  showToast('Unable to open SSP package.', true);
 }
 
 /** Command Center → Reports → Program library page. */
@@ -108,17 +115,23 @@ function getNextActions() {
     }
   });
 
-  var hubUser = typeof getHubCurrentUser === 'function' ? getHubCurrentUser() : null;
+  var hubUser = getHubSessionUser();
   if (typeof getSspReviewQueueItemsForUser === 'function') {
     getSspReviewQueueItemsForUser(hubUser).slice(0, 5).forEach(function(r) {
-      var sidJson = JSON.stringify(String(r.assetId || ''));
+      var sidEsc = hubJsStringLiteral(String(r.assetId || ''));
       var isProc = !!r.isProcessSsp;
+      if (!isProc) {
+        var sid = String(r.assetId || '');
+        var hasAsset = (state.assets || []).some(function(a) { return String(a.id) === sid; });
+        var hasProc = (state.processes || []).some(function(p) { return String(p.id) === sid; });
+        if (hasProc && !hasAsset) isProc = true;
+      }
       actions.push({
         priority: 1,
         icon: '📋',
         label: 'Review SSP: ' + (r.assetName || 'Package'),
         desc: 'Submitted by ' + (r.submittedBy || 'owner') + (r.date ? ' on ' + r.date : ''),
-        action: "showTab('reports');if(typeof aoOpenQueuedSsp==='function')aoOpenQueuedSsp(" + sidJson + ',' + (isProc ? 'true' : 'false') + ');'
+        action: "hubOpenQueuedSsp('" + sidEsc + "'," + (isProc ? 'true' : 'false') + ")"
       });
     });
   }
@@ -375,7 +388,16 @@ function getHubWorkspaces() {
   var controlDraft = userHasControlDraftWork(user);
 
   if (publishedPolicies > 0 || policyDraft) {
-    var policyFn = (policyDraft && tabs.indexOf('policy') !== -1) ? 'goToPoliciesHome()' : 'goToPolicyLibrary()';
+    var policyFn;
+    if (policyDraft && tabs.indexOf('policy') !== -1) {
+      policyFn = 'goToPoliciesHome()';
+    } else if (tabs.indexOf('policy') !== -1) {
+      policyFn = 'goToPolicyLibrary()';
+    } else if (typeof userHasReportsLibraryAccess === 'function' && userHasReportsLibraryAccess(user)) {
+      policyFn = "hubOpenReportsLibrary('policies')";
+    } else {
+      policyFn = 'goToPolicyLibrary()';
+    }
     var policyDesc = policyDraft && tabs.indexOf('policy') !== -1
       ? (publishedPolicies > 0 ? 'Your drafts & approved catalog' : 'Domain policy drafts & ISP')
       : (publishedPolicies > 0 ? publishedPolicies + ' approved polic' + (publishedPolicies === 1 ? 'y' : 'ies') + ' in catalog' : 'Policy catalog');
@@ -383,7 +405,16 @@ function getHubWorkspaces() {
   }
 
   if (implementedControls > 0 || controlDraft) {
-    var ctrlFn = (controlDraft && tabs.indexOf('control') !== -1) ? 'goToControlWorkspace()' : 'goToControlLibrary()';
+    var ctrlFn;
+    if (controlDraft && tabs.indexOf('control') !== -1) {
+      ctrlFn = 'goToControlWorkspace()';
+    } else if (tabs.indexOf('control') !== -1) {
+      ctrlFn = 'goToControlLibrary()';
+    } else if (typeof userHasReportsLibraryAccess === 'function' && userHasReportsLibraryAccess(user)) {
+      ctrlFn = "hubOpenReportsLibrary('controls')";
+    } else {
+      ctrlFn = 'goToControlLibrary()';
+    }
     var ctrlDesc = controlDraft && tabs.indexOf('control') !== -1
       ? (implementedControls > 0 ? 'Draft designs & ' + implementedControls + ' live controls' : 'Control implementation drafts')
       : (implementedControls > 0 ? implementedControls + ' implemented control' + (implementedControls === 1 ? '' : 's') + ' in catalog' : 'Control catalog');
@@ -401,7 +432,7 @@ function getHubWorkspaces() {
         icon: '📚',
         label: 'Program library',
         desc: 'Published policies & control requirements',
-        fn: "goToReportsLibrary('policies')",
+        fn: "hubOpenReportsLibrary('policies')",
         group: 'program'
       });
     }
@@ -514,3 +545,6 @@ function renderHomeTab() {
     + (shouldShowHubPoamStrip() && typeof renderPoamSummaryHtml === 'function' ? renderPoamSummaryHtml() : '')
     + '</div>';
 }
+
+window.hubOpenQueuedSsp = hubOpenQueuedSsp;
+window.hubOpenReportsLibrary = hubOpenReportsLibrary;
