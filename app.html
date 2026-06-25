@@ -467,8 +467,15 @@
   <div class="tab-panel" id="tab-asset">
     <div id="asset-library-panel" style="display:none;height:100%;overflow-y:auto;">
       <div class="page-header">
-        <h1>Asset Library</h1>
-        <p>Global catalog of assets. Create new assets and assign an owner and asset type before starting SSP attestations.</p>
+        <div class="page-header-row">
+          <div>
+            <h1>Asset Library</h1>
+            <p>Global catalog of assets. Create new assets and assign an owner and asset type before starting SSP attestations.</p>
+          </div>
+          <div class="page-header-actions">
+            <button type="button" class="btn btn-secondary" onclick="goToAssetSspHome()">SSP inventory</button>
+          </div>
+        </div>
       </div>
       <div id="asset-library-body" style="padding:0 32px 32px;"></div>
     </div>
@@ -480,73 +487,81 @@
       <div id="asset-type-library-body" style="padding:0 32px 32px;"></div>
     </div>
     <div id="asset-workspace-panel">
-      <div class="page-header">
-        <div class="page-header-row">
-          <div>
-            <div class="role-badge">🖥️ Asset Owner / Control Performer</div>
-            <h1>System Security Plan (SSP) — Asset Owner</h1>
-            <p>Register systems, document categorization, boundary, interconnections, and control attestations for a defensible SSP.</p>
-          </div>
-          <div class="page-header-actions">
-            <button type="button" class="btn btn-secondary wizard-video-trigger"
-              onclick="openWizardVideo('assets/videos/04-assets-ssp.mp4', 'Assets and SSP walkthrough')">▶ Walkthrough</button>
-            <button type="button" class="btn btn-secondary" onclick="goToAssetLibrary()">Browse catalog</button>
-          </div>
-        </div>
-      </div>
-      <div class="wizard-container">
-        <div class="step-nav">
-          <div class="step-nav-title">SSP Workflow</div>
-          <div class="step-item active" onclick="goToStep('asset',1)" id="asset-step-item-1">
-            <div class="step-circle active" id="asset-circle-1">1</div>
-            <div class="step-info"><div class="step-num">Step 1</div><div class="step-name">Asset Inventory</div></div>
-          </div>
-          <div class="step-connector" id="asset-conn-1"></div>
-          <div class="step-item" onclick="goToStep('asset',2)" id="asset-step-item-2">
-            <div class="step-circle pending" id="asset-circle-2">2</div>
-            <div class="step-info"><div class="step-num">Step 2</div><div class="step-name">Attestations</div></div>
-          </div>
-          <div class="step-connector" id="asset-conn-2"></div>
-          <div class="step-item" onclick="goToStep('asset',3)" id="asset-step-item-3">
-            <div class="step-circle pending" id="asset-circle-3">3</div>
-            <div class="step-info"><div class="step-num">Step 3</div><div class="step-name">Interconnections</div></div>
-          </div>
-          <div class="step-connector" id="asset-conn-3"></div>
-          <div class="step-item" onclick="goToStep('asset',4)" id="asset-step-item-4">
-            <div class="step-circle pending" id="asset-circle-4">4</div>
-            <div class="step-info"><div class="step-num">Step 4</div><div class="step-name">Review &amp; Sign-Off</div></div>
-          </div>
-        </div>
-        <div class="wizard-content">
-          <div class="wizard-step active" id="asset-step-1">
-            <div class="wizard-step-body" id="asset-step-1-body"></div>
-            <div class="wizard-step-footer">
-              <span></span>
-              <button class="btn btn-primary" onclick="goToStep('asset',2)">Attestations →</button>
+      <!-- LIST VIEW: assets & processes ready for SSP attestations -->
+      <div id="asset-list-panel" style="height:100%; overflow-y:auto;">
+        <div class="page-header">
+          <div class="page-header-row">
+            <div>
+              <div class="role-badge">🖥️ Asset Owner / Control Performer</div>
+              <h1>System Security Plan (SSP) — Asset Owner</h1>
+              <p>Select an asset or process below to complete control attestations, interconnections, and SSP sign-off.</p>
+            </div>
+            <div class="page-header-actions">
+              <button type="button" class="btn btn-secondary wizard-video-trigger"
+                onclick="openWizardVideo('assets/videos/04-assets-ssp.mp4', 'Assets and SSP walkthrough')">▶ Walkthrough</button>
+              <button type="button" class="btn btn-secondary" onclick="goToAssetLibrary()">Asset library</button>
             </div>
           </div>
-          <div class="wizard-step" id="asset-step-2">
-            <div class="wizard-step-body" id="asset-step-2-body"></div>
-            <div class="wizard-step-footer">
-              <span id="asset-step-2-count" style="font-size:12px;color:var(--text-muted);align-self:center;"></span>
-              <div style="display:flex;gap:8px;align-items:center;">
-              <button class="btn btn-secondary" onclick="goToStep('asset',1)">← Back</button>
-              <button class="btn btn-primary" onclick="goToStep('asset',3)">Interconnections →</button>
+        </div>
+        <div id="asset-list-body" style="padding:0 32px 32px;"></div>
+      </div>
+      <!-- WIZARD VIEW: per-asset or per-process SSP flow -->
+      <div id="asset-wizard-panel" style="display:none; flex-direction:column; height:100%; overflow:hidden;">
+        <div id="asset-wizard-chrome" style="flex-shrink:0; background:white; border-bottom:1px solid var(--border); padding:12px 32px;"></div>
+        <div class="wizard-container" style="flex:1; min-height:0; overflow:hidden;">
+          <div class="step-nav">
+            <div class="step-nav-title">SSP Workflow</div>
+            <div class="step-item active" onclick="goToStep('asset',1)" id="asset-step-item-1">
+              <div class="step-circle active" id="asset-circle-1">1</div>
+              <div class="step-info"><div class="step-num">Step 1</div><div class="step-name">Profile</div></div>
+            </div>
+            <div class="step-connector" id="asset-conn-1"></div>
+            <div class="step-item" onclick="goToStep('asset',2)" id="asset-step-item-2">
+              <div class="step-circle pending" id="asset-circle-2">2</div>
+              <div class="step-info"><div class="step-num">Step 2</div><div class="step-name">Attestations</div></div>
+            </div>
+            <div class="step-connector" id="asset-conn-2"></div>
+            <div class="step-item" onclick="goToStep('asset',3)" id="asset-step-item-3">
+              <div class="step-circle pending" id="asset-circle-3">3</div>
+              <div class="step-info"><div class="step-num">Step 3</div><div class="step-name">Interconnections</div></div>
+            </div>
+            <div class="step-connector" id="asset-conn-3"></div>
+            <div class="step-item" onclick="goToStep('asset',4)" id="asset-step-item-4">
+              <div class="step-circle pending" id="asset-circle-4">4</div>
+              <div class="step-info"><div class="step-num">Step 4</div><div class="step-name">Review &amp; Sign-Off</div></div>
+            </div>
+          </div>
+          <div class="wizard-content">
+            <div class="wizard-step active" id="asset-step-1">
+              <div class="wizard-step-body" id="asset-step-1-body"></div>
+              <div class="wizard-step-footer">
+                <button class="btn btn-secondary" onclick="exitAssetWizard()">← All Assets &amp; Processes</button>
+                <button class="btn btn-primary" onclick="goToStep('asset',2)">Attestations →</button>
               </div>
             </div>
-          </div>
-          <div class="wizard-step" id="asset-step-3">
-            <div class="wizard-step-body" id="asset-step-3-body"></div>
-            <div class="wizard-step-footer">
-              <button class="btn btn-secondary" onclick="goToStep('asset',2)">← Back</button>
-              <button class="btn btn-primary" onclick="goToStep('asset',4)">Review &amp; Sign-Off →</button>
+            <div class="wizard-step" id="asset-step-2">
+              <div class="wizard-step-body" id="asset-step-2-body"></div>
+              <div class="wizard-step-footer">
+                <span id="asset-step-2-count" style="font-size:12px;color:var(--text-muted);align-self:center;"></span>
+                <div style="display:flex;gap:8px;align-items:center;">
+                <button class="btn btn-secondary" onclick="goToStep('asset',1)">← Back</button>
+                <button class="btn btn-primary" onclick="goToStep('asset',3)">Interconnections →</button>
+                </div>
+              </div>
             </div>
-          </div>
-          <div class="wizard-step" id="asset-step-4">
-            <div class="wizard-step-body" id="asset-step-4-body"></div>
-            <div class="wizard-step-footer">
-              <button class="btn btn-secondary" onclick="goToStep('asset',3)">← Back</button>
-              <button class="btn btn-navy" id="asset-submit-btn" onclick="submitSSP()">✓ Sign &amp; Submit SSP</button>
+            <div class="wizard-step" id="asset-step-3">
+              <div class="wizard-step-body" id="asset-step-3-body"></div>
+              <div class="wizard-step-footer">
+                <button class="btn btn-secondary" onclick="goToStep('asset',2)">← Back</button>
+                <button class="btn btn-primary" onclick="goToStep('asset',4)">Review &amp; Sign-Off →</button>
+              </div>
+            </div>
+            <div class="wizard-step" id="asset-step-4">
+              <div class="wizard-step-body" id="asset-step-4-body"></div>
+              <div class="wizard-step-footer">
+                <button class="btn btn-secondary" onclick="goToStep('asset',3)">← Back</button>
+                <button class="btn btn-navy" id="asset-submit-btn" onclick="submitSSP()">✓ Sign &amp; Submit SSP</button>
+              </div>
             </div>
           </div>
         </div>
@@ -706,7 +721,7 @@
 <script src="js/core.js?v=20260625a"></script>
 <script src="js/policies.js?v=20260625a"></script>
 <script src="js/controls.js?v=20260625b"></script>
-<script src="js/assets.js?v=20260625d"></script>
+<script src="js/assets.js?v=20260625e"></script>
 <script src="js/baseline-elevation.js?v=20260624"></script>
 <script src="js/authorization.js?v=20260624"></script>
 <script src="js/frameworks.js?v=20260624"></script>
@@ -727,7 +742,7 @@
 })();
 </script>
 <script src="js/cloud-auth.js?v=20260625a"></script>
-<script src="js/program.js?v=20260621w"></script>
+<script src="js/program.js?v=20260625a"></script>
 <script src="js/app.js?v=20260625a"></script>
 
 </body>

@@ -893,15 +893,26 @@ function goToControlLibrary() {
   showTab('control');
 }
 
-function goToAssetWorkspace() {
+/** Asset tab landing: SSP inventory (assets + processes), not library or a single SSP wizard. */
+function goToAssetSspHome() {
   state._assetLibraryMode = false;
   state._assetTypeLibraryMode = false;
+  state._sspReviewerReadOnly = false;
+  state._selectedAssetId = null;
+  state._selectedProcessId = null;
+  if (typeof currentStep !== 'undefined' && currentStep) currentStep.asset = 1;
   showTab('asset');
+}
+
+function goToAssetWorkspace() {
+  goToAssetSspHome();
 }
 
 function goToAssetLibrary() {
   state._assetLibraryMode = true;
   state._assetTypeLibraryMode = false;
+  state._selectedAssetId = null;
+  state._selectedProcessId = null;
   showTab('asset');
 }
 
@@ -924,13 +935,17 @@ function openAssetWizardFromLibrary(assetId) {
     showToast('You do not have access to open the asset-owner SSP workspace for this system.', true);
     return;
   }
-  goToAssetWorkspace();
+  state._assetLibraryMode = false;
+  state._assetTypeLibraryMode = false;
+  showTab('asset');
   enterAssetSSP(assetId);
 }
 
 /** Open a process SSP wizard from library / reports (no asset-owner-only gate). */
 function openProcessSspFromLibrary(procId) {
-  goToAssetWorkspace();
+  state._assetLibraryMode = false;
+  state._assetTypeLibraryMode = false;
+  showTab('asset');
   if (typeof enterProcessSSP === 'function') enterProcessSSP(procId);
 }
 
