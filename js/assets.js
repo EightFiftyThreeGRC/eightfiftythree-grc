@@ -1535,10 +1535,122 @@ function getSspReviewNistRequirementText(ctrlId) {
   return c ? (c.n || 'No NIST requirement text available for this control.') : 'No NIST requirement text available for this control.';
 }
 
-function buildSspAttestationReviewBlocksHtml(controls, attests, sign, scopeId, canReview) {
+function getSspReviewScopeLabel(item, isProc) {
+  if (!item) return 'General';
+  if (isProc) {
+    var procName = String(item.name || '').trim();
+    if (procName) return procName;
+    var cat = (typeof PROCESS_CATEGORIES !== 'undefined' ? PROCESS_CATEGORIES : []).find(function(c) {
+      return c.id === item.category;
+    });
+    if (cat && cat.label) return cat.label;
+    return 'General';
+  }
+  return String(item.type || '').trim() || 'General';
+}
+
+function buildSspReviewPolicyObjectivesHtml(ctrlId) {
+  if (typeof getControlPolicyReqs !== 'function') return '';
+  var policyReqs = getControlPolicyReqs(ctrlId);
+  if (!policyReqs.length) return '';
+  var blocks = policyReqs.map(function(r) {
+    return '<div style="border:1px solid #c7d2fe;background:#eef2ff;border-radius:6px;padding:8px 10px;margin-bottom:8px;">'
+      + '<div style="font-size:11px;font-weight:700;color:#4338ca;margin-bottom:3px;">' + _esc((r.reqId || 'Policy objective') + ' · ' + (r.policyTitle || r.fam || 'Policy')) + '</div>'
+      + '<div style="font-size:12px;color:#1f2937;line-height:1.5;">' + _esc(r.reqText || 'No objective text captured.') + '</div>'
+      + '</div>';
+  }).join('');
+  return '<div style="padding:12px 14px;background:#faf5ff;border-bottom:1px solid var(--border);">'
+    + '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:#6d28d9;margin-bottom:8px;">Policy requirements linked to this control</div>'
+    + blocks + '</div>';
+}
+
+function buildSspReviewControlDesignHtml(ctrlId) {
+  if (typeof normalizeControlDesignState === 'function') normalizeControlDesignState(ctrlId);
+  var cs = (state.controlStatus || {})[ctrlId] || {};
+  var designSource = cs.designSource || (cs.externalDocRef ? 'external' : 'inline');
+  var inner = '';
+  if (designSource === 'external') {
+    inner = '<div style="display:grid;gap:8px;font-size:12px;color:#334155;line-height:1.55;">'
+      + '<div><strong>External reference:</strong> ' + _esc((cs.externalDocTitle || '').trim() || '—') + '</div>'
+      + '<div><strong>Location:</strong> ' + _esc((cs.externalDocRef || '').trim() || '—') + '</div>'
+      + '<div><strong>Coverage summary:</strong> ' + _esc((cs.externalDocSummary || '').trim() || '—') + '</div>'
+      + '</div>';
+  } else if (typeof parseControlParts === 'function') {
+    var nistParts = parseControlParts(ctrlId) || {};
+    var partKeys = Object.keys(nistParts);
+    if (partKeys.length) {
+      inner = partKeys.map(function(letter) {
+        var partText = ((cs.designParts || {})[letter] || '').trim();
+        return '<div style="border:1px solid #dbeafe;border-radius:6px;padding:8px 10px;margin-bottom:8px;background:white;">'
+          + '<div style="font-size:11px;font-weight:700;color:#1d4ed8;margin-bottom:3px;">Design — Part ' + _esc(letter) + '</div>'
+          + '<div style="font-size:12px;color:#374151;line-height:1.55;white-space:pre-line;">'
+          + (partText ? _esc(partText) : '<span style="color:var(--text-muted);font-style:italic;">Not documented</span>')
+          + '</div></div>';
+      }).join('');
+    } else {
+      var narrative = (cs.approach || cs.narrative || '').trim();
+      inner = '<div style="font-size:12px;color:#334155;line-height:1.65;white-space:pre-line;">'
+        + (narrative ? _esc(narrative) : '<span style="color:var(--text-muted);font-style:italic;">No control owner design narrative documented.</span>')
+        + '</div>';
+    }
+  } else {
+    var nar = (cs.approach || cs.narrative || '').trim();
+    inner = '<div style="font-size:12px;color:#334155;line-height:1.65;white-space:pre-line;">'
+      + (nar ? _esc(nar) : '<span style="color:var(--text-muted);font-style:italic;">No control owner design narrative documented.</span>')
+      + '</div>';
+  }
+  var owner = (state.controlOwners || {})[ctrlId] || {};
+  var ownerLine = (owner.name || '').trim()
+    ? '<div style="font-size:11px;color:#64748b;margin-bottom:8px;">Control owner: <strong>' + _esc(owner.name) + '</strong>'
+      + (cs.status ? ' · Design status: <strong>' + _esc(cs.status) + '</strong>' : '') + '</div>'
+    : '';
+  return '<div style="padding:12px 14px;background:#eff6ff;border-bottom:1px solid var(--border);">'
+    + '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:#1d4ed8;margin-bottom:8px;">Control owner implementation design</div>'
+    + ownerLine + inner + '</div>';
+}
+
+function buildSspReviewScopeRequirementsHtml(ctrlId, scopeLabel, item, isProc) {
+  var scopeTypeLabel = isProc ? 'process' : 'asset type';
+  var g = typeof getControlOwnerGuidanceForScope === 'function'
+    ? getControlOwnerGuidanceForScope(ctrlId, scopeLabel)
+    : { actions: '', evidence: '', criteria: '', refs: '' };
+  var matchedScope = scopeLabel;
+  if (typeof normalizeControlDesignState === 'function') {
+    normalizeControlDesignState(ctrlId);
+    var reqs = ((state.controlStatus || {})[ctrlId] || {}).assetOwnerRequirements || [];
+    var exact = reqs.find(function(r) { return r.assetType === scopeLabel; });
+    var general = reqs.find(function(r) { return r.assetType === 'General'; });
+    if (exact) matchedScope = scopeLabel;
+    else if (general) matchedScope = 'General';
+    else if (reqs[0] && reqs[0].assetType) matchedScope = reqs[0].assetType;
+  }
+  var hasAny = (g.actions || '').trim() || (g.evidence || '').trim() || (g.criteria || '').trim() || (g.refs || '').trim();
+  var body = '';
+  if (!hasAny) {
+    body = '<div style="font-size:12px;color:var(--text-muted);font-style:italic;">No scope-specific requirements documented for this ' + scopeTypeLabel + ' in Control Wizard Step 3.</div>';
+  } else {
+    if ((g.actions || '').trim()) body += '<div style="margin-bottom:8px;font-size:12px;line-height:1.55;color:#14532d;"><strong>Required actions:</strong> ' + _esc(g.actions) + '</div>';
+    if ((g.evidence || '').trim()) body += '<div style="margin-bottom:8px;font-size:12px;line-height:1.55;color:#14532d;"><strong>Required evidence:</strong> ' + _esc(g.evidence) + '</div>';
+    if ((g.criteria || '').trim()) body += '<div style="margin-bottom:8px;font-size:12px;line-height:1.55;color:#14532d;"><strong>Acceptance criteria:</strong> ' + _esc(g.criteria) + '</div>';
+    if ((g.refs || '').trim()) body += '<div style="font-size:12px;line-height:1.55;color:#14532d;"><strong>Procedure / standard references:</strong> ' + _esc(g.refs) + '</div>';
+  }
+  var scopeDisplay = isProc
+    ? _esc(item.name || scopeLabel)
+    : _esc(scopeLabel);
+  var matchNote = matchedScope && matchedScope !== scopeLabel
+    ? ' · Requirement set: <strong>' + _esc(matchedScope) + '</strong>'
+    : '';
+  return '<div style="padding:12px 14px;background:#f0fdf4;border-bottom:1px solid var(--border);">'
+    + '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:#166534;margin-bottom:4px;">Requirements for this ' + scopeTypeLabel + '</div>'
+    + '<div style="font-size:11px;color:#15803d;margin-bottom:8px;">Scope: <strong>' + scopeDisplay + '</strong>' + matchNote + '</div>'
+    + body + '</div>';
+}
+
+function buildSspAttestationReviewBlocksHtml(controls, attests, sign, scopeId, canReview, item, isProc) {
   var draft = canReview ? ensureSspReviewerDraft(scopeId) : null;
   var persisted = sign.reviewerControlComments || {};
   var sidJs = sspRevEscJs(String(scopeId));
+  var scopeLabel = getSspReviewScopeLabel(item, isProc);
 
   return controls.map(function(c) {
     var a = attests[c.id] || {};
@@ -1571,7 +1683,12 @@ function buildSspAttestationReviewBlocksHtml(controls, attests, sign, scopeId, c
       + '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:#64748b;margin-bottom:6px;">NIST SP 800-53 requirement</div>'
       + '<div style="font-size:12px;color:#334155;line-height:1.65;white-space:pre-line;">' + _esc(nistText) + '</div>'
       + '</div>'
-      + '<div style="padding:12px 14px;display:grid;grid-template-columns:minmax(120px,160px) 1fr 1fr;gap:12px 16px;border-bottom:1px solid var(--border);">'
+      + buildSspReviewPolicyObjectivesHtml(c.id)
+      + buildSspReviewControlDesignHtml(c.id)
+      + buildSspReviewScopeRequirementsHtml(c.id, scopeLabel, item, isProc)
+      + '<div style="padding:12px 14px;background:#fffbeb;border-bottom:1px solid #fde68a;">'
+      + '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:#92400e;margin-bottom:10px;">Asset / process owner attestation</div>'
+      + '<div style="display:grid;grid-template-columns:minmax(120px,160px) 1fr 1fr;gap:12px 16px;">'
       + '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.35px;color:var(--text-muted);margin-bottom:4px;">Attestation status</div>'
       + '<div style="font-size:12px;">' + status + '</div></div>'
       + '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.35px;color:var(--text-muted);margin-bottom:4px;">Owner explanation</div>'
@@ -1585,8 +1702,8 @@ function buildSspAttestationReviewBlocksHtml(controls, attests, sign, scopeId, c
 }
 
 /** @deprecated Use buildSspAttestationReviewBlocksHtml — kept for compatibility. */
-function buildSspAttestationReviewRowsHtml(controls, attests, sign, scopeId, canReview) {
-  return buildSspAttestationReviewBlocksHtml(controls, attests, sign, scopeId, canReview);
+function buildSspAttestationReviewRowsHtml(controls, attests, sign, scopeId, canReview, item, isProc) {
+  return buildSspAttestationReviewBlocksHtml(controls, attests, sign, scopeId, canReview, item, isProc);
 }
 
 function buildSspReviewerDecisionPanelHtml(scopeId, isProc, canReview) {
@@ -1644,7 +1761,7 @@ function renderSspReadOnlyReviewInWizard() {
   var interHtml = buildSspInterconnectionsReadOnlyHtml(item.id);
   var canReview = state._sspReviewerReadOnly && sspReviewerCanActOnPackage(item.id);
 
-  var attBlocks = buildSspAttestationReviewBlocksHtml(controls, attests, sign, item.id, canReview);
+  var attBlocks = buildSspAttestationReviewBlocksHtml(controls, attests, sign, item.id, canReview, item, isProc);
   var decisionPanel = buildSspReviewerDecisionPanelHtml(item.id, isProc, canReview);
 
   var signBlock = '<div style="background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:18px;">'
@@ -1678,7 +1795,7 @@ function renderSspReadOnlyReviewInWizard() {
     + signBlock
     + returnBlock
     + '<div style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:4px;">Control attestations</div>'
-    + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;line-height:1.45;">Each control shows the verbatim NIST SP 800-53 requirement, then the owner\'s attestation below it for side-by-side review.</div>'
+    + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;line-height:1.45;">Each control shows the NIST requirement, linked policy objectives, control owner design, scope-specific requirements for this package, then the owner\'s attestation.</div>'
     + '<div style="margin-bottom:22px;">' + (attBlocks || '<div style="padding:16px;color:var(--text-muted);border:1px solid var(--border);border-radius:10px;">No controls in scope.</div>') + '</div>'
     + decisionPanel
     + '<div style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:10px;">Interconnections</div>'
