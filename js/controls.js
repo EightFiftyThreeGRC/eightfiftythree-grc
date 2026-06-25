@@ -1525,7 +1525,7 @@ function openBulkIspDesignPatternModal(sourceCtrlId) {
   }
   var eligible = getBulkIspDesignEligibleControls(sourceCtrlId);
   if (!eligible.length) {
-    showToast('No other ISP controls in your queue to update.', true);
+    showToast('No other XX-1 controls in your queue to update.', true);
     return;
   }
   var selected = {};
@@ -1615,7 +1615,7 @@ function renderBulkIspDesignPatternModalBody() {
     + '  </label>'
     + '</div>'
     + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">'
-    + '  <div style="font-size:12px;color:var(--text-muted);">' + selectedCount + ' selected of ' + eligible.length + ' ISP controls · ' + filtered.length + ' shown</div>'
+    + '  <div style="font-size:12px;color:var(--text-muted);">' + selectedCount + ' selected of ' + eligible.length + ' XX-1 controls · ' + filtered.length + ' shown</div>'
     + '  <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">'
     + '    <button type="button" class="btn btn-secondary btn-sm" onclick="bulkIspDesignSelectIncomplete()">Select incomplete</button>'
     + '    <button type="button" class="btn btn-secondary btn-sm" onclick="bulkIspDesignSelectFiltered(true)">Select all shown</button>'
@@ -1760,12 +1760,12 @@ function applyBulkIspDesignPattern() {
     .map(function(c) { return c.id; })
     .filter(function(id) { return !!st.selected[id]; });
   if (!selectedIds.length) {
-    showToast('Select at least one ISP control to update.', true);
+    showToast('Select at least one XX-1 control to update.', true);
     return;
   }
   var warn = st.overwrite
-    ? 'Overwrite sub-requirement text and scope on ' + selectedIds.length + ' ISP control(s)? Existing content will be replaced.'
-    : 'Fill empty sub-requirements and scope on ' + selectedIds.length + ' ISP control(s)? Controls that already have content will be skipped.';
+    ? 'Overwrite sub-requirement text and scope on ' + selectedIds.length + ' XX-1 control(s)? Existing content will be replaced.'
+    : 'Fill empty sub-requirements and scope on ' + selectedIds.length + ' XX-1 control(s)? Controls that already have content will be skipped.';
   if (!window.confirm(warn)) return;
 
   var idx = 0;
@@ -1782,10 +1782,10 @@ function applyBulkIspDesignPattern() {
       requestAnimationFrame(applyChunk);
       return;
     }
-    addAuditEntry('control', st.sourceCtrlId, 'Bulk-applied ISP design pattern from ' + st.sourceCtrlId + ' to ' + appliedCount + ' control(s)' + (skippedCount ? ' (' + skippedCount + ' unchanged)' : '') + '.');
+    addAuditEntry('control', st.sourceCtrlId, 'Bulk-applied XX-1 design pattern from ' + st.sourceCtrlId + ' to ' + appliedCount + ' control(s)' + (skippedCount ? ' (' + skippedCount + ' unchanged)' : '') + '.');
     markDirty();
     closeBulkIspDesignPatternModal();
-    showToast('✅ ISP pattern applied to ' + appliedCount + ' control' + (appliedCount === 1 ? '' : 's') + (skippedCount ? ' · ' + skippedCount + ' unchanged' : '') + '.');
+    showToast('✅ XX-1 pattern applied to ' + appliedCount + ' control' + (appliedCount === 1 ? '' : 's') + (skippedCount ? ' · ' + skippedCount + ' unchanged' : '') + '.');
     renderControlStep2();
   }
   applyChunk();
@@ -4103,6 +4103,73 @@ function buildGuidanceFromControlOwner(ctrlId, scopeLabel) {
 }
 
 // ── STEP 4: REVIEW & SUBMIT DESIGN ───────────────────────────────────────────
+function getControlDesignPolicyFamily(ctrl) {
+  if (!ctrl) return '';
+  return typeof getPolicyFamilyKeyForControl === 'function' ? getPolicyFamilyKeyForControl(ctrl) : ctrl.f;
+}
+
+function getControlDesignReviewRecipient(ctrl) {
+  var fam = getControlDesignPolicyFamily(ctrl);
+  if (!fam) return { name: '', email: '', role: '' };
+  if (typeof resolveEffectiveDomainOwner === 'function') return resolveEffectiveDomainOwner(fam);
+  return (state.domainOwners || {})[fam] || {};
+}
+
+function controlDesignSubmitIsSelfReview(ctrl) {
+  if (!ctrl) return false;
+  var fam = getControlDesignPolicyFamily(ctrl);
+  if (!fam) return false;
+  if (typeof isSessionDomainPolicyOwnerActor === 'function' && isSessionDomainPolicyOwnerActor(fam)) return true;
+  var recipient = getControlDesignReviewRecipient(ctrl);
+  var submitterEmail = typeof getSessionEmailForApproval === 'function' ? getSessionEmailForApproval() : '';
+  var submitterName = typeof getSessionActorName === 'function' ? getSessionActorName('') : '';
+  if (typeof domainPolicyApproverViolatesSeparationOfDuties === 'function') {
+    return domainPolicyApproverViolatesSeparationOfDuties(fam, submitterEmail, submitterName);
+  }
+  var oEm = typeof normalizeOwnerEmail === 'function'
+    ? normalizeOwnerEmail(recipient.email) : String(recipient.email || '').trim().toLowerCase();
+  var oNm = (recipient.name || '').trim().toLowerCase();
+  var sEm = typeof normalizeOwnerEmail === 'function'
+    ? normalizeOwnerEmail(submitterEmail) : String(submitterEmail || '').trim().toLowerCase();
+  var sNm = (submitterName || '').trim().toLowerCase();
+  if (sEm && oEm && sEm === oEm) return true;
+  return !!(sNm && oNm && sNm === oNm);
+}
+
+function getControlDesignSelfReviewConflicts(selectedControls) {
+  var conflicts = [];
+  var seen = {};
+  (selectedControls || []).forEach(function(c) {
+    if (!c || !c.id || seen[c.id]) return;
+    if (!controlDesignSubmitIsSelfReview(c)) return;
+    seen[c.id] = true;
+    conflicts.push(c);
+  });
+  return conflicts;
+}
+
+function buildControlDesignSelfReviewWarningHtml(conflicts) {
+  if (!conflicts || !conflicts.length) return '';
+  var ids = conflicts.map(function(c) { return c.id; }).join(', ');
+  var fams = [];
+  conflicts.forEach(function(c) {
+    var fam = getControlDesignPolicyFamily(c);
+    if (fam && fams.indexOf(fam) === -1) fams.push(fam);
+  });
+  var famLabels = fams.map(function(f) {
+    if (f === 'ISP') return 'ISP (Information Security Policy)';
+    return f + (FAMILIES[f] ? ' — ' + FAMILIES[f] : '');
+  }).join(', ');
+  var actor = typeof getSessionActorName === 'function' ? getSessionActorName('you') : 'you';
+  return '<div style="background:#fff7ed;border:1px solid #fdba74;border-radius:8px;padding:12px 14px;margin-bottom:12px;font-size:11px;color:#92400e;line-height:1.55;">'
+    + '<div style="font-weight:700;margin-bottom:4px;">⚠ Self-review: you are also the policy owner</div>'
+    + 'You are submitting as <strong>' + escapeHTML(actor) + '</strong>, and you are the domain policy owner for '
+    + '<strong>' + escapeHTML(famLabels) + '</strong>. This routes the package back to you for approval'
+    + (ids ? ' (' + escapeHTML(ids) + ')' : '') + '. '
+    + 'That may be fine in a small team, but assign a separate reviewer if your program requires segregation of duties.'
+    + '</div>';
+}
+
 function renderControlStep4() {
   const body = document.getElementById('control-step-4-body');
   if (!body) return;
@@ -4123,6 +4190,7 @@ function renderControlStep4() {
   });
   const submitEligibleControls = controls.filter(c => ((state.controlStatus[c.id]||{}).status || 'Not Started') !== 'Not Started');
   const selectedForSubmit = submitEligibleControls.filter(c => !!state._controlSubmitSelection[c.id]);
+  const selfReviewConflicts = getControlDesignSelfReviewConflicts(selectedForSubmit);
   const notStartedCount = controls.length - submitEligibleControls.length;
   const families = [...new Set(controls.map(c=>c.f))];
 
@@ -4297,6 +4365,7 @@ function renderControlStep4() {
       <div style="background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:11px;color:var(--text-muted);">
         Submitter is captured from your signed-in identity: <strong>${escapeHTML(typeof getSessionActorName === 'function' ? getSessionActorName('Current user') : (((state.users||[]).find(u=>u.id===state.currentUserId)||{}).name || 'Current user'))}</strong>.
       </div>
+      ${buildControlDesignSelfReviewWarningHtml(selfReviewConflicts)}
       <div style="margin-bottom:14px;">
         <label class="form-label" style="font-size:11px;">Notes for Policy Owner (optional)</label>
         <textarea class="form-input" id="designSubmitNotes" rows="2" style="font-size:12px;resize:vertical;" placeholder="Any context, caveats, or open items the policy owner should be aware of…">${escapeHTML(state.controlDesignSubmission?.notes||'')}</textarea>
@@ -4328,6 +4397,20 @@ function submitControlDesign() {
     showToast('Select at least one eligible control to submit. Not Started controls are excluded.', true);
     return;
   }
+  const selfReviewConflicts = getControlDesignSelfReviewConflicts(selectedControls);
+  if (selfReviewConflicts.length) {
+    var selfFamLabels = [];
+    selfReviewConflicts.forEach(function(c) {
+      var fam = getControlDesignPolicyFamily(c);
+      if (fam && selfFamLabels.indexOf(fam) === -1) selfFamLabels.push(fam);
+    });
+    var famText = selfFamLabels.join(', ') || 'the selected families';
+    if (!window.confirm(
+      'You are listed as the policy owner for ' + famText + '. Submitting will route '
+      + selfReviewConflicts.length + ' control' + (selfReviewConflicts.length === 1 ? '' : 's')
+      + ' back to you for your own review. Continue anyway?'
+    )) return;
+  }
   const designedControls = controls.filter(c => isControlDesigned(c.id));
   const fullyMappedReqs = controls.filter(c => {
     const cov = getControlRequirementCoverage(c);
@@ -4335,8 +4418,16 @@ function submitControlDesign() {
   });
 
   const myControls  = currentUser ? selectedControls.filter(c=>(state.controlOwners[c.id]||{}).name===currentUser.name) : selectedControls;
-  const famsInvolved = [...new Set(myControls.map(c=>c.f).filter(Boolean))];
-  const policyOwnerNames = [...new Set(famsInvolved.map(fam=>(state.domainOwners[fam]||{}).name).filter(Boolean))];
+  const policyOwnerNames = [];
+  const policyOwnerSeen = {};
+  selectedControls.forEach(function(c) {
+    var recipient = getControlDesignReviewRecipient(c);
+    var label = typeof getOwnerDisplayName === 'function' ? getOwnerDisplayName(recipient) : (recipient.name || '');
+    if (label && label !== '—' && !policyOwnerSeen[label]) {
+      policyOwnerSeen[label] = true;
+      policyOwnerNames.push(label);
+    }
+  });
   const recipientLabel = policyOwnerNames.length ? policyOwnerNames.join(', ') : 'Policy Owner';
 
   state.controlDesignSubmission = {
@@ -4358,8 +4449,8 @@ function submitControlDesign() {
     } else {
       state.controlReviewQueue.push({
         controlId:c.id,
-        family:c.f,
-        policyOwner:(state.domainOwners[c.f]||{}).name||'',
+        family:getControlDesignPolicyFamily(c) || c.f,
+        policyOwner: (typeof getOwnerDisplayName === 'function' ? getOwnerDisplayName(getControlDesignReviewRecipient(c)) : (getControlDesignReviewRecipient(c).name || '')) || '',
         submittedBy:name,
         submittedAt:new Date().toISOString(),
         status:'Design Submitted',
