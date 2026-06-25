@@ -817,6 +817,88 @@ function renderPolicyLibraryCatalog() {
     + '</div>';
 }
 
+/** Read-only published policy catalog for Reports → Library (Approved policies only). */
+function renderPublishedPolicyLibrary(bodyEl) {
+  var body = bodyEl || document.getElementById('reports-library-body');
+  if (!body) return;
+  if (!state.baseline) {
+    body.innerHTML = '<div class="empty-state"><div class="es-icon">🏛️</div><div class="es-title">CISO Setup Required</div></div>';
+    return;
+  }
+  var families = getActiveFamilies().filter(function(f) { return f !== 'PM'; });
+  var merges = state.policyMerges || {};
+  var masterFams = families.filter(function(f) { return !merges[f]; });
+  var slavesOf = {};
+  families.forEach(function(f) {
+    if (merges[f]) { if (!slavesOf[merges[f]]) slavesOf[merges[f]] = []; slavesOf[merges[f]].push(f); }
+  });
+  var rows = '';
+  var ispStatus = typeof getISPStatus === 'function' ? getISPStatus() : '';
+  if (ispStatus === 'Approved') {
+    rows += '<tr onclick="openPublishedPolicyFromReports(\'ISP\')" style="cursor:pointer;" onmouseover="this.style.background=\'rgba(13,148,136,0.03)\'" onmouseout="this.style.background=\'\'">'
+      + '<td><span style="font-family:monospace;font-size:11px;font-weight:700;background:#e0f2fe;color:#0369a1;padding:2px 7px;border-radius:4px;">ISP</span></td>'
+      + '<td style="font-weight:600;font-size:13px;color:var(--navy);">Information Security Policy</td>'
+      + '<td style="font-size:12px;color:var(--text-muted);">' + _esc(state.programOwner || '—') + '</td>'
+      + '<td><span style="background:rgba(13,148,136,0.06);border:1px solid rgba(13,148,136,0.25);color:var(--teal);padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;">Approved</span></td>'
+      + '</tr>';
+  }
+  masterFams.forEach(function(fam) {
+    var status = (state.policyStatus[fam] || {}).status || 'Not Started';
+    if (status !== 'Approved') return;
+    var slaves = slavesOf[fam] || [];
+    var badgeStr = [fam].concat(slaves).map(function(f) {
+      return '<span style="font-family:monospace;font-size:10px;font-weight:700;background:rgba(30,58,95,0.08);color:var(--navy);padding:1px 5px;border-radius:3px;">' + f + '</span>';
+    }).join(' ');
+    rows += '<tr onclick="openPublishedPolicyFromReports(\'' + fam + '\')" style="cursor:pointer;" onmouseover="this.style.background=\'rgba(13,148,136,0.03)\'" onmouseout="this.style.background=\'\'">'
+      + '<td>' + badgeStr + '</td>'
+      + '<td style="font-weight:600;font-size:13px;color:var(--navy);">' + _esc(getPolicyMergedTitle(fam)) + '</td>'
+      + '<td style="font-size:12px;color:var(--text-muted);">' + _esc(getDomainOwnerLabel(fam)) + '</td>'
+      + '<td><span style="background:rgba(13,148,136,0.06);border:1px solid rgba(13,148,136,0.25);color:var(--teal);padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;">Approved</span></td>'
+      + '</tr>';
+  });
+  body.innerHTML = '<div style="max-width:1000px;">'
+    + '<div style="margin-bottom:14px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:10px 12px;font-size:12px;color:#0c4a6e;line-height:1.5;">'
+    + '<strong>Authoritative catalog.</strong> Only <strong>Approved</strong> policies appear here. Use the design workspaces to draft or update policies.</div>'
+    + (rows
+      ? '<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;"><table style="width:100%;border-collapse:collapse;">'
+        + '<thead><tr style="background:var(--bg-muted);">'
+        + '<th style="padding:10px 14px;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);text-align:left;">Family</th>'
+        + '<th style="padding:10px 14px;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);text-align:left;">Policy</th>'
+        + '<th style="padding:10px 14px;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);text-align:left;">Owner</th>'
+        + '<th style="padding:10px 14px;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);text-align:left;">Status</th>'
+        + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
+      : '<div class="empty-state" style="padding:32px 16px;"><div class="es-icon">📄</div><div class="es-title">No published policies yet</div><p>Approved domain policies and the organizational ISP will appear here once published.</p></div>')
+    + '</div>';
+}
+
+function renderPublishedISPDocInReports(bodyEl) {
+  var body = bodyEl || document.getElementById('reports-library-body');
+  if (!body) return;
+  var isp = state.infoSecPolicy || {};
+  var html = '<div style="max-width:860px;margin:0 auto;padding-bottom:32px;">'
+    + '<button onclick="backToReportsPolicyLibrary()" style="border:none;background:none;color:var(--teal);font-size:13px;font-weight:600;cursor:pointer;padding:0;margin-bottom:16px;">← Published policies</button>'
+    + '<div style="background:white;border:1px solid var(--border);border-radius:12px;padding:28px 32px;margin-bottom:16px;">'
+    + '<div style="font-size:22px;font-weight:800;color:var(--navy);margin:0 0 6px;">' + _esc(isp.title || 'Information Security Policy') + '</div>'
+    + '<div style="font-size:13px;color:var(--text-muted);">Tier 1 · Approved · Owner: ' + _esc(state.programOwner || 'CISO') + '</div>'
+    + '</div>';
+  (isp.sections || []).forEach(function(sec) {
+    var content = '';
+    if (sec.type === 'purpose') content = isp.purpose || sec.content || '';
+    else if (sec.type === 'scope') content = isp.scope || sec.content || '';
+    else if (sec.type === 'policy') content = isp.policy || sec.content || '';
+    else content = sec.content || '';
+    if (!content) return;
+    html += '<div style="background:white;border:1px solid var(--border);border-top:none;padding:20px 28px;">'
+      + '<div style="font-size:12px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;">' + _esc(sec.title || sec.type) + '</div>'
+      + '<div style="font-size:14px;line-height:1.7;color:#374151;white-space:pre-wrap;">' + _esc(content) + '</div></div>';
+  });
+  html += '</div>';
+  body.innerHTML = html;
+}
+
+window.renderPublishedPolicyLibrary = renderPublishedPolicyLibrary;
+window.renderPublishedISPDocInReports = renderPublishedISPDocInReports;
+
 /** @deprecated Local demo admin hint removed — kept as no-op for stale bookmarks. */
 function policyToggleAdminDraftHint(btn) {
   if (btn) btn.setAttribute('aria-expanded', 'false');
@@ -1370,13 +1452,19 @@ function exportPolicyDocumentDocx(kind, fam) {
   setTimeout(function() { URL.revokeObjectURL(a.href); }, 5000);
 }
 
-function renderPolicyDocViewer(fam) {
+function renderPolicyDocViewer(fam, opts) {
+  opts = opts || {};
   var listPanel = document.getElementById('policy-list-panel');
   var wizPanel  = document.getElementById('policy-wizard-panel');
-  if (listPanel) listPanel.style.display = '';
-  if (wizPanel)  wizPanel.style.display  = 'none';
-  var body = document.getElementById('policy-list-body');
+  if (!opts.bodyEl) {
+    if (listPanel) listPanel.style.display = '';
+    if (wizPanel)  wizPanel.style.display  = 'none';
+  }
+  var body = opts.bodyEl || document.getElementById('policy-list-body');
   if (!body) return;
+  var readOnly = !!opts.readOnly;
+  var backOnclick = opts.backOnclick || "state._policyDocView=false;renderPolicyList();";
+  var backLabel = opts.backLabel || '← Policy Library';
 
   var dp      = (state.domainPolicies || {})[fam];
   var pSt     = (state.policyStatus   || {})[fam] || {};
@@ -1387,7 +1475,7 @@ function renderPolicyDocViewer(fam) {
 
   // Determine if current user can edit
   var cu = state.currentUserId ? (state.users||[]).find(function(u){ return u.id===state.currentUserId; }) : null;
-  var canEdit = !cu || cu.role === 'ciso' || cu.role === 'issm' || cu.role === 'custodian';
+  var canEdit = !readOnly && (!cu || cu.role === 'ciso' || cu.role === 'issm' || cu.role === 'custodian');
 
   var statusCol = status==='Approved' ? 'var(--green)' : status==='Under Review' ? 'var(--blue)' : status==='Returned' ? 'var(--red)' : 'var(--amber)';
   var statusIcon = status==='Approved' ? '✅' : status==='Under Review' ? '👁' : status==='Returned' ? '↩' : '📝';
@@ -1397,7 +1485,7 @@ function renderPolicyDocViewer(fam) {
 
   // Breadcrumb + actions bar
   html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">'
-    + '<button onclick="state._policyDocView=false;renderPolicyList();" style="background:none;border:none;color:var(--teal);font-size:13px;font-weight:600;cursor:pointer;padding:0;">← Policy Library</button>'
+    + '<button onclick="' + backOnclick + '" style="background:none;border:none;color:var(--teal);font-size:13px;font-weight:600;cursor:pointer;padding:0;">' + escapeHTML(backLabel) + '</button>'
     + '<div style="display:flex;gap:8px;align-items:center;">'
     + '<button class="btn btn-secondary btn-sm" onclick="printPolicyDocument(\'domain\',\''+fam+'\')">🖨️ Print / Save PDF</button>'
     + '<button class="btn btn-secondary btn-sm" onclick="exportPolicyDocumentDocx(\'domain\',\''+fam+'\')">⬇ Export Word (.docx)</button>'

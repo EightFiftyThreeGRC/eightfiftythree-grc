@@ -2,6 +2,104 @@
 // Globals only; load after testing.js.
 
 // ============================================================
+// REPORTS LIBRARY (read-only published policies + planned+ controls)
+// ============================================================
+var REPORTS_CONTROL_PLANNED_PLUS = ['Planned', 'In Progress', 'Implemented', 'Not Applicable', 'Inherited'];
+
+function goToReportsDashboard() {
+  state._reportsLibraryView = null;
+  state._reportsLibraryPolicyFam = null;
+  showTab('reports');
+}
+
+function goToReportsLibrary(page) {
+  state._reportsLibraryView = page === 'controls' ? 'controls' : 'policies';
+  state._reportsLibraryPolicyFam = null;
+  state._policyLibraryMode = false;
+  state._controlLibraryMode = false;
+  if (typeof toggleSidebarReportsList === 'function') toggleSidebarReportsList(true);
+  showTab('reports');
+}
+
+function openPublishedPolicyFromReports(fam) {
+  if (fam === 'ISP') {
+    if (typeof getISPStatus === 'function' && getISPStatus() !== 'Approved') return;
+  } else if ((state.policyStatus[fam] || {}).status !== 'Approved') {
+    return;
+  }
+  state._reportsLibraryPolicyFam = fam;
+  renderReports();
+}
+
+function backToReportsPolicyLibrary() {
+  state._reportsLibraryPolicyFam = null;
+  renderReports();
+}
+
+function syncReportsLibraryNavActive() {
+  var polNav = document.getElementById('nav-reports-library-policies');
+  var ctrlNav = document.getElementById('nav-reports-library-controls');
+  var inLib = !!state._reportsLibraryView;
+  if (polNav) polNav.classList.toggle('active', inLib && state._reportsLibraryView === 'policies');
+  if (ctrlNav) ctrlNav.classList.toggle('active', inLib && state._reportsLibraryView === 'controls');
+}
+
+function renderReportsLibraryShell() {
+  var dashPanel = document.getElementById('reports-dashboard-panel');
+  var libPanel = document.getElementById('reports-library-panel');
+  var hdr = document.getElementById('reports-library-header');
+  var body = document.getElementById('reports-library-body');
+  if (dashPanel) dashPanel.style.display = 'none';
+  if (libPanel) libPanel.style.display = '';
+  syncReportsLibraryNavActive();
+
+  if (!body || !hdr) return;
+
+  if (!state.baseline) {
+    hdr.innerHTML = '<div class="role-badge">📚 Library</div><h1>Program Library</h1><p>Published policies and control requirements.</p>';
+    body.innerHTML = '<div class="empty-state"><div class="es-icon">🏛️</div><div class="es-title">Setup Required</div><p>Complete program setup before the library is available.</p></div>';
+    return;
+  }
+
+  if (state._reportsLibraryPolicyFam) {
+    hdr.innerHTML = '<div class="role-badge">📚 Library · Published policies</div><h1>Policy document</h1><p>Read-only view for staff and auditors.</p>';
+    if (state._reportsLibraryPolicyFam === 'ISP') {
+      if (typeof renderPublishedISPDocInReports === 'function') renderPublishedISPDocInReports(body);
+    } else if (typeof renderPolicyDocViewer === 'function') {
+      renderPolicyDocViewer(state._reportsLibraryPolicyFam, {
+        bodyEl: body,
+        readOnly: true,
+        backOnclick: 'backToReportsPolicyLibrary()',
+        backLabel: '← Published policies'
+      });
+    }
+    return;
+  }
+
+  if (state._reportsLibraryView === 'policies') {
+    hdr.innerHTML = '<div class="page-header-row"><div><div class="role-badge">📚 Library</div><h1>Published policies</h1><p>Approved organizational and domain policies — the authoritative policy catalog for staff and auditors.</p></div>'
+      + '<div class="page-header-actions"><button type="button" class="btn btn-secondary" onclick="goToReportsDashboard()">← Reports dashboard</button></div></div>';
+    if (typeof renderPublishedPolicyLibrary === 'function') renderPublishedPolicyLibrary(body);
+    return;
+  }
+
+  if (state._reportsLibraryView === 'controls') {
+    hdr.innerHTML = '<div class="page-header-row"><div><div class="role-badge">📚 Library</div><h1>Control requirements</h1><p>Controls at Planned status or beyond with design and downstream obligations — read-only for staff and auditors.</p></div>'
+      + '<div class="page-header-actions"><button type="button" class="btn btn-secondary" onclick="goToReportsDashboard()">← Reports dashboard</button></div></div>';
+    if (typeof renderPublishedControlLibrary === 'function') renderPublishedControlLibrary(body);
+    return;
+  }
+}
+
+function showReportsDashboardPanels() {
+  var dashPanel = document.getElementById('reports-dashboard-panel');
+  var libPanel = document.getElementById('reports-library-panel');
+  if (dashPanel) dashPanel.style.display = '';
+  if (libPanel) libPanel.style.display = 'none';
+  syncReportsLibraryNavActive();
+}
+
+// ============================================================
 // REPORTS & PROGRAM DASHBOARD
 // renderProgramDashboard (CISO overview card), renderReports
 // (full reports tab), renderPolicyRoadmap (Gantt),
@@ -1305,6 +1403,12 @@ function renderApproverDashboard(user) {
 }
 
 function renderReports() {
+  if (state._reportsLibraryView) {
+    renderReportsLibraryShell();
+    return;
+  }
+  showReportsDashboardPanels();
+
   const body = document.getElementById('reports-body');
   if (!body) return;
   if (!state.baseline) {
@@ -1832,3 +1936,8 @@ function approveAllReviewQueue() {
   showToast('\u2705 All attestations approved');
   renderReviewQueuePanel();
 }
+
+window.goToReportsDashboard = goToReportsDashboard;
+window.goToReportsLibrary = goToReportsLibrary;
+window.openPublishedPolicyFromReports = openPublishedPolicyFromReports;
+window.backToReportsPolicyLibrary = backToReportsPolicyLibrary;

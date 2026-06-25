@@ -1197,6 +1197,8 @@ const state = {
   _reportsProgramReadinessHidden: false, // true = collapse Program Readiness panel in Reports
   _reportsMySummaryHidden: false, // true = collapse "My dashboard" summary card in Reports
   _reportsPhase1BannerHidden: false, // true = collapse Phase 1 completion banner in Reports
+  _reportsLibraryView: null,     // null = dashboard; 'policies' | 'controls' = read-only library under Reports
+  _reportsLibraryPolicyFam: null, // set when drilling into a published policy from Reports library
   activeFrameworks: {}, // voluntary standards crosswalk lenses (off until user enables)
   activeComplianceLaws: {}, // laws & regulations (HIPAA, GLBA, …) tracked separately
   _regMappingInitialized: false,

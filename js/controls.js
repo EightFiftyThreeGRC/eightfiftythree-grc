@@ -182,6 +182,67 @@ function renderControlLibraryView() {
     + '</tbody></table></div>';
 }
 
+/** Read-only control catalog for Reports → Library (Planned status or beyond). */
+function renderPublishedControlLibrary(bodyEl) {
+  var body = bodyEl || document.getElementById('reports-library-body');
+  if (!body) return;
+  if (!state.baseline) {
+    body.innerHTML = '<div class="empty-state"><div class="es-icon">🏛️</div><div class="es-title">CISO Setup Required</div><p>Complete baseline selection to generate the control catalog.</p></div>';
+    return;
+  }
+  var plannedPlus = ['Planned', 'In Progress', 'Implemented', 'Not Applicable', 'Inherited'];
+  var controls = getActiveControls();
+  var families = Array.from(new Set(controls.map(function(c) { return c.f; }))).sort();
+  var familyFilter = state._reportsControlLibFamily || '';
+  var q = (state._reportsControlLibSearch || '').toLowerCase();
+  var rows = controls.filter(function(c) {
+    var status = (state.controlStatus[c.id] || {}).status || 'Not Started';
+    if (plannedPlus.indexOf(status) === -1) return false;
+    if (familyFilter && c.f !== familyFilter) return false;
+    if (q && !c.id.toLowerCase().includes(q) && !c.n.toLowerCase().includes(q)) return false;
+    return true;
+  });
+  var designedCount = rows.filter(function(c) { return typeof isControlDesigned === 'function' && isControlDesigned(c.id); }).length;
+  body.innerHTML = '<div style="max-width:1100px;">'
+    + '<div style="margin-bottom:14px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:10px 12px;font-size:12px;color:#0c4a6e;line-height:1.5;">'
+    + '<strong>Authoritative catalog.</strong> Only controls at <strong>Planned</strong> status or beyond appear here. Click a row for read-only design detail, policy objectives, and asset-owner requirements.</div>'
+    + '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px;">'
+    + '<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:12px 14px;"><div style="font-size:10px;font-weight:700;color:#1d4ed8;text-transform:uppercase;">In catalog</div><div style="font-size:24px;font-weight:800;color:#1d4ed8;">' + rows.length + '</div></div>'
+    + '<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:12px 14px;"><div style="font-size:10px;font-weight:700;color:#166534;text-transform:uppercase;">Designed</div><div style="font-size:24px;font-weight:800;color:#166534;">' + designedCount + '</div></div>'
+    + '<div style="background:#faf5ff;border:1px solid rgba(99,102,241,0.25);border-radius:10px;padding:12px 14px;"><div style="font-size:10px;font-weight:700;color:#6366f1;text-transform:uppercase;">Baseline</div><div style="font-size:24px;font-weight:800;color:#6366f1;">' + escapeHTML(state.baseline === 'L' ? 'Low' : state.baseline === 'M' ? 'Moderate' : 'High') + '</div></div>'
+    + '</div>'
+    + '<div class="filter-bar" style="margin-bottom:12px;">'
+    + '<input class="form-input" value="' + escapeHTML(state._reportsControlLibSearch || '') + '" placeholder="Search control ID or name..." oninput="state._reportsControlLibSearch=this.value;renderPublishedControlLibrary()">'
+    + '<select class="form-select" onchange="state._reportsControlLibFamily=this.value;renderPublishedControlLibrary()"><option value="">All families</option>'
+    + families.map(function(f) { return '<option value="' + f + '"' + (familyFilter === f ? ' selected' : '') + '>' + f + ' — ' + (FAMILIES[f] || f) + '</option>'; }).join('')
+    + '</select>'
+    + '</div>'
+    + (rows.length
+      ? '<div class="table-scroll"><table class="control-table"><thead><tr>'
+        + '<th style="width:92px;">Control</th><th>Name</th><th style="width:150px;">Owner</th><th style="width:120px;">Status</th><th style="width:220px;">Asset applicability</th><th style="width:90px;">Design done</th>'
+        + '</tr></thead><tbody>'
+        + rows.map(function(c) {
+            var cs = state.controlStatus[c.id] || {};
+            var owner = (state.controlOwners || {})[c.id] || {};
+            var cov = getCtrlCoveredAssetTypes(c.id).map(function(t) { return t.label; });
+            var designed = typeof isControlDesigned === 'function' && isControlDesigned(c.id);
+            var escId = c.id.replace(/'/g, "\\'");
+            return '<tr class="control-lib-row" style="cursor:pointer;" onclick="openControlLibraryReadOnly(\'' + escId + '\')">'
+              + '<td><span class="control-id">' + escapeHTML(c.id) + '</span></td>'
+              + '<td style="font-size:12px;color:var(--navy);">' + escapeHTML(c.n) + '</td>'
+              + '<td style="font-size:12px;color:var(--text-muted);">' + escapeHTML(owner.name || 'Unassigned') + '</td>'
+              + '<td>' + chipHTML(cs.status || 'Not Started') + '</td>'
+              + '<td style="font-size:11px;color:var(--text-muted);">' + (cov.length ? escapeHTML(cov.slice(0, 2).join(' · ')) + (cov.length > 2 ? ' +' + (cov.length - 2) : '') : 'Not scoped') + '</td>'
+              + '<td style="font-size:12px;font-weight:700;color:' + (designed ? '#166534' : '#94a3b8') + ';">' + (designed ? 'Yes' : 'No') + '</td>'
+              + '</tr>';
+          }).join('')
+        + '</tbody></table></div>'
+      : '<div class="empty-state" style="padding:32px 16px;"><div class="es-icon">🛡️</div><div class="es-title">No control requirements yet</div><p>Controls move into this catalog once they reach Planned status or beyond in the design workspace.</p></div>')
+    + '</div>';
+}
+
+window.renderPublishedControlLibrary = renderPublishedControlLibrary;
+
 function renderControlStep(step) {
   var designFams = typeof getDesignFamiliesForQueue === 'function' ? getDesignFamiliesForQueue() : [];
   if (step === 1) {

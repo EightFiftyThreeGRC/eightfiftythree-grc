@@ -2467,6 +2467,19 @@
     }
     .sidebar-expand-btn:hover { background: rgba(0,0,0,0.06); color: var(--navy); }
     .sidebar-sub-list .sidebar-item { font-size: 12px; padding: 6px 12px 6px 28px; margin: 1px 10px; }
+    .sidebar-sub-list-label {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-muted);
+      padding: 4px 18px 6px 28px;
+      opacity: 0.85;
+    }
+    .sidebar-sub-item.active {
+      background-color: rgba(0, 113, 227, 0.1);
+      color: var(--accent);
+    }
 
     /* Command Center / Hub */
     .hub-hero { margin-bottom: 28px; }

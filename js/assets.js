@@ -868,7 +868,8 @@ function renderAssetTab() {
     if (inAsset || inProc) {
       if (listPanel) listPanel.style.display = 'none';
       if (wizPanel)  wizPanel.style.display  = 'flex';
-      var step = currentStep.asset || 1;
+      var step = normalizeAssetSspStep(currentStep.asset || 1);
+      currentStep.asset = step;
       for (var i = 1; i <= 4; i++) {
         var s = document.getElementById('asset-step-' + i);
         if (s) s.classList.toggle('active', i === step);
@@ -886,7 +887,8 @@ function renderAssetTab() {
   }
 
   if (inAsset || inProc) {
-    var step2 = currentStep.asset || 1;
+    var step2 = normalizeAssetSspStep(currentStep.asset || 1);
+    currentStep.asset = step2;
     renderAssetWizardChrome();
     renderAssetStep(step2);
   } else {

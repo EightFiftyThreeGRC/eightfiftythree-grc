@@ -591,6 +591,20 @@ function toggleSidebarControlsList(forceOpen) {
   }
 }
 
+function toggleSidebarReportsList(forceOpen) {
+  if (typeof state._sidebarReportsExpanded !== 'boolean') state._sidebarReportsExpanded = false;
+  if (forceOpen === true) state._sidebarReportsExpanded = true;
+  else if (forceOpen === false) state._sidebarReportsExpanded = false;
+  else state._sidebarReportsExpanded = !state._sidebarReportsExpanded;
+  var list = document.getElementById('sidebar-reports-list');
+  var btn = document.getElementById('sidebar-reports-toggle');
+  if (list) list.classList.toggle('sidebar-sub-list--collapsed', !state._sidebarReportsExpanded);
+  if (btn) {
+    btn.textContent = state._sidebarReportsExpanded ? '▾' : '▸';
+    btn.setAttribute('aria-expanded', state._sidebarReportsExpanded ? 'true' : 'false');
+  }
+}
+
 function toggleSidebarAssetsList(forceOpen) {
   if (typeof state._sidebarAssetsExpanded !== 'boolean') state._sidebarAssetsExpanded = false;
   if (forceOpen === true) state._sidebarAssetsExpanded = true;
