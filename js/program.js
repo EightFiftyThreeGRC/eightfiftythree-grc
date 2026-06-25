@@ -789,19 +789,29 @@ function updateNotificationBadges() {
   // Reports badge: pending review queue items for ISSM/CISO, or ISP awaiting approver sign-off
   var reviewCount = 0;
   if (typeof canSessionApproveISP === 'function' && canSessionApproveISP()) {
-    reviewCount = 1;
+    reviewCount++;
   } else if (role === 'approver' && typeof getISPStatus === 'function' && getISPStatus() === 'Under Review') {
-    reviewCount = 1;
-  } else if (role === 'issm' || role === 'ciso' || !user) {
-    var queue = state.controlReviewQueue || [];
-    if (role === 'issm' && user.families) {
-      reviewCount = queue.filter(function(r) {
-        var fam = (r.controlId||'').replace(/-.*/, '');
-        return user.families.includes(fam);
-      }).length;
-    } else {
-      reviewCount = queue.length;
-    }
+    reviewCount++;
+  }
+  if (typeof getSspReviewQueueItemsForUser === 'function') {
+    reviewCount += getSspReviewQueueItemsForUser(user).length;
+  }
+  var queue = state.controlReviewQueue || [];
+  if (role === 'issm' && user && user.families) {
+    reviewCount += queue.filter(function(r) {
+      if (!r || r.type === 'ssp' || r.type === 'baseline-elevation') return false;
+      var fam = (r.controlId||'').replace(/-.*/, '');
+      return user.families.includes(fam);
+    }).length;
+  } else if (role === 'ciso' || !user) {
+    reviewCount += queue.filter(function(r) {
+      return r && r.type !== 'ssp' && r.type !== 'baseline-elevation';
+    }).length;
+  } else if (user && role !== 'ao' && role !== 'approver') {
+    reviewCount += queue.filter(function(r) {
+      return r && r.type !== 'ssp' && r.type !== 'baseline-elevation'
+        && typeof controlDesignQueueMatchesReviewer === 'function' && controlDesignQueueMatchesReviewer(r);
+    }).length;
   }
   setBadge('badge-reports', reviewCount);
 

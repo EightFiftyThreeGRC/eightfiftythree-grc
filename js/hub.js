@@ -91,8 +91,23 @@ function getNextActions() {
     }
   });
 
+  var hubUser = typeof getHubCurrentUser === 'function' ? getHubCurrentUser() : null;
+  if (typeof getSspReviewQueueItemsForUser === 'function') {
+    getSspReviewQueueItemsForUser(hubUser).slice(0, 5).forEach(function(r) {
+      var sidJson = JSON.stringify(String(r.assetId || ''));
+      var isProc = !!r.isProcessSsp;
+      actions.push({
+        priority: 1,
+        icon: '📋',
+        label: 'Review SSP: ' + (r.assetName || 'Package'),
+        desc: 'Submitted by ' + (r.submittedBy || 'owner') + (r.date ? ' on ' + r.date : ''),
+        action: "showTab('reports');if(typeof aoOpenQueuedSsp==='function')aoOpenQueuedSsp(" + sidJson + ',' + (isProc ? 'true' : 'false') + ');'
+      });
+    });
+  }
+
   (state.controlReviewQueue || []).slice(0, 5).forEach(function(r) {
-    if (!r || !r.controlId) return;
+    if (!r || !r.controlId || r.type === 'ssp') return;
     var cs = (state.controlStatus || {})[r.controlId] || {};
     var isReturn = r.type === 'control-return' || r.status === 'Returned to Policy Owner' || !!cs.returnedToPolicyOwner;
     var escId = r.controlId.replace(/'/g, "\\'");

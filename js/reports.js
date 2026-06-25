@@ -981,16 +981,21 @@ function renderMyDashboard(controls, families) {
     if (co.dueDate && co.dueDate < new Date().toISOString().slice(0,10)) overdue++;
   });
 
-  // Pending review count (ISSM/CISO: control queue; AO: SSP packages assigned to this reviewer)
+  // Pending review count (SSP packages + control design queue)
   var pendingReview = 0;
-  if (user.role === 'ao') {
-    pendingReview = (state.controlReviewQueue||[]).filter(function(r) { return sspQueueRowMatchesAo(r, user); }).length;
-  } else if (user.role === 'issm' || user.role === 'ciso') {
-    pendingReview = (state.controlReviewQueue||[]).filter(function(r) {
-      if (r.type === 'ssp') return false;
+  if (typeof getSspReviewQueueItemsForUser === 'function') {
+    pendingReview += getSspReviewQueueItemsForUser(user).length;
+  }
+  if (user.role === 'issm' || user.role === 'ciso') {
+    pendingReview += (state.controlReviewQueue||[]).filter(function(r) {
+      if (!r || r.type === 'ssp' || r.type === 'baseline-elevation') return false;
       if (user.role !== 'issm') return true;
       var fam = (r.controlId||'').replace(/-.*/, '');
       return (user.families||[]).includes(fam);
+    }).length;
+  } else if (user.role !== 'ao' && user.role !== 'approver' && user.role !== 'asset-owner') {
+    pendingReview += (state.controlReviewQueue||[]).filter(function(r) {
+      return r && r.type !== 'ssp' && r.type !== 'baseline-elevation' && typeof controlDesignQueueMatchesReviewer === 'function' && controlDesignQueueMatchesReviewer(r);
     }).length;
   }
 
@@ -1199,16 +1204,9 @@ function renderReturnedWorkCallout(user) {
     + '</div>';
 }
 
-// ── AO: SSP / Process SSP approval queue (controlReviewQueue type 'ssp') ─────
+// ── SSP / Process SSP approval queue (controlReviewQueue type 'ssp') ─────
 function sspQueueRowMatchesAo(r, user) {
-  if (!r || r.type !== 'ssp' || !user) return false;
-  var st = String(r.status || 'Pending');
-  if (st !== 'Pending' && st !== '') return false;
-  if (String(r.reviewerUserId || '') === String(user.id || '')) return true;
-  if (String(r.reviewerRole || '').toLowerCase() === 'ao' && (r.reviewerName || '').trim() && (user.name || '').trim()) {
-    if (String(r.reviewerName).trim().toLowerCase() === String(user.name).trim().toLowerCase()) return true;
-  }
-  return false;
+  return typeof sspQueueRowMatchesReviewer === 'function' && sspQueueRowMatchesReviewer(r, user);
 }
 
 function aoOpenQueuedSsp(scopeId, isProcess) {
@@ -1277,14 +1275,17 @@ function aoReturnQueuedSsp(scopeId, isProcess) {
   renderReports();
 }
 
-function renderAoSspApprovalQueueHtml(user) {
-  if (!user || user.role !== 'ao') return '';
-  var items = (state.controlReviewQueue || []).filter(function(r) { return sspQueueRowMatchesAo(r, user); });
+function renderSspApprovalQueueHtml(user) {
+  if (user && typeof userMayReceiveSspReviews === 'function' && !userMayReceiveSspReviews(user)) return '';
+  var items = typeof getSspReviewQueueItemsForUser === 'function'
+    ? getSspReviewQueueItemsForUser(user)
+    : (state.controlReviewQueue || []).filter(function(r) { return sspQueueRowMatchesAo(r, user); });
   var sspLabel = state.privacyOverlay ? 'SPSP' : 'SSP';
   if (!items.length) {
+    if (user && typeof userMayReceiveSspReviews === 'function' && !userMayReceiveSspReviews(user)) return '';
     return '<div style="background:linear-gradient(135deg,#faf5ff,#f3e8ff);border:1px solid #c4b5fd;border-radius:12px;padding:18px 20px;margin-bottom:20px;max-width:920px;">'
-      + '<div style="font-size:13px;font-weight:800;color:#5b21b6;margin-bottom:6px;">ATO / ' + sspLabel + ' approval queue</div>'
-      + '<div style="font-size:12px;color:#6b21a8;line-height:1.55;">No packages are waiting on you as the designated reviewer. When an owner submits a ' + sspLabel + ' and selects you as reviewer, it appears here.</div></div>';
+      + '<div style="font-size:13px;font-weight:800;color:#5b21b6;margin-bottom:6px;">' + sspLabel + ' review queue</div>'
+      + '<div style="font-size:12px;color:#6b21a8;line-height:1.55;">No packages are waiting on you as the designated reviewer. When an owner submits a ' + sspLabel + ' and selects you as reviewer, it appears here on <strong>Reports</strong>.</div></div>';
   }
   var rows = items.map(function(r) {
     var isProc = !!r.isProcessSsp;
@@ -1313,8 +1314,8 @@ function renderAoSspApprovalQueueHtml(user) {
   }).join('');
   return '<div style="background:linear-gradient(135deg,#faf5ff,#f3e8ff);border:1px solid #c4b5fd;border-radius:12px;padding:18px 20px;margin-bottom:20px;max-width:100%;">'
     + '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px;">'
-    + '<div><div style="font-size:14px;font-weight:800;color:#5b21b6;">ATO / ' + sspLabel + ' approval queue</div>'
-    + '<div style="font-size:12px;color:#6b21a8;margin-top:4px;line-height:1.45;">Packages submitted for your review as designated ' + sspLabel + ' reviewer.</div></div>'
+    + '<div><div style="font-size:14px;font-weight:800;color:#5b21b6;">' + sspLabel + ' review queue</div>'
+    + '<div style="font-size:12px;color:#6b21a8;margin-top:4px;line-height:1.45;">Packages submitted for your review as designated ' + sspLabel + ' reviewer. Open to inspect attestations, then approve or return to the owner.</div></div>'
     + '<span style="font-size:12px;font-weight:700;background:white;border:1px solid #c4b5fd;border-radius:20px;padding:4px 12px;color:#5b21b6;">' + items.length + ' pending</span></div>'
     + '<div class="table-scroll"><table style="width:100%;border-collapse:collapse;background:white;border-radius:8px;overflow:hidden;border:1px solid #e9d5ff;">'
     + '<thead><tr style="background:#f5f3ff;">'
@@ -1502,7 +1503,7 @@ function renderReports() {
     ${renderProgramReadinessPanelHtml()}
     ${typeof renderAuthorizationStatusPanelHtml === 'function' ? renderAuthorizationStatusPanelHtml() : ''}
     ${renderReturnedWorkCallout(user)}
-    ${user && user.role === 'ao' ? renderAoSspApprovalQueueHtml(user) : ''}
+    ${renderSspApprovalQueueHtml(user)}
     ${isScoped && showMyView ? renderMyDashboard(controls, families) : ''}
     ${renderISPApprovalCallout(user)}
     ${showProgramExecDashboard ? renderProgramDashboard(controls, families) : ''}

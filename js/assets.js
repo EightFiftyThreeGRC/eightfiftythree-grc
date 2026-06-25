@@ -2368,6 +2368,48 @@ function getSspSignoffFromState(scopeId) {
   return {};
 }
 
+/** True when a pending SSP queue row is assigned to this session user or roster match. */
+function sspQueueRowMatchesReviewer(r, user) {
+  if (!r || r.type !== 'ssp') return false;
+  var st = String(r.status || 'Pending');
+  if (st !== 'Pending' && st !== '') return false;
+
+  var reviewerUserId = String(r.reviewerUserId || '');
+  var reviewerEmail = typeof normalizeOwnerEmail === 'function'
+    ? normalizeOwnerEmail(r.reviewerEmail || '')
+    : String(r.reviewerEmail || '').trim().toLowerCase();
+  var reviewerName = String(r.reviewerName || '').trim().toLowerCase();
+
+  if (user && reviewerUserId && String(user.id || '') === reviewerUserId) return true;
+
+  var sessionEmail = typeof getSessionEmailForApproval === 'function' ? getSessionEmailForApproval() : '';
+  if (sessionEmail && reviewerEmail && sessionEmail === reviewerEmail) return true;
+
+  var sessionName = String(typeof getSessionActorName === 'function' ? getSessionActorName('') : '').trim().toLowerCase();
+  if (!sessionName && user && user.name) sessionName = String(user.name).trim().toLowerCase();
+  if (sessionName && reviewerName && sessionName === reviewerName) return true;
+
+  if (user && reviewerName && user.name && String(user.name).trim().toLowerCase() === reviewerName) return true;
+
+  return false;
+}
+
+function userMayReceiveSspReviews(user) {
+  if (!user) return true;
+  return user.role === 'issm' || user.role === 'ao' || user.role === 'ciso' || user.role === 'approver';
+}
+
+function getSspReviewQueueItemsForUser(user) {
+  if (!user) {
+    return (state.controlReviewQueue || []).filter(function(r) {
+      if (!r || r.type !== 'ssp') return false;
+      var st = String(r.status || 'Pending');
+      return st === 'Pending' || st === '';
+    });
+  }
+  return (state.controlReviewQueue || []).filter(function(r) { return sspQueueRowMatchesReviewer(r, user); });
+}
+
 /** After reviewer change, keep the latest pending SSP queue row in sync. */
 function syncSspReviewerToReviewQueue(scopeId, isProcessSsp) {
   var k = String(scopeId);
@@ -2857,8 +2899,13 @@ function submitSSP() {
   delete state.sspSignoffs[asset.id].aoReturnNotes;
   delete state.sspSignoffs[asset.id].aoReturnedAt;
   delete state.sspSignoffs[asset.id].aoReturnedBy;
-  // Push to ISSM review queue
+  // Push to reviewer queue (replace any stale pending row for this asset)
   if (!state.controlReviewQueue) state.controlReviewQueue = [];
+  state.controlReviewQueue = state.controlReviewQueue.filter(function(r) {
+    if (!r || r.type !== 'ssp') return true;
+    if (!!r.isProcessSsp) return true;
+    return String(r.assetId) !== String(asset.id);
+  });
   state.controlReviewQueue.push({
     type: 'ssp',
     assetId: asset.id,
@@ -3251,6 +3298,11 @@ function submitProcessSSP() {
   delete state.sspSignoffs[proc.id].aoReturnedAt;
   delete state.sspSignoffs[proc.id].aoReturnedBy;
   if (!state.controlReviewQueue) state.controlReviewQueue = [];
+  state.controlReviewQueue = state.controlReviewQueue.filter(function(r) {
+    if (!r || r.type !== 'ssp') return true;
+    if (!r.isProcessSsp) return true;
+    return String(r.assetId) !== String(proc.id);
+  });
   state.controlReviewQueue.push({
     type: 'ssp',
     assetId: proc.id,
@@ -3281,3 +3333,6 @@ window.assetSspGoNext = assetSspGoNext;
 window.assetSspGoBack = assetSspGoBack;
 window.syncAssetSspStepNavLayout = syncAssetSspStepNavLayout;
 window.syncAssetSspFooterNav = syncAssetSspFooterNav;
+window.sspQueueRowMatchesReviewer = sspQueueRowMatchesReviewer;
+window.getSspReviewQueueItemsForUser = getSspReviewQueueItemsForUser;
+window.userMayReceiveSspReviews = userMayReceiveSspReviews;
