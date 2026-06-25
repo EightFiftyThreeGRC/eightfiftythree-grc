@@ -2777,7 +2777,7 @@ function sspPackageOwnedBySessionUser(scopeId, isProcess, user) {
   var tokens = getSspSessionIdentityTokens(user);
   var scopedIds = typeof getCurrentPersonAssetIds === 'function' ? getCurrentPersonAssetIds() : null;
   if (scopedIds && scopedIds.indexOf(sid) !== -1) return true;
-  if ((user.assets || []).map(String).indexOf(sid) !== -1) return true;
+  if (user && (user.assets || []).map(String).indexOf(sid) !== -1) return true;
 
   if (isProcess) {
     var proc = (state.processes || []).find(function(p) { return String(p.id) === sid; });
