@@ -962,8 +962,9 @@ function renderAssetHome() {
     var signoff    = (state.sspSignoffs||{})[item.id]     || {};
     var completed  = controls.filter(function(c){ return attests[c.id] && attests[c.id].status; }).length;
     var pct        = controls.length ? Math.round(completed/controls.length*100) : 0;
-    var status     = signoff.status==='Approved'?'Approved':signoff.status==='Submitted'?'Submitted':completed>0?'In Progress':'Not Started';
-    var col        = status==='Approved'?'var(--green)':status==='Submitted'?'var(--blue)':status==='In Progress'?'var(--amber)':'var(--slate)';
+    var isReturned = typeof signoffIsReturnedForRevision === 'function' && signoffIsReturnedForRevision(signoff);
+    var status     = signoff.status==='Approved'?'Approved':signoff.status==='Submitted'?'Submitted':isReturned?'Returned for revision':completed>0?'In Progress':'Not Started';
+    var col        = status==='Approved'?'var(--green)':signoff.status==='Submitted'?'var(--blue)':isReturned?'#c2410c':status==='In Progress'?'var(--amber)':'var(--slate)';
     var enterFn    = isProc ? 'enterProcessSSP' : 'enterAssetSSP';
     var removeFn   = isProc ? 'removeProcess'   : 'removeAsset';
     var subtitle   = isProc
@@ -2726,7 +2727,7 @@ function normalizeSspSignoffStatus(st) {
 function signoffIsReturnedForRevision(rawSig) {
   if (!rawSig || !rawSig.aoReturnedAt) return false;
   var st = normalizeSspSignoffStatus(rawSig.status);
-  return st !== 'Submitted' && st !== 'Approved';
+  return st !== 'Approved';
 }
 
 function getSspSignoffFromState(scopeId) {
@@ -2754,6 +2755,9 @@ function getSspSessionIdentityTokens(user) {
     addName(user.name);
     addEmail(user.email);
   }
+  addName(state.programOwner);
+  addEmail(state.programOwnerEmail);
+  if (typeof resolveProgramOwnerActorName === 'function') addName(resolveProgramOwnerActorName());
   if (typeof getSessionActorName === 'function') addName(getSessionActorName(''));
   if (typeof getSessionEmailForApproval === 'function') addEmail(getSessionEmailForApproval());
   var personIds = (state._currentPersonIds && state._currentPersonIds.length)
@@ -2769,7 +2773,6 @@ function getSspSessionIdentityTokens(user) {
 }
 
 function sspPackageOwnedBySessionUser(scopeId, isProcess, user) {
-  if (!user) return false;
   var sid = String(scopeId);
   var tokens = getSspSessionIdentityTokens(user);
   var scopedIds = typeof getCurrentPersonAssetIds === 'function' ? getCurrentPersonAssetIds() : null;
@@ -2787,7 +2790,7 @@ function sspPackageOwnedBySessionUser(scopeId, isProcess, user) {
     if (asset) {
       var aOwner = String(asset.owner || '').trim().toLowerCase();
       if (aOwner && tokens.names.indexOf(aOwner) !== -1) return true;
-      if (asset.ownerId && String(asset.ownerId) === String(user.id)) return true;
+      if (user && asset.ownerId && String(asset.ownerId) === String(user.id)) return true;
     }
   }
 
@@ -2798,7 +2801,6 @@ function sspPackageOwnedBySessionUser(scopeId, isProcess, user) {
 }
 
 function getReturnedSspPackagesForUser(user) {
-  if (!user) return [];
   var sspLabel = state.privacyOverlay ? 'SPSP' : 'SSP';
   var rows = [];
   (state.assets || []).forEach(function(a) {
@@ -2819,7 +2821,7 @@ function getReturnedSspPackagesForUser(user) {
 function openReturnedSspForRevision(scopeId, isProcess) {
   var sid = String(scopeId);
   var user = state.currentUserId ? (state.users || []).find(function(u) { return u.id === state.currentUserId; }) : null;
-  if (user && !sspPackageOwnedBySessionUser(sid, !!isProcess, user)) {
+  if (!sspPackageOwnedBySessionUser(sid, !!isProcess, user)) {
     showToast('This returned package is not assigned to your profile.', true);
     return;
   }
@@ -2836,7 +2838,7 @@ function openReturnedSspForRevision(scopeId, isProcess) {
 }
 
 function renderReturnedSspWorkCallout(user) {
-  if (!user || typeof getReturnedSspPackagesForUser !== 'function') return '';
+  if (typeof getReturnedSspPackagesForUser !== 'function') return '';
   var rows = getReturnedSspPackagesForUser(user);
   if (!rows.length) return '';
   var sspLabel = rows[0].sspLabel || (state.privacyOverlay ? 'SPSP' : 'SSP');

@@ -829,7 +829,7 @@ function updateNotificationBadges() {
   if (typeof getSspReviewQueueItemsForUser === 'function') {
     reviewCount += getSspReviewQueueItemsForUser(user).length;
   }
-  if (typeof getReturnedSspPackagesForUser === 'function' && user) {
+  if (typeof getReturnedSspPackagesForUser === 'function') {
     reviewCount += getReturnedSspPackagesForUser(user).length;
   }
   var queue = state.controlReviewQueue || [];

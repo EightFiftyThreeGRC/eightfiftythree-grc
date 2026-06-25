@@ -1166,7 +1166,7 @@ function renderReturnedWorkCallout(user) {
     }
   }
 
-  if (typeof getReturnedSspPackagesForUser === 'function' && user) {
+  if (typeof getReturnedSspPackagesForUser === 'function') {
     getReturnedSspPackagesForUser(user).forEach(function(r) {
       var notes = String(r.sign.aoReturnNotes || '').trim();
       var sidEsc = String(r.scopeId || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
@@ -1304,10 +1304,17 @@ function aoReturnQueuedSsp(scopeId, isProcess, opts) {
   markDirty();
   if (typeof updateNotificationBadges === 'function') updateNotificationBadges();
   showToast(label + ' returned to the owner for revision.');
-  if (opts.fromReview && typeof closeSspReadOnlyReview === 'function') {
-    closeSspReadOnlyReview();
-  } else if (typeof renderReports === 'function') {
-    renderReports();
+  var afterReturn = function() {
+    if (opts.fromReview && typeof closeSspReadOnlyReview === 'function') {
+      closeSspReadOnlyReview();
+    } else if (typeof renderReports === 'function') {
+      renderReports();
+    }
+  };
+  if (typeof cloudPushNow === 'function' && typeof isCloudSessionActive === 'function' && isCloudSessionActive()) {
+    cloudPushNow().finally(afterReturn);
+  } else {
+    afterReturn();
   }
 }
 
@@ -1483,7 +1490,7 @@ function renderReports() {
   // Empty state for scoped users with no assignments
   if (showMyView && controls.length === 0 && families.length === 0) {
     var uName = user ? user.name.split(' ')[0] : 'there';
-    var returnedSspHtml = (typeof renderReturnedSspWorkCallout === 'function' && user) ? renderReturnedSspWorkCallout(user) : '';
+    var returnedSspHtml = (typeof renderReturnedSspWorkCallout === 'function') ? renderReturnedSspWorkCallout(user) : '';
     var returnedWorkHtml = typeof renderReturnedWorkCallout === 'function' ? renderReturnedWorkCallout(user) : '';
     body.innerHTML = (returnedSspHtml || returnedWorkHtml)
       + '<div class="empty-state"><div class="es-icon">\uD83D\uDCCA</div><div class="es-title">Welcome, ' + escapeHTML(uName) + '</div>'
