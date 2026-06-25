@@ -641,7 +641,7 @@ function renderAssetTypeLibrary() {
       }).join('') + '</tbody></table></div>'
       : '<div style="font-size:12px;color:var(--text-muted);">No requests submitted yet.</div>')
     + '</div>'
-    + '<div style="margin-top:12px;"><button class="btn btn-secondary btn-sm" onclick="goToAssetWorkspace()">Open Asset Workspace →</button></div>';
+    + '<div style="margin-top:12px;"><button class="btn btn-secondary btn-sm" onclick="goToAssetSspHome()">SSP inventory →</button></div>';
 }
 
 function getAssetOwnerProfiles() {
@@ -776,7 +776,7 @@ function renderAssetLibrary() {
     + '</div>'
     + '<div style="display:flex;gap:8px;">'
     + '<button class="btn btn-primary btn-sm" onclick="createAssetFromLibrary()">Create Asset</button>'
-    + '<button class="btn btn-secondary btn-sm" onclick="goToAssetWorkspace()">Open Asset Workspace →</button>'
+    + '<button class="btn btn-secondary btn-sm" onclick="goToAssetSspHome()">SSP inventory →</button>'
     + '</div>'
     + '</div>'
     + '<div style="background:white;border:1px solid var(--border);border-radius:10px;padding:14px;">'
@@ -1167,10 +1167,7 @@ function openSspReadOnlyFromQueue(scopeId, isProcess, exitTab) {
   }
   currentStep.asset = 1;
 
-  if (typeof goToAssetWorkspace === 'function') goToAssetWorkspace();
-  else {
-    if (typeof showTab === 'function') showTab('asset');
-  }
+  if (typeof showTab === 'function') showTab('asset');
 
   var listPanel = document.getElementById('asset-list-panel');
   var wizPanel = document.getElementById('asset-wizard-panel');
