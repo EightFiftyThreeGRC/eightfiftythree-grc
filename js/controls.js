@@ -3654,16 +3654,6 @@ function buildStep3PolicyContextHtml(ctrl, policyReqs) {
     + '</div>';
 }
 
-function buildIspGovernanceStep3GuidanceHtml(ctrl) {
-  if (!(typeof isPolicyAndProceduresControl === 'function' && isPolicyAndProceduresControl(ctrl.id))) return '';
-  return '<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:11px;color:#166534;line-height:1.55;">'
-    + '<div style="font-weight:700;margin-bottom:4px;">IS Governance scope — organizational policy control</div>'
-    + 'For XX-1 controls, obligations are governance activities (develop, disseminate, review policy/procedures), not operational asset tasks. '
-    + 'Map Step 2 sub-requirements: <strong>(a)</strong> → implementation actions, <strong>(b)</strong> → procedures &amp; evidence, <strong>(c)</strong> → review cycle &amp; acceptance criteria. '
-    + 'The same pattern usually applies across all XX-1 controls — fill one, then use <strong>Apply to controls…</strong>.'
-    + '</div>';
-}
-
 function buildAssetOwnerReqSuggestionsFromDesign(ctrlId, scopeKey) {
   normalizeControlDesignState(ctrlId);
   var cs = state.controlStatus[ctrlId] || {};
@@ -3814,7 +3804,7 @@ function renderControlStep3() {
     </div>
     ${minus1WithScope.length > 1 ? `
     <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:11px;color:#166534;line-height:1.55;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
-      <div><strong>XX-1 shortcut:</strong> ${minus1WithScope.length} policy controls share IS Governance scope. Use <em>Suggest from Step 2</em> on one control, then <strong>Apply to controls…</strong> to copy obligations across the set.</div>
+      <div><strong>XX-1 shortcut:</strong> ${minus1WithScope.length} policy controls often share the same obligation pattern. Use <em>Suggest from Step 2</em> on one control, then <strong>Apply to controls…</strong> to copy across the set.</div>
     </div>` : ''}
 
     <div style="display:flex;gap:0;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:16px;flex-wrap:wrap;width:fit-content;">
@@ -3886,7 +3876,6 @@ function renderControlStep3() {
           <div style="padding:16px 18px;">
             ${buildStep3DesignContextHtml(c)}
             ${buildStep3PolicyContextHtml(c, pReqs)}
-            ${scopeEntries.some(function(e) { return isIsGovernanceScopeEntry(e); }) ? buildIspGovernanceStep3GuidanceHtml(c) : ''}
             ${typeBlocks}
           </div>
         </div>`;
