@@ -1268,12 +1268,12 @@ function renderControlStep2() {
         <div class="ctrl-family-subnav" style="display:flex;flex-wrap:wrap;gap:8px;">
           ${renderControlFamilyChipNav(designFams, activeFam, 2)}
         </div>
-        ${activeFam === 'ISP' ? `
+        ${activeFam === 'ISP' && getXx1PolicyControlsInQueue().length > 1 ? `
         <div style="margin-top:10px;padding:10px 14px;background:#f0fdf4;border:1px solid #86efac;border-radius:8px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
           <div style="font-size:11px;color:#166534;line-height:1.5;">
-            <strong>ISP shortcut:</strong> Policy &amp; Procedures controls share governance text and <em>IS Governance</em> scope. Document one control, then bulk-apply the pattern to the rest.
+            <strong>XX-1 shortcut:</strong> Policy &amp; Procedures controls (XX-1, including PM-1) share governance text and <em>IS Governance</em> scope — not other PM program controls.
           </div>
-          ${state._selectedCtrl ? '<button type="button" class="btn btn-secondary btn-sm" onclick="openBulkIspDesignPatternModal(\'' + String(state._selectedCtrl).replace(/'/g, "\\'") + '\')">Bulk apply to ISP controls…</button>' : ''}
+          ${state._selectedCtrl && isIspOrganizationalControl(state._selectedCtrl) ? '<button type="button" class="btn btn-secondary btn-sm" onclick="openBulkIspDesignPatternModal(\'' + String(state._selectedCtrl).replace(/'/g, "\\'") + '\')">Bulk apply to XX-1 controls…</button>' : ''}
         </div>` : ''}
       </div>
       <div style="display:flex;flex:1;overflow:hidden;">
@@ -1440,10 +1440,13 @@ function normalizeControlDesignState(ctrlId) {
 var ISP_GOVERNANCE_TYPE_KEY = 'proc_is_governance';
 
 function isIspOrganizationalControl(ctrlId) {
-  var ctrl = CONTROLS.find(function(c) { return c.id === ctrlId; });
-  if (!ctrl) return false;
-  if (typeof isControlIspTier === 'function' && isControlIspTier(ctrl)) return true;
   return typeof isPolicyAndProceduresControl === 'function' && isPolicyAndProceduresControl(ctrlId);
+}
+
+function getXx1PolicyControlsInQueue() {
+  return getMyDesignQueueControls().filter(function(c) {
+    return isIspOrganizationalControl(c.id);
+  });
 }
 
 function controlScopeWasTouched(cs) {
@@ -1502,7 +1505,7 @@ function ispDesignPatternHasContent(ctrlId) {
 }
 
 function getBulkIspDesignEligibleControls(sourceCtrlId) {
-  return controlsInDesignGroup('ISP').filter(function(c) {
+  return getXx1PolicyControlsInQueue().filter(function(c) {
     if (c.id === sourceCtrlId) return false;
     var cs = state.controlStatus[c.id] || {};
     if (cs.returnedToPolicyOwner || cs.recommendedDeselect) return false;
@@ -1512,6 +1515,10 @@ function getBulkIspDesignEligibleControls(sourceCtrlId) {
 
 function openBulkIspDesignPatternModal(sourceCtrlId) {
   normalizeControlDesignState(sourceCtrlId);
+  if (!isIspOrganizationalControl(sourceCtrlId)) {
+    showToast('Bulk apply is for XX-1 Policy & Procedures controls only (not other PM controls).', true);
+    return;
+  }
   if (!ispDesignPatternHasContent(sourceCtrlId)) {
     showToast('Document sub-requirements A/B/C and/or select IS Governance scope on this control first.', true);
     return;
@@ -1540,8 +1547,8 @@ function openBulkIspDesignPatternModal(sourceCtrlId) {
     + '<div style="background:white;border-radius:14px;width:940px;max-width:100%;box-shadow:0 24px 60px rgba(2,6,23,0.22);overflow:hidden;">'
     + '  <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">'
     + '    <div>'
-    + '      <div style="font-size:15px;font-weight:800;color:var(--navy);margin-bottom:4px;">Bulk apply ISP design pattern</div>'
-    + '      <div style="font-size:12px;color:var(--text-muted);line-height:1.45;">Source: <span class="control-id">' + escapeHTML(sourceCtrlId) + '</span> — copies sub-requirement text and asset/process scope to other ISP controls.</div>'
+    + '      <div style="font-size:15px;font-weight:800;color:var(--navy);margin-bottom:4px;">Bulk apply XX-1 design pattern</div>'
+    + '      <div style="font-size:12px;color:var(--text-muted);line-height:1.45;">Source: <span class="control-id">' + escapeHTML(sourceCtrlId) + '</span> — copies sub-requirement text and asset/process scope to other XX-1 Policy &amp; Procedures controls.</div>'
     + '    </div>'
     + '    <button type="button" class="btn btn-secondary btn-sm" onclick="closeBulkIspDesignPatternModal()">Close</button>'
     + '  </div>'
@@ -2611,7 +2618,7 @@ function renderControlDetailForm(ctrl) {
       }).join('')}
       ${(typeof isIspOrganizationalControl === 'function' && isIspOrganizationalControl(ctrl.id)) ? `
       <div style="margin-top:4px;display:flex;justify-content:flex-end;">
-        <button type="button" class="btn btn-secondary btn-sm" onclick="openBulkIspDesignPatternModal('${cid}')">Bulk apply to all ISP controls…</button>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="openBulkIspDesignPatternModal('${cid}')">Bulk apply to all XX-1 controls…</button>
       </div>` : ''}
       ` : `
       <div>
@@ -3720,7 +3727,7 @@ function renderControlStep3() {
     </div>
     ${minus1WithScope.length > 1 ? `
     <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:11px;color:#166534;line-height:1.55;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
-      <div><strong>XX-1 shortcut:</strong> ${minus1WithScope.length} policy controls often share the same obligation pattern — fill one, then use <strong>Apply to controls…</strong> to copy across the set.</div>
+      <div><strong>XX-1 shortcut:</strong> ${minus1WithScope.length} Policy &amp; Procedures controls (XX-1) often share the same obligation pattern — fill one, then use <strong>Apply to controls…</strong> to copy across the set. Other PM controls are excluded.</div>
     </div>` : ''}
 
     <div style="display:flex;gap:0;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:16px;flex-wrap:wrap;width:fit-content;">
