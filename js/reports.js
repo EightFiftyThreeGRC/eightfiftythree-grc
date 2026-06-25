@@ -1246,35 +1246,60 @@ function aoRemoveSspQueueRow(scopeId, isProcess) {
   });
 }
 
-function aoApproveQueuedSsp(scopeId, isProcess) {
+function aoApproveQueuedSsp(scopeId, isProcess, opts) {
+  opts = opts || {};
   var sid = String(scopeId);
   var u = state.currentUserId ? (state.users || []).find(function(x) { return x.id === state.currentUserId; }) : null;
   var label = isProcess ? 'Process SSP' : (state.privacyOverlay ? 'SPSP' : 'SSP');
   if (!confirm('Approve this ' + label + ' for authorization?')) return;
   if (!state.sspSignoffs) state.sspSignoffs = {};
   var prev = state.sspSignoffs[sid] || {};
+  var collected = typeof collectSspReviewerCommentsFromDraft === 'function'
+    ? collectSspReviewerCommentsFromDraft(sid)
+    : { overall: '', byControl: {} };
   state.sspSignoffs[sid] = Object.assign({}, prev, {
     status: 'Approved',
     approvedBy: u ? u.name : 'AO',
-    approvedDate: new Date().toISOString().slice(0, 10)
+    approvedDate: new Date().toISOString().slice(0, 10),
+    reviewerApprovalNotes: collected.overall || '',
+    reviewerControlComments: Object.assign({}, collected.byControl)
   });
+  if (typeof clearSspReviewerDraft === 'function') clearSspReviewerDraft(sid);
   aoRemoveSspQueueRow(sid, isProcess);
   try {
-    addAuditEntry(isProcess ? 'process' : 'asset', sid, label + ' approved by AO (' + (u ? u.name : 'AO') + ')');
+    var auditMsg = label + ' approved by AO (' + (u ? u.name : 'AO') + ')';
+    if (collected.overall) auditMsg += ': ' + collected.overall;
+    addAuditEntry(isProcess ? 'process' : 'asset', sid, auditMsg);
   } catch (e) {}
   markDirty();
   if (typeof updateNotificationBadges === 'function') updateNotificationBadges();
   showToast('\u2705 ' + label + ' approved.');
-  renderReports();
+  if (opts.fromReview && typeof closeSspReadOnlyReview === 'function') {
+    closeSspReadOnlyReview();
+  } else if (typeof renderReports === 'function') {
+    renderReports();
+  }
 }
 
-function aoReturnQueuedSsp(scopeId, isProcess) {
+function aoReturnQueuedSsp(scopeId, isProcess, opts) {
+  opts = opts || {};
   var sid = String(scopeId);
   var label = isProcess ? 'Process SSP' : (state.privacyOverlay ? 'SPSP' : 'SSP');
-  var notes = '';
-  try {
-    notes = window.prompt('Optional notes to the owner (e.g. what to fix before resubmitting):', '') || '';
-  } catch (e) {}
+  var collected = typeof collectSspReviewerCommentsFromDraft === 'function'
+    ? collectSspReviewerCommentsFromDraft(sid)
+    : { overall: '', byControl: {} };
+  var notes = typeof buildSspReturnNotesFromDraft === 'function'
+    ? buildSspReturnNotesFromDraft(sid)
+    : '';
+  if (!notes && !opts.fromReview) {
+    try {
+      notes = window.prompt('Optional notes to the owner (e.g. what to fix before resubmitting):', '') || '';
+    } catch (e) {}
+  }
+  if (!String(notes || '').trim()) {
+    showToast('Add an overall comment or at least one per-control comment before returning.', true);
+    return;
+  }
   var u = state.currentUserId ? (state.users || []).find(function(x) { return x.id === state.currentUserId; }) : null;
   var returnedBy = u ? (u.name || '').trim() : '';
   if (!state.sspSignoffs) state.sspSignoffs = {};
@@ -1283,9 +1308,11 @@ function aoReturnQueuedSsp(scopeId, isProcess) {
   delete next.status;
   delete next.signedBy;
   delete next.signedDate;
-  next.aoReturnNotes = notes.trim();
+  next.aoReturnNotes = String(notes).trim();
   next.aoReturnedAt = new Date().toISOString().slice(0, 10);
   next.aoReturnedBy = returnedBy || (isProcess ? 'Process SSP reviewer' : 'SSP reviewer');
+  next.reviewerControlComments = Object.assign({}, collected.byControl);
+  delete next.reviewerDraft;
   state.sspSignoffs[sid] = next;
   aoRemoveSspQueueRow(sid, isProcess);
   try {
@@ -1294,7 +1321,11 @@ function aoReturnQueuedSsp(scopeId, isProcess) {
   markDirty();
   if (typeof updateNotificationBadges === 'function') updateNotificationBadges();
   showToast(label + ' returned to the owner for revision.');
-  renderReports();
+  if (opts.fromReview && typeof closeSspReadOnlyReview === 'function') {
+    closeSspReadOnlyReview();
+  } else if (typeof renderReports === 'function') {
+    renderReports();
+  }
 }
 
 function renderSspApprovalQueueHtml(user) {
@@ -1329,15 +1360,13 @@ function renderSspApprovalQueueHtml(user) {
       + '<td style="padding:10px 12px;font-size:12px;color:var(--text-muted);">' + dt + '</td>'
       + '<td style="padding:10px 12px;font-size:12px;color:var(--text-muted);">' + rev + '</td>'
       + '<td style="padding:10px 12px;text-align:right;white-space:nowrap;">'
-      + '<button type="button" class="btn btn-secondary btn-sm" style="font-size:11px;margin-right:6px;" onclick=\'aoOpenQueuedSsp(' + sidJson + ',' + (isProc ? 'true' : 'false') + ')\'>Open</button>'
-      + '<button type="button" class="btn btn-sm" style="font-size:11px;margin-right:6px;background:#16a34a;color:white;border:none;" onclick=\'aoApproveQueuedSsp(' + sidJson + ',' + (isProc ? 'true' : 'false') + ')\'>Approve</button>'
-      + '<button type="button" class="btn btn-sm" style="font-size:11px;background:#f59e0b;color:white;border:none;" onclick=\'aoReturnQueuedSsp(' + sidJson + ',' + (isProc ? 'true' : 'false') + ')\'>Return</button>'
+      + '<button type="button" class="btn btn-secondary btn-sm" style="font-size:11px;" onclick=\'aoOpenQueuedSsp(' + sidJson + ',' + (isProc ? 'true' : 'false') + ')\'>Open &amp; review</button>'
       + '</td></tr>';
   }).join('');
   return '<div style="background:linear-gradient(135deg,#faf5ff,#f3e8ff);border:1px solid #c4b5fd;border-radius:12px;padding:18px 20px;margin-bottom:20px;max-width:100%;">'
     + '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px;">'
     + '<div><div style="font-size:14px;font-weight:800;color:#5b21b6;">' + sspLabel + ' review queue</div>'
-    + '<div style="font-size:12px;color:#6b21a8;margin-top:4px;line-height:1.45;">Packages submitted for your review as designated ' + sspLabel + ' reviewer. Open to inspect attestations, then approve or return to the owner.</div></div>'
+    + '<div style="font-size:12px;color:#6b21a8;margin-top:4px;line-height:1.45;">Packages submitted for your review as designated ' + sspLabel + ' reviewer. Open each package to inspect attestations, add per-control comments, and approve or return.</div></div>'
     + '<span style="font-size:12px;font-weight:700;background:white;border:1px solid #c4b5fd;border-radius:20px;padding:4px 12px;color:#5b21b6;">' + items.length + ' pending</span></div>'
     + '<div class="table-scroll"><table style="width:100%;border-collapse:collapse;background:white;border-radius:8px;overflow:hidden;border:1px solid #e9d5ff;">'
     + '<thead><tr style="background:#f5f3ff;">'
@@ -1346,7 +1375,7 @@ function renderSspApprovalQueueHtml(user) {
     + '<th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:700;color:#6b21b6;">Signed by</th>'
     + '<th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:700;color:#6b21b6;">Submitted</th>'
     + '<th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:700;color:#6b21b6;">Reviewer</th>'
-    + '<th style="padding:8px 12px;text-align:right;font-size:11px;font-weight:700;color:#6b21b6;">Actions</th>'
+    + '<th style="padding:8px 12px;text-align:right;font-size:11px;font-weight:700;color:#6b21b6;">Review</th>'
     + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
 }
 

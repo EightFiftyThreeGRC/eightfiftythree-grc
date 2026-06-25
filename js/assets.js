@@ -1247,6 +1247,17 @@ function openSspApprovalLogModal(scopeId, isProcess) {
     dl += row('Returned to owner', _esc((sign.aoReturnedBy || '').trim() || '—') + (sign.aoReturnedAt ? ' · ' + _esc(sign.aoReturnedAt) : ''));
     dl += row('Reviewer notes (return)', retNote);
   }
+  var ctrlComments = sign.reviewerControlComments || {};
+  var ctrlCommentKeys = Object.keys(ctrlComments).filter(function(cid) { return String(ctrlComments[cid] || '').trim(); });
+  if (ctrlCommentKeys.length) {
+    var ctrlBlock = ctrlCommentKeys.sort().map(function(cid) {
+      return '<div style="margin-top:6px;font-size:12px;"><span class="control-id" style="margin-right:6px;">' + _esc(cid) + '</span>' + _esc(String(ctrlComments[cid]).trim()) + '</div>';
+    }).join('');
+    dl += row('Per-control reviewer comments', ctrlBlock);
+  }
+  if ((sign.reviewerApprovalNotes || '').trim()) {
+    dl += row('Approval notes', _esc(String(sign.reviewerApprovalNotes).trim()));
+  }
 
   var catWant = isProcess ? 'process' : 'asset';
   var events = (state.auditTrail || []).filter(function(e) {
@@ -1404,6 +1415,187 @@ function formatSspReadOnlyEvidenceCell(raw) {
   return _esc(ev);
 }
 
+function sspRevEscJs(s) {
+  return String(s || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
+function getSspReviewSessionUser() {
+  if (state.currentUserId && state.users) {
+    var u = (state.users || []).find(function(x) { return x.id === state.currentUserId; });
+    if (u) return u;
+  }
+  return null;
+}
+
+function sspSignoffMatchesSessionReviewer(sign) {
+  if (!sign) return false;
+  if (!state.currentUserId) return true;
+  var fakeRow = {
+    type: 'ssp',
+    status: 'Pending',
+    reviewerUserId: sign.reviewerUserId || '',
+    reviewerEmail: sign.reviewerEmail || '',
+    reviewerName: sign.reviewerName || ''
+  };
+  return sspQueueRowMatchesReviewer(fakeRow, getSspReviewSessionUser());
+}
+
+function sspPackageAwaitingReviewerDecision(scopeId) {
+  var sign = getSspSignoffFromState(scopeId);
+  if (normalizeSspSignoffStatus(sign.status) !== 'Submitted') return false;
+  var sid = String(scopeId);
+  return (state.controlReviewQueue || []).some(function(r) {
+    return r && r.type === 'ssp' && String(r.assetId) === sid;
+  });
+}
+
+function sspReviewerCanActOnPackage(scopeId) {
+  if (!sspPackageAwaitingReviewerDecision(scopeId)) return false;
+  return sspSignoffMatchesSessionReviewer(getSspSignoffFromState(scopeId));
+}
+
+function ensureSspReviewerDraft(scopeId) {
+  if (!state.sspSignoffs) state.sspSignoffs = {};
+  var k = String(scopeId);
+  if (!state.sspSignoffs[k]) state.sspSignoffs[k] = {};
+  if (!state.sspSignoffs[k].reviewerDraft || typeof state.sspSignoffs[k].reviewerDraft !== 'object') {
+    state.sspSignoffs[k].reviewerDraft = { overall: '', byControl: {} };
+  }
+  if (!state.sspSignoffs[k].reviewerDraft.byControl || typeof state.sspSignoffs[k].reviewerDraft.byControl !== 'object') {
+    state.sspSignoffs[k].reviewerDraft.byControl = {};
+  }
+  return state.sspSignoffs[k].reviewerDraft;
+}
+
+function setSspReviewerDraftOverall(scopeId, val) {
+  var d = ensureSspReviewerDraft(scopeId);
+  var old = d.overall || '';
+  d.overall = String(val || '');
+  if (typeof logFieldChange === 'function') logFieldChange('sspSignoffs.' + scopeId + '.reviewerDraft.overall', old, d.overall);
+  markDirty();
+}
+
+function setSspReviewerDraftControlComment(scopeId, controlId, val) {
+  var d = ensureSspReviewerDraft(scopeId);
+  var cid = String(controlId);
+  var old = d.byControl[cid] || '';
+  d.byControl[cid] = String(val || '');
+  if (typeof logFieldChange === 'function') logFieldChange('sspSignoffs.' + scopeId + '.reviewerDraft.byControl.' + cid, old, d.byControl[cid]);
+  markDirty();
+}
+
+function flushSspReviewerDraftFromDom(scopeId) {
+  var el = document.getElementById('ssp-reviewer-overall');
+  if (el) setSspReviewerDraftOverall(scopeId, el.value);
+}
+
+function collectSspReviewerCommentsFromDraft(scopeId) {
+  flushSspReviewerDraftFromDom(scopeId);
+  var d = ensureSspReviewerDraft(scopeId);
+  var overall = String(d.overall || '').trim();
+  var byControl = {};
+  Object.keys(d.byControl || {}).forEach(function(cid) {
+    var t = String(d.byControl[cid] || '').trim();
+    if (t) byControl[cid] = t;
+  });
+  return { overall: overall, byControl: byControl };
+}
+
+function buildSspReturnNotesFromDraft(scopeId) {
+  var collected = collectSspReviewerCommentsFromDraft(scopeId);
+  var parts = [];
+  if (collected.overall) parts.push(collected.overall);
+  Object.keys(collected.byControl).sort().forEach(function(cid) {
+    parts.push(cid + ': ' + collected.byControl[cid]);
+  });
+  return parts.join('\n\n');
+}
+
+function clearSspReviewerDraft(scopeId) {
+  if (!state.sspSignoffs) return;
+  var k = String(scopeId);
+  if (state.sspSignoffs[k]) delete state.sspSignoffs[k].reviewerDraft;
+}
+
+function buildSspOwnerReviewerCommentCalloutHtml(scopeId, controlId) {
+  var sign = getSspSignoffFromState(scopeId);
+  if (!signoffIsReturnedForRevision(sign)) return '';
+  var note = String(((sign.reviewerControlComments || {})[controlId]) || '').trim();
+  if (!note) return '';
+  return '<div style="margin-top:10px;padding:10px 12px;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;font-size:12px;color:#78350f;line-height:1.45;">'
+    + '<div style="font-weight:700;color:#9a3412;margin-bottom:4px;">Reviewer comment on this control</div>'
+    + _esc(note) + '</div>';
+}
+
+function buildSspAttestationReviewRowsHtml(controls, attests, sign, scopeId, canReview) {
+  var draft = canReview ? ensureSspReviewerDraft(scopeId) : null;
+  var persisted = sign.reviewerControlComments || {};
+  var sidJs = sspRevEscJs(String(scopeId));
+
+  return controls.map(function(c) {
+    var a = attests[c.id] || {};
+    var status = a.status ? _esc(a.status) : '<span style="color:var(--text-muted);">—</span>';
+    var expl = (a.explanation || '').trim();
+    var evCell = formatSspReadOnlyEvidenceCell(a.evidenceLocation);
+    var mainRow = '<tr style="border-bottom:1px solid var(--border);">'
+      + '<td style="padding:8px 10px;font-family:monospace;font-size:12px;font-weight:700;">' + _esc(c.id) + '</td>'
+      + '<td style="padding:8px 10px;font-size:12px;">' + _esc(_controlShortName(c.id)) + '</td>'
+      + '<td style="padding:8px 10px;font-size:12px;">' + status + '</td>'
+      + '<td style="padding:8px 10px;font-size:11px;color:#475569;">' + (expl ? _esc(expl) : '—') + '</td>'
+      + '<td style="padding:8px 10px;font-size:11px;color:#475569;">' + evCell + '</td>'
+      + '</tr>';
+    var commentHtml = '';
+    var persistedNote = String(persisted[c.id] || '').trim();
+    if (canReview) {
+      var draftVal = (draft.byControl && draft.byControl[c.id]) ? draft.byControl[c.id] : '';
+      commentHtml = '<tr><td colspan="5" style="padding:4px 10px 14px 10px;background:#fafbff;border-bottom:1px solid var(--border);">'
+        + '<label style="display:block;font-size:11px;font-weight:600;color:#4338ca;margin-bottom:4px;">Reviewer comment (optional)</label>'
+        + '<textarea class="form-input" style="width:100%;font-size:12px;resize:vertical;min-height:52px;" rows="2"'
+        + ' placeholder="Call out issues or questions for this control only…"'
+        + ' oninput="setSspReviewerDraftControlComment(\'' + sidJs + '\',\'' + sspRevEscJs(c.id) + '\',this.value)">' + _esc(draftVal) + '</textarea>'
+        + '</td></tr>';
+    } else if (persistedNote) {
+      commentHtml = '<tr><td colspan="5" style="padding:8px 10px 14px 42px;background:#fffbeb;border-bottom:1px solid #fde68a;font-size:12px;color:#78350f;line-height:1.45;">'
+        + '<strong>Reviewer comment:</strong> ' + _esc(persistedNote) + '</td></tr>';
+    }
+    return mainRow + commentHtml;
+  }).join('');
+}
+
+function buildSspReviewerDecisionPanelHtml(scopeId, isProc, canReview) {
+  if (!canReview) return '';
+  var draft = ensureSspReviewerDraft(scopeId);
+  var sidJs = sspRevEscJs(String(scopeId));
+  var isProcJs = isProc ? 'true' : 'false';
+  return '<div style="background:linear-gradient(135deg,#faf5ff,#f5f3ff);border:1px solid #c4b5fd;border-radius:12px;padding:16px 18px;margin:16px 0 22px;">'
+    + '<div style="font-size:13px;font-weight:800;color:#5b21b6;margin-bottom:8px;">Your review decision</div>'
+    + '<p style="font-size:12px;color:#6b21a8;margin:0 0 12px;line-height:1.45;">Use per-control comments above for specific callouts. Add an overall summary here, then approve or return to the owner.</p>'
+    + '<label style="display:block;font-size:11px;font-weight:600;color:#5b21b6;margin-bottom:4px;">Overall comment</label>'
+    + '<textarea id="ssp-reviewer-overall" class="form-input" style="width:100%;font-size:12px;resize:vertical;min-height:72px;margin-bottom:14px;" rows="3"'
+    + ' placeholder="Package-level feedback for the owner (recommended when returning)…"'
+    + ' oninput="setSspReviewerDraftOverall(\'' + sidJs + '\',this.value)">' + _esc(draft.overall || '') + '</textarea>'
+    + '<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">'
+    + '<button type="button" class="btn btn-sm" style="background:#16a34a;color:white;border:none;" onclick="submitSspReviewApprove(\'' + sidJs + '\',' + isProcJs + ')">✓ Approve package</button>'
+    + '<button type="button" class="btn btn-sm" style="background:#f59e0b;color:white;border:none;" onclick="submitSspReviewReturn(\'' + sidJs + '\',' + isProcJs + ')">↩ Return for revision</button>'
+    + '</div></div>';
+}
+
+function submitSspReviewApprove(scopeId, isProcess) {
+  if (typeof aoApproveQueuedSsp === 'function') {
+    aoApproveQueuedSsp(scopeId, !!isProcess, { fromReview: true });
+  } else {
+    showToast('Unable to approve — review action unavailable.', true);
+  }
+}
+
+function submitSspReviewReturn(scopeId, isProcess) {
+  if (typeof aoReturnQueuedSsp === 'function') {
+    aoReturnQueuedSsp(scopeId, !!isProcess, { fromReview: true });
+  } else {
+    showToast('Unable to return — review action unavailable.', true);
+  }
+}
+
 function renderSspReadOnlyReviewInWizard() {
   var body = document.getElementById('asset-step-1-body');
   if (!body) return;
@@ -1423,20 +1615,10 @@ function renderSspReadOnlyReviewInWizard() {
   var st = normalizeSspSignoffStatus(sign.status);
   var step1Block = buildSspReadOnlyStep1ProfileHtml(item, isProc);
   var interHtml = buildSspInterconnectionsReadOnlyHtml(item.id);
+  var canReview = state._sspReviewerReadOnly && sspReviewerCanActOnPackage(item.id);
 
-  var attRows = controls.map(function(c) {
-    var a = attests[c.id] || {};
-    var status = a.status ? _esc(a.status) : '<span style="color:var(--text-muted);">—</span>';
-    var expl = (a.explanation || '').trim();
-    var evCell = formatSspReadOnlyEvidenceCell(a.evidenceLocation);
-    return '<tr style="border-bottom:1px solid var(--border);">'
-      + '<td style="padding:8px 10px;font-family:monospace;font-size:12px;font-weight:700;">' + _esc(c.id) + '</td>'
-      + '<td style="padding:8px 10px;font-size:12px;">' + _esc(_controlShortName(c.id)) + '</td>'
-      + '<td style="padding:8px 10px;font-size:12px;">' + status + '</td>'
-      + '<td style="padding:8px 10px;font-size:11px;color:#475569;">' + (expl ? _esc(expl) : '—') + '</td>'
-      + '<td style="padding:8px 10px;font-size:11px;color:#475569;">' + evCell + '</td>'
-      + '</tr>';
-  }).join('');
+  var attRows = buildSspAttestationReviewRowsHtml(controls, attests, sign, item.id, canReview);
+  var decisionPanel = buildSspReviewerDecisionPanelHtml(item.id, isProc, canReview);
 
   var signBlock = '<div style="background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:18px;">'
     + '<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:8px;">Submission &amp; reviewer</div>'
@@ -1454,13 +1636,13 @@ function renderSspReadOnlyReviewInWizard() {
       + '<div style="font-size:12px;font-weight:700;color:#9a3412;margin-bottom:6px;">Returned to owner (read-only snapshot)</div>'
       + '<div style="font-size:12px;color:#78350f;line-height:1.5;">'
       + (sign.aoReturnedBy ? '<div><strong>Returned by:</strong> ' + _esc(sign.aoReturnedBy) + (sign.aoReturnedAt ? ' · ' + _esc(sign.aoReturnedAt) : '') + '</div>' : '')
-      + '<div style="margin-top:8px;"><strong>Reviewer notes:</strong> ' + (String(sign.aoReturnNotes || '').trim() ? _esc(String(sign.aoReturnNotes).trim()) : '<span style="font-style:italic;color:var(--text-muted);">None.</span>') + '</div>'
+      + '<div style="margin-top:8px;"><strong>Overall reviewer notes:</strong> ' + (String(sign.aoReturnNotes || '').trim() ? _esc(String(sign.aoReturnNotes).trim()) : '<span style="font-style:italic;color:var(--text-muted);">None.</span>') + '</div>'
       + '</div></div>';
   }
 
   body.innerHTML = ''
     + '<div style="background:#eef2ff;border:1px solid #c7d2fe;border-radius:10px;padding:14px 16px;margin-bottom:20px;display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap;">'
-    + '<div><div style="font-size:11px;font-weight:700;color:#4338ca;text-transform:uppercase;letter-spacing:0.04em;">Read-only ' + sspLabel + ' review</div>'
+    + '<div><div style="font-size:11px;font-weight:700;color:#4338ca;text-transform:uppercase;letter-spacing:0.04em;">' + (canReview ? sspLabel + ' review' : 'Read-only ' + sspLabel + ' review') + '</div>'
     + '<div style="font-size:18px;font-weight:800;color:var(--navy);margin-top:4px;">' + _esc(item.name || 'Unnamed') + '</div>'
     + '<div style="font-size:12px;color:var(--text-muted);margin-top:4px;">' + (isProc ? 'Process SSP' : _esc(item.type || 'System')) + ' · ' + controls.length + ' control(s) in scope</div></div>'
     + '<button type="button" class="btn btn-secondary btn-sm" onclick="closeSspReadOnlyReview()">' + backLabel + '</button>'
@@ -1476,6 +1658,7 @@ function renderSspReadOnlyReviewInWizard() {
     + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:700;">Explanation</th>'
     + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:700;">Evidence location</th>'
     + '</tr></thead><tbody>' + (attRows || '<tr><td colspan="5" style="padding:16px;color:var(--text-muted);">No controls in scope.</td></tr>') + '</tbody></table></div>'
+    + decisionPanel
     + '<div style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:10px;">Interconnections</div>'
     + interHtml
     + '<div style="margin-top:24px;"><button type="button" class="btn btn-secondary" onclick="closeSspReadOnlyReview()">' + backLabel + '</button></div>';
@@ -2164,6 +2347,7 @@ function renderAssetSSPStep4_Attestations() {
         + ' oninput="setSSPAttestation(\'' + asset.id + '\',\'' + c.id + '\',\'evidenceLocation\',this.value)">'
         + '</div>'
         + '</div>'
+        + buildSspOwnerReviewerCommentCalloutHtml(asset.id, c.id)
         + '</div>';
     });
     html += '</div>';
@@ -2943,6 +3127,9 @@ function submitSSP() {
   delete state.sspSignoffs[asset.id].aoReturnNotes;
   delete state.sspSignoffs[asset.id].aoReturnedAt;
   delete state.sspSignoffs[asset.id].aoReturnedBy;
+  delete state.sspSignoffs[asset.id].reviewerDraft;
+  delete state.sspSignoffs[asset.id].reviewerControlComments;
+  delete state.sspSignoffs[asset.id].reviewerApprovalNotes;
   // Push to reviewer queue (replace any stale pending row for this asset)
   if (!state.controlReviewQueue) state.controlReviewQueue = [];
   state.controlReviewQueue = state.controlReviewQueue.filter(function(r) {
@@ -3222,7 +3409,9 @@ function renderProcessSSPStep4_Attestations() {
         + ' value="' + _esc(evidenceLocation) + '"'
         + (isSubmitted ? ' readonly' : '')
         + ' oninput="setSSPAttestation(\'' + proc.id + '\',\'' + c.id + '\',\'evidenceLocation\',this.value)">'
-        + '</div></div></div>';
+        + '</div></div>'
+        + buildSspOwnerReviewerCommentCalloutHtml(proc.id, c.id)
+        + '</div>';
     });
     html += '</div>';
   });
@@ -3341,6 +3530,9 @@ function submitProcessSSP() {
   delete state.sspSignoffs[proc.id].aoReturnNotes;
   delete state.sspSignoffs[proc.id].aoReturnedAt;
   delete state.sspSignoffs[proc.id].aoReturnedBy;
+  delete state.sspSignoffs[proc.id].reviewerDraft;
+  delete state.sspSignoffs[proc.id].reviewerControlComments;
+  delete state.sspSignoffs[proc.id].reviewerApprovalNotes;
   if (!state.controlReviewQueue) state.controlReviewQueue = [];
   state.controlReviewQueue = state.controlReviewQueue.filter(function(r) {
     if (!r || r.type !== 'ssp') return true;
@@ -3382,3 +3574,11 @@ window.getSspReviewQueueItemsForUser = getSspReviewQueueItemsForUser;
 window.userMayReceiveSspReviews = userMayReceiveSspReviews;
 window.openSspReadOnlyFromQueue = openSspReadOnlyFromQueue;
 window.closeSspReadOnlyReview = closeSspReadOnlyReview;
+window.setSspReviewerDraftOverall = setSspReviewerDraftOverall;
+window.setSspReviewerDraftControlComment = setSspReviewerDraftControlComment;
+window.submitSspReviewApprove = submitSspReviewApprove;
+window.submitSspReviewReturn = submitSspReviewReturn;
+window.sspReviewerCanActOnPackage = sspReviewerCanActOnPackage;
+window.collectSspReviewerCommentsFromDraft = collectSspReviewerCommentsFromDraft;
+window.buildSspReturnNotesFromDraft = buildSspReturnNotesFromDraft;
+window.clearSspReviewerDraft = clearSspReviewerDraft;
