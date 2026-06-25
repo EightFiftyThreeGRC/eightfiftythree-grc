@@ -1527,7 +1527,15 @@ function buildSspOwnerReviewerCommentCalloutHtml(scopeId, controlId) {
     + _esc(note) + '</div>';
 }
 
-function buildSspAttestationReviewRowsHtml(controls, attests, sign, scopeId, canReview) {
+function getSspReviewNistRequirementText(ctrlId) {
+  if (typeof NIST_CONTROL_TEXT !== 'undefined' && NIST_CONTROL_TEXT[ctrlId]) {
+    return NIST_CONTROL_TEXT[ctrlId];
+  }
+  var c = (typeof CONTROLS !== 'undefined' && CONTROLS) ? CONTROLS.find(function(x) { return x.id === ctrlId; }) : null;
+  return c ? (c.n || 'No NIST requirement text available for this control.') : 'No NIST requirement text available for this control.';
+}
+
+function buildSspAttestationReviewBlocksHtml(controls, attests, sign, scopeId, canReview) {
   var draft = canReview ? ensureSspReviewerDraft(scopeId) : null;
   var persisted = sign.reviewerControlComments || {};
   var sidJs = sspRevEscJs(String(scopeId));
@@ -1537,29 +1545,48 @@ function buildSspAttestationReviewRowsHtml(controls, attests, sign, scopeId, can
     var status = a.status ? _esc(a.status) : '<span style="color:var(--text-muted);">—</span>';
     var expl = (a.explanation || '').trim();
     var evCell = formatSspReadOnlyEvidenceCell(a.evidenceLocation);
-    var mainRow = '<tr style="border-bottom:1px solid var(--border);">'
-      + '<td style="padding:8px 10px;font-family:monospace;font-size:12px;font-weight:700;">' + _esc(c.id) + '</td>'
-      + '<td style="padding:8px 10px;font-size:12px;">' + _esc(_controlShortName(c.id)) + '</td>'
-      + '<td style="padding:8px 10px;font-size:12px;">' + status + '</td>'
-      + '<td style="padding:8px 10px;font-size:11px;color:#475569;">' + (expl ? _esc(expl) : '—') + '</td>'
-      + '<td style="padding:8px 10px;font-size:11px;color:#475569;">' + evCell + '</td>'
-      + '</tr>';
-    var commentHtml = '';
+    var nistText = getSspReviewNistRequirementText(c.id);
+
+    var commentBlock = '';
     var persistedNote = String(persisted[c.id] || '').trim();
     if (canReview) {
       var draftVal = (draft.byControl && draft.byControl[c.id]) ? draft.byControl[c.id] : '';
-      commentHtml = '<tr><td colspan="5" style="padding:4px 10px 14px 10px;background:#fafbff;border-bottom:1px solid var(--border);">'
+      commentBlock = '<div style="padding:12px 14px;background:#fafbff;border-top:1px solid #c7d2fe;">'
         + '<label style="display:block;font-size:11px;font-weight:600;color:#4338ca;margin-bottom:4px;">Reviewer comment (optional)</label>'
         + '<textarea class="form-input" style="width:100%;font-size:12px;resize:vertical;min-height:52px;" rows="2"'
         + ' placeholder="Call out issues or questions for this control only…"'
         + ' oninput="setSspReviewerDraftControlComment(\'' + sidJs + '\',\'' + sspRevEscJs(c.id) + '\',this.value)">' + _esc(draftVal) + '</textarea>'
-        + '</td></tr>';
+        + '</div>';
     } else if (persistedNote) {
-      commentHtml = '<tr><td colspan="5" style="padding:8px 10px 14px 42px;background:#fffbeb;border-bottom:1px solid #fde68a;font-size:12px;color:#78350f;line-height:1.45;">'
-        + '<strong>Reviewer comment:</strong> ' + _esc(persistedNote) + '</td></tr>';
+      commentBlock = '<div style="padding:12px 14px;background:#fffbeb;border-top:1px solid #fde68a;font-size:12px;color:#78350f;line-height:1.45;">'
+        + '<strong>Reviewer comment:</strong> ' + _esc(persistedNote) + '</div>';
     }
-    return mainRow + commentHtml;
+
+    return '<div style="border:1px solid var(--border);border-radius:10px;margin-bottom:14px;overflow:hidden;background:white;">'
+      + '<div style="padding:10px 12px;background:#f1f5f9;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
+      + '<span style="font-family:monospace;font-size:12px;font-weight:700;color:var(--navy);">' + _esc(c.id) + '</span>'
+      + '<span style="font-size:13px;font-weight:600;color:var(--navy);">' + _esc(_controlShortName(c.id)) + '</span>'
+      + '</div>'
+      + '<div style="padding:12px 14px;background:#f8fafc;border-bottom:1px solid var(--border);">'
+      + '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:#64748b;margin-bottom:6px;">NIST SP 800-53 requirement</div>'
+      + '<div style="font-size:12px;color:#334155;line-height:1.65;white-space:pre-line;">' + _esc(nistText) + '</div>'
+      + '</div>'
+      + '<div style="padding:12px 14px;display:grid;grid-template-columns:minmax(120px,160px) 1fr 1fr;gap:12px 16px;border-bottom:1px solid var(--border);">'
+      + '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.35px;color:var(--text-muted);margin-bottom:4px;">Attestation status</div>'
+      + '<div style="font-size:12px;">' + status + '</div></div>'
+      + '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.35px;color:var(--text-muted);margin-bottom:4px;">Owner explanation</div>'
+      + '<div style="font-size:12px;color:#475569;line-height:1.5;">' + (expl ? _esc(expl) : '<span style="color:var(--text-muted);">—</span>') + '</div></div>'
+      + '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.35px;color:var(--text-muted);margin-bottom:4px;">Evidence location</div>'
+      + '<div style="font-size:12px;color:#475569;line-height:1.5;">' + evCell + '</div></div>'
+      + '</div>'
+      + commentBlock
+      + '</div>';
   }).join('');
+}
+
+/** @deprecated Use buildSspAttestationReviewBlocksHtml — kept for compatibility. */
+function buildSspAttestationReviewRowsHtml(controls, attests, sign, scopeId, canReview) {
+  return buildSspAttestationReviewBlocksHtml(controls, attests, sign, scopeId, canReview);
 }
 
 function buildSspReviewerDecisionPanelHtml(scopeId, isProc, canReview) {
@@ -1617,7 +1644,7 @@ function renderSspReadOnlyReviewInWizard() {
   var interHtml = buildSspInterconnectionsReadOnlyHtml(item.id);
   var canReview = state._sspReviewerReadOnly && sspReviewerCanActOnPackage(item.id);
 
-  var attRows = buildSspAttestationReviewRowsHtml(controls, attests, sign, item.id, canReview);
+  var attBlocks = buildSspAttestationReviewBlocksHtml(controls, attests, sign, item.id, canReview);
   var decisionPanel = buildSspReviewerDecisionPanelHtml(item.id, isProc, canReview);
 
   var signBlock = '<div style="background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:18px;">'
@@ -1650,14 +1677,9 @@ function renderSspReadOnlyReviewInWizard() {
     + step1Block
     + signBlock
     + returnBlock
-    + '<div style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:10px;">Control attestations</div>'
-    + '<div class="table-scroll" style="margin-bottom:22px;"><table class="control-table control-table--readonly" style="width:100%;border-collapse:collapse;"><thead><tr>'
-    + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:700;">Control</th>'
-    + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:700;">Requirement</th>'
-    + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:700;">Status</th>'
-    + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:700;">Explanation</th>'
-    + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:700;">Evidence location</th>'
-    + '</tr></thead><tbody>' + (attRows || '<tr><td colspan="5" style="padding:16px;color:var(--text-muted);">No controls in scope.</td></tr>') + '</tbody></table></div>'
+    + '<div style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:4px;">Control attestations</div>'
+    + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;line-height:1.45;">Each control shows the verbatim NIST SP 800-53 requirement, then the owner\'s attestation below it for side-by-side review.</div>'
+    + '<div style="margin-bottom:22px;">' + (attBlocks || '<div style="padding:16px;color:var(--text-muted);border:1px solid var(--border);border-radius:10px;">No controls in scope.</div>') + '</div>'
     + decisionPanel
     + '<div style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:10px;">Interconnections</div>'
     + interHtml
