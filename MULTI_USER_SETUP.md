@@ -1,13 +1,6 @@
 # Multi-User Setup (Cloud Mode)
 
-EightFiftyThree GRC runs in two modes:
-
-- **Local / demo mode (default):** zero-config, all data in the browser's
-  `localStorage`, profile picking for demos. This is what the public GitHub
-  Pages demo uses — nothing changes if you skip this guide.
-- **Cloud / multi-user mode:** real "Sign in with Microsoft / Google", one
-  shared program that syncs across computers, and roles tied to each person's
-  authenticated identity (no impersonation).
+EightFiftyThree GRC requires cloud sign-in. There is no local-only or profile-picking demo mode — every session is tied to a real account, and program data syncs through Supabase.
 
 Cloud mode is powered by [Supabase](https://supabase.com) (managed Postgres +
 Auth). The front-end stays exactly where it is — GitHub Pages, no build step.
@@ -16,12 +9,12 @@ Auth). The front-end stays exactly where it is — GitHub Pages, no build step.
 
 ## What you get
 
-| | Local mode | Cloud mode |
-|---|---|---|
-| Sign-in | Pick a demo profile | Microsoft / Google OAuth |
-| Data location | This browser only | Shared Postgres, all computers |
-| Roles | Anyone can switch (impersonation) | Locked to your real identity |
-| Cost | Free | Free tier is generous |
+| | Cloud mode |
+|---|---|
+| Sign-in | Email/password (and optional Microsoft / Google OAuth) |
+| Data location | Shared Postgres, all computers |
+| Roles | Locked to your rostered identity |
+| Cost | Free tier is generous |
 
 ---
 
@@ -195,7 +188,6 @@ deliberately the smallest change that delivers real login + cross-computer sync.
 
 ---
 
-## Turning it off
-Blank out both fields in `js/cloud-config.js` and the app silently reverts to
-local/demo mode. The legacy "Sign in with Microsoft" (Entra/MSAL) feature under
-**Users & roles** is independent and unaffected.
+## Misconfiguration
+
+If `js/cloud-config.js` is blank or invalid, the app shows the sign-in gate with a configuration error. There is no offline/local-only fallback. The legacy Entra/MSAL feature under **Users & roles** (if configured separately) is independent of Supabase sign-in.

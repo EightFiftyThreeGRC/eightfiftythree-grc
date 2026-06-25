@@ -19,14 +19,16 @@ Repository source: this workspace/repo is the primary source intended for public
 
 ## Architecture
 
-Zero-dependency, no-build, no-server web application. All logic runs client-side; data lives in `localStorage`. Primary dev is now happening in Cursor; this file is written so Claude (or any LLM) can make targeted edits when called on.
+Zero-dependency, no-build static web application. UI and logic run client-side; the canonical program lives in Supabase (`programs.state` JSONB). Each signed-in browser mirrors state to `localStorage` as an offline cache. Primary dev is in Cursor; this file is written so Claude (or any LLM) can make targeted edits when called on.
 
 ### File Structure
 
 The original monolithic `js/app.js` was refactored in commit `c08deff` (2026-04-23) into per-domain modules. They are loaded in dependency order from `index.html`. Globals only — no modules, no bundler, no transpilation.
 
 ```
-index.html                  — UI shell, sidebar, tab containers, role picker
+app.html                    — UI shell, sidebar, tab containers, cloud sign-in gate
+js/cloud-config.js          — Supabase connection settings
+js/cloud-auth.js            — Sign-in, program load/sync, account menu
 css/app.css                 — all styles (one @media (max-width:900px) breakpoint)
 js/nist-control-text.js     — verbatim NIST 800-53 control requirement text lookup
 js/core.js                  — STATE shape, STATE_DEFAULTS, ROLE_TABS, persistence
@@ -51,8 +53,8 @@ js/authorization.js         — AO decision data + helpers + the openAtoDecision
 js/reports.js               — Reports & Dashboard, audit/change-log views, review queues
                               (composes renderAuthorizationStatusPanelHtml into the
                               dashboard so AOs can record decisions inline)
-js/admin.js                 — Users & roles tab, role picker (selectUserProfile,
-                              applyRoleView), profile-button rendering
+js/admin.js                 — Users & roles tab, profile / account menu (openProfileMenu,
+                              applyRoleView for cloud identity mapping)
 js/app.js                   — App shell only: TAB_IDS, currentStep, showTab, goToStep,
                               snapshot modal, beforeunload handler, DOMContentLoaded
 README.md                   — public GitHub README + operator smoke-test runbook
@@ -168,7 +170,7 @@ When rebuilding snapshots, every key in the live `state` object should have a co
 - **Administration** → Users & roles
 
 Top-right toolbar provides: Save indicator, Save now, Export JSON, Import JSON, Snapshots, Reset.
-Top-left of sidebar has the profile/role picker (`🔑 Admin` button → `showRolePicker()`).
+Top-left of sidebar has the account button (`openProfileMenu()` → cloud sign-in gate or account menu with sign-out).
 
 ### CISO Setup Wizard (5 steps)
 
@@ -178,7 +180,7 @@ Top-left of sidebar has the profile/role picker (`🔑 Admin` button → `showRo
 4. **Consolidate** — review and prioritize domain policies, suggest merges (e.g., PS+AT, CP+IR, MP+PE, SR+SA)
 5. **Assign Owners** — assign the 20 NIST control families to domain policy owners, set priorities and deadlines
 
-**Phantom-owner safety net:** `prefillDemoOwners()` and `prefillDemoControlOwners(fam)` (in `js/program.js`) inject synthetic identities ("Alex Rivera", "Jordan Patel", etc.) for demos. Each entry point is now confirmation-gated, every demo record is tagged with `isDemoPlaceholder: true`, and `blockActionIfDemoPlaceholders()` (called from `cisoFinish`, `submitSSP`, `submitControlDesign`, policy submit, `submitAtoDecision`, `finalizeSarAndHandoff`) refuses to advance until placeholders are replaced. The role picker (`selectUserProfile` in `js/admin.js`) refuses to impersonate any user with `isDemoPlaceholder: true`. The legacy `prefillFakeOwners` / `prefillFakeControlOwners` names remain as `@deprecated` thin wrappers — do not call them in new code.
+**Phantom-owner safety net:** `prefillDemoOwners()` and `prefillDemoControlOwners(fam)` (in `js/program.js`) inject synthetic identities ("Alex Rivera", "Jordan Patel", etc.) for demos. Each entry point is now confirmation-gated, every demo record is tagged with `isDemoPlaceholder: true`, and `blockActionIfDemoPlaceholders()` (called from `cisoFinish`, `submitSSP`, `submitControlDesign`, policy submit, `submitAtoDecision`, `finalizeSarAndHandoff`) refuses to advance until placeholders are replaced. The legacy `prefillFakeOwners` / `prefillFakeControlOwners` names remain as `@deprecated` thin wrappers — do not call them in new code.
 
 ### Role-Based Workspaces
 

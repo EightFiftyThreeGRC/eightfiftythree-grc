@@ -1,6 +1,6 @@
 # EightFiftyThree GRC
 
-Browser-based NIST SP 800-53 Rev. 5 program management tool. No backend, no account, and no external data transfer during normal use.
+Browser-based NIST SP 800-53 Rev. 5 program management tool. Sign in with your work account; program data syncs through Supabase.
 
 **[Launch the tool](https://eightfiftythreegrc.github.io/eightfiftythree-grc/)** (repo: [EightFiftyThreeGRC/eightfiftythree-grc](https://github.com/EightFiftyThreeGRC/eightfiftythree-grc))
 
@@ -27,11 +27,13 @@ The application guides teams through a full governance workflow:
 
 ## Architecture
 
-Zero-dependency, no-build, no-server static web app. All logic runs client-side and state lives in `localStorage`.
+Zero-dependency, no-build static web app. UI and logic run client-side; the canonical program lives in Supabase (`programs.state` JSONB). Each signed-in browser also mirrors state to `localStorage` as an offline cache.
 
 ```
-index.html                  UI shell, sidebar, tab containers, role picker
+app.html                    UI shell, sidebar, tab containers, cloud sign-in gate
 css/app.css                 all styles (single mobile breakpoint)
+js/cloud-config.js          Supabase connection settings
+js/cloud-auth.js            Sign-in, program load/sync, account menu
 js/nist-control-text.js     verbatim NIST 800-53 control text lookup
 js/core.js                  STATE shape, defaults, persistence, audit/change log
 js/program.js               CISO setup wizard + demo snapshots
@@ -41,7 +43,7 @@ js/assets.js                Assets & SSP wizard + asset libraries
 js/baseline-elevation.js    Baseline elevation triggers and review flow
 js/authorization.js         AO decision data + decision modal
 js/reports.js               Reports & Dashboard, audit/change-log, review queues
-js/admin.js                 Users & roles, role picker, profile
+js/admin.js                 Users & roles, profile / account menu
 js/app.js                   App shell: tabs, snapshot modal, beforeunload
 ```
 
@@ -49,24 +51,25 @@ js/app.js                   App shell: tabs, snapshot modal, beforeunload
 
 Technical characteristics:
 
-- no framework, no build pipeline, no external runtime dependencies
-- program state stored in `localStorage` under `eightfiftythree-grc-v1`
+- no framework, no build pipeline
+- program state synced to Supabase; mirrored in `localStorage` under `eightfiftythree-grc-v1` for the signed-in browser
 - saved snapshots stored in `localStorage` under `eightfiftythree-grc-snapshots`
 - existing users with data under the legacy `larsen-grc-*` or `hawthorn-grc-*` keys are automatically migrated on first load
 
 ## Local Development
 
-1. Serve the repository root from any static file server, for example `python -m http.server 8765` or `npx serve .`.
-2. Open the served URL in a modern browser (the app needs `localStorage`).
-3. Use the Snapshots modal to load a built-in demo program, or start a fresh one.
+1. Copy or configure `js/cloud-config.js` with your Supabase project URL and anon key (see `MULTI_USER_SETUP.md`).
+2. Serve the repository root from any static file server, for example `python -m http.server 8765` or `npx serve .`.
+3. Open `app.html` in a modern browser and sign in (or create an account).
+4. Use the Snapshots modal to load a built-in demo program, or start a fresh one.
 
 ### Smoke test before shipping
 
 1. `node --check js/<each file>.js` — syntax validation across all modules.
-2. Walk the CISO wizard end to end (Step 1 → Step 5, including the "different approver" path on Step 3).
+2. Sign in and walk the CISO wizard end to end (Step 1 → Step 5, including the "different approver" path on Step 3).
 3. Load each built-in XMPL snapshot, then Reset, and confirm no ghost state remains.
 4. Export JSON, re-import it, and confirm the program round-trips cleanly.
-5. Sign in as each role (CISO, ISSM, Control Owner, Asset Owner, Custodian, Assessor, AO, Approver) and confirm the visible tabs match `ROLE_TABS`.
+5. Add roster users and confirm each role sees the intended tabs after signing in with that account.
 
 ## Documentation
 

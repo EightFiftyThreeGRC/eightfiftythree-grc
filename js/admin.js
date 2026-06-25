@@ -101,175 +101,39 @@ function getPersonIdentityKey(user) {
 }
 
 function renderProfileButtonContent(user) {
-  // Multi-user (cloud) mode: the button is the signed-in account, not a role picker.
   if (typeof isCloudLocked === 'function' && isCloudLocked()) {
     var display = typeof getCloudSessionDisplayName === 'function'
       ? getCloudSessionDisplayName()
       : ((typeof getCloudSessionName === 'function' ? getCloudSessionName() : '') || (typeof getCloudSessionEmail === 'function' ? getCloudSessionEmail() : '') || 'Signed in');
+    var roleHint = 'Signed in · Sign out';
+    if (!user && typeof isCloudOwnerSession === 'function' && isCloudOwnerSession()) {
+      var ownerName = typeof resolveProgramOwnerActorName === 'function' ? resolveProgramOwnerActorName() : '';
+      if (ownerName) display = ownerName;
+      roleHint = 'Program owner · Sign out';
+    } else if (user) {
+      var rm = getProgramRoleMeta(user.role);
+      if (rm && rm.label) roleHint = rm.label + ' · Sign out';
+    }
     return ''
       + '<span class="profile-btn-line"><span>👤</span><span>' + _esc(display) + '</span></span>'
-      + '<span class="profile-btn-sub">Signed in · Sign out</span>';
+      + '<span class="profile-btn-sub">' + _esc(roleHint) + '</span>';
   }
-  var displayName = user ? (userNeedsProfileSetup(user) ? (user.email || user.name) : getOwnerDisplayName(user)) : 'Admin mode';
-  var icon = user ? (state.entraSession ? '◆' : '👤') : '🔑';
-  var sub = state.entraSession ? 'Microsoft · Switch profile' : 'Switch role / preview';
   return ''
-    + '<span class="profile-btn-line">'
-    + '<span>' + icon + '</span>'
-    + '<span>' + _esc(displayName) + '</span>'
-    + '</span>'
-    + '<span class="profile-btn-sub">' + sub + '</span>';
+    + '<span class="profile-btn-line"><span>👤</span><span>Sign in</span></span>'
+    + '<span class="profile-btn-sub">Account</span>';
 }
 
-function showRolePicker() {
-  // In multi-user (cloud) mode there is no profile picking — show the signed-in
-  // account + sign-out instead. Identity and role come from real authentication.
-  if (typeof isCloudLocked === 'function' && isCloudLocked()) {
+function openProfileMenu() {
+  if (typeof isCloudSessionActive === 'function' && isCloudSessionActive()) {
     if (typeof showCloudAccountMenu === 'function') showCloudAccountMenu();
     return;
   }
-  const overlay = document.getElementById('rolePickerOverlay');
-  if (!overlay) return;
-  syncUsersFromState();
-  const sub = document.getElementById('rolePickerSubtitle');
-  if (sub) {
-    sub.textContent = isEntraAuthEnabled()
-      ? 'Sign in with Microsoft, use Admin mode for demos, or pick a profile below.'
-      : 'Choose a profile to enter the right workspace.';
-  }
-  if (typeof renderEntraAuthPickerSection === 'function') renderEntraAuthPickerSection();
-  renderRolePickerProfiles();
-  overlay.style.display = 'flex';
+  if (typeof showCloudSignInGate === 'function') showCloudSignInGate();
 }
 
-function renderRolePickerProfiles() {
-  const container = document.getElementById('rolePickerProfiles');
-  if (!container) return;
-  if (!state.users || state.users.length === 0) {
-    container.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:32px;color:rgba(255,255,255,0.35);font-size:14px;">'
-      + 'No users have been added yet.<br><span style="font-size:12px;margin-top:6px;display:block;">An admin can add users in the Users &amp; Roles section.</span></div>';
-    return;
-  }
-
-  // ── Group users by PERSON (email preferred, else name), merging roles ──
-  var roleOrder = ['ciso','ao','assessor','issm','control-owner','asset-owner','custodian','approver'];
-  var byPerson = {};
-  var personOrder = [];
-  state.users.forEach(function(u) {
-    var key = getPersonIdentityKey(u);
-    if (!key || key === 'id:' + u.id && !u.email && !u.name) return;
-    if (!byPerson[key]) {
-      byPerson[key] = { name: getOwnerDisplayName(u), email: u.email || '', records: [], roles: [], primaryId: u.id, needsProfile: userNeedsProfileSetup(u) };
-      personOrder.push(key);
-    }
-    byPerson[key].records.push(u);
-    if (byPerson[key].roles.indexOf(u.role) === -1) byPerson[key].roles.push(u.role);
-    if (userNeedsProfileSetup(u)) byPerson[key].needsProfile = true;
-  });
-
-  // Sort people: CISO first, then by role priority
-  personOrder.sort(function(a, b) {
-    var ra = 99, rb = 99;
-    byPerson[a].roles.forEach(function(r){ var i = roleOrder.indexOf(r); if (i !== -1 && i < ra) ra = i; });
-    byPerson[b].roles.forEach(function(r){ var i = roleOrder.indexOf(r); if (i !== -1 && i < rb) rb = i; });
-    return ra - rb;
-  });
-
-  // Build assignment text for a person across all their records
-  var buildAssignText = function(records) {
-    var parts = [];
-    records.forEach(function(u) {
-      if ((u.role === 'issm' || u.role === 'custodian') && u.families && u.families.length)
-        parts.push(u.families.join(', '));
-      else if (u.role === 'control-owner' && u.controls && u.controls.length)
-        parts.push(u.controls.length + ' control(s)');
-      else if (u.role === 'asset-owner' && u.assets && u.assets.length)
-        parts.push(u.assets.length + ' asset(s)');
-    });
-    return parts.join(' · ');
-  };
-
-  var html = '';
-  personOrder.forEach(function(key) {
-    var person = byPerson[key];
-    var primaryRole = person.roles[0] || 'custodian';
-    // Find highest-priority role for the primary color
-    for (var rp = 0; rp < roleOrder.length; rp++) {
-      if (person.roles.indexOf(roleOrder[rp]) !== -1) { primaryRole = roleOrder[rp]; break; }
-    }
-    var pm = getProgramRoleMeta(primaryRole);
-    var assignText = buildAssignText(person.records);
-    // Use the first record's ID for login — applyRoleView will find all sibling records by name
-    var loginId = person.primaryId;
-
-    html += '<div onclick="selectUserProfile(\'' + loginId + '\')" '
-      + 'style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:20px;cursor:pointer;transition:all 0.15s;" '
-      + 'onmouseenter="this.style.background=\'rgba(255,255,255,0.12)\';this.style.borderColor=\'' + pm.color + '\';" '
-      + 'onmouseleave="this.style.background=\'rgba(255,255,255,0.06)\';this.style.borderColor=\'rgba(255,255,255,0.1)\';">'
-      + '<div style="font-size:24px;margin-bottom:10px;">' + pm.icon + '</div>'
-      + '<div style="color:white;font-weight:600;font-size:15px;margin-bottom:8px;">' + _esc(person.needsProfile ? (person.email || person.name) : person.name) + '</div>'
-      + (person.needsProfile ? '<div style="color:rgba(255,255,255,0.45);font-size:11px;margin:-4px 0 8px;">Complete profile on first sign-in</div>' : '')
-      + '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;">';
-    // Show a badge for each role this person holds
-    person.roles.forEach(function(role) {
-      var rm = getProgramRoleMeta(role);
-      html += '<span style="display:inline-block;background:' + rm.color + '22;color:' + rm.color + ';font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;">' + _esc(rm.label) + '</span>';
-    });
-    html += '</div>';
-    if (assignText) {
-      html += '<div style="color:rgba(255,255,255,0.4);font-size:12px;font-family:monospace;">' + _esc(assignText) + '</div>';
-    }
-    html += '</div>';
-  });
-
-  container.innerHTML = html;
-}
-
-function selectUserProfile(userId) {
-  // Multi-user mode: identity is fixed by sign-in; never allow switching personas.
-  if (typeof isCloudLocked === 'function' && isCloudLocked()) {
-    if (typeof showToast === 'function') showToast('Your role is set by your account. Switching identities is disabled in multi-user mode.', true);
-    return;
-  }
-  if (userId === 'admin' && typeof clearEntraSessionLocal === 'function') clearEntraSessionLocal();
-  // Block impersonation of demo placeholder users — any attestation made
-  // while signed in as one of them would have no real signatory and would
-  // be a non-repudiation violation in a real program.
-  if (userId && userId !== 'admin') {
-    var __pickedUser = (state.users || []).find(function(x){ return x.id === userId; });
-    if (__pickedUser && __pickedUser.isDemoPlaceholder) {
-      showToast('Cannot sign in as a demo placeholder user. Replace ' + (__pickedUser.name || 'this user') + ' with a real person under Administration → Users & roles, or stay in Admin mode for demos.', true);
-      return;
-    }
-  }
-  if(typeof window !== 'undefined') {
-    window.selectedControl = null;
-    window.selectedDomain = null;
-    if(state) state._policyDomain = null;
-  }
-  const rightPanel = document.getElementById('right-panel-content');
-  if(rightPanel) rightPanel.innerHTML = '<div style="padding:40px;text-align:center;color:#64748b;">Loading user context...</div>';
-  const origText = document.body.style.opacity;
-  document.body.style.opacity = '0.7';
-  setTimeout(() => { document.body.style.opacity = origText; }, 300);
-
-  const overlay = document.getElementById('rolePickerOverlay');
-  if (overlay) overlay.style.display = 'none';
-  if (userId === 'admin') {
-    state._currentPersonIds = null;
-    if (typeof hideProfileSetupModal === 'function') hideProfileSetupModal();
-  }
-  applyRoleView(userId);
-  if (userId === 'admin') {
-    showTab('ciso');
-    showToast('🔑 Admin mode');
-  } else {
-    const u = state.users.find(function(x){ return x.id === userId; });
-    if (u) {
-      showToast('👤 Signed in as ' + getOwnerDisplayName(u));
-      maybePromptProfileSetup(u);
-    }
-  }
+// Legacy name kept for any stale onclick references.
+function showRolePicker() {
+  openProfileMenu();
 }
 
 function applyRoleView(userId) {
@@ -287,8 +151,8 @@ function applyRoleView(userId) {
   const btn = document.getElementById('profileBtn');
   if (btn) {
     btn.innerHTML = renderProfileButtonContent(user);
-    btn.title = 'Switch role or preview another user profile';
-    btn.setAttribute('aria-label', 'Switch role or preview another user profile');
+    btn.title = 'Your account';
+    btn.setAttribute('aria-label', 'Your account');
   }
 
   // Admin: show all tabs and clear any impersonation context
@@ -831,7 +695,6 @@ function renderUsersTab() {
         + (u.note ? '<div style="color:#94a3b8;font-size:12px;margin-top:4px;">' + _esc(u.note) + '</div>' : '')
         + '</div>'
         + '<div style="display:flex;gap:8px;">'
-        + '<button onclick="previewAsUser(\'' + u.id + '\')" title="Preview as this user" style="background:#f0f9ff;color:#0369a1;border:1px solid #bae6fd;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;">👁 Preview</button>'
         + '<button ' + (readOnly ? 'disabled ' : 'onclick="openEditUserModal(\'' + u.id + '\')"') + ' title="Edit user" style="background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;">✏️ Edit</button>'
         + '<button ' + (readOnly ? 'disabled ' : 'onclick="removeUser(\'' + u.id + '\')"') + ' title="Remove user" style="background:#fef2f2;color:#dc2626;border:1px solid #fca5a5;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;">✕</button>'
         + '</div>'
@@ -923,14 +786,15 @@ function saveNewUser() {
 function removeUser(id) {
   if (isUsersReadOnlyForCurrentUser()) { showToast('Read-only: AO cannot modify users.', true); return; }
   state.users = (state.users || []).filter(function(u){ return u.id !== id; });
-  if (state.currentUserId === id) applyRoleView('admin');
+  if (state.currentUserId === id) {
+    if (typeof mapCloudIdentityToRoleView === 'function' && typeof isCloudSessionActive === 'function' && isCloudSessionActive()) {
+      mapCloudIdentityToRoleView();
+    } else {
+      applyRoleView('admin');
+    }
+  }
   renderUsersTab();
   showToast('User removed');
-}
-
-function previewAsUser(id) {
-  selectUserProfile(id);
-  showToast('👁 Previewing as ' + (state.users.find(function(u){ return u.id===id; })||{}).name);
 }
 
 function openEditUserModal(id) {

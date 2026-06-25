@@ -132,7 +132,7 @@ function applyEntraSignIn(account, silent) {
   };
   markDirty();
   if (typeof applyRoleView === 'function') applyRoleView(matched.id);
-  var overlay = document.getElementById('rolePickerOverlay');
+  var overlay = document.getElementById('cloudAccountOverlay');
   if (overlay) overlay.style.display = 'none';
   if (typeof maybePromptProfileSetup === 'function') maybePromptProfileSetup(matched);
   if (!silent) showToast('Signed in with Microsoft as ' + getOwnerDisplayName(matched));

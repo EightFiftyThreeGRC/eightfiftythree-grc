@@ -817,13 +817,9 @@ function renderPolicyLibraryCatalog() {
     + '</div>';
 }
 
-/** Toggle the admin-only explainer under Build / Edit Policies (Domain policies home). */
+/** @deprecated Local demo admin hint removed — kept as no-op for stale bookmarks. */
 function policyToggleAdminDraftHint(btn) {
-  var panel = document.getElementById('policy-admin-draft-hint');
-  if (!panel) return;
-  var open = panel.style.display !== 'block';
-  panel.style.display = open ? 'block' : 'none';
-  if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  if (btn) btn.setAttribute('aria-expanded', 'false');
 }
 
 function renderPolicyList() {
@@ -913,7 +909,6 @@ function renderPolicyList() {
     }
   }
 
-  const isLocalDemoAdmin = typeof isLocalDemoAdminMode === 'function' && isLocalDemoAdminMode();
   const isCloudOwner = typeof isCloudOwnerSession === 'function' && isCloudOwnerSession();
   const canDraft = canDraftDomainPoliciesFromList();
 
@@ -972,11 +967,6 @@ function renderPolicyList() {
         + '<div style="font-size:11px; color:var(--text-muted); margin-bottom:10px;">' + ctrlCount + ' controls in baseline'
         + (custodian ? ' \u00B7 Custodian: ' + custodian : '') + '</div>'
         + actionBtn
-        + (isLocalDemoAdmin && status === 'Not Started'
-          ? '<div style="font-size:11px;color:var(--text-muted);margin-top:10px;line-height:1.45;padding:8px 10px;background:#f8fafc;border-radius:8px;border:1px solid var(--border);">'
-          + '<span style="color:var(--navy);font-weight:700;">Demo mode:</span> '
-          + 'Use <strong>Switch role</strong> in the sidebar to preview a policy owner\'s workspace, or assign yourself as owner in Program setup.</div>'
-          : '')
         + '</div>';
     });
   }
@@ -992,12 +982,6 @@ function renderPolicyList() {
       + '<div style="font-size:32px; margin-bottom:12px;">📭</div>'
       + '<div style="font-size:15px; font-weight:600; color:var(--navy); margin-bottom:6px;">No policy domains assigned yet</div>'
       + '<div style="font-size:13px; color:var(--text-muted);">Your CISO hasn\'t assigned any policy domains to your account yet. Contact your CISO or program administrator to get started.</div>'
-      + '</div>';
-  } else if (isLocalDemoAdmin) {
-    cardsSection = '<div style="text-align:center; padding:48px 32px;">'
-      + '<div style="font-size:32px; margin-bottom:12px;">\uD83D\uDCCB</div>'
-      + '<div style="font-size:15px; font-weight:600; color:var(--navy); margin-bottom:6px;">Select a policy owner above</div>'
-      + '<div style="font-size:13px; color:var(--text-muted);">Choose a policy owner from the dropdown to preview their assigned domains in demo mode.</div>'
       + '</div>';
   } else {
     cardsSection = '';
@@ -1061,33 +1045,6 @@ function renderPolicyList() {
     + '</div>'
     + '</div>';
 
-  // Local demo only: preview another policy owner's domains (cloud mode uses real sign-in).
-  let opts = '<option value="">Select policy owner\u2026</option>';
-  ownerNames.forEach(function(name) {
-    const n = ownerMap[name].length;
-    opts += '<option value="' + name + '"' + (name === sel ? ' selected' : '') + '>'
-      + name + ' (' + n + ' ' + (n === 1 ? 'policy' : 'policies') + ')</option>';
-  });
-
-  const rolePickerHTML = isLocalDemoAdmin
-    ? '<div style="margin-bottom:16px;">'
-        + '<div style="display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:8px;">'
-        + '<div style="min-width:0;flex:1;">'
-        + '<div style="font-size:16px;font-weight:800;color:var(--navy);margin-bottom:4px;">Build / Edit Policies</div>'
-        + '<div style="font-size:13px;color:var(--text-muted);">Preview domains by policy owner (demo mode).</div>'
-        + '</div>'
-        + '<button type="button" id="policy-admin-draft-hint-btn" class="btn btn-secondary btn-sm" style="white-space:nowrap;flex-shrink:0;" onclick="policyToggleAdminDraftHint(this)" aria-expanded="false" aria-controls="policy-admin-draft-hint" title="Why drafting is disabled in demo admin mode">'
-        + '\u2139\uFE0F Why can\u2019t I draft?</button>'
-        + '</div>'
-        + '<div id="policy-admin-draft-hint" style="display:none;margin-bottom:12px;padding:12px 14px;font-size:13px;line-height:1.5;color:var(--text);background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;">'
-        + '<strong style="color:var(--navy);">Demo admin is read-only here.</strong> '
-        + 'To draft domain policies locally, use <strong>Switch role</strong> in the sidebar and pick the policy owner for that domain. '
-        + 'In cloud mode you sign in with your real account instead.</div>'
-        + '<label style="font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted); display:block; margin-bottom:8px;">Policy Owner</label>'
-        + '<select class="form-select" style="font-size:14px; max-width:420px;" onchange="state._policyOwnerFilter=this.value; renderPolicyList();">' + opts + '</select>'
-        + '</div>'
-    : '';
-
   const cloudOwnerBuildHTML = isCloudOwner
     ? '<div style="margin-bottom:16px;">'
       + '<div style="font-size:16px;font-weight:800;color:var(--navy);margin-bottom:4px;">Build / Edit Policies</div>'
@@ -1095,12 +1052,19 @@ function renderPolicyList() {
       + '</div>'
     : '';
 
+  const assigneeBuildHTML = (!isCloudOwner && state.currentUserId && famsToShow.length)
+    ? '<div style="margin-bottom:16px;">'
+      + '<div style="font-size:16px;font-weight:800;color:var(--navy);margin-bottom:4px;">My policy domains</div>'
+      + '<div style="font-size:13px;color:var(--text-muted);">Open a domain below to draft or continue your assigned policies.</div>'
+      + '</div>'
+    : '';
+
   var policyElevBlock = (typeof renderPolicyElevationBlockingHtml === 'function' ? renderPolicyElevationBlockingHtml() : '');
   body.innerHTML = '<div style="max-width:900px;">'
     + policyElevBlock
     + librarySection
-    + (isLocalDemoAdmin ? rolePickerHTML + cardsSection : '')
-    + (isCloudOwner ? cloudOwnerBuildHTML + cardsSection : '')
+    + (isCloudOwner ? cloudOwnerBuildHTML : assigneeBuildHTML)
+    + (famsToShow.length || (state.currentUserId && !famsToShow.length) ? cardsSection : '')
     + '</div>';
 }
 

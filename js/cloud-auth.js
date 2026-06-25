@@ -55,18 +55,13 @@ function isCloudSessionActive() {
   return !!(__cloudSession && __cloudProgramId);
 }
 
-// Other modules call this to know whether to hide the demo role-picker.
+// Other modules call this to know whether impersonation is disabled (always true now).
 function isCloudLocked() {
   return !!__cloudLocked;
 }
 
 function isCloudProgramOwner() {
   return !!(__cloudProgramOwnerId && __cloudSession && __cloudProgramOwnerId === __cloudSession.user.id);
-}
-
-/** Local demo admin (role picker) — not signed in via cloud. */
-function isLocalDemoAdminMode() {
-  return !state.currentUserId && !isCloudSessionActive();
 }
 
 /** Cloud sign-in as program owner (full oversight, no role picker). */
@@ -95,7 +90,6 @@ function resolveProgramOwnerActorName() {
 /** True when the signed-in session is acting as the CISO / program owner (not a separate approver or delegate). */
 function isSessionProgramOwnerActor() {
   if (isCloudOwnerSession()) return true;
-  if (isLocalDemoAdminMode()) return true;
 
   var ownerName = String(state.programOwner || '').trim().toLowerCase();
   var ownerEmail = typeof normalizeOwnerEmail === 'function'
@@ -145,7 +139,6 @@ function getSessionActorName(fallback) {
 function getControlWorkspaceTitle() {
   if (state.currentUserId) return 'My Controls';
   if (isCloudOwnerSession()) return 'Control design queue';
-  if (isLocalDemoAdminMode()) return 'Control Library';
   return 'Controls';
 }
 
@@ -957,31 +950,27 @@ async function signOutCloud() {
   __cloudProgramOwnerId = null;
   __cloudLocked = false;
   try { document.body.classList.remove('cloud-session-active'); } catch (e) { /* ignore */ }
-  // Close any open account/role menu, then reload to a clean gate.
-  var overlay = document.getElementById('rolePickerOverlay');
+  // Close any open account menu, then reload to a clean gate.
+  var overlay = document.getElementById('cloudAccountOverlay');
   if (overlay) overlay.style.display = 'none';
   try { window.location.reload(); } catch (e) { showCloudSignInGate(); }
 }
 
-// ── account menu (replaces the demo role-picker once signed in) ──────────────
+// ── account menu (signed-in users) ───────────────────────────────────────────
 function showCloudAccountMenu() {
-  var overlay = document.getElementById('rolePickerOverlay');
+  var overlay = document.getElementById('cloudAccountOverlay');
   if (!overlay) return;
-  var sub = document.getElementById('rolePickerSubtitle');
-  if (sub) sub.textContent = 'You are signed in. Your access is tied to your account — switching identities is disabled.';
-  var adminBtn = document.getElementById('rolePickerAdminBtn');
-  if (adminBtn) adminBtn.style.display = 'none';
-  var entra = document.getElementById('entraAuthPickerSection');
-  if (entra) { entra.innerHTML = ''; entra.style.display = 'none'; }
+  var sub = document.getElementById('cloudAccountSubtitle');
+  if (sub) sub.textContent = 'Your access is tied to your account — switching identities is disabled.';
   var roleLabel = '';
   try {
     var u = state.currentUserId ? (state.users || []).find(function(x){ return x.id === state.currentUserId; }) : null;
     roleLabel = u && typeof getProgramRoleMeta === 'function' ? getProgramRoleMeta(u.role).label
       : (__cloudProgramOwnerId && __cloudSession && __cloudProgramOwnerId === __cloudSession.user.id ? 'Program owner' : '');
   } catch (e) { /* ignore */ }
-  var profiles = document.getElementById('rolePickerProfiles');
-  if (profiles) {
-    profiles.innerHTML = '<div class="cloud-account-card">'
+  var body = document.getElementById('cloudAccountBody');
+  if (body) {
+    body.innerHTML = '<div class="cloud-account-card">'
       + '<div class="cloud-account-name">' + escapeHTML(getCloudSessionDisplayName()) + '</div>'
       + '<div class="cloud-account-email">' + escapeHTML(getCloudSessionEmail()) + '</div>'
       + (roleLabel ? '<div class="cloud-account-role">' + escapeHTML(roleLabel) + '</div>' : '')
@@ -1255,7 +1244,10 @@ async function enterCloudWithSession(session) {
 
 // ── boot entry point (called from app.js DOMContentLoaded) ──────────────────
 async function initCloudAuth() {
-  if (!isCloudEnabled()) return false;
+  if (!isCloudEnabled()) {
+    showCloudSignInGate('This deployment requires cloud sign-in. Configure js/cloud-config.js with your Supabase credentials.');
+    return false;
+  }
   showCloudSignInGate();
   try {
     await loadSupabaseScript();
@@ -1329,7 +1321,6 @@ if (typeof window !== 'undefined') {
   window.isCloudSessionActive = isCloudSessionActive;
   window.isCloudLocked = isCloudLocked;
   window.isCloudProgramOwner = isCloudProgramOwner;
-  window.isLocalDemoAdminMode = isLocalDemoAdminMode;
   window.isCloudOwnerSession = isCloudOwnerSession;
   window.getSessionActorName = getSessionActorName;
   window.resolveProgramOwnerActorName = resolveProgramOwnerActorName;

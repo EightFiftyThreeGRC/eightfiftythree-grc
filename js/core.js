@@ -1924,11 +1924,14 @@ function importProgramFromFile(ev) {
       showToast('Current program saved as auto-backup snapshot before import.');
       if (!applyLoadedState(saved)) throw new Error('apply');
       Object.keys(currentStep).forEach(function(k) { currentStep[k] = 1; });
-      applyRoleView('admin');
+      if (typeof isCloudSessionActive === 'function' && isCloudSessionActive()
+          && typeof mapCloudIdentityToRoleView === 'function') {
+        mapCloudIdentityToRoleView();
+      }
       showTab('ciso');
       goToStep('ciso', 1);
       saveToStorage();
-      showToast('Program imported from file. Data saved to this browser.');
+      showToast('Program imported from file.');
     } catch (err) {
       console.warn('importProgramFromFile', err);
       showToast('Could not import that file. Choose a valid program JSON export.', true);

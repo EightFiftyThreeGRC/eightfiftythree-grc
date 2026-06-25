@@ -20,12 +20,8 @@ test.describe('EightFiftyThree GRC smoke', function() {
     expect(tabs).toContain('frameworks');
   });
 
-  test('welcome can be dismissed and program setup renders', async function({ page }) {
+  test('program setup step renders when invoked', async function({ page }) {
     await page.goto('/app.html', { waitUntil: 'domcontentloaded' });
-    await page.evaluate(function() {
-      localStorage.setItem('eightfiftythree-grc-welcome-dismissed', '1');
-    });
-    await page.reload({ waitUntil: 'domcontentloaded' });
     await page.waitForFunction(function() {
       return typeof window.renderCISOStep1 === 'function';
     });
@@ -36,7 +32,6 @@ test.describe('EightFiftyThree GRC smoke', function() {
   test('XMPL snapshot loads and command center appears', async function({ page }) {
     await page.goto('/app.html', { waitUntil: 'domcontentloaded' });
     await page.evaluate(function() {
-      localStorage.setItem('eightfiftythree-grc-welcome-dismissed', '1');
       if (window.state) {
         window.state.cisoComplete = true;
         window.state.baseline = 'L';

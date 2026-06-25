@@ -686,15 +686,16 @@ function resetApp() {
   state.entraSession = null;
   // Reset step counters
   Object.keys(currentStep).forEach(function(k){ currentStep[k] = 1; });
-  // Return to admin view and update profile button
-  applyRoleView('admin');
-  // Re-lock role tabs
+  reapplySessionRoleView();
   renderSidebarBadges();
-  // Navigate to CISO tab step 1
   showTab('ciso');
   goToStep('ciso', 1);
-  // Clear localStorage so users/roles don't reload on next page load
   try { localStorage.removeItem(STORAGE_KEY); localStorage.removeItem(STORAGE_KEY + '-ts'); } catch(e) {}
+  try {
+    if (typeof cloudPushNow === 'function' && typeof isCloudSessionActive === 'function' && isCloudSessionActive()) {
+      cloudPushNow();
+    }
+  } catch (ePush) { console.warn('cloudPushNow after reset:', ePush); }
   showToast('\u21BA Program reset. Starting fresh.');
 }
 
@@ -1017,7 +1018,7 @@ function applySnapshotFromDataString(dataStr) {
   var saved = JSON.parse(dataStr);
   if (!applyLoadedState(saved)) throw new Error('apply');
   Object.keys(currentStep).forEach(function(k) { currentStep[k] = 1; });
-  applyRoleView('admin');
+  reapplySessionRoleView();
   showTab('ciso');
   goToStep('ciso', 1);
   saveToStorage();
@@ -1186,44 +1187,10 @@ function setupMobileNav() {
   });
 }
 
-/** localStorage key: once set, welcome intro is skipped on this browser. */
-var WELCOME_INTRO_STORAGE_KEY = 'eightfiftythree-grc-welcome-dismissed';
-
 function applySetupFocusMode() {
   var inSetup = !state.cisoComplete;
   document.body.classList.toggle('setup-focus-mode', inSetup);
   if (typeof applyPostSetupNav === 'function') applyPostSetupNav();
-}
-
-function dismissWelcomeIntro() {
-  try {
-    localStorage.setItem(WELCOME_INTRO_STORAGE_KEY, '1');
-  } catch (e) {}
-  var ov = document.getElementById('welcomeIntroOverlay');
-  if (ov) {
-    try {
-      var vids = ov.getElementsByTagName('video');
-      for (var i = 0; i < vids.length; i++) {
-        try { vids[i].pause(); } catch (eP) {}
-        try { vids[i].currentTime = 0; } catch (eT) {}
-        try { vids[i].muted = true; } catch (eM) {}
-      }
-    } catch (eV) {}
-    ov.classList.remove('is-visible');
-    ov.setAttribute('aria-hidden', 'true');
-  }
-  try {
-    document.body.style.overflow = '';
-  } catch (e2) {}
-  setTimeout(function() {
-    try {
-      showTab('home');
-    } catch (eH) {}
-    try {
-      var cta = document.querySelector('.onboard-cta');
-      if (cta && typeof cta.focus === 'function') cta.focus();
-    } catch (e3) {}
-  }, 0);
 }
 
 /* Reusable wizard walkthrough modal. The same #wizardVideoOverlay is used for every
@@ -1281,37 +1248,8 @@ document.addEventListener('keydown', function(ev) {
   if (ov && ov.classList.contains('is-visible')) closeWizardVideo();
 });
 
-function maybeShowWelcomeIntro() {
-  var dismissed = false;
-  try {
-    dismissed = localStorage.getItem(WELCOME_INTRO_STORAGE_KEY) === '1';
-  } catch (e) {}
-  if (dismissed) return;
-  /* Returning browsers with an existing program: set flag so we do not block them after this deploy. */
-  try {
-    if (typeof state !== 'undefined' && String(state.orgName || '').trim() !== '') {
-      localStorage.setItem(WELCOME_INTRO_STORAGE_KEY, '1');
-      return;
-    }
-  } catch (e2) {}
-  var ov = document.getElementById('welcomeIntroOverlay');
-  if (!ov) return;
-  ov.classList.add('is-visible');
-  ov.removeAttribute('aria-hidden');
-  try {
-    document.body.style.overflow = 'hidden';
-  } catch (e2) {}
-  setTimeout(function() {
-    try {
-      var btn = ov.querySelector('.welcome-intro-proceed');
-      if (btn && typeof btn.focus === 'function') btn.focus();
-    } catch (e3) {}
-  }, 50);
-}
-
-// Render the app UI once `state` has been loaded (from localStorage in local
-// mode, or from the shared backend in cloud mode). Safe to call more than once
-// (cloud realtime re-invokes it after a remote update).
+// Render the app UI once `state` has been loaded from the shared backend.
+// Safe to call more than once (cloud realtime re-invokes it after a remote update).
 function bootAfterStateReady() {
   try { renderSidebarBadges(); } catch (e) { console.warn('renderSidebarBadges:', e); }
   try { applySetupFocusMode(); } catch (e) { console.warn('applySetupFocusMode:', e); }
@@ -1319,50 +1257,17 @@ function bootAfterStateReady() {
 }
 window.bootAfterStateReady = bootAfterStateReady;
 
-// Single-user / demo boot: load from this browser's localStorage and show the
-// full app (admin view), optionally honoring a legacy Entra session.
-function bootLocalMode(force) {
-  // When Supabase is wired up, never open the legacy admin / role-picker demo without
-  // an explicit ?demo=1 opt-in — the sign-in gate is the entry point.
-  if (!force && typeof isCloudConfigured === 'function' && isCloudConfigured()) {
-    if (!/[?&]demo=1(?:&|$)/.test(window.location.search || '')) {
-      if (typeof showCloudSignInGate === 'function') showCloudSignInGate();
-      return;
-    }
+function reapplySessionRoleView() {
+  if (typeof isCloudSessionActive === 'function' && isCloudSessionActive()
+      && typeof mapCloudIdentityToRoleView === 'function') {
+    mapCloudIdentityToRoleView();
+    return;
   }
-  try { loadFromStorage(); } catch (e) { console.warn('loadFromStorage:', e); }
-  var entraBoot = Promise.resolve(false);
-  if (typeof initEntraAuth === 'function') {
-    entraBoot = initEntraAuth().catch(function(e) {
-      console.warn('initEntraAuth:', e);
-      return false;
-    });
-  }
-  entraBoot.then(function(entraSignedIn) {
-    if (!entraSignedIn) {
-      try { applyRoleView('admin'); } catch (e) { console.warn('applyRoleView:', e); }
-    }
-    bootAfterStateReady();
-  });
 }
-window.bootLocalMode = bootLocalMode;
-
-// "Continue without an account" escape hatch from the cloud sign-in gate —
-// keeps the public GitHub Pages demo usable for portfolio viewers.
-function continueAsLocalDemo() {
-  if (typeof hideCloudSignInGate === 'function') hideCloudSignInGate();
-  bootLocalMode(true);
-}
-window.continueAsLocalDemo = continueAsLocalDemo;
 
 document.addEventListener('DOMContentLoaded', function() {
   // Auth-independent UI wiring.
   try { setupMobileNav(); } catch (e) { console.warn('setupMobileNav:', e); }
-  // The first-visit welcome ("data stays in this browser") only applies to local
-  // mode; in cloud mode the sign-in gate is the entry point.
-  if (!(typeof isCloudEnabled === 'function' && isCloudEnabled())) {
-    try { maybeShowWelcomeIntro(); } catch (e) { console.warn('maybeShowWelcomeIntro:', e); }
-  }
   try {
     var wvo = document.getElementById('wizardVideoOverlay');
     if (wvo) {
@@ -1383,22 +1288,21 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   });
 
-  // Cloud (multi-user) mode drives boot when configured; otherwise local mode.
-  if (typeof isCloudEnabled === 'function' && isCloudEnabled()) {
-    try {
+  try {
+    if (typeof initCloudAuth === 'function') {
       initCloudAuth().catch(function(e) {
         console.warn('initCloudAuth:', e);
         if (typeof showCloudSignInGate === 'function') {
           showCloudSignInGate('Sign-in failed to initialize. Check your connection and try again.');
         }
       });
-    } catch (e) {
-      console.warn('initCloudAuth threw:', e);
-      if (typeof showCloudSignInGate === 'function') {
-        showCloudSignInGate('Sign-in failed to initialize. Check your connection and try again.');
-      }
+    } else if (typeof showCloudSignInGate === 'function') {
+      showCloudSignInGate('Sign-in is not available. Reload the page or check your deployment.');
     }
-  } else {
-    bootLocalMode();
+  } catch (e) {
+    console.warn('initCloudAuth threw:', e);
+    if (typeof showCloudSignInGate === 'function') {
+      showCloudSignInGate('Sign-in failed to initialize. Check your connection and try again.');
+    }
   }
 });
