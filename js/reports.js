@@ -44,6 +44,25 @@ function syncReportsLibraryNavActive() {
   if (ctrlNav) ctrlNav.classList.toggle('active', inLib && state._reportsLibraryView === 'controls');
 }
 
+function userHasReportsLibraryAccess(user) {
+  if (!state.baseline) return false;
+  if (!user) return true;
+  if (typeof getPersonVisibleTabIds === 'function') {
+    return getPersonVisibleTabIds(user).indexOf('reports') !== -1;
+  }
+  return true;
+}
+
+function renderReportsLibraryEntryHtml() {
+  return '<div style="background:linear-gradient(135deg,#f0fdf4,#ecfeff);border:1px solid #86efac;border-radius:12px;padding:18px 20px;margin-bottom:20px;max-width:100%;">'
+    + '<div style="font-size:14px;font-weight:800;color:#14532d;margin-bottom:6px;">📚 Program library</div>'
+    + '<div style="font-size:12px;color:#166534;line-height:1.55;margin-bottom:14px;">Authoritative read-only catalogs for staff and auditors — <strong>approved policies</strong> and <strong>control requirements</strong> at Planned status or beyond, without entering design workspaces.</div>'
+    + '<div style="display:flex;flex-wrap:wrap;gap:10px;">'
+    + '<button type="button" class="btn btn-primary btn-sm" onclick="goToReportsLibrary(\'policies\')">Published policies</button>'
+    + '<button type="button" class="btn btn-secondary btn-sm" onclick="goToReportsLibrary(\'controls\')">Control requirements</button>'
+    + '</div></div>';
+}
+
 function renderReportsLibraryShell() {
   var dashPanel = document.getElementById('reports-dashboard-panel');
   var libPanel = document.getElementById('reports-library-panel');
@@ -1400,6 +1419,8 @@ function renderApproverDashboard(user) {
     html += '</div>';
   }
   html += '</div>';
+  html += typeof renderReportsLibraryEntryHtml === 'function' ? renderReportsLibraryEntryHtml() : '';
+  html += typeof renderSspApprovalQueueHtml === 'function' ? renderSspApprovalQueueHtml(user) : '';
   return html;
 }
 
@@ -1447,7 +1468,8 @@ function renderReports() {
   if (showMyView && controls.length === 0 && families.length === 0) {
     var uName = user ? user.name.split(' ')[0] : 'there';
     body.innerHTML = '<div class="empty-state"><div class="es-icon">\uD83D\uDCCA</div><div class="es-title">Welcome, ' + escapeHTML(uName) + '</div>'
-      + '<p>No controls or policy domains have been assigned to you yet. Once your CISO or ISSM assigns work to you, your personal dashboard and reports will appear here.</p></div>';
+      + '<p>No controls or policy domains have been assigned to you yet. Once your CISO or ISSM assigns work to you, your personal dashboard and reports will appear here.</p></div>'
+      + (typeof renderReportsLibraryEntryHtml === 'function' && userHasReportsLibraryAccess(user) ? renderReportsLibraryEntryHtml() : '');
     return;
   }
 
@@ -1503,6 +1525,7 @@ function renderReports() {
     ${renderProgramReadinessPanelHtml()}
     ${typeof renderAuthorizationStatusPanelHtml === 'function' ? renderAuthorizationStatusPanelHtml() : ''}
     ${renderReturnedWorkCallout(user)}
+    ${userHasReportsLibraryAccess(user) ? renderReportsLibraryEntryHtml() : ''}
     ${renderSspApprovalQueueHtml(user)}
     ${isScoped && showMyView ? renderMyDashboard(controls, families) : ''}
     ${renderISPApprovalCallout(user)}
@@ -1942,3 +1965,5 @@ window.goToReportsDashboard = goToReportsDashboard;
 window.goToReportsLibrary = goToReportsLibrary;
 window.openPublishedPolicyFromReports = openPublishedPolicyFromReports;
 window.backToReportsPolicyLibrary = backToReportsPolicyLibrary;
+window.renderReportsLibraryEntryHtml = renderReportsLibraryEntryHtml;
+window.userHasReportsLibraryAccess = userHasReportsLibraryAccess;

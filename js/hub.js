@@ -379,6 +379,15 @@ function getHubWorkspaces() {
 
   if (tabs.indexOf('reports') !== -1) {
     workspaces.push({ icon: '📊', label: 'Reports', desc: 'Program dashboard', fn: "showTab('reports')", group: 'program' });
+    if (typeof userHasReportsLibraryAccess === 'function' && userHasReportsLibraryAccess(user)) {
+      workspaces.push({
+        icon: '📚',
+        label: 'Program library',
+        desc: 'Published policies & control requirements',
+        fn: "goToReportsLibrary('policies')",
+        group: 'program'
+      });
+    }
   }
 
   if (tabs.indexOf('frameworks') !== -1 && userHasFrameworkMapping()) {

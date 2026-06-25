@@ -605,6 +605,38 @@ function toggleSidebarReportsList(forceOpen) {
   }
 }
 
+/** Show Reports → Library sidebar for anyone with Reports access; auto-expand for signed-in users. */
+function syncReportsLibrarySidebar(user) {
+  var list = document.getElementById('sidebar-reports-list');
+  var btn = document.getElementById('sidebar-reports-toggle');
+  var navReports = document.getElementById('nav-reports');
+  if (!list) return;
+
+  var hasReports = !user;
+  if (user && typeof getPersonVisibleTabIds === 'function') {
+    hasReports = getPersonVisibleTabIds(user).indexOf('reports') !== -1;
+  } else if (user) {
+    hasReports = true;
+  }
+
+  list.style.display = hasReports ? '' : 'none';
+  if (btn) btn.style.visibility = hasReports ? 'visible' : 'hidden';
+  if (navReports && (navReports.style.display === 'none' || !state.baseline)) {
+    list.style.display = 'none';
+    if (btn) btn.style.visibility = 'hidden';
+    return;
+  }
+
+  if (hasReports && user && typeof state._sidebarReportsExpanded !== 'boolean') {
+    state._sidebarReportsExpanded = true;
+  }
+  if (hasReports && user) {
+    toggleSidebarReportsList(true);
+  } else if (hasReports && typeof state._sidebarReportsExpanded === 'boolean') {
+    toggleSidebarReportsList(state._sidebarReportsExpanded);
+  }
+}
+
 function toggleSidebarAssetsList(forceOpen) {
   if (typeof state._sidebarAssetsExpanded !== 'boolean') state._sidebarAssetsExpanded = false;
   if (forceOpen === true) state._sidebarAssetsExpanded = true;
@@ -739,6 +771,7 @@ function renderSidebarBadges() {
 
   // Update notification badges and asset sidebar whenever sidebar is rendered
   applyPostSetupNav();
+  if (typeof syncReportsLibrarySidebar === 'function') syncReportsLibrarySidebar(user);
   setTimeout(updateNotificationBadges, 50);
   setTimeout(renderSidebarAssets, 60);
   setTimeout(function() {

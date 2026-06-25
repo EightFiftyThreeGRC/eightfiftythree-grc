@@ -269,6 +269,7 @@
     /* Setup focus — calmer first-run experience (keep Program setup in sidebar) */
     body.setup-focus-mode #sidebar-workspaces-section { display: none; }
     body.setup-focus-mode #sidebar-program-section #nav-reports,
+    body.setup-focus-mode #sidebar-program-section #sidebar-reports-list,
     body.setup-focus-mode #sidebar-program-section #nav-frameworks,
     body.setup-focus-mode #sidebar-program-section #nav-poam,
     body.setup-focus-mode #sidebar-program-section #nav-users { display: none !important; }

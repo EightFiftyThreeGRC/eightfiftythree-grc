@@ -167,6 +167,7 @@ function applyRoleView(userId) {
     if (adminSection) adminSection.style.display = '';
     if (typeof applySetupFocusMode === 'function') applySetupFocusMode();
     if (typeof renderSidebarBadges === 'function') renderSidebarBadges();
+    if (typeof syncReportsLibrarySidebar === 'function') syncReportsLibrarySidebar(null);
     return;
   }
 
@@ -198,6 +199,7 @@ function applyRoleView(userId) {
     var showProgramSection = programTabIds.some(function(id) { return visible.indexOf(id) !== -1; });
     adminSection.style.display = showProgramSection ? '' : 'none';
   }
+  if (typeof syncReportsLibrarySidebar === 'function') syncReportsLibrarySidebar(user);
 
   // Navigate to the highest-priority role's default tab (approver last — defaults to Reports)
   var rolePriority = ['ciso','ao','assessor','issm','control-owner','asset-owner','custodian','approver'];
