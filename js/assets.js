@@ -788,7 +788,9 @@ function renderAssetLibrary() {
           var sign = getSspSignoffFromState(a.id);
           var rawSt = sign.status || 'Not Started';
           var normSt = normalizeSspSignoffStatus(sign.status);
-          var displaySt = normSt || rawSt;
+          var displaySt = (typeof signoffIsReturnedForRevision === 'function' && signoffIsReturnedForRevision(sign))
+            ? 'Returned for revision'
+            : (normSt || rawSt);
           var canViewPkg = normSt === 'Submitted' || normSt === 'Approved';
           var hasLog = canViewPkg || !!(sign.signedBy || '').trim() || !!(sign.signedDate || '').trim()
             || sign.aoReturnedAt || !!(sign.approvedBy || '').trim();
@@ -870,7 +872,7 @@ function renderAssetTab() {
   var assetId   = state._selectedAssetId;
   var procId    = state._selectedProcessId;
   var scopedIds = getCurrentPersonAssetIds();
-  if (scopedIds && assetId && scopedIds.indexOf(String(assetId)) === -1) {
+  if (scopedIds && assetId && !state._sspOwnerRevisionMode && scopedIds.indexOf(String(assetId)) === -1) {
     state._selectedAssetId = null;
     assetId = null;
   }
@@ -963,8 +965,8 @@ function renderAssetHome() {
     var completed  = controls.filter(function(c){ return attests[c.id] && attests[c.id].status; }).length;
     var pct        = controls.length ? Math.round(completed/controls.length*100) : 0;
     var isReturned = typeof signoffIsReturnedForRevision === 'function' && signoffIsReturnedForRevision(signoff);
-    var status     = signoff.status==='Approved'?'Approved':signoff.status==='Submitted'?'Submitted':isReturned?'Returned for revision':completed>0?'In Progress':'Not Started';
-    var col        = status==='Approved'?'var(--green)':signoff.status==='Submitted'?'var(--blue)':isReturned?'#c2410c':status==='In Progress'?'var(--amber)':'var(--slate)';
+    var status     = signoff.status==='Approved'?'Approved':isReturned?'Returned for revision':signoff.status==='Submitted'?'Submitted':completed>0?'In Progress':'Not Started';
+    var col        = status==='Approved'?'var(--green)':isReturned?'#c2410c':status==='Submitted'?'var(--blue)':status==='In Progress'?'var(--amber)':'var(--slate)';
     var enterFn    = isProc ? 'enterProcessSSP' : 'enterAssetSSP';
     var removeFn   = isProc ? 'removeProcess'   : 'removeAsset';
     var subtitle   = isProc
@@ -2755,9 +2757,10 @@ function getSspSessionIdentityTokens(user) {
     addName(user.name);
     addEmail(user.email);
   }
-  addName(state.programOwner);
-  addEmail(state.programOwnerEmail);
-  if (typeof resolveProgramOwnerActorName === 'function') addName(resolveProgramOwnerActorName());
+  // Session-aware identity. getSessionActorName / getSessionEmailForApproval
+  // resolve to the program owner ONLY when the current session is the program
+  // owner — so a cloud program owner (currentUserId null) still matches their
+  // packages, without leaking the program owner's packages onto other users.
   if (typeof getSessionActorName === 'function') addName(getSessionActorName(''));
   if (typeof getSessionEmailForApproval === 'function') addEmail(getSessionEmailForApproval());
   var personIds = (state._currentPersonIds && state._currentPersonIds.length)

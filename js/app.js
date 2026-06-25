@@ -817,6 +817,11 @@ function showTab(tabId) {
     state._selectedProcessId = null;
     if (typeof _restoreAssetWizardLayoutAfterReadOnly === 'function') _restoreAssetWizardLayoutAfterReadOnly();
   }
+  if (tabId !== 'asset' && state._sspOwnerRevisionMode) {
+    state._sspOwnerRevisionMode = false;
+    state._selectedAssetId = null;
+    state._selectedProcessId = null;
+  }
   if (state.currentUserId && state.users) {
     var cu = state.users.find(function(u) { return u.id === state.currentUserId; });
     if (cu) {

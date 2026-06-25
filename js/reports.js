@@ -811,12 +811,12 @@ function renderAssetOwnerReport(user) {
     var pct      = controls.length ? Math.round(done / controls.length * 100) : 0;
     var isRet    = typeof signoffIsReturnedForRevision === 'function' && signoffIsReturnedForRevision(signRaw);
     var status   = signRaw.status === 'Approved'  ? 'Approved'
-                 : signRaw.status === 'Submitted' ? 'Submitted'
                  : isRet ? 'Returned for revision'
+                 : signRaw.status === 'Submitted' ? 'Submitted'
                  : done > 0 ? 'In Progress' : 'Not Started';
     var col      = status === 'Approved'  ? 'var(--green)'
-                 : signRaw.status === 'Submitted' ? 'var(--blue)'
                  : isRet ? '#c2410c'
+                 : status === 'Submitted' ? 'var(--blue)'
                  : status === 'In Progress' ? 'var(--amber)' : 'var(--slate)';
 
     totalControls += controls.length;
@@ -1490,9 +1490,11 @@ function renderReports() {
   // Empty state for scoped users with no assignments
   if (showMyView && controls.length === 0 && families.length === 0) {
     var uName = user ? user.name.split(' ')[0] : 'there';
-    var returnedSspHtml = (typeof renderReturnedSspWorkCallout === 'function') ? renderReturnedSspWorkCallout(user) : '';
+    // renderReturnedWorkCallout already includes returned-SSP cards alongside
+    // returned ISP / domain-policy / evidence work, so use it alone here to avoid
+    // both dropping non-SSP work and double-rendering SSP cards.
     var returnedWorkHtml = typeof renderReturnedWorkCallout === 'function' ? renderReturnedWorkCallout(user) : '';
-    body.innerHTML = (returnedSspHtml || returnedWorkHtml)
+    body.innerHTML = returnedWorkHtml
       + '<div class="empty-state"><div class="es-icon">\uD83D\uDCCA</div><div class="es-title">Welcome, ' + escapeHTML(uName) + '</div>'
       + '<p>No controls or policy domains have been assigned to you yet. Once your CISO or ISSM assigns work to you, your personal dashboard and reports will appear here.</p></div>'
       + (typeof renderReportsLibraryEntryHtml === 'function' && userHasReportsLibraryAccess(user) ? renderReportsLibraryEntryHtml() : '');
