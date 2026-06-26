@@ -2823,6 +2823,25 @@ function getReturnedSspPackagesForUser(user) {
   return rows;
 }
 
+/** Submitted SSP/SPSP packages this session owns that are awaiting a reviewer decision. */
+function getSubmittedSspPackagesForOwner(user) {
+  var sspLabel = state.privacyOverlay ? 'SPSP' : 'SSP';
+  var rows = [];
+  (state.assets || []).forEach(function(a) {
+    var sig = getSspSignoffFromState(a.id);
+    if (normalizeSspSignoffStatus(sig.status) !== 'Submitted') return;
+    if (!sspPackageOwnedBySessionUser(a.id, false, user)) return;
+    rows.push({ scopeId: String(a.id), isProcess: false, name: a.name || 'Unnamed', sign: sig, sspLabel: sspLabel });
+  });
+  (state.processes || []).forEach(function(p) {
+    var sig = getSspSignoffFromState(p.id);
+    if (normalizeSspSignoffStatus(sig.status) !== 'Submitted') return;
+    if (!sspPackageOwnedBySessionUser(p.id, true, user)) return;
+    rows.push({ scopeId: String(p.id), isProcess: true, name: p.name || 'Unnamed', sign: sig, sspLabel: sspLabel });
+  });
+  return rows;
+}
+
 function openReturnedSspForRevision(scopeId, isProcess) {
   var sid = String(scopeId);
   var user = state.currentUserId ? (state.users || []).find(function(u) { return u.id === state.currentUserId; }) : null;
@@ -3860,5 +3879,6 @@ window.collectSspReviewerCommentsFromDraft = collectSspReviewerCommentsFromDraft
 window.buildSspReturnNotesFromDraft = buildSspReturnNotesFromDraft;
 window.clearSspReviewerDraft = clearSspReviewerDraft;
 window.getReturnedSspPackagesForUser = getReturnedSspPackagesForUser;
+window.getSubmittedSspPackagesForOwner = getSubmittedSspPackagesForOwner;
 window.openReturnedSspForRevision = openReturnedSspForRevision;
 window.renderReturnedSspWorkCallout = renderReturnedSspWorkCallout;

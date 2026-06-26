@@ -262,12 +262,18 @@ function getNextActions() {
     });
   }
 
-  (state.assets || []).forEach(function(a) {
-    var signoff = (state.sspSignoffs || {})[a.id] || {};
-    if (signoff.status === 'Submitted') {
-      actions.push({ priority: 4, icon: '🖥️', label: 'SSP submitted: ' + a.name, desc: 'Review asset package on Reports.', action: "showTab('reports');" });
-    }
-  });
+  if (typeof getSubmittedSspPackagesForOwner === 'function') {
+    getSubmittedSspPackagesForOwner(hubUser).slice(0, 5).forEach(function(r) {
+      var reviewer = (r.sign && String(r.sign.reviewerName || '').trim()) || 'your reviewer';
+      actions.push({
+        priority: 4,
+        icon: '🖥️',
+        label: (r.sspLabel || 'SSP') + ' awaiting review: ' + (r.name || 'Package'),
+        desc: 'Submitted — awaiting ' + reviewer + '. View status in Assets & SSP.',
+        action: "showTab('asset')"
+      });
+    });
+  }
 
   actions.sort(function(a, b) { return a.priority - b.priority; });
   return actions.slice(0, 8);
