@@ -1433,7 +1433,9 @@ function getSspReviewSessionUser() {
 
 function sspSignoffMatchesSessionReviewer(sign) {
   if (!sign) return false;
-  if (!state.currentUserId) return true;
+  // No currentUserId means the cloud program-owner session (a real actor), not an
+  // omniscient admin. Match the designated reviewer by session identity so the
+  // submitter cannot approve/return their own package (separation of duties).
   var fakeRow = {
     type: 'ssp',
     status: 'Pending',
@@ -2904,13 +2906,10 @@ function userMayReceiveSspReviews(user) {
 }
 
 function getSspReviewQueueItemsForUser(user) {
-  if (!user) {
-    return (state.controlReviewQueue || []).filter(function(r) {
-      if (!r || r.type !== 'ssp') return false;
-      var st = String(r.status || 'Pending');
-      return st === 'Pending' || st === '';
-    });
-  }
+  // Always scope to the designated reviewer — including the cloud program-owner
+  // session (user null), which sspQueueRowMatchesReviewer resolves via session
+  // identity. Returning all pending rows for a null user surfaced the submitter's
+  // own SSP in their queue and let them approve it.
   return (state.controlReviewQueue || []).filter(function(r) { return sspQueueRowMatchesReviewer(r, user); });
 }
 
