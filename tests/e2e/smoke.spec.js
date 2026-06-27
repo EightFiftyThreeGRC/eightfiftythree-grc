@@ -16,7 +16,7 @@ test.describe('EightFiftyThree GRC smoke', function() {
     }, { timeout: 15000 });
     var tabs = await page.evaluate(function() { return window.TAB_IDS; });
     expect(tabs).toContain('home');
-    expect(tabs).toContain('poam');
+    expect(tabs).toContain('reports');
     expect(tabs).toContain('frameworks');
   });
 
@@ -43,23 +43,6 @@ test.describe('EightFiftyThree GRC smoke', function() {
       else if (typeof window.showTab === 'function') window.showTab('home');
     });
     await expect(page.locator('#home-body')).toContainText(/Command Center|Test Org|program/i, { timeout: 10000 });
-  });
-
-  test('POA&M tab renders and can add item', async function({ page }) {
-    await page.goto('/app.html', { waitUntil: 'domcontentloaded' });
-    await page.waitForFunction(function() { return typeof window.addPoamItem === 'function'; });
-    await page.evaluate(function() { window.showTab('poam'); });
-    await expect(page.locator('#poam-body')).toContainText(/POA&M|finding/i);
-    await page.evaluate(function() {
-      window.addPoamItem({
-        controlId: 'AC-1',
-        finding: 'E2E test finding for automated smoke test',
-        severity: 'Low',
-        dueDate: '2099-01-01',
-        assignee: 'Tester'
-      });
-    });
-    await expect(page.locator('#poam-body')).toContainText('E2E test finding');
   });
 
   test('framework alignment tab shows crosswalk', async function({ page }) {

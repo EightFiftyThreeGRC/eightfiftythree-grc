@@ -97,7 +97,6 @@ function renderOnboardingHome() {
 
 function getNextActions() {
   var actions = [];
-  var today = new Date().toISOString().slice(0, 10);
 
   if (!state.cisoComplete) {
     var p = getSetupProgressSummary();
@@ -164,12 +163,6 @@ function getNextActions() {
       ? "openControlReassignmentModal('" + escId + "');"
       : "state._selectedCtrl='" + escId + "';showTab('control');goToStep('control',2);";
     actions.push({ priority: 3, icon: isReturn ? '↩' : '🔧', label: (isReturn ? 'Reassign control: ' : 'Review control: ') + r.controlId, desc: (r.status || 'Pending review'), action: action });
-  });
-
-  (state.poamItems || []).forEach(function(p) {
-    if (p.dueDate && p.dueDate < today && p.status !== 'Closed' && p.status !== 'Mitigated') {
-      actions.push({ priority: 0, icon: '⚠️', label: 'Overdue POA&M', desc: p.finding.slice(0, 60), action: "showTab('poam');" });
-    }
   });
 
   if (typeof getISPStatus === 'function' && getISPStatus() === 'Under Review') {
@@ -368,27 +361,6 @@ function userHasFrameworkMapping() {
   return fw.length > 0 || laws.length > 0;
 }
 
-function getScopedPoamOpenCount(user) {
-  if (typeof ensurePoamState === 'function') ensurePoamState();
-  var items = state.poamItems || [];
-  var tabs = getHubVisibleTabIds();
-  if (tabs.indexOf('poam') === -1) return 0;
-  var open = items.filter(function(p) {
-    return p.status !== 'Closed' && p.status !== 'Mitigated' && p.status !== 'Risk Accepted';
-  });
-  if (!user || !state.currentUserId) return open.length;
-  var roles = getHubPersonRoles(user);
-  if (roles.indexOf('ciso') !== -1 || roles.indexOf('assessor') !== -1 || roles.indexOf('ao') !== -1) {
-    return open.length;
-  }
-  var name = (user.name || '').trim().toLowerCase();
-  var email = (user.email || '').trim().toLowerCase();
-  return open.filter(function(p) {
-    var asn = (p.assignee || '').trim().toLowerCase();
-    return !asn || asn === name || (email && asn === email);
-  }).length;
-}
-
 function userHasAssetWorkspaceContent(user) {
   var tabs = getHubVisibleTabIds();
   if (tabs.indexOf('asset') === -1) return false;
@@ -467,11 +439,6 @@ function getHubWorkspaces() {
     workspaces.push({ icon: '◇', label: 'Frameworks', desc: 'ISO / SOC 2 / CIS alignment', fn: "showTab('frameworks')", group: 'program' });
   }
 
-  var poamOpen = getScopedPoamOpenCount(user);
-  if (tabs.indexOf('poam') !== -1 && poamOpen > 0) {
-    workspaces.push({ icon: '📝', label: 'POA&M', desc: poamOpen + ' open finding' + (poamOpen === 1 ? '' : 's'), fn: "showTab('poam')", group: 'program' });
-  }
-
   return workspaces;
 }
 
@@ -490,10 +457,6 @@ function renderHubWorkspaceGroupHtml(title, items) {
 function shouldShowHubFrameworkStrip() {
   var tabs = getHubVisibleTabIds();
   return tabs.indexOf('frameworks') !== -1 && userHasFrameworkMapping();
-}
-
-function shouldShowHubPoamStrip() {
-  return getScopedPoamOpenCount(getHubSessionUser()) > 0 && getHubVisibleTabIds().indexOf('poam') !== -1;
 }
 
 function updateCommandCenterPageHeader() {
@@ -558,7 +521,7 @@ function renderHomeTab() {
     + '<div class="hub-kpi"><div class="hub-kpi-val">' + implPct + '%</div><div class="hub-kpi-label">Controls implemented</div><div class="hub-kpi-sub">' + implemented + ' / ' + ctrlTotal + '</div></div>'
     + '<div class="hub-kpi"><div class="hub-kpi-val">' + ownerCount + '</div><div class="hub-kpi-label">Policy owners</div><div class="hub-kpi-sub">' + domainsAssigned + ' / ' + domainTotal + ' domains rostered</div></div>'
     + '<div class="hub-kpi"><div class="hub-kpi-val">' + (state.assets || []).length + '</div><div class="hub-kpi-label">Assets in inventory</div></div>'
-    + '<div class="hub-kpi"><div class="hub-kpi-val">' + getPoamOpenCount() + '</div><div class="hub-kpi-label">Open POA&amp;M items</div></div>'
+    + '<div class="hub-kpi"><div class="hub-kpi-val">' + countPublishedPolicyItems() + '</div><div class="hub-kpi-label">Policies approved</div></div>'
     + '</div>'
     + (shouldShowHubFrameworkStrip() && typeof renderFrameworkDashboardStripHtml === 'function' ? renderFrameworkDashboardStripHtml() : '')
     + '<div class="hub-lower-grid">'
@@ -567,7 +530,6 @@ function renderHomeTab() {
     + workspaceHtml
     + '</div></div>'
     + '</div>'
-    + (shouldShowHubPoamStrip() && typeof renderPoamSummaryHtml === 'function' ? renderPoamSummaryHtml() : '')
     + '</div>';
 }
 

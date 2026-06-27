@@ -868,9 +868,6 @@ function updateNotificationBadges() {
   }
   setBadge('badge-asset', assetCount);
 
-  if (typeof getPoamOverdueCount === 'function') {
-    setBadge('badge-poam', getPoamOverdueCount());
-  }
 }
 
 function renderSidebarAssets() {

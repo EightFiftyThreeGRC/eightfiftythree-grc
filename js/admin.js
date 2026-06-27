@@ -195,7 +195,7 @@ function applyRoleView(userId) {
     if (nav) nav.style.display = visible.indexOf(id) !== -1 ? '' : 'none';
   });
   if (adminSection) {
-    var programTabIds = ['ciso', 'reports', 'frameworks', 'poam', 'users'];
+    var programTabIds = ['ciso', 'reports', 'frameworks', 'users'];
     var showProgramSection = programTabIds.some(function(id) { return visible.indexOf(id) !== -1; });
     adminSection.style.display = showProgramSection ? '' : 'none';
   }

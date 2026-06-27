@@ -122,8 +122,8 @@ Users / auth
 - `currentUserId` — `null` = admin mode; string id = signed-in user
 - Role → tabs mapping: `ROLE_TABS` in `js/core.js` (~line 1075). Roles: `ciso`, `issm`, `control-owner`, `asset-owner`, `custodian`, `assessor`, `ao`, `approver`. As of 2026-04-27 the dedicated Control Assessment (`tester`) and Authorization (`ato`) tabs were removed. `ao` now sees `asset` + `reports` + `users`; `assessor` sees only `reports`. AO decisions are recorded via `openAtoDecisionModal()` which is launched from the Authorization status panel on the Reports dashboard.
 
-POA&M / accountability
-- `poamItems` — findings tracker
+Accountability
+- POA&M / Findings was removed from Phase 1 on 2026-06-27 (tab, `js/poam.js`, `poamItems`/`_poamFilter`/`_poamSearch` state, and all Command Center wiring deleted). Risk/issue identification is deferred to a future "Phase 2" redesign. The terms "POA&M" / "Plan of Action and Milestones" still appear in NIST control text (CA-5, PM-4) and ISP/policy boilerplate — that is intentional policy content, not the removed feature.
 - `auditTrail` — `[{ t, cat, ref, msg }]`, semantic event log. Capped at 800 entries. Written via `addAuditEntry(cat, refId, msg)`.
 - `changeLog` — `[{ t, u, p, o, n }]` field-level change log written by `logFieldChange(path, oldVal, newVal)`. Capped at 2000 entries. Use this when typing into ISP fields, renaming roles, editing attestation text — anything where the audit trail's coarse "submitted/approved" categories are insufficient.
 

@@ -1077,13 +1077,13 @@ const ROLE_TABS = {
   // AOs still record decisions through openAtoDecisionModal() launched from the
   // Reports dashboard. Asssessors no longer have a dedicated workspace —
   // assessment data persists in state but is not edited via UI.
-  'ciso':          ['home','ciso','policy','asset','frameworks','poam','reports'],
-  'issm':          ['home','policy','asset','frameworks','poam','reports'],
-  'control-owner': ['home','control','frameworks','poam','reports'],
-  'asset-owner':   ['home','asset','poam','reports'],
+  'ciso':          ['home','ciso','policy','asset','frameworks','reports'],
+  'issm':          ['home','policy','asset','frameworks','reports'],
+  'control-owner': ['home','control','frameworks','reports'],
+  'asset-owner':   ['home','asset','reports'],
   'custodian':     ['home','policy','reports'],
-  'assessor':      ['home','poam','reports'],
-  'ao':            ['home','asset','poam','reports','users'],
+  'assessor':      ['home','reports'],
+  'ao':            ['home','asset','reports','users'],
   'approver':      ['home','reports'],
 };
 
@@ -1189,8 +1189,6 @@ const state = {
   infoSecPolicySuggestions: [],  // [{ id, createdAt, suggestedBy, summary, status: Proposed|Approved|Rejected|Promoted }]
   infoSecPolicyReviewDraft: null, // { version, createdAt, updatedAt, content, promotedSuggestionIds } — annual review working draft seeded from approved suggestions
 
-  // POA&M / Findings tracking
-  poamItems: [],                 // [{ id, controlId, finding, severity, status, dueDate, assignee, createdDate, closedDate, mitigationPlan, evidenceRef }]
   controlEvidence: {},           // { 'AC-1': { url, hash, attestationDate, type, description } }
   auditTrail: [],                // [{ t, cat, ref, msg }] activity log for reports / accountability
   changeLog: [],                 // field-level edits: { t, u, p, o, n } — capped FIFO
@@ -1212,8 +1210,6 @@ const state = {
   entraSession: null, // { email, name, oid, matchedUserId, signedInAt } when signed in via Entra
   _frameworkFilter: '',
   _frameworkSearch: '',
-  _poamFilter: 'open',
-  _poamSearch: '',
 };
 const STATE_DEFAULTS = JSON.parse(JSON.stringify(state));
 const STATE_ALLOWED_KEYS = Object.keys(STATE_DEFAULTS);

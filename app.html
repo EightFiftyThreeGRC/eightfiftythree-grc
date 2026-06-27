@@ -99,10 +99,6 @@
     <div class="sidebar-item" onclick="showTab('frameworks')" id="nav-frameworks">
       <span class="icon">◇</span> Framework alignment
     </div>
-    <div class="sidebar-item" onclick="showTab('poam')" id="nav-poam">
-      <span class="icon">📝</span> Findings &amp; POA&amp;M
-      <span class="sidebar-item-badge warn" id="badge-poam" style="display:none;"></span>
-    </div>
     <div class="sidebar-item" onclick="showTab('users')" id="nav-users">
       <span class="icon">👥</span> Users &amp; roles
     </div>
@@ -584,15 +580,6 @@
        state.atoDecisions) is preserved; AOs can still record decisions via
        openAtoDecisionModal() launched from the Reports dashboard. -->
 
-  <div class="tab-panel" id="tab-poam">
-    <div class="page-header">
-      <div class="role-badge">📝 Findings &amp; POA&amp;M</div>
-      <h1>Plan of Action &amp; Milestones</h1>
-      <p>Track assessment findings, control gaps, and remediation through closure — aligned to NIST CA-5 and PM-4.</p>
-    </div>
-    <div style="padding:24px 36px;" id="poam-body"></div>
-  </div>
-
   <!-- ============================================================ -->
   <!-- FRAMEWORK ALIGNMENT TAB -->
   <!-- ============================================================ -->
@@ -731,7 +718,7 @@
 </div>
 
 <script src="js/nist-control-text.js?v=20260624"></script>
-<script src="js/core.js?v=20260626a"></script>
+<script src="js/core.js?v=20260627b"></script>
 <script src="js/policies.js?v=20260627a"></script>
 <script src="js/controls.js?v=20260627a"></script>
     <script src="js/assets.js?v=20260627a"></script>
@@ -739,10 +726,9 @@
 <script src="js/authorization.js?v=20260624"></script>
 <script src="js/frameworks.js?v=20260624"></script>
 <script src="js/entra-auth.js?v=20260625a"></script>
-<script src="js/poam.js?v=20260624"></script>
-    <script src="js/hub.js?v=20260626a"></script>
+    <script src="js/hub.js?v=20260627b"></script>
     <script src="js/reports.js?v=20260626a"></script>
-<script src="js/admin.js?v=20260625b"></script>
+<script src="js/admin.js?v=20260627b"></script>
 <!-- Cloud sign-in + cross-computer sync via Supabase. See MULTI_USER_SETUP.md. -->
 <script src="js/cloud-config.js?v=20260625a"></script>
 <script>
@@ -755,8 +741,8 @@
 })();
 </script>
 <script src="js/cloud-auth.js?v=20260625a"></script>
-    <script src="js/program.js?v=20260627a"></script>
-<script src="js/app.js?v=20260627a"></script>
+    <script src="js/program.js?v=20260627b"></script>
+<script src="js/app.js?v=20260627b"></script>
 
 </body>
 </html>
