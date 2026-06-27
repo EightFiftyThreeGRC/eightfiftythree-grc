@@ -43,7 +43,7 @@ function atoCurrentRoles() {
 
 function atoCanDecide(boundary) {
   if (!boundary) return false;
-  if (!state.currentUserId) return true; // admin mode
+  if (typeof isAdminSession === 'function' ? isAdminSession() : !state.currentUserId) return true; // program owner / admin
   var roles = atoCurrentRoles();
   if (roles.indexOf('ao') === -1 && roles.indexOf('ciso') === -1) return false;
   var ids = state._currentPersonIds || [state.currentUserId];

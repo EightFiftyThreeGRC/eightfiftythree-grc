@@ -806,6 +806,10 @@ function goToDomainOwnersFromDashboard() {
 }
 
 function showTab(tabId) {
+  // Restricted viewers (rostered but unresolved profile) only get home + reports.
+  if (state._restrictedViewer && tabId !== 'home' && tabId !== 'reports') {
+    tabId = 'reports';
+  }
   if (tabId !== 'policy') {
     if (state._ispReviewView) state._ispReviewView = false;
     if (state._ispRevisionView) state._ispRevisionView = false;

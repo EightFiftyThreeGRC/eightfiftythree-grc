@@ -278,6 +278,7 @@ function getHubSessionUser() {
 }
 
 function getHubVisibleTabIds() {
+  if (state._restrictedViewer) return ['home', 'reports'];
   var user = getHubSessionUser();
   if (!user) return typeof TAB_IDS !== 'undefined' ? TAB_IDS.slice() : ['home', 'reports'];
   return typeof getPersonVisibleTabIds === 'function' ? getPersonVisibleTabIds(user) : ['reports'];

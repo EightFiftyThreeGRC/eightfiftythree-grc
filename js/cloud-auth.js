@@ -156,7 +156,10 @@ function getCloudClient() {
   __sbClient = window.supabase.createClient(
     String(CLOUD_CONFIG.supabaseUrl).trim(),
     String(CLOUD_CONFIG.supabaseAnonKey).trim(),
-    { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: 'implicit' } }
+    // PKCE authorization-code flow keeps access/refresh tokens out of the URL
+    // fragment (vs. the legacy implicit flow). supabase-js exchanges the code
+    // automatically because detectSessionInUrl is on.
+    { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: 'pkce' } }
   );
   return __sbClient;
 }
@@ -1059,8 +1062,13 @@ function mapCloudIdentityToRoleView() {
     if (typeof applyRoleView === 'function') applyRoleView(matched.id);
     if (typeof maybePromptProfileSetup === 'function') maybePromptProfileSetup(matched);
   } else {
-    // Rostered (RLS let us in) but no exact match — fall back to read-only-ish reports.
-    if (typeof applyRoleView === 'function') applyRoleView('admin');
+    // Rostered (RLS let us in) but no exact profile match — least privilege:
+    // a reports-only viewer with no program-owner powers (not full admin).
+    if (typeof applyRoleView === 'function') applyRoleView('restricted');
+    if (typeof showTab === 'function') showTab('reports');
+    if (typeof showToast === 'function') {
+      showToast('Your account isn\u2019t matched to a program role yet — you have read-only access. Ask the program owner to add your email to the roster.', true);
+    }
   }
   // Make the top-left profile button reflect the signed-in identity (name/email)
   // and a sign-out hint, instead of the generic "Admin mode / impersonate".
