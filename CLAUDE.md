@@ -15,7 +15,7 @@ Repository source: this workspace/repo is the primary source intended for public
 - No prior branding (Larsen Cyber GRC Wizard, Hawthorn, or any earlier working name) should appear in any new code, docs, or comments. The only permitted mentions are inside the one-time localStorage migration shim, where the literal legacy key strings are required to read the old data.
 - The About section says "experienced cyber GRC advisor" — keep it generic
 - The demo company is **XMPL Co.** (previously "Acme")
-- As of 2026-04-27, `index.html` has been rebranded to EightFiftyThree GRC: `<title>`, `<meta description>`, the sidebar `.brand` ("EightFiftyThree"), and the footer "© EightFiftyThree GRC" are all clean.
+- As of 2026-04-27, the app has been rebranded to EightFiftyThree GRC: `<title>`, `<meta description>`, the sidebar `.brand` ("EightFiftyThree"), and the footer "© EightFiftyThree GRC" are all clean. (`index.html` is now the public landing page; the app shell is `app.html`.)
 
 ## Architecture
 
@@ -23,21 +23,24 @@ Zero-dependency, no-build static web application. UI and logic run client-side; 
 
 ### File Structure
 
-The original monolithic `js/app.js` was refactored in commit `c08deff` (2026-04-23) into per-domain modules. They are loaded in dependency order from `index.html`. Globals only — no modules, no bundler, no transpilation.
+The original monolithic `js/app.js` was refactored in commit `c08deff` (2026-04-23) into per-domain modules. They are loaded in dependency order from `app.html`. Globals only — no modules, no bundler, no transpilation.
 
 ```
+index.html                  — public landing page (links to app.html)
 app.html                    — UI shell, sidebar, tab containers, cloud sign-in gate
+css/landing.css             — landing page styles
+css/app.css                 — all app styles (one @media (max-width:900px) breakpoint)
 js/cloud-config.js          — Supabase connection settings
 js/cloud-auth.js            — Sign-in, program load/sync, account menu
-css/app.css                 — all styles (one @media (max-width:900px) breakpoint)
+js/entra-auth.js            — Microsoft Entra ID (Azure AD) sign-in via MSAL.js
 js/nist-control-text.js     — verbatim NIST 800-53 control requirement text lookup
 js/core.js                  — STATE shape, STATE_DEFAULTS, ROLE_TABS, persistence
                               (saveToStorage / loadFromStorage / markDirty /
                               importProgramFromFile / validateProgramShape /
                               applyLoadedState / addAuditEntry / logFieldChange /
                               getDemoPlaceholderNames / blockActionIfDemoPlaceholders)
-js/program.js               — CISO setup wizard (5 steps); prefillDemoOwners;
-                              prefillDemoControlOwners; sidebar badges
+js/program.js               — CISO setup wizard (7 steps, CISO_STEP_LABELS);
+                              prefillDemoOwners; prefillDemoControlOwners; sidebar badges
 js/policies.js              — Domain Policies wizard (4 steps) + policy library
 js/controls.js              — Control Implementation wizard (4 steps) + control library
 js/assets.js                — Assets & SSP wizard (4 steps) + asset/asset-type libraries;
@@ -45,11 +48,15 @@ js/assets.js                — Assets & SSP wizard (4 steps) + asset/asset-type
 js/baseline-elevation.js    — Baseline elevation triggers and review flow
 js/testing.js               — INTENTIONALLY EMPTY (Control Assessment workspace
                               was removed 2026-04-27; the file is kept as a stub
-                              so legacy snapshot/export references don't 404)
+                              so legacy snapshot/export references don't 404; it is
+                              NOT loaded by app.html)
 js/authorization.js         — AO decision data + helpers + the openAtoDecisionModal
                               modal launched from the Reports dashboard. Owns
                               atoEnsureState, atoCanDecide, submitAtoDecisionFromModal,
                               renderAuthorizationStatusPanelHtml.
+js/frameworks.js            — Framework alignment tab: NIST crosswalks to voluntary
+                              standards (ISO 27001, SOC 2) and compliance laws (HIPAA)
+js/hub.js                   — Command Center (post-setup home dashboard, 'home' tab)
 js/reports.js               — Reports & Dashboard, audit/change-log views, review queues
                               (composes renderAuthorizationStatusPanelHtml into the
                               dashboard so AOs can record decisions inline)
@@ -57,21 +64,23 @@ js/admin.js                 — Users & roles tab, profile / account menu (openP
                               applyRoleView for cloud identity mapping)
 js/app.js                   — App shell only: TAB_IDS, currentStep, showTab, goToStep,
                               snapshot modal, beforeunload handler, DOMContentLoaded
+scripts/check-all.js        — syntax check across all JS modules (npm run check:js)
+tests/e2e/smoke.spec.js     — Playwright smoke tests (npm run test:e2e)
+supabase/                   — schema.sql, config, edge functions
 README.md                   — public GitHub README + operator smoke-test runbook
 CONTROL_OWNER_SPEC.md       — compliance + UX spec for the Control Owner flow
-NOTEBOOKLM_IMPLEMENTATION_PLAN.md — prioritized backlog from the 2026-04 review
 ```
 
 When adding a function, place it in the file that owns the corresponding domain. Cross-file calls happen via globals; call sites should defensively `typeof fn === 'function'` when calling helpers from a downstream module.
 
 ### Deployment
 
-GitHub Pages serves `index.html` + `css/app.css` + every `js/*.js`. No build step. Push to `main` and Pages redeploys.
+GitHub Pages serves `index.html` (landing) + `app.html` (app shell) + `css/*.css` + every `js/*.js`. No build step. Push to `main` and Pages redeploys via `.github/workflows/deploy-pages.yml`.
 
 ### Vanilla JS Conventions
 
 - Plain `function` declarations at top level, attached to the global scope. No modules, no classes, no React/Angular/Vue.
-- DOM rendering is `innerHTML = ...` into static containers declared in `index.html`. Tabs are `.tab-panel` divs with `id="tab-<name>"`; wizard steps are `.wizard-step` divs with `id="<tab>-step-<n>"` and body containers with `id="<tab>-step-<n>-body"`.
+- DOM rendering is `innerHTML = ...` into static containers declared in `app.html`. Tabs are `.tab-panel` divs with `id="tab-<name>"`; wizard steps are `.wizard-step` divs with `id="<tab>-step-<n>"` and body containers with `id="<tab>-step-<n>-body"`.
 - Event wiring is inline `onclick="foo()"` in generated HTML. Any string argument you embed in an `onclick` MUST escape quotes (use the existing `escKey`/`escapeHTML` helpers) — one unescaped quote has historically broken all JavaScript parsing.
 - When an event handler triggers a re-render, wrap it in `setTimeout(fn, 0)` so the browser doesn't destroy the element mid-event.
 
@@ -161,24 +170,27 @@ When rebuilding snapshots, every key in the live `state` object should have a co
 
 ## App Workflow
 
-### Sidebar Navigation (from `index.html`)
+### Sidebar Navigation (from `app.html`)
 
-- **Program overview** → Program setup (CISO wizard)
-- **Workspaces** → Domain policies · Control implementation · Assets & SSP
-- **Libraries** → Policy library · Control library · Asset library · Asset type library
-- **Reporting** → Reports & Dashboard (also hosts the Authorization status panel + AO decision modal)
-- **Administration** → Users & roles
+- **Command Center** (`home` tab) → post-setup dashboard with next actions, KPIs, quick links
+- **Policy & control design** → Domain policies · Control implementation
+- **Asset & process compliance** → Assets & SSP
+- **Program** → Program setup (CISO wizard) · Reports & Dashboard (with Published policies / Control requirements sub-items; also hosts the Authorization status panel + AO decision modal) · Framework alignment · Users & roles
+
+`TAB_IDS` in `js/app.js` is `['home','ciso','policy','control','asset','frameworks','reports','users']`. Library views are reached from the Reports sub-items and workspace toggles rather than a dedicated sidebar section.
 
 Top-right toolbar provides: Save indicator, Save now, Export JSON, Import JSON, Snapshots, Reset.
 Top-left of sidebar has the account button (`openProfileMenu()` → cloud sign-in gate or account menu with sign-out).
 
-### CISO Setup Wizard (5 steps)
+### CISO Setup Wizard (7 steps — `CISO_STEP_LABELS` in `js/program.js`)
 
-1. **Select Baseline** — org name, CISO info, NIST baseline (L/M/H), privacy overlay toggle
-2. **PM Controls** — select which Program Management controls apply (PM-18–PM-27 auto-selected when privacy overlay is on)
-3. **InfoSec Policy** — build the org-level ISP: sections, requirements, review cycle, approver
-4. **Consolidate** — review and prioritize domain policies, suggest merges (e.g., PS+AT, CP+IR, MP+PE, SR+SA)
-5. **Assign Owners** — assign the 20 NIST control families to domain policy owners, set priorities and deadlines
+1. **Organization** — org name, CISO / program-owner identity
+2. **Baseline** — NIST baseline (L/M/H), privacy overlay toggle
+3. **Reg mapping** — voluntary standards (ISO 27001, SOC 2) and compliance laws (HIPAA) crosswalk selection
+4. **PM Controls** — select which Program Management controls apply (PM-18–PM-27 auto-selected when privacy overlay is on)
+5. **InfoSec Policy** — build the org-level ISP: sections, requirements, review cycle, approver
+6. **Consolidate** — review and prioritize domain policies, suggest merges (e.g., PS+AT, CP+IR, MP+PE, SR+SA)
+7. **Assign Owners** — assign the 20 NIST control families to domain policy owners, set priorities and deadlines
 
 **Phantom-owner safety net:** `prefillDemoOwners()` and `prefillDemoControlOwners(fam)` (in `js/program.js`) inject synthetic identities ("Alex Rivera", "Jordan Patel", etc.) for demos. Each entry point is now confirmation-gated, every demo record is tagged with `isDemoPlaceholder: true`, and `blockActionIfDemoPlaceholders()` (called from `cisoFinish`, `submitSSP`, `submitControlDesign`, policy submit, `submitAtoDecision`, `finalizeSarAndHandoff`) refuses to advance until placeholders are replaced. The legacy `prefillFakeOwners` / `prefillFakeControlOwners` names remain as `@deprecated` thin wrappers — do not call them in new code.
 

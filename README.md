@@ -30,10 +30,13 @@ The application guides teams through a full governance workflow:
 Zero-dependency, no-build static web app. UI and logic run client-side; the canonical program lives in Supabase (`programs.state` JSONB). Each signed-in browser also mirrors state to `localStorage` as an offline cache.
 
 ```
+index.html                  public landing page (links to app.html)
 app.html                    UI shell, sidebar, tab containers, cloud sign-in gate
-css/app.css                 all styles (single mobile breakpoint)
+css/landing.css             landing page styles
+css/app.css                 all app styles (single mobile breakpoint)
 js/cloud-config.js          Supabase connection settings
 js/cloud-auth.js            Sign-in, program load/sync, account menu
+js/entra-auth.js            Microsoft Entra ID (OAuth) sign-in support
 js/nist-control-text.js     verbatim NIST 800-53 control text lookup
 js/core.js                  STATE shape, defaults, persistence, audit/change log
 js/program.js               CISO setup wizard + demo snapshots
@@ -42,12 +45,16 @@ js/controls.js              Control Implementation wizard + control library
 js/assets.js                Assets & SSP wizard + asset libraries
 js/baseline-elevation.js    Baseline elevation triggers and review flow
 js/authorization.js         AO decision data + decision modal
+js/frameworks.js            Framework alignment tab (ISO 27001 / SOC 2 / HIPAA crosswalks)
+js/hub.js                   Command Center home tab
 js/reports.js               Reports & Dashboard, audit/change-log, review queues
 js/admin.js                 Users & roles, profile / account menu
 js/app.js                   App shell: tabs, snapshot modal, beforeunload
+scripts/check-all.js        syntax check across all JS modules (npm run check:js)
+tests/e2e/                  Playwright smoke tests (npm run test:e2e)
 ```
 
-`js/testing.js` exists as a stub for legacy snapshot/export references but is **not** loaded by `index.html`.
+`js/testing.js` exists as a stub for legacy snapshot/export references but is **not** loaded by `app.html`.
 
 Technical characteristics:
 

@@ -271,7 +271,6 @@
     body.setup-focus-mode #sidebar-program-section #nav-reports,
     body.setup-focus-mode #sidebar-program-section #sidebar-reports-list,
     body.setup-focus-mode #sidebar-program-section #nav-frameworks,
-    body.setup-focus-mode #sidebar-program-section #nav-poam,
     body.setup-focus-mode #sidebar-program-section #nav-users { display: none !important; }
     body.setup-focus-mode #sidebar-program-section .sidebar-section-label { display: none; }
     body.setup-focus-mode .profile-btn-wrap { opacity: 0.65; }
@@ -2575,11 +2574,6 @@
     }
     .hub-quick-card:hover { background: #f5f5f7; }
     .hub-quick-card span { font-size: 24px; }
-    .hub-poam-strip {
-      display: flex; justify-content: space-between; align-items: center;
-      padding: 12px 16px; margin-bottom: 20px; border-radius: 12px;
-      background: #fff7ed; border: 1px solid #fed7aa; cursor: pointer; font-size: 13px;
-    }
     .hub-link { color: var(--accent); font-weight: 600; }
     .hub-empty-actions { color: var(--text-muted); font-size: 14px; padding: 8px 0; }
     @media (max-width: 1024px) {
@@ -2959,28 +2953,6 @@
     }
     .profile-setup-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); }
     .profile-setup-actions { margin-top: 8px; }
-
-    /* POA&M */
-    .poam-stats { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 20px; align-items: stretch; }
-    .poam-stat-card { background: var(--white); border: 1px solid rgba(0,0,0,0.06); border-radius: 12px; padding: 16px 20px; min-width: 120px; }
-    .poam-stat-warn { border-color: #fecaca; background: #fef2f2; }
-    .poam-stat-num { font-size: 28px; font-weight: 800; }
-    .poam-stat-label { font-size: 12px; color: var(--text-muted); }
-    .poam-toolbar { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; align-items: center; }
-    .poam-filter-chip {
-      padding: 6px 14px; border-radius: 99px; border: 1px solid var(--border);
-      background: var(--white); font-size: 12px; font-weight: 600; cursor: pointer; text-transform: capitalize;
-    }
-    .poam-filter-chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
-    .poam-table-wrap { overflow-x: auto; background: var(--white); border-radius: 14px; border: 1px solid rgba(0,0,0,0.06); }
-    .poam-sev-pill { font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 6px; }
-    .poam-sev-critical { background: #fee2e2; color: #991b1b; }
-    .poam-sev-high { background: #ffedd5; color: #c2410c; }
-    .poam-sev-medium { background: #fef3c7; color: #92400e; }
-    .poam-sev-low { background: #f3f4f6; color: #4b5563; }
-    .poam-row-overdue { background: #fef2f2; }
-    .poam-inline-select, .poam-inline-date, .poam-inline-input { font-size: 12px !important; padding: 6px 8px !important; }
-    .poam-modal-card { background: var(--white); border-radius: 16px; padding: 28px; max-width: 520px; width: 100%; box-shadow: 0 24px 80px rgba(0,0,0,0.2); }
 
     /* ============================================================
        MULTI-USER CLOUD SIGN-IN GATE + ACCOUNT MENU
