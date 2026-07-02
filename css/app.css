@@ -1691,9 +1691,13 @@
       .sidebar {
         transform: translateX(-102%);
         transition: transform 0.22s ease;
+        /* Must stack above .mobile-nav-backdrop (1195) or the backdrop
+           swallows every tap on the open drawer. */
+        z-index: 1200;
       }
       body.mobile-nav-open .sidebar {
         transform: translateX(0);
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.25);
       }
       body.mobile-nav-open .mobile-nav-backdrop {
         display: block;
