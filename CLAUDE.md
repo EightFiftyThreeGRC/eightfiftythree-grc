@@ -56,7 +56,10 @@ js/authorization.js         — AO decision data + helpers + the openAtoDecision
                               renderAuthorizationStatusPanelHtml.
 js/frameworks.js            — Framework alignment tab: NIST crosswalks to voluntary
                               standards (ISO 27001, SOC 2) and compliance laws (HIPAA)
-js/hub.js                   — Command Center (post-setup home dashboard, 'home' tab)
+js/hub.js                   — Command Center (post-setup home dashboard, 'home' tab);
+                              program phase roadmap bar (renderProgramPhaseBar)
+js/risk.js                  — Risks & Issues tab (`risk`): triage queue, risk register,
+                              POA&M-compatible issues, sidebar inventories, SoD flows
 js/reports.js               — Reports & Dashboard, audit/change-log views, review queues
                               (composes renderAuthorizationStatusPanelHtml into the
                               dashboard so AOs can record decisions inline)
@@ -126,13 +129,21 @@ Assessment & Authorization
 - `atoDecisions` — `{ [boundaryId]: { decision, conditions[], expiresAt, residualRiskNarrative, signature, ... } }`
 - `_atoLibraryFilter` — UI filter object for the AO/authorization library views
 
+Risks & Issues (Phase 2 — `js/risk.js`, tab id `risk`)
+- `risks[]` — risk register (likelihood × impact, treatment, acceptance)
+- `issues[]` — POA&M-compatible remediation items (CA-5)
+- `riskTriageDismissals{}` — `{ 'h1:scope:ctrl': { by, at } }` dismissed triage keys
+- Legacy `poamItems[]` migrates to `issues[]` on load via `migratePoamItemsToIssues()`
+- UI flags: `_riskView`, `_riskFilter`, `_riskSearch`, `_issueFilter`, `_issueSearch`, `_sidebarRiskExpanded`, `_phase2SidebarFirstLive`, `_selectedRiskId`, `_selectedIssueId`
+- PM-4 selected in CISO wizard → issues sub-view labeled **Issues (POA&M)** + CSV export
+
 Users / auth
 - `users` — `[{ id, name, email, role, families[], controls[], note, isDemoPlaceholder? }]`
 - `currentUserId` — `null` = admin mode; string id = signed-in user
-- Role → tabs mapping: `ROLE_TABS` in `js/core.js` (~line 1075). Roles: `ciso`, `issm`, `control-owner`, `asset-owner`, `custodian`, `assessor`, `ao`, `approver`. As of 2026-04-27 the dedicated Control Assessment (`tester`) and Authorization (`ato`) tabs were removed. `ao` now sees `asset` + `reports` + `users`; `assessor` sees only `reports`. AO decisions are recorded via `openAtoDecisionModal()` which is launched from the Authorization status panel on the Reports dashboard.
+- Role → tabs mapping: `ROLE_TABS` in `js/core.js` (~line 1075). Roles: `ciso`, `issm`, `control-owner`, `asset-owner`, `custodian`, `assessor`, `ao`, `approver`. The `risk` tab is on most implementation/review roles (`ciso`, `issm`, `control-owner`, `asset-owner`, `assessor`, `ao`). As of 2026-04-27 the dedicated Control Assessment (`tester`) and Authorization (`ato`) tabs were removed. `ao` now sees `asset` + `risk` + `reports` + `users`; `assessor` sees `risk` + `reports`. AO decisions are recorded via `openAtoDecisionModal()` which is launched from the Authorization status panel on the Reports dashboard.
 
 Accountability
-- POA&M / Findings was removed from Phase 1 on 2026-06-27 (tab, `js/poam.js`, `poamItems`/`_poamFilter`/`_poamSearch` state, and all Command Center wiring deleted). Risk/issue identification is deferred to a future "Phase 2" redesign. The terms "POA&M" / "Plan of Action and Milestones" still appear in NIST control text (CA-5, PM-4) and ISP/policy boilerplate — that is intentional policy content, not the removed feature.
+- **Risks & Issues** (2026-07): replaced the interim Phase-1 POA&M tab (`js/poam.js` removed). See `js/risk.js` and `PHASE2_RISKS_ISSUES_SPEC.md`. POA&M terminology in ISP/control text (CA-5, PM-4) is intentional policy content.
 - `auditTrail` — `[{ t, cat, ref, msg }]`, semantic event log. Capped at 800 entries. Written via `addAuditEntry(cat, refId, msg)`.
 - `changeLog` — `[{ t, u, p, o, n }]` field-level change log written by `logFieldChange(path, oldVal, newVal)`. Capped at 2000 entries. Use this when typing into ISP fields, renaming roles, editing attestation text — anything where the audit trail's coarse "submitted/approved" categories are insufficient.
 
@@ -144,6 +155,7 @@ UI-only flags (transient)
 - `_selectedAssetId`, `_selectedProcessId`, `_selectedCtrl` — wizard selections
 - `_auditTrailUiMode`, `_auditTrailEventCatFilter`, `_changeLogUserFilter`, `_changeLogDateFilter`
 - `_reportsProgramReadinessHidden`, `_reportsMySummaryHidden`, `_reportsPhase1BannerHidden`, `_reportsMyView`
+- `_riskView`, `_sidebarRiskExpanded`, `_selectedRiskId`, `_selectedIssueId` — Risks & Issues UI
 
 ### Persistence Helpers
 
@@ -175,9 +187,12 @@ When rebuilding snapshots, every key in the live `state` object should have a co
 - **Command Center** (`home` tab) → post-setup dashboard with next actions, KPIs, quick links
 - **Policy & control design** → Domain policies · Control implementation
 - **Asset & process compliance** → Assets & SSP
-- **Program** → Program setup (CISO wizard) · Reports & Dashboard (with Published policies / Control requirements sub-items; also hosts the Authorization status panel + AO decision modal) · Framework alignment · Users & roles
+- **Program** → Program setup (CISO wizard) · Reports & Dashboard · Framework alignment · Users & roles
+- **Risks & issues** (after setup completes) → expandable sidebar inventories + **Risks & Issues** workspace
 
-`TAB_IDS` in `js/app.js` is `['home','ciso','policy','control','asset','frameworks','reports','users']`. Library views are reached from the Reports sub-items and workspace toggles rather than a dedicated sidebar section.
+Top of main content: **program phase roadmap** (Phase 1 governance · Phase 2 risks/issues · Phase 3 continuous monitoring [coming soon]) — `renderProgramPhaseBar()` in `js/hub.js`.
+
+`TAB_IDS` in `js/app.js` is `['home','ciso','policy','control','asset','frameworks','risk','reports','users']`. Library views are reached from the Reports sub-items and workspace toggles rather than a dedicated sidebar section.
 
 Top-right toolbar provides: Save indicator, Save now, Export JSON, Import JSON, Snapshots, Reset.
 Top-left of sidebar has the account button (`openProfileMenu()` → cloud sign-in gate or account menu with sign-out).
@@ -198,7 +213,8 @@ Top-left of sidebar has the account button (`openProfileMenu()` → cloud sign-i
 
 - **Domain Policies** (Policy Owner) — 4 steps: Review & Custodian → Control Selection → Policy Content → Control Owners → submit for CISO approval
 - **Control Implementation** (Control Owner) — 4 steps: My Controls → Design Controls → Asset Requirements → Review & Submit
-- **Assets & SSP** (Asset Owner) — 4 steps: Asset Inventory → Attestations → Interconnections → Review & Sign-Off. Submitting the SSP records an "SSP Reviewer" (NOT the formal AO decision).
+- **Assets & SSP** (Asset Owner) — 4 steps: Asset Inventory → Attestations → Interconnections → Review & Sign-Off. Submitting the SSP records an "SSP Reviewer" (NOT the formal AO decision). SSP review supports per-control comments and **Raise issue** (→ `openRaiseIssueFromSspReview` in `js/risk.js`).
+- **Risks & Issues** — Triage queue (H1–H5 computed suggestions from Phase-1 signals) · Risk register · Issues (POA&M-compatible when PM-4 selected). Sidebar inventories appear after `cisoComplete`. SoD: risk acceptance (program owner/AO), issue verification (≠ assignee).
 - **Authorization (AO Decision)** — no longer a workspace. AOs open the AO Decision modal (`openAtoDecisionModal(boundaryId)`) from the **Authorization status** panel on the Reports dashboard. Modal collects decision (ATO / IATT / Denial), conditions, expiry, residual-risk narrative, and digital signature; persists to `state.atoDecisions[boundaryId]`. Gated by `atoCanDecide(boundary)`. The earlier 4-step Control Assessment wizard and the dedicated Authorization tab were removed 2026-04-27 — the underlying state (`authBoundaries`, `assessmentPlans`, `atoDecisions`) is preserved so existing programs keep their data.
 - **Reports & Dashboard** — program health, compliance posture, per-user dashboards, audit trail panel, review queue panel, **Authorization status** panel (per-boundary ATO state + Record decision button)
 - **Users & roles** — user registry and role assignment

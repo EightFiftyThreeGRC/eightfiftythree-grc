@@ -22,6 +22,7 @@ The application guides teams through a full governance workflow:
 - Domain policy ownership and lifecycle tracking
 - Control owner assignment and control implementation status
 - Asset and process mapping for SSP-style attestations
+- Risks & Issues workspace (triage queue, risk register, POA&M-compatible issues when PM-4 is selected)
 - Authorizing-Official decision capture (ATO / IATT / Denial) with conditions, expiry, residual-risk narrative, and digital signature
 - Dashboard/reporting views, users/roles, snapshots, and JSON import/export
 
