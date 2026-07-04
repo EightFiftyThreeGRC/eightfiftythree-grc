@@ -137,8 +137,7 @@ function showRolePicker() {
 }
 
 function applyRoleView(userId) {
-  state._restrictedViewer = (userId === 'restricted');
-  state.currentUserId = (userId === 'admin' || userId === 'restricted') ? null : userId;
+  state.currentUserId = userId === 'admin' ? null : userId;
   const user = state.currentUserId ? state.users.find(function(u){ return u.id === state.currentUserId; }) : null;
 
   // Clear transient UI state to prevent stale selections from a different persona
@@ -160,14 +159,12 @@ function applyRoleView(userId) {
   if (!user) {
     state._currentPersonIds = null;
     if (typeof hideProfileSetupModal === 'function') hideProfileSetupModal();
-    // Restricted viewer (rostered email but unresolved profile): reports-only, no owner tabs.
-    var restrictedTabs = state._restrictedViewer ? ['home', 'reports'] : null;
     TAB_IDS.forEach(function(id) {
       const nav = document.getElementById('nav-' + id);
-      if (nav) nav.style.display = (!restrictedTabs || restrictedTabs.indexOf(id) !== -1) ? '' : 'none';
+      if (nav) nav.style.display = '';
     });
     const adminSection = document.getElementById('sidebar-program-section');
-    if (adminSection) adminSection.style.display = state._restrictedViewer ? 'none' : '';
+    if (adminSection) adminSection.style.display = '';
     if (typeof applySetupFocusMode === 'function') applySetupFocusMode();
     if (typeof renderSidebarBadges === 'function') renderSidebarBadges();
     if (typeof syncReportsLibrarySidebar === 'function') syncReportsLibrarySidebar(null);
@@ -198,7 +195,7 @@ function applyRoleView(userId) {
     if (nav) nav.style.display = visible.indexOf(id) !== -1 ? '' : 'none';
   });
   if (adminSection) {
-    var programTabIds = ['ciso', 'reports', 'frameworks', 'users'];
+    var programTabIds = ['ciso', 'reports', 'frameworks', 'risk', 'users'];
     var showProgramSection = programTabIds.some(function(id) { return visible.indexOf(id) !== -1; });
     adminSection.style.display = showProgramSection ? '' : 'none';
   }

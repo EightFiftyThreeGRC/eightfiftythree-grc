@@ -572,10 +572,7 @@ function renderAssetTypeLibrary() {
       ? '<div class="table-scroll"><table class="control-table"><thead><tr><th>Type</th><th style="width:90px;">Source</th><th style="width:200px;">Header Group</th><th style="width:110px;">Actions</th></tr></thead><tbody>'
         + activeTypeRows.map(function(row){
           var selected = row.group || 'Custom';
-          // Escape for a single-quoted JS string inside a double-quoted HTML
-          // attribute: backslash + single-quote (JS), then HTML-escape so a
-          // double-quote or angle bracket in a user-defined type name can't break out.
-          var safeType = escapeHTML(String(row.label || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'"));
+          var safeType = row.label.replace(/'/g,"\\'");
           var isElev = typeof isElevatedCustomAssetTypeName === 'function' && isElevatedCustomAssetTypeName(row.label);
           var sourceLabel = isElev ? 'ELEVATED' : row.source;
           var typeCell = '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
@@ -589,7 +586,7 @@ function renderAssetTypeLibrary() {
           return '<tr><td>' + typeCell + '</td>'
             + '<td style="font-size:11px;color:#334155;font-weight:700;text-transform:uppercase;">' + escapeHTML(sourceLabel) + '</td>'
             + '<td>' + groupCell + '</td>'
-            + '<td><button class="btn btn-sm" style="font-size:10px;padding:3px 8px;background:#fee2e2;color:#991b1b;border:1px solid #fecaca;" onclick="requestOrApplyAssetTypeChange(\'delete\',\'' + safeType + '\',\'' + escapeHTML(String(selected).replace(/\\/g, '\\\\').replace(/'/g, "\\'")) + '\')">Delete</button></td></tr>';
+            + '<td><button class="btn btn-sm" style="font-size:10px;padding:3px 8px;background:#fee2e2;color:#991b1b;border:1px solid #fecaca;" onclick="requestOrApplyAssetTypeChange(\'delete\',\'' + safeType + '\',\'' + selected.replace(/'/g,"\\'") + '\')">Delete</button></td></tr>';
         }).join('')
         + '</tbody></table></div>'
       : '<div style="font-size:12px;color:var(--text-muted);">No active asset types available.</div>')
@@ -789,15 +786,9 @@ function renderAssetLibrary() {
         + assets.map(function(a){
           var aidEsc = String(a.id || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
           var sign = getSspSignoffFromState(a.id);
+          var rawSt = sign.status || 'Not Started';
           var normSt = normalizeSspSignoffStatus(sign.status);
-          var libIsRet = typeof signoffIsReturnedForRevision === 'function' && signoffIsReturnedForRevision(sign);
-          var libControls = typeof getAssetSSPControls === 'function' ? getAssetSSPControls(a) : [];
-          var libAttests = (state.sspAttestations || {})[a.id] || {};
-          var libDone = libControls.filter(function(c){ return (libAttests[c.id] || {}).status; }).length;
-          var displaySt = normSt === 'Approved' ? 'Approved'
-            : libIsRet ? 'Returned for revision'
-            : normSt === 'Submitted' ? 'Submitted'
-            : libDone > 0 ? 'In Progress' : 'Not Started';
+          var displaySt = normSt || rawSt;
           var canViewPkg = normSt === 'Submitted' || normSt === 'Approved';
           var hasLog = canViewPkg || !!(sign.signedBy || '').trim() || !!(sign.signedDate || '').trim()
             || sign.aoReturnedAt || !!(sign.approvedBy || '').trim();
@@ -879,7 +870,7 @@ function renderAssetTab() {
   var assetId   = state._selectedAssetId;
   var procId    = state._selectedProcessId;
   var scopedIds = getCurrentPersonAssetIds();
-  if (scopedIds && assetId && !state._sspOwnerRevisionMode && scopedIds.indexOf(String(assetId)) === -1) {
+  if (scopedIds && assetId && scopedIds.indexOf(String(assetId)) === -1) {
     state._selectedAssetId = null;
     assetId = null;
   }
@@ -971,9 +962,8 @@ function renderAssetHome() {
     var signoff    = (state.sspSignoffs||{})[item.id]     || {};
     var completed  = controls.filter(function(c){ return attests[c.id] && attests[c.id].status; }).length;
     var pct        = controls.length ? Math.round(completed/controls.length*100) : 0;
-    var isReturned = typeof signoffIsReturnedForRevision === 'function' && signoffIsReturnedForRevision(signoff);
-    var status     = signoff.status==='Approved'?'Approved':isReturned?'Returned for revision':signoff.status==='Submitted'?'Submitted':completed>0?'In Progress':'Not Started';
-    var col        = status==='Approved'?'var(--green)':isReturned?'#c2410c':status==='Submitted'?'var(--blue)':status==='In Progress'?'var(--amber)':'var(--slate)';
+    var status     = signoff.status==='Approved'?'Approved':signoff.status==='Submitted'?'Submitted':completed>0?'In Progress':'Not Started';
+    var col        = status==='Approved'?'var(--green)':status==='Submitted'?'var(--blue)':status==='In Progress'?'var(--amber)':'var(--slate)';
     var enterFn    = isProc ? 'enterProcessSSP' : 'enterAssetSSP';
     var removeFn   = isProc ? 'removeProcess'   : 'removeAsset';
     var subtitle   = isProc
@@ -1062,7 +1052,7 @@ function getAssetSSPControls(asset) {
 // ─── ENTER / EXIT SSP WIZARD ─────────────────────────────────────────────────
 function enterAssetSSP(assetId) {
   if (state._sspReviewerReadOnly) state._sspReviewerReadOnly = false;
-  if (!state._sspOwnerRevisionMode && !userCanAccessAssetWorkspace()) {
+  if (!userCanAccessAssetWorkspace()) {
     showToast('You do not have access to edit this SSP in the asset-owner workspace.', true);
     return;
   }
@@ -1108,7 +1098,6 @@ function enterProcessSSP(procId) {
 
 function exitAssetWizard() {
   state._sspReviewerReadOnly = false;
-  state._sspOwnerRevisionMode = false;
   state._sspReadOnlyExitTab = null;
   if (typeof _restoreAssetWizardLayoutAfterReadOnly === 'function') _restoreAssetWizardLayoutAfterReadOnly();
   state._selectedAssetId   = null;
@@ -1440,9 +1429,7 @@ function getSspReviewSessionUser() {
 
 function sspSignoffMatchesSessionReviewer(sign) {
   if (!sign) return false;
-  // No currentUserId means the cloud program-owner session (a real actor), not an
-  // omniscient admin. Match the designated reviewer by session identity so the
-  // submitter cannot approve/return their own package (separation of duties).
+  if (!state.currentUserId) return true;
   var fakeRow = {
     type: 'ssp',
     status: 'Pending',
@@ -1540,184 +1527,40 @@ function buildSspOwnerReviewerCommentCalloutHtml(scopeId, controlId) {
     + _esc(note) + '</div>';
 }
 
-function getSspReviewNistRequirementText(ctrlId) {
-  if (typeof NIST_CONTROL_TEXT !== 'undefined' && NIST_CONTROL_TEXT[ctrlId]) {
-    return NIST_CONTROL_TEXT[ctrlId];
-  }
-  var c = (typeof CONTROLS !== 'undefined' && CONTROLS) ? CONTROLS.find(function(x) { return x.id === ctrlId; }) : null;
-  return c ? (c.n || 'No NIST requirement text available for this control.') : 'No NIST requirement text available for this control.';
-}
-
-function getSspReviewScopeLabel(item, isProc) {
-  if (!item) return 'General';
-  if (isProc) {
-    var procName = String(item.name || '').trim();
-    if (procName) return procName;
-    var cat = (typeof PROCESS_CATEGORIES !== 'undefined' ? PROCESS_CATEGORIES : []).find(function(c) {
-      return c.id === item.category;
-    });
-    if (cat && cat.label) return cat.label;
-    return 'General';
-  }
-  return String(item.type || '').trim() || 'General';
-}
-
-function buildSspReviewPolicyObjectivesHtml(ctrlId) {
-  if (typeof getControlPolicyReqs !== 'function') return '';
-  var policyReqs = getControlPolicyReqs(ctrlId);
-  if (!policyReqs.length) return '';
-  var blocks = policyReqs.map(function(r) {
-    return '<div style="border:1px solid #c7d2fe;background:#eef2ff;border-radius:6px;padding:8px 10px;margin-bottom:8px;">'
-      + '<div style="font-size:11px;font-weight:700;color:#4338ca;margin-bottom:3px;">' + _esc((r.reqId || 'Policy objective') + ' · ' + (r.policyTitle || r.fam || 'Policy')) + '</div>'
-      + '<div style="font-size:12px;color:#1f2937;line-height:1.5;">' + _esc(r.reqText || 'No objective text captured.') + '</div>'
-      + '</div>';
-  }).join('');
-  return '<div style="padding:12px 14px;background:#faf5ff;border-bottom:1px solid var(--border);">'
-    + '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:#6d28d9;margin-bottom:8px;">Policy requirements linked to this control</div>'
-    + blocks + '</div>';
-}
-
-function buildSspReviewControlDesignHtml(ctrlId) {
-  if (typeof normalizeControlDesignState === 'function') normalizeControlDesignState(ctrlId);
-  var cs = (state.controlStatus || {})[ctrlId] || {};
-  var designSource = cs.designSource || (cs.externalDocRef ? 'external' : 'inline');
-  var inner = '';
-  if (designSource === 'external') {
-    inner = '<div style="display:grid;gap:8px;font-size:12px;color:#334155;line-height:1.55;">'
-      + '<div><strong>External reference:</strong> ' + _esc((cs.externalDocTitle || '').trim() || '—') + '</div>'
-      + '<div><strong>Location:</strong> ' + _esc((cs.externalDocRef || '').trim() || '—') + '</div>'
-      + '<div><strong>Coverage summary:</strong> ' + _esc((cs.externalDocSummary || '').trim() || '—') + '</div>'
-      + '</div>';
-  } else if (typeof parseControlParts === 'function') {
-    var nistParts = parseControlParts(ctrlId) || {};
-    var partKeys = Object.keys(nistParts);
-    if (partKeys.length) {
-      inner = partKeys.map(function(letter) {
-        var partText = ((cs.designParts || {})[letter] || '').trim();
-        return '<div style="border:1px solid #dbeafe;border-radius:6px;padding:8px 10px;margin-bottom:8px;background:white;">'
-          + '<div style="font-size:11px;font-weight:700;color:#1d4ed8;margin-bottom:3px;">Design — Part ' + _esc(letter) + '</div>'
-          + '<div style="font-size:12px;color:#374151;line-height:1.55;white-space:pre-line;">'
-          + (partText ? _esc(partText) : '<span style="color:var(--text-muted);font-style:italic;">Not documented</span>')
-          + '</div></div>';
-      }).join('');
-    } else {
-      var narrative = (cs.approach || cs.narrative || '').trim();
-      inner = '<div style="font-size:12px;color:#334155;line-height:1.65;white-space:pre-line;">'
-        + (narrative ? _esc(narrative) : '<span style="color:var(--text-muted);font-style:italic;">No control owner design narrative documented.</span>')
-        + '</div>';
-    }
-  } else {
-    var nar = (cs.approach || cs.narrative || '').trim();
-    inner = '<div style="font-size:12px;color:#334155;line-height:1.65;white-space:pre-line;">'
-      + (nar ? _esc(nar) : '<span style="color:var(--text-muted);font-style:italic;">No control owner design narrative documented.</span>')
-      + '</div>';
-  }
-  var owner = (state.controlOwners || {})[ctrlId] || {};
-  var ownerLine = (owner.name || '').trim()
-    ? '<div style="font-size:11px;color:#64748b;margin-bottom:8px;">Control owner: <strong>' + _esc(owner.name) + '</strong>'
-      + (cs.status ? ' · Design status: <strong>' + _esc(cs.status) + '</strong>' : '') + '</div>'
-    : '';
-  return '<div style="padding:12px 14px;background:#eff6ff;border-bottom:1px solid var(--border);">'
-    + '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:#1d4ed8;margin-bottom:8px;">Control owner implementation design</div>'
-    + ownerLine + inner + '</div>';
-}
-
-function buildSspReviewScopeRequirementsHtml(ctrlId, scopeLabel, item, isProc) {
-  var scopeTypeLabel = isProc ? 'process' : 'asset type';
-  var g = typeof getControlOwnerGuidanceForScope === 'function'
-    ? getControlOwnerGuidanceForScope(ctrlId, scopeLabel)
-    : { actions: '', evidence: '', criteria: '', refs: '' };
-  var matchedScope = scopeLabel;
-  if (typeof normalizeControlDesignState === 'function') {
-    normalizeControlDesignState(ctrlId);
-    var reqs = ((state.controlStatus || {})[ctrlId] || {}).assetOwnerRequirements || [];
-    var exact = reqs.find(function(r) { return r.assetType === scopeLabel; });
-    var general = reqs.find(function(r) { return r.assetType === 'General'; });
-    if (exact) matchedScope = scopeLabel;
-    else if (general) matchedScope = 'General';
-    else if (reqs[0] && reqs[0].assetType) matchedScope = reqs[0].assetType;
-  }
-  var hasAny = (g.actions || '').trim() || (g.evidence || '').trim() || (g.criteria || '').trim() || (g.refs || '').trim();
-  var body = '';
-  if (!hasAny) {
-    body = '<div style="font-size:12px;color:var(--text-muted);font-style:italic;">No scope-specific requirements documented for this ' + scopeTypeLabel + ' in Control Wizard Step 3.</div>';
-  } else {
-    if ((g.actions || '').trim()) body += '<div style="margin-bottom:8px;font-size:12px;line-height:1.55;color:#14532d;"><strong>Required actions:</strong> ' + _esc(g.actions) + '</div>';
-    if ((g.evidence || '').trim()) body += '<div style="margin-bottom:8px;font-size:12px;line-height:1.55;color:#14532d;"><strong>Required evidence:</strong> ' + _esc(g.evidence) + '</div>';
-    if ((g.criteria || '').trim()) body += '<div style="margin-bottom:8px;font-size:12px;line-height:1.55;color:#14532d;"><strong>Acceptance criteria:</strong> ' + _esc(g.criteria) + '</div>';
-    if ((g.refs || '').trim()) body += '<div style="font-size:12px;line-height:1.55;color:#14532d;"><strong>Procedure / standard references:</strong> ' + _esc(g.refs) + '</div>';
-  }
-  var scopeDisplay = isProc
-    ? _esc(item.name || scopeLabel)
-    : _esc(scopeLabel);
-  var matchNote = matchedScope && matchedScope !== scopeLabel
-    ? ' · Requirement set: <strong>' + _esc(matchedScope) + '</strong>'
-    : '';
-  return '<div style="padding:12px 14px;background:#f0fdf4;border-bottom:1px solid var(--border);">'
-    + '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:#166534;margin-bottom:4px;">Requirements for this ' + scopeTypeLabel + '</div>'
-    + '<div style="font-size:11px;color:#15803d;margin-bottom:8px;">Scope: <strong>' + scopeDisplay + '</strong>' + matchNote + '</div>'
-    + body + '</div>';
-}
-
-function buildSspAttestationReviewBlocksHtml(controls, attests, sign, scopeId, canReview, item, isProc) {
+function buildSspAttestationReviewRowsHtml(controls, attests, sign, scopeId, canReview, isProcess) {
   var draft = canReview ? ensureSspReviewerDraft(scopeId) : null;
   var persisted = sign.reviewerControlComments || {};
   var sidJs = sspRevEscJs(String(scopeId));
-  var scopeLabel = getSspReviewScopeLabel(item, isProc);
 
   return controls.map(function(c) {
     var a = attests[c.id] || {};
     var status = a.status ? _esc(a.status) : '<span style="color:var(--text-muted);">—</span>';
     var expl = (a.explanation || '').trim();
     var evCell = formatSspReadOnlyEvidenceCell(a.evidenceLocation);
-    var nistText = getSspReviewNistRequirementText(c.id);
-
-    var commentBlock = '';
+    var mainRow = '<tr style="border-bottom:1px solid var(--border);">'
+      + '<td style="padding:8px 10px;font-family:monospace;font-size:12px;font-weight:700;">' + _esc(c.id) + '</td>'
+      + '<td style="padding:8px 10px;font-size:12px;">' + _esc(_controlShortName(c.id)) + '</td>'
+      + '<td style="padding:8px 10px;font-size:12px;">' + status + '</td>'
+      + '<td style="padding:8px 10px;font-size:11px;color:#475569;">' + (expl ? _esc(expl) : '—') + '</td>'
+      + '<td style="padding:8px 10px;font-size:11px;color:#475569;">' + evCell + '</td>'
+      + '</tr>';
+    var commentHtml = '';
     var persistedNote = String(persisted[c.id] || '').trim();
     if (canReview) {
       var draftVal = (draft.byControl && draft.byControl[c.id]) ? draft.byControl[c.id] : '';
-      commentBlock = '<div style="padding:12px 14px;background:#fafbff;border-top:1px solid #c7d2fe;">'
+      commentHtml = '<tr><td colspan="5" style="padding:4px 10px 14px 10px;background:#fafbff;border-bottom:1px solid var(--border);">'
         + '<label style="display:block;font-size:11px;font-weight:600;color:#4338ca;margin-bottom:4px;">Reviewer comment (optional)</label>'
         + '<textarea class="form-input" style="width:100%;font-size:12px;resize:vertical;min-height:52px;" rows="2"'
         + ' placeholder="Call out issues or questions for this control only…"'
         + ' oninput="setSspReviewerDraftControlComment(\'' + sidJs + '\',\'' + sspRevEscJs(c.id) + '\',this.value)">' + _esc(draftVal) + '</textarea>'
-        + '</div>';
+        + '<div style="margin-top:8px;"><button type="button" class="btn btn-secondary btn-sm" onclick="openRaiseIssueFromSspReview(\'' + sidJs + '\',\'' + sspRevEscJs(c.id) + '\',' + (isProcess ? 'true' : 'false') + ')">Raise issue</button></div>'
+        + '</td></tr>';
     } else if (persistedNote) {
-      commentBlock = '<div style="padding:12px 14px;background:#fffbeb;border-top:1px solid #fde68a;font-size:12px;color:#78350f;line-height:1.45;">'
-        + '<strong>Reviewer comment:</strong> ' + _esc(persistedNote) + '</div>';
+      commentHtml = '<tr><td colspan="5" style="padding:8px 10px 14px 42px;background:#fffbeb;border-bottom:1px solid #fde68a;font-size:12px;color:#78350f;line-height:1.45;">'
+        + '<strong>Reviewer comment:</strong> ' + _esc(persistedNote) + '</td></tr>';
     }
-
-    return '<div style="border:1px solid var(--border);border-radius:10px;margin-bottom:14px;overflow:hidden;background:white;">'
-      + '<div style="padding:10px 12px;background:#f1f5f9;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
-      + '<span style="font-family:monospace;font-size:12px;font-weight:700;color:var(--navy);">' + _esc(c.id) + '</span>'
-      + '<span style="font-size:13px;font-weight:600;color:var(--navy);">' + _esc(_controlShortName(c.id)) + '</span>'
-      + '</div>'
-      + '<div style="padding:12px 14px;background:#f8fafc;border-bottom:1px solid var(--border);">'
-      + '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:#64748b;margin-bottom:6px;">NIST SP 800-53 requirement</div>'
-      + '<div style="font-size:12px;color:#334155;line-height:1.65;white-space:pre-line;">' + _esc(nistText) + '</div>'
-      + '</div>'
-      + buildSspReviewPolicyObjectivesHtml(c.id)
-      + buildSspReviewControlDesignHtml(c.id)
-      + buildSspReviewScopeRequirementsHtml(c.id, scopeLabel, item, isProc)
-      + '<div style="padding:12px 14px;background:#fffbeb;border-bottom:1px solid #fde68a;">'
-      + '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:#92400e;margin-bottom:10px;">Asset / process owner attestation</div>'
-      + '<div style="display:grid;grid-template-columns:minmax(120px,160px) 1fr 1fr;gap:12px 16px;">'
-      + '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.35px;color:var(--text-muted);margin-bottom:4px;">Attestation status</div>'
-      + '<div style="font-size:12px;">' + status + '</div></div>'
-      + '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.35px;color:var(--text-muted);margin-bottom:4px;">Owner explanation</div>'
-      + '<div style="font-size:12px;color:#475569;line-height:1.5;">' + (expl ? _esc(expl) : '<span style="color:var(--text-muted);">—</span>') + '</div></div>'
-      + '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.35px;color:var(--text-muted);margin-bottom:4px;">Evidence location</div>'
-      + '<div style="font-size:12px;color:#475569;line-height:1.5;">' + evCell + '</div></div>'
-      + '</div>'
-      + '</div>'
-      + commentBlock
-      + '</div>';
+    return mainRow + commentHtml;
   }).join('');
-}
-
-/** @deprecated Use buildSspAttestationReviewBlocksHtml — kept for compatibility. */
-function buildSspAttestationReviewRowsHtml(controls, attests, sign, scopeId, canReview, item, isProc) {
-  return buildSspAttestationReviewBlocksHtml(controls, attests, sign, scopeId, canReview, item, isProc);
 }
 
 function buildSspReviewerDecisionPanelHtml(scopeId, isProc, canReview) {
@@ -1775,7 +1618,7 @@ function renderSspReadOnlyReviewInWizard() {
   var interHtml = buildSspInterconnectionsReadOnlyHtml(item.id);
   var canReview = state._sspReviewerReadOnly && sspReviewerCanActOnPackage(item.id);
 
-  var attBlocks = buildSspAttestationReviewBlocksHtml(controls, attests, sign, item.id, canReview, item, isProc);
+  var attRows = buildSspAttestationReviewRowsHtml(controls, attests, sign, item.id, canReview, isProc);
   var decisionPanel = buildSspReviewerDecisionPanelHtml(item.id, isProc, canReview);
 
   var signBlock = '<div style="background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:18px;">'
@@ -1808,9 +1651,14 @@ function renderSspReadOnlyReviewInWizard() {
     + step1Block
     + signBlock
     + returnBlock
-    + '<div style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:4px;">Control attestations</div>'
-    + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;line-height:1.45;">Each control shows the NIST requirement, linked policy objectives, control owner design, scope-specific requirements for this package, then the owner\'s attestation.</div>'
-    + '<div style="margin-bottom:22px;">' + (attBlocks || '<div style="padding:16px;color:var(--text-muted);border:1px solid var(--border);border-radius:10px;">No controls in scope.</div>') + '</div>'
+    + '<div style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:10px;">Control attestations</div>'
+    + '<div class="table-scroll" style="margin-bottom:22px;"><table class="control-table control-table--readonly" style="width:100%;border-collapse:collapse;"><thead><tr>'
+    + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:700;">Control</th>'
+    + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:700;">Requirement</th>'
+    + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:700;">Status</th>'
+    + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:700;">Explanation</th>'
+    + '<th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:700;">Evidence location</th>'
+    + '</tr></thead><tbody>' + (attRows || '<tr><td colspan="5" style="padding:16px;color:var(--text-muted);">No controls in scope.</td></tr>') + '</tbody></table></div>'
     + decisionPanel
     + '<div style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:10px;">Interconnections</div>'
     + interHtml
@@ -2738,7 +2586,7 @@ function normalizeSspSignoffStatus(st) {
 function signoffIsReturnedForRevision(rawSig) {
   if (!rawSig || !rawSig.aoReturnedAt) return false;
   var st = normalizeSspSignoffStatus(rawSig.status);
-  return st !== 'Approved';
+  return st !== 'Submitted' && st !== 'Approved';
 }
 
 function getSspSignoffFromState(scopeId) {
@@ -2747,157 +2595,6 @@ function getSspSignoffFromState(scopeId) {
   if (m[a]) return m[a];
   if (m[scopeId]) return m[scopeId];
   return {};
-}
-
-function getSspSessionIdentityTokens(user) {
-  var names = [];
-  var emails = [];
-  function addName(n) {
-    var v = String(n || '').trim().toLowerCase();
-    if (v && names.indexOf(v) === -1) names.push(v);
-  }
-  function addEmail(e) {
-    var v = typeof normalizeOwnerEmail === 'function'
-      ? normalizeOwnerEmail(e || '')
-      : String(e || '').trim().toLowerCase();
-    if (v && emails.indexOf(v) === -1) emails.push(v);
-  }
-  if (user) {
-    addName(user.name);
-    addEmail(user.email);
-  }
-  // Session-aware identity. getSessionActorName / getSessionEmailForApproval
-  // resolve to the program owner ONLY when the current session is the program
-  // owner — so a cloud program owner (currentUserId null) still matches their
-  // packages, without leaking the program owner's packages onto other users.
-  if (typeof getSessionActorName === 'function') addName(getSessionActorName(''));
-  if (typeof getSessionEmailForApproval === 'function') addEmail(getSessionEmailForApproval());
-  var personIds = (state._currentPersonIds && state._currentPersonIds.length)
-    ? state._currentPersonIds.slice()
-    : (user && user.id ? [user.id] : []);
-  personIds.forEach(function(pid) {
-    var rec = (state.users || []).find(function(u) { return u.id === pid; });
-    if (!rec) return;
-    addName(rec.name);
-    addEmail(rec.email);
-  });
-  return { names: names, emails: emails };
-}
-
-function sspPackageOwnedBySessionUser(scopeId, isProcess, user) {
-  var sid = String(scopeId);
-  var tokens = getSspSessionIdentityTokens(user);
-  var scopedIds = typeof getCurrentPersonAssetIds === 'function' ? getCurrentPersonAssetIds() : null;
-  if (scopedIds && scopedIds.indexOf(sid) !== -1) return true;
-  if (user && (user.assets || []).map(String).indexOf(sid) !== -1) return true;
-
-  if (isProcess) {
-    var proc = (state.processes || []).find(function(p) { return String(p.id) === sid; });
-    if (proc) {
-      var ownerName = String(proc.owner || '').trim().toLowerCase();
-      if (ownerName && tokens.names.indexOf(ownerName) !== -1) return true;
-    }
-  } else {
-    var asset = (state.assets || []).find(function(a) { return String(a.id) === sid; });
-    if (asset) {
-      var aOwner = String(asset.owner || '').trim().toLowerCase();
-      if (aOwner && tokens.names.indexOf(aOwner) !== -1) return true;
-      if (user && asset.ownerId && String(asset.ownerId) === String(user.id)) return true;
-    }
-  }
-
-  var sign = getSspSignoffFromState(sid);
-  var signedBy = String(sign.signedBy || '').trim().toLowerCase();
-  if (signedBy && tokens.names.indexOf(signedBy) !== -1) return true;
-  return false;
-}
-
-function getReturnedSspPackagesForUser(user) {
-  var sspLabel = state.privacyOverlay ? 'SPSP' : 'SSP';
-  var rows = [];
-  (state.assets || []).forEach(function(a) {
-    var sig = getSspSignoffFromState(a.id);
-    if (!signoffIsReturnedForRevision(sig)) return;
-    if (!sspPackageOwnedBySessionUser(a.id, false, user)) return;
-    rows.push({ scopeId: String(a.id), isProcess: false, name: a.name || 'Unnamed', sign: sig, sspLabel: sspLabel });
-  });
-  (state.processes || []).forEach(function(p) {
-    var sig = getSspSignoffFromState(p.id);
-    if (!signoffIsReturnedForRevision(sig)) return;
-    if (!sspPackageOwnedBySessionUser(p.id, true, user)) return;
-    rows.push({ scopeId: String(p.id), isProcess: true, name: p.name || 'Unnamed', sign: sig, sspLabel: sspLabel });
-  });
-  return rows;
-}
-
-/** Submitted SSP/SPSP packages this session owns that are awaiting a reviewer decision. */
-function getSubmittedSspPackagesForOwner(user) {
-  var sspLabel = state.privacyOverlay ? 'SPSP' : 'SSP';
-  var rows = [];
-  (state.assets || []).forEach(function(a) {
-    var sig = getSspSignoffFromState(a.id);
-    if (normalizeSspSignoffStatus(sig.status) !== 'Submitted') return;
-    if (!sspPackageOwnedBySessionUser(a.id, false, user)) return;
-    rows.push({ scopeId: String(a.id), isProcess: false, name: a.name || 'Unnamed', sign: sig, sspLabel: sspLabel });
-  });
-  (state.processes || []).forEach(function(p) {
-    var sig = getSspSignoffFromState(p.id);
-    if (normalizeSspSignoffStatus(sig.status) !== 'Submitted') return;
-    if (!sspPackageOwnedBySessionUser(p.id, true, user)) return;
-    rows.push({ scopeId: String(p.id), isProcess: true, name: p.name || 'Unnamed', sign: sig, sspLabel: sspLabel });
-  });
-  return rows;
-}
-
-function openReturnedSspForRevision(scopeId, isProcess) {
-  var sid = String(scopeId);
-  var user = state.currentUserId ? (state.users || []).find(function(u) { return u.id === state.currentUserId; }) : null;
-  if (!sspPackageOwnedBySessionUser(sid, !!isProcess, user)) {
-    showToast('This returned package is not assigned to your profile.', true);
-    return;
-  }
-  state._sspOwnerRevisionMode = true;
-  state._sspReviewerReadOnly = false;
-  state._sspReadOnlyExitTab = null;
-  state._assetLibraryMode = false;
-  state._assetTypeLibraryMode = false;
-  state._reportsLibraryView = null;
-  state._reportsLibraryPolicyFam = null;
-  if (isProcess) {
-    state._selectedProcessId = sid;
-    state._selectedAssetId = null;
-  } else {
-    state._selectedAssetId = sid;
-    state._selectedProcessId = null;
-  }
-  currentStep.asset = 1;
-  if (typeof showTab === 'function') showTab('asset');
-}
-
-function renderReturnedSspWorkCallout(user) {
-  if (typeof getReturnedSspPackagesForUser !== 'function') return '';
-  var rows = getReturnedSspPackagesForUser(user);
-  if (!rows.length) return '';
-  var sspLabel = rows[0].sspLabel || (state.privacyOverlay ? 'SPSP' : 'SSP');
-  var body = rows.map(function(r) {
-    var notes = String(r.sign.aoReturnNotes || '').trim();
-    var by = _esc(String(r.sign.aoReturnedBy || '').trim() || 'Reviewer');
-    var on = _esc(r.sign.aoReturnedAt || '');
-    var sidEsc = sspRevEscJs(r.scopeId);
-    var isProcJs = r.isProcess ? 'true' : 'false';
-    return '<div style="border-bottom:1px solid rgba(0,0,0,0.06);padding:12px 0;">'
-      + '<div style="font-weight:700;color:var(--navy);">' + _esc(r.name) + ' <span style="font-size:11px;font-weight:600;color:#c2410c;text-transform:uppercase;">' + (r.isProcess ? 'Process' : 'Asset') + ' · returned</span></div>'
-      + '<div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Returned by ' + by + (on ? ' · ' + on : '') + '</div>'
-      + '<div style="margin-top:8px;padding:10px 12px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;font-size:12px;color:#78350f;line-height:1.45;"><strong>Reviewer notes</strong> — '
-      + (notes ? _esc(notes) : '<span style="font-style:italic;color:var(--text-muted);">None provided.</span>') + '</div>'
-      + '<button type="button" class="btn btn-primary btn-sm" style="margin-top:10px;font-size:11px;" onclick="openReturnedSspForRevision(\'' + sidEsc + '\',' + isProcJs + ')">Open ' + _esc(sspLabel) + ' to revise →</button>'
-      + '</div>';
-  }).join('');
-  return '<div style="background:linear-gradient(135deg,#fffbeb,#fef3c7);border:1px solid #fcd34d;border-radius:12px;padding:18px 20px;margin-bottom:20px;max-width:920px;">'
-    + '<div style="font-size:14px;font-weight:800;color:#92400e;margin-bottom:4px;">' + _esc(sspLabel) + ' returned for your revision</div>'
-    + '<div style="font-size:12px;color:#b45309;margin-bottom:12px;line-height:1.45;">Your reviewer sent these packages back. Address the notes, then sign and submit again from Step 4.</div>'
-    + body
-    + '</div>';
 }
 
 /** True when a pending SSP queue row is assigned to this session user or roster match. */
@@ -2932,10 +2629,13 @@ function userMayReceiveSspReviews(user) {
 }
 
 function getSspReviewQueueItemsForUser(user) {
-  // Always scope to the designated reviewer — including the cloud program-owner
-  // session (user null), which sspQueueRowMatchesReviewer resolves via session
-  // identity. Returning all pending rows for a null user surfaced the submitter's
-  // own SSP in their queue and let them approve it.
+  if (!user) {
+    return (state.controlReviewQueue || []).filter(function(r) {
+      if (!r || r.type !== 'ssp') return false;
+      var st = String(r.status || 'Pending');
+      return st === 'Pending' || st === '';
+    });
+  }
   return (state.controlReviewQueue || []).filter(function(r) { return sspQueueRowMatchesReviewer(r, user); });
 }
 
@@ -3420,7 +3120,6 @@ function submitSSP() {
   }
   var revName = (prevSign.reviewerName || '').trim() || formatSspReviewerDisplay(prevSign);
   if (!confirm('Submit the SSP for "' + asset.name + '" signed by ' + signer + '?\n\nThis will send it to ' + revName + ' for review.')) return;
-  state._sspOwnerRevisionMode = false;
   state.sspSignoffs[asset.id] = Object.assign({}, prevSign, {
     signedBy: signer,
     signedDate: new Date().toISOString().slice(0,10),
@@ -3824,7 +3523,6 @@ function submitProcessSSP() {
   }
   var revProcName = (prevProcSign.reviewerName || '').trim() || formatSspReviewerDisplay(prevProcSign);
   if (!confirm('Submit the Process SSP for "' + proc.name + '" signed by ' + signer + '?\n\nThis will send it to ' + revProcName + ' for review.')) return;
-  state._sspOwnerRevisionMode = false;
   state.sspSignoffs[proc.id] = Object.assign({}, prevProcSign, {
     signedBy: signer,
     signedDate: new Date().toISOString().slice(0,10),
@@ -3885,7 +3583,3 @@ window.sspReviewerCanActOnPackage = sspReviewerCanActOnPackage;
 window.collectSspReviewerCommentsFromDraft = collectSspReviewerCommentsFromDraft;
 window.buildSspReturnNotesFromDraft = buildSspReturnNotesFromDraft;
 window.clearSspReviewerDraft = clearSspReviewerDraft;
-window.getReturnedSspPackagesForUser = getReturnedSspPackagesForUser;
-window.getSubmittedSspPackagesForOwner = getSubmittedSspPackagesForOwner;
-window.openReturnedSspForRevision = openReturnedSspForRevision;
-window.renderReturnedSspWorkCallout = renderReturnedSspWorkCallout;

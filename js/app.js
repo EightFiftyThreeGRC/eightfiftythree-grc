@@ -316,7 +316,7 @@ function renderReviewCycleCard(policyKey, label) {
 
   return '<div style="border:1px solid ' + rs.border + ';border-radius:10px;padding:16px 18px;margin-bottom:16px;background:' + rs.bg + ';">'
     + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">'
-    + '<div style="font-size:13px;font-weight:700;color:var(--navy);display:flex;align-items:center;">' + reviewStatusDot(policyKey) + ' Policy Review Status — ' + escapeHTML(label || '') + '</div>'
+    + '<div style="font-size:13px;font-weight:700;color:var(--navy);display:flex;align-items:center;">' + reviewStatusDot(policyKey) + ' Policy Review Status — ' + label + '</div>'
     + '<span style="font-size:11px;font-weight:600;color:' + rs.color + ';background:white;border:1px solid ' + rs.border + ';padding:2px 10px;border-radius:12px;">' + rs.label + '</span>'
     + '</div>'
     + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">'
@@ -704,7 +704,7 @@ function resetApp() {
 // Tab IDs, showTab, role-view routing, CISO wizard shell
 // (step dispatch, toast, cisoFinish, sidebar badges).
 // ============================================================
-const TAB_IDS = ['home','ciso','policy','control','asset','frameworks','reports','users'];
+const TAB_IDS = ['home','ciso','policy','control','asset','frameworks','risk','reports','users'];
 try { window.TAB_IDS = TAB_IDS; } catch (e) {}
 
 
@@ -806,10 +806,6 @@ function goToDomainOwnersFromDashboard() {
 }
 
 function showTab(tabId) {
-  // Restricted viewers (rostered but unresolved profile) only get home + reports.
-  if (state._restrictedViewer && tabId !== 'home' && tabId !== 'reports') {
-    tabId = 'reports';
-  }
   if (tabId !== 'policy') {
     if (state._ispReviewView) state._ispReviewView = false;
     if (state._ispRevisionView) state._ispRevisionView = false;
@@ -821,11 +817,6 @@ function showTab(tabId) {
     state._selectedProcessId = null;
     if (typeof _restoreAssetWizardLayoutAfterReadOnly === 'function') _restoreAssetWizardLayoutAfterReadOnly();
   }
-  if (tabId !== 'asset' && state._sspOwnerRevisionMode) {
-    state._sspOwnerRevisionMode = false;
-    state._selectedAssetId = null;
-    state._selectedProcessId = null;
-  }
   if (state.currentUserId && state.users) {
     var cu = state.users.find(function(u) { return u.id === state.currentUserId; });
     if (cu) {
@@ -833,7 +824,7 @@ function showTab(tabId) {
       var allowLibraryTab =
         (tabId === 'policy' && (state._policyLibraryMode || state._policyDocView || !!state._policyDomain || state._ispReviewView || state._ispRevisionView)) ||
         (tabId === 'control' && state._controlLibraryMode) ||
-        (tabId === 'asset' && (state._assetTypeLibraryMode || state._assetLibraryMode || state._sspReviewerReadOnly || state._sspOwnerRevisionMode));
+        (tabId === 'asset' && (state._assetTypeLibraryMode || state._assetLibraryMode || state._sspReviewerReadOnly));
       if (vis.length && vis.indexOf(tabId) === -1 && !allowLibraryTab) {
         tabId = vis.indexOf('reports') !== -1 ? 'reports' : vis[0];
       }
@@ -872,11 +863,13 @@ function showTab(tabId) {
   if (tabId === 'control')  renderControlTab();
   if (tabId === 'asset')    renderAssetTab();
   if (tabId === 'frameworks') renderFrameworksTab();
+  if (tabId === 'risk')     renderRiskTab();
   if (tabId === 'reports')    renderReports();
   if (tabId === 'users')    renderUsersTab();
   updateNotificationBadges();
   enhanceKeyboardAccessibility();
   if (typeof applySetupFocusMode === 'function') applySetupFocusMode();
+  if (typeof renderProgramPhaseBar === 'function') renderProgramPhaseBar();
 }
 
 
@@ -1267,6 +1260,7 @@ document.addEventListener('keydown', function(ev) {
 function bootAfterStateReady() {
   try { renderSidebarBadges(); } catch (e) { console.warn('renderSidebarBadges:', e); }
   try { applySetupFocusMode(); } catch (e) { console.warn('applySetupFocusMode:', e); }
+  try { if (typeof renderProgramPhaseBar === 'function') renderProgramPhaseBar(); } catch (e) { console.warn('renderProgramPhaseBar:', e); }
   try { showTab('home'); } catch (e) { console.warn('showTab:', e); }
 }
 window.bootAfterStateReady = bootAfterStateReady;

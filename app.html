@@ -10,7 +10,7 @@
   <meta name="description" content="EightFiftyThree GRC — NIST SP 800-53 Rev. 5 program management">
   <title>EightFiftyThree GRC — Application</title>
 
-    <link rel="stylesheet" href="css/app.css?v=20260702a">
+    <link rel="stylesheet" href="css/app.css?v=20260704b">
 
 </head>
 <body>
@@ -99,6 +99,10 @@
     <div class="sidebar-item" onclick="showTab('frameworks')" id="nav-frameworks">
       <span class="icon">◇</span> Framework alignment
     </div>
+    <div class="sidebar-item" onclick="showTab('risk')" id="nav-risk">
+      <span class="icon">⚡</span> Risks &amp; Issues
+      <span class="sidebar-item-badge warn" id="badge-risk" style="display:none;"></span>
+    </div>
     <div class="sidebar-item" onclick="showTab('users')" id="nav-users">
       <span class="icon">👥</span> Users &amp; roles
     </div>
@@ -124,6 +128,8 @@
 
 <!-- MAIN CONTENT -->
 <main class="main" id="main-content" role="main" aria-label="Main content">
+
+  <div id="program-phase-bar" class="program-phase-bar" role="navigation" aria-label="Program lifecycle phases"></div>
 
   <!-- COMMAND CENTER -->
   <div class="tab-panel active" id="tab-home">
@@ -580,6 +586,15 @@
        state.atoDecisions) is preserved; AOs can still record decisions via
        openAtoDecisionModal() launched from the Reports dashboard. -->
 
+  <div class="tab-panel" id="tab-risk">
+    <div class="page-header">
+      <div class="role-badge">⚡ Phase 2 — Risks &amp; Issues</div>
+      <h1>Risks &amp; Issues</h1>
+      <p id="risk-page-subtitle">Phase 2 — triage program signals, maintain the risk register, and track remediation.</p>
+    </div>
+    <div style="padding:24px 36px;" id="risk-body"></div>
+  </div>
+
   <!-- ============================================================ -->
   <!-- FRAMEWORK ALIGNMENT TAB -->
   <!-- ============================================================ -->
@@ -718,17 +733,18 @@
 </div>
 
 <script src="js/nist-control-text.js?v=20260624"></script>
-<script src="js/core.js?v=20260701a"></script>
-<script src="js/policies.js?v=20260627b"></script>
-<script src="js/controls.js?v=20260627b"></script>
-    <script src="js/assets.js?v=20260627b"></script>
+<script src="js/core.js?v=20260704"></script>
+<script src="js/policies.js?v=20260625a"></script>
+<script src="js/controls.js?v=20260625e"></script>
+<script src="js/assets.js?v=20260704"></script>
 <script src="js/baseline-elevation.js?v=20260624"></script>
-<script src="js/authorization.js?v=20260627a"></script>
+<script src="js/authorization.js?v=20260624"></script>
 <script src="js/frameworks.js?v=20260624"></script>
 <script src="js/entra-auth.js?v=20260625a"></script>
-    <script src="js/hub.js?v=20260627c"></script>
-    <script src="js/reports.js?v=20260627a"></script>
-<script src="js/admin.js?v=20260627c"></script>
+<script src="js/risk.js?v=20260704"></script>
+<script src="js/hub.js?v=20260704b"></script>
+<script src="js/reports.js?v=20260704"></script>
+<script src="js/admin.js?v=20260704"></script>
 <!-- Cloud sign-in + cross-computer sync via Supabase. See MULTI_USER_SETUP.md. -->
 <script src="js/cloud-config.js?v=20260625a"></script>
 <script>
@@ -740,9 +756,9 @@
   if (gate) gate.style.display = 'flex';
 })();
 </script>
-<script src="js/cloud-auth.js?v=20260627a"></script>
-    <script src="js/program.js?v=20260627c"></script>
-<script src="js/app.js?v=20260627c"></script>
+<script src="js/cloud-auth.js?v=20260625a"></script>
+<script src="js/program.js?v=20260704"></script>
+<script src="js/app.js?v=20260704b"></script>
 
 </body>
 </html>

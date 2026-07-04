@@ -17,23 +17,10 @@ function hubJsStringLiteral(s) {
   return String(s || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 }
 
-/** Command Center → open a returned SSP/SPSP for owner revision. */
-function hubOpenReturnedSsp(scopeId, isProcess) {
-  if (typeof openReturnedSspForRevision === 'function') openReturnedSspForRevision(scopeId, !!isProcess);
-  else showToast('Unable to open returned SSP package.', true);
-}
-
 /** Command Center → open a queued SSP read-only (same path as Reports queue Open). */
 function hubOpenQueuedSsp(scopeId, isProcess) {
-  if (typeof openSspReadOnlyFromQueue === 'function') {
-    openSspReadOnlyFromQueue(scopeId, !!isProcess, 'reports');
-    return;
-  }
-  if (typeof aoOpenQueuedSsp === 'function') {
-    aoOpenQueuedSsp(scopeId, !!isProcess);
-    return;
-  }
-  showToast('Unable to open SSP package.', true);
+  if (typeof aoOpenQueuedSsp === 'function') aoOpenQueuedSsp(scopeId, !!isProcess);
+  else showToast('Unable to open SSP package.', true);
 }
 
 /** Command Center → Reports → Program library page. */
@@ -97,6 +84,7 @@ function renderOnboardingHome() {
 
 function getNextActions() {
   var actions = [];
+  var today = new Date().toISOString().slice(0, 10);
 
   if (!state.cisoComplete) {
     var p = getSetupProgressSummary();
@@ -120,36 +108,17 @@ function getNextActions() {
     }
   });
 
-  var hubUser = getHubSessionUser();
-  if (typeof getReturnedSspPackagesForUser === 'function') {
-    getReturnedSspPackagesForUser(hubUser).slice(0, 5).forEach(function(r) {
-      var sidEsc = hubJsStringLiteral(String(r.scopeId || ''));
-      var notes = String((r.sign && r.sign.aoReturnNotes) || '').trim();
-      actions.push({
-        priority: 0,
-        icon: '↩',
-        label: 'Revise ' + (r.sspLabel || 'SSP') + ': ' + (r.name || 'Package'),
-        desc: notes ? ('Returned: ' + notes.slice(0, 80) + (notes.length > 80 ? '\u2026' : '')) : 'Returned by reviewer — update and resubmit.',
-        action: "hubOpenReturnedSsp('" + sidEsc + "'," + (r.isProcess ? 'true' : 'false') + ")"
-      });
-    });
-  }
+  var hubUser = typeof getHubCurrentUser === 'function' ? getHubCurrentUser() : null;
   if (typeof getSspReviewQueueItemsForUser === 'function') {
     getSspReviewQueueItemsForUser(hubUser).slice(0, 5).forEach(function(r) {
-      var sidEsc = hubJsStringLiteral(String(r.assetId || ''));
+      var sidJson = JSON.stringify(String(r.assetId || ''));
       var isProc = !!r.isProcessSsp;
-      if (!isProc) {
-        var sid = String(r.assetId || '');
-        var hasAsset = (state.assets || []).some(function(a) { return String(a.id) === sid; });
-        var hasProc = (state.processes || []).some(function(p) { return String(p.id) === sid; });
-        if (hasProc && !hasAsset) isProc = true;
-      }
       actions.push({
         priority: 1,
         icon: '📋',
         label: 'Review SSP: ' + (r.assetName || 'Package'),
         desc: 'Submitted by ' + (r.submittedBy || 'owner') + (r.date ? ' on ' + r.date : ''),
-        action: "hubOpenQueuedSsp('" + sidEsc + "'," + (isProc ? 'true' : 'false') + ")"
+        action: "showTab('reports');if(typeof aoOpenQueuedSsp==='function')aoOpenQueuedSsp(" + sidJson + ',' + (isProc ? 'true' : 'false') + ');'
       });
     });
   }
@@ -164,6 +133,10 @@ function getNextActions() {
       : "state._selectedCtrl='" + escId + "';showTab('control');goToStep('control',2);";
     actions.push({ priority: 3, icon: isReturn ? '↩' : '🔧', label: (isReturn ? 'Reassign control: ' : 'Review control: ') + r.controlId, desc: (r.status || 'Pending review'), action: action });
   });
+
+  if (typeof getRiskHubNextActions === 'function') {
+    getRiskHubNextActions().forEach(function(a) { actions.push(a); });
+  }
 
   if (typeof getISPStatus === 'function' && getISPStatus() === 'Under Review') {
     var ispTitle = ((state.infoSecPolicy && state.infoSecPolicy.title) ? String(state.infoSecPolicy.title).trim() : '')
@@ -255,18 +228,12 @@ function getNextActions() {
     });
   }
 
-  if (typeof getSubmittedSspPackagesForOwner === 'function') {
-    getSubmittedSspPackagesForOwner(hubUser).slice(0, 5).forEach(function(r) {
-      var reviewer = (r.sign && String(r.sign.reviewerName || '').trim()) || 'your reviewer';
-      actions.push({
-        priority: 4,
-        icon: '🖥️',
-        label: (r.sspLabel || 'SSP') + ' awaiting review: ' + (r.name || 'Package'),
-        desc: 'Submitted — awaiting ' + reviewer + '. View status in Assets & SSP.',
-        action: "showTab('asset')"
-      });
-    });
-  }
+  (state.assets || []).forEach(function(a) {
+    var signoff = (state.sspSignoffs || {})[a.id] || {};
+    if (signoff.status === 'Submitted') {
+      actions.push({ priority: 4, icon: '🖥️', label: 'SSP submitted: ' + a.name, desc: 'Review asset package on Reports.', action: "showTab('reports');" });
+    }
+  });
 
   actions.sort(function(a, b) { return a.priority - b.priority; });
   return actions.slice(0, 8);
@@ -278,7 +245,6 @@ function getHubSessionUser() {
 }
 
 function getHubVisibleTabIds() {
-  if (state._restrictedViewer) return ['home', 'reports'];
   var user = getHubSessionUser();
   if (!user) return typeof TAB_IDS !== 'undefined' ? TAB_IDS.slice() : ['home', 'reports'];
   return typeof getPersonVisibleTabIds === 'function' ? getPersonVisibleTabIds(user) : ['reports'];
@@ -362,6 +328,11 @@ function userHasFrameworkMapping() {
   return fw.length > 0 || laws.length > 0;
 }
 
+function getScopedRiskIssueOpenCount(user) {
+  if (typeof getScopedIssueOpenCount === 'function') return getScopedIssueOpenCount(user);
+  return typeof getCombinedOpenRiskIssueCount === 'function' ? getCombinedOpenRiskIssueCount() : 0;
+}
+
 function userHasAssetWorkspaceContent(user) {
   var tabs = getHubVisibleTabIds();
   if (tabs.indexOf('asset') === -1) return false;
@@ -386,16 +357,7 @@ function getHubWorkspaces() {
   var controlDraft = userHasControlDraftWork(user);
 
   if (publishedPolicies > 0 || policyDraft) {
-    var policyFn;
-    if (policyDraft && tabs.indexOf('policy') !== -1) {
-      policyFn = 'goToPoliciesHome()';
-    } else if (tabs.indexOf('policy') !== -1) {
-      policyFn = 'goToPolicyLibrary()';
-    } else if (typeof userHasReportsLibraryAccess === 'function' && userHasReportsLibraryAccess(user)) {
-      policyFn = "hubOpenReportsLibrary('policies')";
-    } else {
-      policyFn = 'goToPolicyLibrary()';
-    }
+    var policyFn = (policyDraft && tabs.indexOf('policy') !== -1) ? 'goToPoliciesHome()' : 'goToPolicyLibrary()';
     var policyDesc = policyDraft && tabs.indexOf('policy') !== -1
       ? (publishedPolicies > 0 ? 'Your drafts & approved catalog' : 'Domain policy drafts & ISP')
       : (publishedPolicies > 0 ? publishedPolicies + ' approved polic' + (publishedPolicies === 1 ? 'y' : 'ies') + ' in catalog' : 'Policy catalog');
@@ -403,16 +365,7 @@ function getHubWorkspaces() {
   }
 
   if (implementedControls > 0 || controlDraft) {
-    var ctrlFn;
-    if (controlDraft && tabs.indexOf('control') !== -1) {
-      ctrlFn = 'goToControlWorkspace()';
-    } else if (tabs.indexOf('control') !== -1) {
-      ctrlFn = 'goToControlLibrary()';
-    } else if (typeof userHasReportsLibraryAccess === 'function' && userHasReportsLibraryAccess(user)) {
-      ctrlFn = "hubOpenReportsLibrary('controls')";
-    } else {
-      ctrlFn = 'goToControlLibrary()';
-    }
+    var ctrlFn = (controlDraft && tabs.indexOf('control') !== -1) ? 'goToControlWorkspace()' : 'goToControlLibrary()';
     var ctrlDesc = controlDraft && tabs.indexOf('control') !== -1
       ? (implementedControls > 0 ? 'Draft designs & ' + implementedControls + ' live controls' : 'Control implementation drafts')
       : (implementedControls > 0 ? implementedControls + ' implemented control' + (implementedControls === 1 ? '' : 's') + ' in catalog' : 'Control catalog');
@@ -430,7 +383,7 @@ function getHubWorkspaces() {
         icon: '📚',
         label: 'Program library',
         desc: 'Published policies & control requirements',
-        fn: "hubOpenReportsLibrary('policies')",
+        fn: "goToReportsLibrary('policies')",
         group: 'program'
       });
     }
@@ -438,6 +391,12 @@ function getHubWorkspaces() {
 
   if (tabs.indexOf('frameworks') !== -1 && userHasFrameworkMapping()) {
     workspaces.push({ icon: '◇', label: 'Frameworks', desc: 'ISO / SOC 2 / CIS alignment', fn: "showTab('frameworks')", group: 'program' });
+  }
+
+  var riskOpen = getScopedRiskIssueOpenCount(user);
+  if (tabs.indexOf('risk') !== -1 && riskOpen > 0) {
+    var riskLabel = typeof hasPm4PoamControl === 'function' && hasPm4PoamControl() ? 'POA&M & risks' : 'Risks & issues';
+    workspaces.push({ icon: '⚡', label: 'Risks & Issues', desc: riskOpen + ' open ' + riskLabel, fn: "showTab('risk')", group: 'program' });
   }
 
   return workspaces;
@@ -458,6 +417,13 @@ function renderHubWorkspaceGroupHtml(title, items) {
 function shouldShowHubFrameworkStrip() {
   var tabs = getHubVisibleTabIds();
   return tabs.indexOf('frameworks') !== -1 && userHasFrameworkMapping();
+}
+
+function shouldShowHubRiskStrip() {
+  var tabs = getHubVisibleTabIds();
+  if (tabs.indexOf('risk') === -1) return false;
+  return (typeof getCombinedOpenRiskIssueCount === 'function' && getCombinedOpenRiskIssueCount() > 0)
+    || (typeof getTriagePendingCount === 'function' && getTriagePendingCount() > 0);
 }
 
 function updateCommandCenterPageHeader() {
@@ -522,7 +488,7 @@ function renderHomeTab() {
     + '<div class="hub-kpi"><div class="hub-kpi-val">' + implPct + '%</div><div class="hub-kpi-label">Controls implemented</div><div class="hub-kpi-sub">' + implemented + ' / ' + ctrlTotal + '</div></div>'
     + '<div class="hub-kpi"><div class="hub-kpi-val">' + ownerCount + '</div><div class="hub-kpi-label">Policy owners</div><div class="hub-kpi-sub">' + domainsAssigned + ' / ' + domainTotal + ' domains rostered</div></div>'
     + '<div class="hub-kpi"><div class="hub-kpi-val">' + (state.assets || []).length + '</div><div class="hub-kpi-label">Assets in inventory</div></div>'
-    + '<div class="hub-kpi"><div class="hub-kpi-val">' + countPublishedPolicyItems() + '</div><div class="hub-kpi-label">Policies approved</div></div>'
+    + '<div class="hub-kpi"><div class="hub-kpi-val">' + (typeof getCombinedOpenRiskIssueCount === 'function' ? getCombinedOpenRiskIssueCount() : 0) + '</div><div class="hub-kpi-label">Open risks &amp; issues</div></div>'
     + '</div>'
     + (shouldShowHubFrameworkStrip() && typeof renderFrameworkDashboardStripHtml === 'function' ? renderFrameworkDashboardStripHtml() : '')
     + '<div class="hub-lower-grid">'
@@ -531,9 +497,78 @@ function renderHomeTab() {
     + workspaceHtml
     + '</div></div>'
     + '</div>'
+    + (shouldShowHubRiskStrip() && typeof renderRiskSummaryHtml === 'function' ? renderRiskSummaryHtml() : '')
     + '</div>';
 }
 
-window.hubOpenQueuedSsp = hubOpenQueuedSsp;
-window.hubOpenReturnedSsp = hubOpenReturnedSsp;
-window.hubOpenReportsLibrary = hubOpenReportsLibrary;
+function getActiveTabIdFromDom() {
+  var el = document.querySelector('.tab-panel.active');
+  return el && el.id ? el.id.replace(/^tab-/, '') : 'home';
+}
+
+/** Top-of-app program lifecycle roadmap (Phase 1–3). */
+function renderProgramPhaseBar() {
+  var bar = document.getElementById('program-phase-bar');
+  if (!bar) return;
+
+  var phase1Complete = !!state.cisoComplete;
+  var tab = getActiveTabIdFromDom();
+  var phase1Tabs = { ciso: 1, policy: 1, control: 1, asset: 1 };
+  var focusPhase = !phase1Complete ? 1 : (tab === 'risk' ? 2 : (phase1Tabs[tab] ? 1 : 2));
+
+  var phases = [
+    {
+      n: 1,
+      label: 'Phase 1',
+      title: 'Set up program governance',
+      desc: 'ISP, domain policies, controls, assets & SSP attestation',
+      state: phase1Complete ? 'complete' : 'active',
+      focused: focusPhase === 1,
+      action: "showTab('ciso')",
+      status: phase1Complete ? 'Complete' : 'In progress'
+    },
+    {
+      n: 2,
+      label: 'Phase 2',
+      title: 'Record issues & risks',
+      desc: 'Triage gaps, risk register, and POA&M-compatible remediation',
+      state: !phase1Complete ? 'locked' : 'active',
+      focused: focusPhase === 2 && phase1Complete,
+      action: "state._riskView='triage';showTab('risk');",
+      status: !phase1Complete ? 'After Phase 1' : 'Active'
+    },
+    {
+      n: 3,
+      label: 'Phase 3',
+      title: 'Continuous monitoring',
+      desc: 'In-production control testing, process audits, and high-risk area reviews',
+      state: 'planned',
+      focused: false,
+      action: '',
+      status: 'Coming soon'
+    }
+  ];
+
+  var html = '<div class="program-phase-track">';
+  phases.forEach(function(p, idx) {
+    if (idx > 0) {
+      html += '<div class="program-phase-connector' + (phases[idx - 1].state === 'complete' ? ' program-phase-connector--done' : '') + '" aria-hidden="true"></div>';
+    }
+    var cls = 'program-phase-step program-phase-step--' + p.state + (p.focused ? ' program-phase-step--active' : '');
+    var inner = '<span class="program-phase-eyebrow">' + escapeHTML(p.label) + '</span>'
+      + '<span class="program-phase-title">' + escapeHTML(p.title) + '</span>'
+      + '<span class="program-phase-desc">' + escapeHTML(p.desc) + '</span>'
+      + '<span class="program-phase-status">' + escapeHTML(p.status) + '</span>';
+    if (p.action && p.state !== 'locked' && p.state !== 'planned') {
+      html += '<button type="button" class="' + cls + '" onclick="' + p.action + '">' + inner + '</button>';
+    } else {
+      html += '<div class="' + cls + '" title="' + (p.state === 'planned' ? 'Planned: ongoing assessment and internal audit workflows' : 'Complete Phase 1 first') + '">' + inner + '</div>';
+    }
+  });
+  html += '</div>';
+  bar.innerHTML = html;
+}
+
+try {
+  window.renderProgramPhaseBar = renderProgramPhaseBar;
+} catch (e) {}

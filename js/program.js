@@ -829,9 +829,6 @@ function updateNotificationBadges() {
   if (typeof getSspReviewQueueItemsForUser === 'function') {
     reviewCount += getSspReviewQueueItemsForUser(user).length;
   }
-  if (typeof getReturnedSspPackagesForUser === 'function') {
-    reviewCount += getReturnedSspPackagesForUser(user).length;
-  }
   var queue = state.controlReviewQueue || [];
   if (role === 'issm' && user && user.families) {
     reviewCount += queue.filter(function(r) {
@@ -868,6 +865,9 @@ function updateNotificationBadges() {
   }
   setBadge('badge-asset', assetCount);
 
+  if (typeof getRiskOverdueBadgeCount === 'function') {
+    setBadge('badge-risk', getRiskOverdueBadgeCount());
+  }
 }
 
 function renderSidebarAssets() {
@@ -904,9 +904,7 @@ function renderSidebarAssets() {
     var attests = (state.sspAttestations||{})[a.id] || {};
     var controls = getAssetSSPControls(a);
     var done = controls.filter(function(c){ return (attests[c.id]||{}).status; }).length;
-    var isRet = typeof signoffIsReturnedForRevision === 'function' && signoffIsReturnedForRevision(signoff);
     var statusDot = signoff.status === 'Approved'  ? 'var(--green)'
-                  : isRet                          ? '#c2410c'
                   : signoff.status === 'Submitted' ? 'var(--accent)'
                   : done > 0                       ? '#f59e0b'
                   :                                  'var(--border)';
@@ -995,13 +993,6 @@ function userCanAccessAssetWorkspace() {
 }
 
 function openAssetWizardFromLibrary(assetId) {
-  var sig = typeof getSspSignoffFromState === 'function' ? getSspSignoffFromState(assetId) : ((state.sspSignoffs || {})[assetId] || {});
-  if (typeof signoffIsReturnedForRevision === 'function' && signoffIsReturnedForRevision(sig)) {
-    if (typeof openReturnedSspForRevision === 'function') {
-      openReturnedSspForRevision(assetId, false);
-      return;
-    }
-  }
   if (!userCanAccessAssetWorkspace()) {
     showToast('You do not have access to open the asset-owner SSP workspace for this system.', true);
     return;
@@ -1014,13 +1005,6 @@ function openAssetWizardFromLibrary(assetId) {
 
 /** Open a process SSP wizard from library / reports (no asset-owner-only gate). */
 function openProcessSspFromLibrary(procId) {
-  var sig = typeof getSspSignoffFromState === 'function' ? getSspSignoffFromState(procId) : ((state.sspSignoffs || {})[procId] || {});
-  if (typeof signoffIsReturnedForRevision === 'function' && signoffIsReturnedForRevision(sig)) {
-    if (typeof openReturnedSspForRevision === 'function') {
-      openReturnedSspForRevision(procId, true);
-      return;
-    }
-  }
   state._assetLibraryMode = false;
   state._assetTypeLibraryMode = false;
   showTab('asset');
@@ -1237,8 +1221,8 @@ function renderCISOStep2Baseline() {
       <div class="summary-kv"><span class="sk">Baseline:</span><span class="sv">${state.baseline==='L'?'Low Impact':state.baseline==='M'?'Moderate Impact':'High Impact'}</span></div>
       <div class="summary-kv"><span class="sk">Privacy Overlay:</span><span class="sv">${state.privacyOverlay?'Yes — PT (Privacy) family included':'No'}</span></div>
       <div class="summary-kv"><span class="sk">Total Controls in Scope:</span><span class="sv">${BASELINE_COUNTS[state.baseline] || 0} controls across ${getActiveFamilies().filter(f=>f!=='PM').length} families${Object.values(state.pmControls||{}).filter(Boolean).length ? ' + ' + Object.values(state.pmControls||{}).filter(Boolean).length + ' PM controls' : ''}</span></div>
-      <div class="summary-kv"><span class="sk">Organization:</span><span class="sv">${escapeHTML(state.orgName||'Not yet set')}</span></div>
-      <div class="summary-kv"><span class="sk">Program Owner:</span><span class="sv">${state.programOwner ? escapeHTML(state.programOwner) + ' — ' + escapeHTML(((state.programOwnerTitle || '').trim()) || getDefaultProgramOwnerTitle()) + (state.programOwnerEmail ? ' &lt;' + escapeHTML(state.programOwnerEmail) + '&gt;' : '') : 'Not yet assigned'}</span></div>
+      <div class="summary-kv"><span class="sk">Organization:</span><span class="sv">${state.orgName||'Not yet set'}</span></div>
+      <div class="summary-kv"><span class="sk">Program Owner:</span><span class="sv">${state.programOwner ? state.programOwner + ' — ' + (((state.programOwnerTitle || '').trim()) || getDefaultProgramOwnerTitle()) + (state.programOwnerEmail ? ' &lt;' + state.programOwnerEmail + '&gt;' : '') : 'Not yet assigned'}</span></div>
     </div>` : ''}
   `;
 }
