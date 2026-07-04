@@ -561,6 +561,8 @@ function cisoFinish() {
   if (typeof applySetupFocusMode === 'function') applySetupFocusMode();
   showTab('home');
   showToast('✅ Program setup complete! Command Center is your new home base.');
+  state._phase2SidebarFirstLive = true;
+  if (typeof renderSidebarRiskInventory === 'function') renderSidebarRiskInventory();
 }
 
 function toggleSidebarPoliciesList(forceOpen) {
@@ -775,6 +777,9 @@ function renderSidebarBadges() {
   setTimeout(updateNotificationBadges, 50);
   setTimeout(renderSidebarAssets, 60);
   setTimeout(function() {
+    if (typeof renderSidebarRiskInventory === 'function') renderSidebarRiskInventory();
+  }, 65);
+  setTimeout(function() {
     if (typeof enhanceKeyboardAccessibility === 'function') enhanceKeyboardAccessibility();
   }, 80);
 }
@@ -868,6 +873,7 @@ function updateNotificationBadges() {
   if (typeof getRiskOverdueBadgeCount === 'function') {
     setBadge('badge-risk', getRiskOverdueBadgeCount());
   }
+  if (typeof renderSidebarRiskInventory === 'function') renderSidebarRiskInventory();
 }
 
 function renderSidebarAssets() {

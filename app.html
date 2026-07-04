@@ -10,7 +10,7 @@
   <meta name="description" content="EightFiftyThree GRC — NIST SP 800-53 Rev. 5 program management">
   <title>EightFiftyThree GRC — Application</title>
 
-    <link rel="stylesheet" href="css/app.css?v=20260704b">
+    <link rel="stylesheet" href="css/app.css?v=20260704c">
 
 </head>
 <body>
@@ -99,13 +99,19 @@
     <div class="sidebar-item" onclick="showTab('frameworks')" id="nav-frameworks">
       <span class="icon">◇</span> Framework alignment
     </div>
-    <div class="sidebar-item" onclick="showTab('risk')" id="nav-risk">
-      <span class="icon">⚡</span> Risks &amp; Issues
-      <span class="sidebar-item-badge warn" id="badge-risk" style="display:none;"></span>
-    </div>
     <div class="sidebar-item" onclick="showTab('users')" id="nav-users">
       <span class="icon">👥</span> Users &amp; roles
     </div>
+  </div>
+
+  <div class="sidebar-section sidebar-advanced" id="sidebar-phase2-section" style="display:none;">
+    <div class="sidebar-section-label">Phase 2 — Risks &amp; issues</div>
+    <div class="sidebar-item sidebar-item--expandable" onclick="goToRiskWorkspace()" id="nav-risk">
+      <button type="button" class="sidebar-expand-btn" id="sidebar-risk-toggle" onclick="event.stopPropagation();toggleSidebarRiskList();" aria-expanded="false" aria-controls="sidebar-risk-list" title="Show inventories">▸</button>
+      <span class="icon">⚡</span> Risks &amp; Issues
+      <span class="sidebar-item-badge warn" id="badge-risk" style="display:none;"></span>
+    </div>
+    <div id="sidebar-risk-list" class="sidebar-sub-list sidebar-sub-list--collapsed"></div>
   </div>
 
   <div class="sidebar-section" style="margin-top:auto; border-bottom:none; padding:16px 18px;">
@@ -733,7 +739,7 @@
 </div>
 
 <script src="js/nist-control-text.js?v=20260624"></script>
-<script src="js/core.js?v=20260704"></script>
+<script src="js/core.js?v=20260704c"></script>
 <script src="js/policies.js?v=20260625a"></script>
 <script src="js/controls.js?v=20260625e"></script>
 <script src="js/assets.js?v=20260704"></script>
@@ -741,7 +747,7 @@
 <script src="js/authorization.js?v=20260624"></script>
 <script src="js/frameworks.js?v=20260624"></script>
 <script src="js/entra-auth.js?v=20260625a"></script>
-<script src="js/risk.js?v=20260704"></script>
+<script src="js/risk.js?v=20260704c"></script>
 <script src="js/hub.js?v=20260704b"></script>
 <script src="js/reports.js?v=20260704"></script>
 <script src="js/admin.js?v=20260704"></script>
@@ -757,7 +763,7 @@
 })();
 </script>
 <script src="js/cloud-auth.js?v=20260625a"></script>
-<script src="js/program.js?v=20260704"></script>
+<script src="js/program.js?v=20260704c"></script>
 <script src="js/app.js?v=20260704b"></script>
 
 </body>

@@ -378,8 +378,8 @@
     body.setup-focus-mode #sidebar-program-section #nav-reports,
     body.setup-focus-mode #sidebar-program-section #sidebar-reports-list,
     body.setup-focus-mode #sidebar-program-section #nav-frameworks,
-    body.setup-focus-mode #sidebar-program-section #nav-risk,
     body.setup-focus-mode #sidebar-program-section #nav-users { display: none !important; }
+    body.setup-focus-mode #sidebar-phase2-section { display: none !important; }
     body.setup-focus-mode #sidebar-program-section .sidebar-section-label { display: none; }
     body.setup-focus-mode .profile-btn-wrap { opacity: 0.65; }
     body.cloud-session-active.setup-focus-mode .profile-btn-wrap { opacity: 1; }
@@ -3086,6 +3086,7 @@
     .poam-sev-medium { background: #fef3c7; color: #92400e; }
     .poam-sev-low { background: #f3f4f6; color: #4b5563; }
     .poam-row-overdue { background: #fef2f2; }
+    .poam-row-selected { outline: 2px solid var(--teal); outline-offset: -2px; background: #f0fdfa; }
     .poam-inline-select, .poam-inline-date, .poam-inline-input { font-size: 12px !important; padding: 6px 8px !important; }
     .poam-modal-card { background: var(--white); border-radius: 16px; padding: 28px; max-width: 520px; width: 100%; box-shadow: 0 24px 80px rgba(0,0,0,0.2); }
 

@@ -1214,6 +1214,10 @@ const state = {
   _riskSearch: '',
   _issueFilter: 'open',
   _issueSearch: '',
+  _sidebarRiskExpanded: false,
+  _phase2SidebarFirstLive: false,
+  _selectedRiskId: null,
+  _selectedIssueId: null,
 };
 const STATE_DEFAULTS = JSON.parse(JSON.stringify(state));
 const STATE_ALLOWED_KEYS = Object.keys(STATE_DEFAULTS);
