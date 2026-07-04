@@ -284,8 +284,19 @@ When `privacyOverlay` is true, the ISP auto-injects tiered privacy requirements 
 - Avoid committing one-off prompt files or stale planning artifacts in repo root
 - Before publish, run syntax checks and a naming pass for branding consistency
 
+## Agent QA Regime ("QA the app")
+
+When the user asks to **"QA the app"** (or run tests / run the QA regime / test everything), act as the orchestrator defined in `AGENT_QA_PLAN.md`:
+
+1. Spawn one subagent per checklist in `tests/agents/` (00–05), passing the checklist file contents as the agent's prompt. Model per checklist header: haiku for 00, opus for 03, sonnet for the rest. Run 00/03/05 in parallel; run 01/02/04 serialized (they own the browser/local server).
+2. Agents report findings only — the orchestrator makes all code edits, then re-runs the affected agent.
+3. Finish with a fresh Agent 6 (`tests/agents/06-verifier.md`) reviewing the run's full diff. Green = all agents PASS + verifier approves.
+4. Write the scorecard to `tests/agents/LAST_RUN.md` (overwrite each run; per-agent PASS/FAIL + open findings).
+5. Hard rules: never test against the live Supabase program with real sign-in (local server only); nothing destructive without a snapshot/backup first; "quick QA" = Agent 0 only.
+
 ## Reference Documents
 
+- `AGENT_QA_PLAN.md` — multi-agent QA regime (orchestrator flow, agent roster, model tiering); per-agent checklists in `tests/agents/`
 - `CONTROL_OWNER_SPEC.md` — combined compliance + UX specification for the Control Owner wizard (NIST SP 800-53A alignment, status taxonomy, data schema, attestation workflow, and UX patterns)
 - `PHASE2_RISKS_ISSUES_SPEC.md` — design spec for the Phase 2 Risks & Issues dimension (risk register + POA&M-compatible issues, triage hooks from Phase-1 signals, SoD, milestones)
 - `README.md` — public project overview and operator smoke-test runbook
