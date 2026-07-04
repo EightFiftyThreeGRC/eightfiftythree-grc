@@ -4,7 +4,7 @@
 
 A free, browser-based GRC program management tool built on NIST SP 800-53 Rev. 5. Built by Jacob Larsen as a personal portfolio project. Published open-source on GitHub Pages under MIT license. No monetization — this is a skill showcase.
 
-Live URL: `https://eightfiftythreegrc.github.io/eightfiftythree-grc/` (org repo **EightFiftyThreeGRC/eightfiftythree-grc**; Pages must use **GitHub Actions** with `.github/workflows/deploy-pages.yml`, or classic “Deploy from branch” `main` / `/`).
+Live URL: `https://eightfiftythreegrc.github.io/eightfiftythree-grc/` (org repo **EightFiftyThreeGRC/eightfiftythree-grc**; Pages deploys via classic “Deploy from branch” `main` / `/` ONLY — the redundant `deploy-pages.yml` Actions workflow was removed 2026-07-04 because it raced the branch deployer and caused failure emails. Do not re-add a Pages deploy workflow.).
 
 Repository source: this workspace/repo is the primary source intended for public GitHub upload.
 
@@ -78,7 +78,7 @@ When adding a function, place it in the file that owns the corresponding domain.
 
 ### Deployment
 
-GitHub Pages serves `index.html` (landing) + `app.html` (app shell) + `css/*.css` + every `js/*.js`. No build step. Push to `main` and Pages redeploys via `.github/workflows/deploy-pages.yml`.
+GitHub Pages serves `index.html` (landing) + `app.html` (app shell) + `css/*.css` + every `js/*.js`. No build step. Push to `main` and the built-in "pages build and deployment" workflow redeploys automatically (source: Deploy from branch, `main` / root). There is deliberately no custom deploy workflow.
 
 ### Vanilla JS Conventions
 
