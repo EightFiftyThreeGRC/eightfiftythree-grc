@@ -12,7 +12,7 @@
       --white: #ffffff;
       --border: #d2d2d7;
       --text: #1d1d1f;
-      --text-muted: #86868b;
+      --text-muted: #6e6e73; /* 5.1:1 on white (WCAG AA for body text) */
       --sidebar-w: 248px;
       --red: #dc2626;
       --red-light: #fee2e2;
@@ -1194,29 +1194,31 @@
       white-space: nowrap;
     }
 
+    /* Chip text uses darker tones than the base status vars so 12px/600 text
+       clears WCAG AA 4.5:1 on the light chip backgrounds. */
     .chip-green {
       background-color: var(--green-light);
-      color: var(--green);
+      color: #15803d; /* 4.6:1 on --green-light */
     }
 
     .chip-amber {
       background-color: var(--amber-light);
-      color: var(--amber);
+      color: #92400e; /* 6.4:1 on --amber-light */
     }
 
     .chip-red {
       background-color: var(--red-light);
-      color: var(--red);
+      color: #b91c1c; /* 5.3:1 on --red-light */
     }
 
     .chip-blue {
       background-color: var(--blue-light);
-      color: var(--blue);
+      color: #1d4ed8; /* 5.5:1 on --blue-light */
     }
 
     .chip-gray {
       background-color: var(--gray-light);
-      color: var(--gray);
+      color: #4b5563; /* 6.9:1 on --gray-light */
     }
 
     /* Table Scroll */
@@ -1677,6 +1679,19 @@
 
       .step-nav {
         display: none;
+      }
+
+      /* Un-clip scrollable containers so long tables print in full */
+      .table-scroll {
+        max-height: none !important;
+        overflow: visible !important;
+      }
+
+      /* Keep rows and cards intact across page breaks */
+      tr,
+      .evidence-card,
+      .fw-coverage-card {
+        page-break-inside: avoid;
       }
     }
 
@@ -2141,101 +2156,6 @@
       }
     }
 
-    /* Reusable wizard walkthrough video modal (one per page; src swapped at open time) */
-    #wizardVideoOverlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(11, 17, 32, 0.78);
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-      z-index: 3000;
-      display: none;
-      align-items: center;
-      justify-content: center;
-      padding: 20px;
-    }
-    #wizardVideoOverlay.is-visible {
-      display: flex;
-    }
-    .wizard-video-card {
-      position: relative;
-      width: min(860px, 100%);
-      background: var(--white);
-      border-radius: 16px;
-      box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.35), 0 0 0 1px rgba(15, 23, 42, 0.06);
-      padding: 28px 28px 24px;
-      border-top: 4px solid var(--teal);
-    }
-    .wizard-video-close {
-      position: absolute;
-      top: 10px;
-      right: 12px;
-      width: 36px;
-      height: 36px;
-      border-radius: 8px;
-      border: 1px solid transparent;
-      background: transparent;
-      color: var(--text-muted);
-      font-size: 24px;
-      line-height: 1;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .wizard-video-close:hover,
-    .wizard-video-close:focus {
-      background: var(--bg);
-      color: var(--navy);
-      border-color: var(--border);
-      outline: none;
-    }
-    .wizard-video-title {
-      font-size: 20px;
-      font-weight: 800;
-      color: var(--navy);
-      line-height: 1.2;
-      margin: 0 36px 14px 0;
-    }
-    .wizard-video-frame {
-      border-radius: 10px;
-      overflow: hidden;
-      border: 1px solid var(--border);
-      background: #0b1120;
-      margin-bottom: 12px;
-    }
-    .wizard-video-frame video {
-      display: block;
-      width: 100%;
-      height: auto;
-      background: #0b1120;
-    }
-    .wizard-video-caption {
-      font-size: 13px;
-      line-height: 1.5;
-      color: var(--text-muted);
-      margin: 0;
-      font-style: italic;
-    }
-    .wizard-video-trigger {
-      flex-shrink: 0;
-      font-size: 13px;
-      font-weight: 600;
-      padding: 8px 14px;
-      border-radius: 8px;
-      white-space: nowrap;
-      background-color: #f0f9ff;
-      color: #0369a1;
-      border: 1px solid #bae6fd;
-      box-shadow: 0 1px 2px rgba(14, 165, 233, 0.08);
-    }
-    .wizard-video-trigger:hover,
-    .wizard-video-trigger:focus {
-      background-color: #e0f2fe;
-      border-color: var(--teal);
-      color: #075985;
-      outline: none;
-    }
     .page-header-row {
       display: flex;
       align-items: flex-start;
@@ -2254,12 +2174,6 @@
       margin: 0;
     }
     @media (max-width: 900px) {
-      .wizard-video-card {
-        padding: 22px 18px 18px;
-      }
-      .wizard-video-title {
-        font-size: 18px;
-      }
       .page-header-row {
         flex-direction: column;
         align-items: flex-start;
@@ -2446,7 +2360,7 @@
     .sp-setup-fields { display: flex; flex-direction: column; gap: 12px; }
     .sp-setup-actions { display: flex; gap: 8px; margin-top: 4px; }
     .sp-setup-off { font-size: 13px; color: var(--text-muted); }
-    .sp-evidence-badge { font-size: 10px; font-weight: 700; padding: 4px 10px; border-radius: 6px; background: #e8f4fd; color: #0078d4; }
+    .sp-evidence-badge { font-size: 10px; font-weight: 700; padding: 4px 10px; border-radius: 6px; background: #e8f4fd; color: #005a9e; /* 6.4:1 */ }
     .sp-evidence-link { display: inline-block; margin-top: 8px; font-size: 12px; font-weight: 600; color: #0078d4; text-decoration: none; }
     .sp-evidence-link:hover { text-decoration: underline; }
 
@@ -3318,3 +3232,4 @@
       background: #e5e9f0;
     }
     .cloud-gate-divider span { padding: 0 12px; }
+

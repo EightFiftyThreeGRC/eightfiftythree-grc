@@ -873,8 +873,13 @@ function showTab(tabId) {
 }
 
 
+/* Clickable-but-not-a-button elements that should be keyboard operable.
+   Keep this single list in sync between the tabindex retrofit and the
+   delegated Enter/Space handler below. */
+var _KEYBOARD_CLICKABLE_SELECTOR = '.sidebar-item, .step-item, .baseline-card, .privacy-toggle-card, .control-substep-item, .sidebar-sub-item';
+
 function enhanceKeyboardAccessibility() {
-  document.querySelectorAll('.sidebar-item, .step-item').forEach(function(el) {
+  document.querySelectorAll(_KEYBOARD_CLICKABLE_SELECTOR).forEach(function(el) {
     var tag = (el.tagName || '').toLowerCase();
     if (tag === 'button' || tag === 'a' || tag === 'input' || tag === 'select' || tag === 'textarea') return;
     if (!el.hasAttribute('tabindex')) el.setAttribute('tabindex', '0');
@@ -884,7 +889,7 @@ function enhanceKeyboardAccessibility() {
   document.addEventListener('keydown', function(ev) {
     if (ev.key !== 'Enter' && ev.key !== ' ') return;
     var t = ev.target;
-    if (!t || !t.matches || !t.matches('.sidebar-item, .step-item')) return;
+    if (!t || !t.matches || !t.matches(_KEYBOARD_CLICKABLE_SELECTOR)) return;
     ev.preventDefault();
     t.click();
   });
@@ -949,6 +954,8 @@ function goToStep(tabId, step) {
     if (typeof syncAssetSspStepNavLayout === 'function') syncAssetSspStepNavLayout(step);
     if (typeof syncAssetSspFooterNav === 'function') syncAssetSspFooterNav();
   }
+  // Step bodies re-render via innerHTML, so retrofit keyboard access each time.
+  if (typeof enhanceKeyboardAccessibility === 'function') enhanceKeyboardAccessibility();
 }
 
 
@@ -1023,6 +1030,10 @@ function getCurrentProgramCounts() {
 
 function applySnapshotFromDataString(dataStr) {
   var saved = JSON.parse(dataStr);
+  // Reset to defaults first so keys absent from the snapshot don't bleed through
+  // from the current program (restore must fully replace, per the confirm dialog).
+  // Safe: callers route through openSnapshotRestoreConfirm, which auto-backups first.
+  resetStateToDefaults();
   if (!applyLoadedState(saved)) throw new Error('apply');
   Object.keys(currentStep).forEach(function(k) { currentStep[k] = 1; });
   reapplySessionRoleView();
@@ -1200,59 +1211,29 @@ function applySetupFocusMode() {
   if (typeof applyPostSetupNav === 'function') applyPostSetupNav();
 }
 
-/* Reusable wizard walkthrough modal. The same #wizardVideoOverlay is used for every
-   wizard; the trigger button passes the mp4 path and modal title to openWizardVideo. */
-var _wizardVideoLastFocus = null;
-
-function openWizardVideo(src, title) {
-  var ov = document.getElementById('wizardVideoOverlay');
-  var v  = document.getElementById('wizardVideoEl');
-  var t  = document.getElementById('wizardVideoTitle');
-  if (!ov || !v) return;
-  try { _wizardVideoLastFocus = document.activeElement; } catch (e) {}
-  if (t && title) t.textContent = title;
-  try {
-    while (v.firstChild) v.removeChild(v.firstChild);
-    v.src = src;
-    v.currentTime = 0;
-    v.muted = false;
-  } catch (eS) {}
-  ov.classList.add('is-visible');
-  ov.removeAttribute('aria-hidden');
-  try { document.body.style.overflow = 'hidden'; } catch (e2) {}
-  setTimeout(function() {
-    try {
-      var btn = ov.querySelector('.wizard-video-close');
-      if (btn) btn.focus();
-    } catch (e3) {}
-    try { v.play(); } catch (e4) {}
-  }, 50);
-}
-
-function closeWizardVideo() {
-  var ov = document.getElementById('wizardVideoOverlay');
-  var v  = document.getElementById('wizardVideoEl');
-  if (v) {
-    try { v.pause(); } catch (eP) {}
-    try { v.currentTime = 0; } catch (eT) {}
-    try { v.muted = true; } catch (eM) {}
-    /* Drop the src so the browser stops downloading the file in the background. */
-    try { v.removeAttribute('src'); v.load(); } catch (eC) {}
-  }
-  if (ov) {
-    ov.classList.remove('is-visible');
-    ov.setAttribute('aria-hidden', 'true');
-  }
-  try { document.body.style.overflow = ''; } catch (e5) {}
-  setTimeout(function() {
-    try { if (_wizardVideoLastFocus && _wizardVideoLastFocus.focus) _wizardVideoLastFocus.focus(); } catch (e6) {}
-  }, 0);
-}
+/* Generic Escape-to-close for the app's dynamically created modal overlays.
+   Ordered innermost-first: confirm dialogs close before the modals beneath them.
+   Each entry uses the modal's own close function when one exists (so cleanup
+   like focus restore or state resets still runs), else removes the overlay. */
+var _ESC_CLOSABLE_MODALS = [
+  { id: 'snapshotRestoreConfirmOverlay', close: null },
+  { id: 'resetModalOverlay',             close: null },
+  { id: 'atoDecisionOverlay',            close: 'closeAtoDecisionModal' },
+  { id: 'riskModalOverlay',              close: null },
+  { id: 'snapshotModal',                 close: '_closeSnapModal' }
+];
 
 document.addEventListener('keydown', function(ev) {
   if (ev.key !== 'Escape') return;
-  var ov = document.getElementById('wizardVideoOverlay');
-  if (ov && ov.classList.contains('is-visible')) closeWizardVideo();
+  for (var i = 0; i < _ESC_CLOSABLE_MODALS.length; i++) {
+    var m = _ESC_CLOSABLE_MODALS[i];
+    var el = document.getElementById(m.id);
+    if (!el) continue;
+    var fn = m.close && window[m.close];
+    if (typeof fn === 'function') fn(); else el.remove();
+    ev.stopPropagation();
+    return; // close only the topmost open modal per keypress
+  }
 });
 
 // Render the app UI once `state` has been loaded from the shared backend.
@@ -1276,14 +1257,6 @@ function reapplySessionRoleView() {
 document.addEventListener('DOMContentLoaded', function() {
   // Auth-independent UI wiring.
   try { setupMobileNav(); } catch (e) { console.warn('setupMobileNav:', e); }
-  try {
-    var wvo = document.getElementById('wizardVideoOverlay');
-    if (wvo) {
-      wvo.addEventListener('click', function(ev) {
-        if (ev.target === wvo) closeWizardVideo();
-      });
-    }
-  } catch (eBd) { console.warn('wizardVideoOverlay backdrop wiring:', eBd); }
   window.addEventListener('beforeunload', function(ev) {
     if (!window.isDirty) return;
     try { saveToStorage(); } catch (e2) {}

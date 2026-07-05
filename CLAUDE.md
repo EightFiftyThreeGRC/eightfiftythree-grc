@@ -23,13 +23,14 @@ Zero-dependency, no-build static web application. UI and logic run client-side; 
 
 ### File Structure
 
-The original monolithic `js/app.js` was refactored in commit `c08deff` (2026-04-23) into per-domain modules. They are loaded in dependency order from `app.html`. Globals only — no modules, no bundler, no transpilation.
+The original monolithic `js/app.js` was refactored in commit `c08deff` (2026-04-23) into per-domain modules. Globals only — no modules, no bundler, no transpilation. Actual `<script>` load order in `app.html` (source of truth — check the tags, not this list): nist-control-text → core → policies → controls → assets → baseline-elevation → authorization → frameworks → entra-auth → risk → hub → reports → admin → cloud-config → cloud-auth → program → app. Script/CSS tags carry `?v=YYYYMMDD` cache-busters — bump them for any file you edit.
 
 ```
 index.html                  — public landing page (links to app.html)
 app.html                    — UI shell, sidebar, tab containers, cloud sign-in gate
 css/landing.css             — landing page styles
-css/app.css                 — all app styles (one @media (max-width:900px) breakpoint)
+css/app.css                 — all app styles (~12 media-query blocks: 900px primary,
+                              plus 768/600/480/1024px and @media print)
 js/cloud-config.js          — Supabase connection settings
 js/cloud-auth.js            — Sign-in, program load/sync, account menu
 js/entra-auth.js            — Microsoft Entra ID (Azure AD) sign-in via MSAL.js
@@ -140,7 +141,7 @@ Risks & Issues (Phase 2 — `js/risk.js`, tab id `risk`)
 Users / auth
 - `users` — `[{ id, name, email, role, families[], controls[], note, isDemoPlaceholder? }]`
 - `currentUserId` — `null` = admin mode; string id = signed-in user
-- Role → tabs mapping: `ROLE_TABS` in `js/core.js` (~line 1075). Roles: `ciso`, `issm`, `control-owner`, `asset-owner`, `custodian`, `assessor`, `ao`, `approver`. The `risk` tab is on most implementation/review roles (`ciso`, `issm`, `control-owner`, `asset-owner`, `assessor`, `ao`). As of 2026-04-27 the dedicated Control Assessment (`tester`) and Authorization (`ato`) tabs were removed. `ao` now sees `asset` + `risk` + `reports` + `users`; `assessor` sees `risk` + `reports`. AO decisions are recorded via `openAtoDecisionModal()` which is launched from the Authorization status panel on the Reports dashboard.
+- Role → tabs mapping: `ROLE_TABS` in `js/core.js` (~line 1075). Roles: `ciso`, `issm`, `control-owner`, `asset-owner`, `custodian`, `assessor`, `ao`, `approver`. Every role's list includes `home` (Command Center). The `risk` tab is on most implementation/review roles (`ciso`, `issm`, `control-owner`, `asset-owner`, `assessor`, `ao`). As of 2026-04-27 the dedicated Control Assessment (`tester`) and Authorization (`ato`) tabs were removed. `ao` now sees `home` + `asset` + `risk` + `reports` + `users`; `assessor` sees `home` + `risk` + `reports`. Admins can also define custom role slugs via `state.customProgramRoles[]` (resolved by `getRoleTabs()` in `js/app.js` using `tabsTemplate: 'assessor' | 'reports-only'`). AO decisions are recorded via `openAtoDecisionModal()` which is launched from the Authorization status panel on the Reports dashboard. Tab visibility is enforced in `showTab()` (redirects out-of-role tab ids), not just hidden nav.
 
 Accountability
 - **Risks & Issues** (2026-07): replaced the interim Phase-1 POA&M tab (`js/poam.js` removed). See `js/risk.js` and `PHASE2_RISKS_ISSUES_SPEC.md`. POA&M terminology in ISP/control text (CA-5, PM-4) is intentional policy content.
@@ -173,7 +174,7 @@ A one-time migration shim runs at script parse time (see `migrateLegacyStorageKe
 
 ### Built-in Demo Snapshots
 
-Defined near the bottom of `js/program.js`. XMPL Inc. snapshots at increasing maturity:
+Defined near the bottom of `js/core.js` (restore/load flow lives in `js/app.js`). XMPL Inc. snapshots at increasing maturity:
 
 1. `XMPL_SNAPSHOT` — Program setup level (baseline, CISO, PM controls, ISP drafted, users roster seeded)
 2. `XMPL_DOMAIN_SNAPSHOT` — Domain policies complete (owners, merges, control assignments)
@@ -207,7 +208,7 @@ Top-left of sidebar has the account button (`openProfileMenu()` → cloud sign-i
 6. **Consolidate** — review and prioritize domain policies, suggest merges (e.g., PS+AT, CP+IR, MP+PE, SR+SA)
 7. **Assign Owners** — assign the 20 NIST control families to domain policy owners, set priorities and deadlines
 
-**Phantom-owner safety net:** `prefillDemoOwners()` and `prefillDemoControlOwners(fam)` (in `js/program.js`) inject synthetic identities ("Alex Rivera", "Jordan Patel", etc.) for demos. Each entry point is now confirmation-gated, every demo record is tagged with `isDemoPlaceholder: true`, and `blockActionIfDemoPlaceholders()` (called from `cisoFinish`, `submitSSP`, `submitControlDesign`, policy submit, `submitAtoDecision`, `finalizeSarAndHandoff`) refuses to advance until placeholders are replaced. The legacy `prefillFakeOwners` / `prefillFakeControlOwners` names remain as `@deprecated` thin wrappers — do not call them in new code.
+**Phantom-owner safety net:** `prefillDemoOwners()` and `prefillDemoControlOwners(fam)` (in `js/program.js`) inject synthetic identities ("Alex Rivera", "Jordan Patel", etc.) for demos. Each entry point is now confirmation-gated, every demo record is tagged with `isDemoPlaceholder: true`, and `blockActionIfDemoPlaceholders()` (called from `cisoFinish`, `submitSSP`, `submitProcessSSP`, `submitControlDesign`, `confirmSubmitDomainPolicy`, `openAtoDecisionModal`, `submitAtoDecisionFromModal`) refuses to advance until placeholders are replaced. The legacy `prefillFakeOwners` / `prefillFakeControlOwners` names remain as `@deprecated` thin wrappers — do not call them in new code.
 
 ### Role-Based Workspaces
 

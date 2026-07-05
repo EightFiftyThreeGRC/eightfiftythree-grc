@@ -1135,9 +1135,12 @@ const state = {
   attestations: {},         // legacy — superseded by sspAttestations
   sspAttestations: {},      // { assetId|procId: { controlId: { status, explanation, date } } }
   sspSignoffs: {},          // { assetId|procId: { signedBy, signedDate, status, reviewerUserId, reviewerName, reviewerEmail, reviewerRole } }
+  sspInterconnections: {},  // { assetId|procId: [{ id, name, direction, dataTypes, agreement, ... }] } SSP interconnection records
   customAssetTypes: [],     // user-defined asset types added by control owners
   customAssetTypeGroups: {}, // { 'OT Device':'Infrastructure', ... }
   customAssetTypeHeaders: [], // user-defined group headers shown in asset coverage
+  removedBuiltInAssetTypeKeys: [],   // built-in asset type keys the user has removed
+  removedBuiltInAssetTypeGroups: [], // built-in asset type group headers the user has removed
   cisoComplete: false,
   infoSecPolicy: null,
   policySelectedControls: null,  // { 'AC': ['AC-1', 'AC-2', ...] }
@@ -1175,6 +1178,7 @@ const state = {
   controlDeadlines: {},          // { 'AC-1': 'YYYY-MM-DD' } implementation deadline per control
   controlWorkflowState: {},      // { 'AC-1': 'draft'|'in-progress'|'awaiting-review'|'approved' }
   controlReviewQueue: [],        // [{ controlId, owner, status, submittedAt }] pending reviews
+  controlDesignSubmission: null, // { submittedAt, submitterName, designedCount, totalCount, notes } last design submission
   assetMappings: {},             // { 'AC-1': ['asset-1', 'asset-2'] } which assets a control affects
   policyVersions: {},            // { 'AC': [{ version:'1.0', approvedAt:'2026-02-01', approved:true }, ...] }
   policyAcknowledgments: {},     // { 'AC': { 'user-1': '2026-03-15', 'user-2': null } }
@@ -1218,6 +1222,30 @@ const state = {
   _phase2SidebarFirstLive: false,
   _selectedRiskId: null,
   _selectedIssueId: null,
+
+  // Transient UI flags previously written ad-hoc across modules; declared here so
+  // resetStateToDefaults() clears them and STATE_ALLOWED_KEYS stays the single
+  // source of truth for the state shape (2026-07 QA follow-up).
+  _controlDesignReviewOverrides: {}, // per-control review decision overrides (controls.js)
+  _controlSubmitSelection: {},       // checked controls on the design-submit step (controls.js)
+  _ctrlStep3Filter: '',              // '' = 'all'; asset-requirements filter (controls.js)
+  _currentPersonIds: null,           // ids matching the signed-in identity (admin.js/app.js)
+  _domainPolicyReqSyncSigByFam: {},  // last-synced requirement signatures per family (policies.js)
+  _issueModalScopeId: '',            // Raise-issue modal prefill (risk.js)
+  _issueModalSource: '',             // Raise-issue modal prefill (risk.js)
+  _issueModalSourceKey: '',          // Raise-issue modal prefill (risk.js)
+  _newUserRolePreset: '',            // role preselected when opening Add User (admin.js)
+  _reportsControlLibFamily: '',      // Reports control library family filter (reports.js)
+  _reportsControlLibSearch: '',      // Reports control library search (reports.js)
+  _reportsMyView: false,             // per-user "my view" toggle on Reports (reports.js)
+  _selectedAssetId: null,            // wizard selection (assets.js)
+  _selectedCtrl: null,               // wizard selection (controls.js)
+  _selectedProcessId: null,          // wizard selection (assets.js)
+  _sidebarAssetsExpanded: false,     // sidebar inventory expanders (hub.js/app.js)
+  _sidebarControlsExpanded: false,
+  _sidebarPoliciesExpanded: false,
+  _sidebarReportsExpanded: false,
+  _suggestedOwner: {},               // per-family suggested owner inputs (program.js)
 };
 const STATE_DEFAULTS = JSON.parse(JSON.stringify(state));
 const STATE_ALLOWED_KEYS = Object.keys(STATE_DEFAULTS);
@@ -1829,11 +1857,26 @@ function showUndoActionToast(msg) {
   }, 10000);
 }
 
+/* Recursion guard for imported JSON: legitimate program exports never nest more
+   than a few levels, so anything deeper is malformed or adversarial. */
+function exceedsMaxDepth(v, maxDepth) {
+  if (maxDepth < 0) return true;
+  if (v === null || typeof v !== 'object') return false;
+  var keys = Array.isArray(v) ? v : Object.keys(v).map(function(k) { return v[k]; });
+  for (var i = 0; i < keys.length; i++) {
+    if (exceedsMaxDepth(keys[i], maxDepth - 1)) return true;
+  }
+  return false;
+}
+
 function validateProgramShape(parsed) {
   var errors = [];
   var warnings = [];
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
     return { ok: false, errors: ['Root must be a plain object'], warnings: [] };
+  }
+  if (exceedsMaxDepth(parsed, 24)) {
+    return { ok: false, errors: ['Program data is nested too deeply — file appears malformed'], warnings: [] };
   }
   Object.keys(parsed).forEach(function(k) {
     if (STATE_ALLOWED_KEYS.indexOf(k) === -1) {

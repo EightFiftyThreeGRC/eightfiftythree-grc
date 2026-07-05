@@ -698,6 +698,7 @@ function renderISSMWorkspace(user) {
     + '<td style="padding:10px 14px;"><span style="font-family:monospace;font-size:11px;font-weight:700;background:#e0f2fe;color:#0369a1;padding:2px 7px;border-radius:4px;">ISP</span></td>'
     + '<td style="padding:10px 14px;font-weight:600;font-size:13px;color:var(--primary);">Information Security Policy</td>'
     + '<td style="padding:10px 14px;font-size:12px;color:var(--text-muted);">' + _esc(state.programOwner||'CISO') + '</td>'
+    + '<td style="padding:10px 14px;">' + policyControlLinkCellHtml('ISP', ispStatus) + '</td>'
     + '<td style="padding:10px 14px;">' + issmStatusChip(ispStatus, 'ISP') + '</td>'
     + '</tr>';
 
@@ -716,6 +717,7 @@ function renderISSMWorkspace(user) {
       + '<td style="padding:10px 14px;">' + badgeStr + (isMyDomain ? ' <span style="font-size:10px;color:#6366f1;font-weight:600;">★ yours</span>' : '') + '</td>'
       + '<td style="padding:10px 14px;font-weight:600;font-size:13px;color:' + (isMyDomain ? 'var(--primary)' : 'var(--navy)') + ';">' + _esc(title) + '</td>'
       + '<td style="padding:10px 14px;font-size:12px;color:var(--text-muted);">' + _esc(ownerName) + '</td>'
+      + '<td style="padding:10px 14px;">' + policyControlLinkCellHtml(mf, st) + '</td>'
       + '<td style="padding:10px 14px;">' + issmStatusChip(st, mf) + '</td>'
       + '</tr>';
   });
@@ -726,6 +728,7 @@ function renderISSMWorkspace(user) {
     + '<th style="padding:10px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);text-align:left;">Family</th>'
     + '<th style="padding:10px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);text-align:left;">Policy</th>'
     + '<th style="padding:10px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);text-align:left;">Owner</th>'
+    + '<th style="padding:10px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);text-align:left;">Controls</th>'
     + '<th style="padding:10px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);text-align:left;">Status</th>'
     + '</tr></thead>'
     + '<tbody id="tbod-${Math.random().toString(36).slice(2,8)}">' + libRows + '</tbody></table></div>';
@@ -912,7 +915,7 @@ function renderPolicyList() {
   const body = document.getElementById('policy-list-body');
   if (!body) return;
   if (!state.baseline) {
-    body.innerHTML = '<div class="empty-state"><div class="es-icon">\uD83C\uDFDB\uFE0F</div><div class="es-title">CISO Setup Required</div><p>The CISO must complete all 4 steps of program setup before policy owners can begin. Ask your CISO to finish baseline selection, PM controls, security policy, and role assignments.</p></div>';
+    body.innerHTML = '<div class="empty-state"><div class="es-icon">\uD83C\uDFDB\uFE0F</div><div class="es-title">CISO Setup Required</div><p>The CISO must complete all 7 steps of program setup before policy owners can begin. Ask your CISO to finish baseline selection, PM controls, security policy, and role assignments.</p></div>';
     return;
   }
 
@@ -1084,6 +1087,7 @@ function renderPolicyList() {
     + '<td style="font-weight:600;font-size:13px;color:var(--navy);">Information Security Policy</td>'
     + '<td style="font-size:12px;color:var(--text-muted);">Tier 1 — Organization</td>'
     + '<td style="font-size:12px;color:var(--text-muted);">' + _esc(state.programOwner || state.programOwnerEmail || '—') + '</td>'
+    + '<td>' + policyControlLinkCellHtml('ISP', ispStatus) + '</td>'
     + '<td><span style="background:' + ispStyle.bg + ';border:1px solid ' + ispStyle.border + ';color:' + ispStyle.text + ';padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;">' + _esc(ispStatus) + '</span></td>'
     + '</tr>';
 
@@ -1106,6 +1110,7 @@ function renderPolicyList() {
       + '<td style="font-weight:600;font-size:13px;color:var(--navy);">' + _esc(mergedTitle) + '</td>'
       + '<td style="font-size:12px;color:var(--text-muted);">Tier 2 — Domain</td>'
       + '<td style="font-size:12px;color:var(--text-muted);">' + _esc(owner) + '</td>'
+      + '<td>' + policyControlLinkCellHtml(fam, status) + '</td>'
       + '<td>' + statusCell + '</td>'
       + '</tr>';
   });
@@ -1120,6 +1125,7 @@ function renderPolicyList() {
     + '<th style="padding:10px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);text-align:left;">Policy Name</th>'
     + '<th style="padding:10px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);text-align:left;">Tier</th>'
     + '<th style="padding:10px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);text-align:left;">Owner</th>'
+    + '<th style="padding:10px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);text-align:left;">Controls</th>'
     + '<th style="padding:10px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);text-align:left;">Status</th>'
     + '</tr></thead>'
     + '<tbody id="tbod-${Math.random().toString(36).slice(2,8)}">' + libRows + '</tbody>'
@@ -1774,6 +1780,69 @@ function getPolicyAllFamilies(fam) {
   return [fam].concat(slaves);
 }
 
+// ── Policy ↔ control traceability ─────────────────────────────────────────────
+// Derived summary of the controls a domain policy governs (its Step-2 selection)
+// and how many of those are implemented. Returns null when no selection exists
+// yet (e.g. the policy hasn't been started).
+function _countImplementedControls(ids) {
+  var implemented = 0;
+  (ids || []).forEach(function(id) {
+    var st = ((state.controlStatus || {})[id] || {}).status;
+    if (st === 'Implemented' || st === 'Inherited') implemented++;
+  });
+  return implemented;
+}
+
+function getPolicyControlLinkSummary(fam) {
+  var sel = (state.policySelectedControls || {})[fam];
+  if (!sel || !Array.isArray(sel) || !sel.length) return null;
+  return { selected: sel.length, implemented: _countImplementedControls(sel) };
+}
+
+// ISP (Tier 1) governs the selected PM controls plus every XX-1 Policy &
+// Procedures control in the active baseline.
+function getIspControlLinkSummary() {
+  if (typeof getActiveControls !== 'function' || typeof isControlIspTier !== 'function') return null;
+  var ids = getActiveControls().filter(isControlIspTier).map(function(c) { return c.id; });
+  if (!ids.length) return null;
+  return { selected: ids.length, implemented: _countImplementedControls(ids) };
+}
+
+// Deep link: open the Control Library pre-filtered to every family the policy
+// covers (master + merged slaves). The library family filter accepts a
+// comma-separated list for this purpose.
+function openControlLibraryForPolicy(fam) {
+  var fams = typeof getPolicyAllFamilies === 'function' ? getPolicyAllFamilies(fam) : [fam];
+  state._controlLibraryFamilyFilter = fams.join(',');
+  state._controlLibraryStatusFilter = '';
+  state._controlLibraryAssetTypeFilter = '';
+  state._controlLibrarySearch = '';
+  state._controlLibraryColFilters = {};
+  if (typeof goToControlLibrary === 'function') goToControlLibrary();
+}
+
+// Compact clickable pill used in the Policy Library tables. Returns an em-dash
+// for policies that haven't been started (no curated control selection yet).
+function policyControlLinkCellHtml(fam, status) {
+  var link = null;
+  var clickable = false;
+  if (fam === 'ISP') {
+    if (status !== 'Not Started') link = getIspControlLinkSummary();
+  } else if (status !== 'Not Started') {
+    link = getPolicyControlLinkSummary(fam);
+    clickable = !!link;
+  }
+  if (!link) return '<span style="font-size:12px;color:var(--text-muted);">—</span>';
+  var pillStyle = 'display:inline-block;background:rgba(30,58,95,0.05);border:1px solid rgba(30,58,95,0.18);color:var(--navy);padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;font-family:inherit;';
+  var pill = clickable
+    ? '<button type="button" style="' + pillStyle + 'cursor:pointer;" title="Open the Control Library filtered to this policy’s control families" onclick="event.stopPropagation();openControlLibraryForPolicy(\'' + String(fam).replace(/'/g, "\\'") + '\')">' + link.selected + ' controls</button>'
+    : '<span style="' + pillStyle + '">' + link.selected + ' controls</span>';
+  var sub = link.implemented
+    ? '<div style="font-size:10px;color:var(--teal);font-weight:600;margin-top:3px;">' + link.implemented + ' implemented</div>'
+    : '<div style="font-size:10px;color:#94a3b8;margin-top:3px;">0 implemented</div>';
+  return pill + sub;
+}
+
 function renderPolicyWizardChrome(step) {
   const el = document.getElementById('policy-wizard-header');
   if (!el) return;
@@ -1879,7 +1948,7 @@ function renderPolicyStep1() {
   const helpEl = document.getElementById('policy-step-1-help');
   const body = document.getElementById('policy-step-1-body');
   if (!fam || !state.baseline) {
-    if (body) body.innerHTML = '<div class="empty-state"><div class="es-icon">\uD83C\uDFDB\uFE0F</div><div class="es-title">CISO Setup Required</div><p>The CISO must complete all 4 steps of program setup before policy owners can begin. Ask your CISO to finish baseline selection, PM controls, security policy, and role assignments.</p></div>';
+    if (body) body.innerHTML = '<div class="empty-state"><div class="es-icon">\uD83C\uDFDB\uFE0F</div><div class="es-title">CISO Setup Required</div><p>The CISO must complete all 7 steps of program setup before policy owners can begin. Ask your CISO to finish baseline selection, PM controls, security policy, and role assignments.</p></div>';
     return;
   }
   const owner = state.domainOwners[fam] || {};
@@ -2109,7 +2178,7 @@ function renderPolicyStep2() {
   const helpEl = document.getElementById('policy-step-2-help');
   const body = document.getElementById('policy-step-2-body');
   if (!state.baseline) {
-    if (body) body.innerHTML = '<div class="empty-state"><div class="es-icon">\uD83C\uDFDB\uFE0F</div><div class="es-title">CISO Setup Required</div><p>The CISO must complete all 4 setup steps first, including baseline selection and control assignment.</p></div>';
+    if (body) body.innerHTML = '<div class="empty-state"><div class="es-icon">\uD83C\uDFDB\uFE0F</div><div class="es-title">CISO Setup Required</div><p>The CISO must complete all 7 setup steps first, including baseline selection and control assignment.</p></div>';
     return;
   }
   const families = getActiveFamilies().filter(function(f){ return f !== 'PM'; });

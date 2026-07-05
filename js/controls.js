@@ -85,6 +85,8 @@ function renderControlLibraryView() {
   ASSET_TYPES.forEach(function(cat) { cat.types.forEach(function(t) { allTypeLabels.push(t.label); }); });
   (state.customAssetTypes || []).forEach(function(t) { if (t && !allTypeLabels.includes(t)) allTypeLabels.push(t); });
   var familyFilter = state._controlLibraryFamilyFilter || '';
+  // Comma-separated multi-family filter (set by openControlLibraryForPolicy for merged policies)
+  var famFilterList = familyFilter ? familyFilter.split(',') : null;
   var statusFilter = state._controlLibraryStatusFilter || '';
   var assetTypeFilter = state._controlLibraryAssetTypeFilter || '';
   var q = (state._controlLibrarySearch || '').toLowerCase();
@@ -104,7 +106,7 @@ function renderControlLibraryView() {
     var qMatch = !q || c.id.toLowerCase().includes(q) || c.n.toLowerCase().includes(q);
     var deselBaseline = cs.deselectDecision === 'Approved' && inActiveBaseline(c);
     if (statusFilter === '__deselected__' && !deselBaseline) return false;
-    if (!(!familyFilter || c.f === familyFilter) || !(!statusFilter || statusFilter === '__deselected__' || status === statusFilter) || !typeMatch || !qMatch) return false;
+    if (!(!famFilterList || famFilterList.indexOf(c.f) !== -1) || !(!statusFilter || statusFilter === '__deselected__' || status === statusFilter) || !typeMatch || !qMatch) return false;
     // Per-column text filters
     var owner = (state.controlOwners || {})[c.id] || {};
     if (cf.control && !c.id.toLowerCase().includes(cf.control.toLowerCase())) return false;
@@ -130,6 +132,7 @@ function renderControlLibraryView() {
     + '<div class="filter-bar" style="margin-bottom:12px;">'
     + '<input class="form-input" value="' + escapeHTML(state._controlLibrarySearch || '') + '" placeholder="Search control ID or name..." oninput="state._controlLibrarySearch=this.value;renderControlLibraryView()">'
     + '<select class="form-select" onchange="state._controlLibraryFamilyFilter=this.value;renderControlLibraryView()"><option value="">All families</option>'
+    + (familyFilter.indexOf(',') !== -1 ? '<option value="' + escapeHTML(familyFilter) + '" selected>' + escapeHTML(familyFilter.split(',').join(' + ')) + ' — policy scope</option>' : '')
     + families.map(function(f){ return '<option value="' + f + '"' + (familyFilter===f?' selected':'') + '>' + f + ' — ' + (FAMILIES[f]||f) + '</option>'; }).join('')
     + '</select>'
     + '<select class="form-select" onchange="state._controlLibraryStatusFilter=this.value;renderControlLibraryView()"><option value="">All statuses</option>'
@@ -783,6 +786,13 @@ function openControlLibraryReadOnly(ctrlId) {
   var reqs = cs.assetOwnerRequirements || [];
   var covered = getCtrlCoveredAssetTypes(ctrlId);
   var policyReqs = getControlPolicyReqs(ctrlId);
+  var roGovFam = typeof getPolicyFamilyKeyForControl === 'function' ? getPolicyFamilyKeyForControl(ctrl) : ctrl.f;
+  var roGovTitle = roGovFam === 'ISP'
+    ? 'Information Security Policy'
+    : ((typeof getPolicyMergedTitle === 'function' ? getPolicyMergedTitle(roGovFam) : roGovFam) + ' Policy');
+  var roGovStatus = roGovFam === 'ISP'
+    ? (typeof getISPStatus === 'function' ? getISPStatus() : (((state.policyStatus || {}).ISP || {}).status || 'Not Started'))
+    : (((state.policyStatus || {})[roGovFam] || {}).status || 'Not Started');
   var nistParts = parseControlParts(ctrlId) || {};
   var designSource = cs.designSource || (cs.externalDocRef ? 'external' : 'inline');
   var linkedAssetNames = (cs.linkedAssets || []).map(function(aid) {
@@ -847,7 +857,7 @@ function openControlLibraryReadOnly(ctrlId) {
     + '<div style="position:sticky;top:0;background:white;border-bottom:1px solid var(--border);padding:14px 18px;display:flex;align-items:center;justify-content:space-between;z-index:2;">'
     + '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);">Control Library · Read-only</div>'
     + '<div style="font-size:18px;font-weight:800;color:var(--navy);margin-top:2px;">' + escapeHTML(ctrl.id) + ' — ' + escapeHTML(ctrl.n) + '</div>'
-    + '<div style="font-size:12px;color:var(--text-muted);margin-top:3px;">Owner: ' + escapeHTML(owner.name || 'Unassigned') + ' · Status: ' + escapeHTML(cs.status || 'Not Started') + '</div></div>'
+    + '<div style="font-size:12px;color:var(--text-muted);margin-top:3px;">Owner: ' + escapeHTML(owner.name || 'Unassigned') + ' · Status: ' + escapeHTML(cs.status || 'Not Started') + ' · Governed by: ' + escapeHTML(roGovTitle) + ' (' + escapeHTML(roGovStatus) + ')</div></div>'
     + '<button onclick="document.getElementById(\'controlLibraryReadOnlyOverlay\').remove()" style="border:none;background:#f8fafc;color:#334155;font-size:16px;font-weight:700;border-radius:8px;padding:6px 10px;cursor:pointer;">✕</button></div>'
     + '<div style="padding:18px;">'
     + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">'
@@ -1277,7 +1287,7 @@ function renderControlStep2() {
   const body = document.getElementById('control-step-2-body');
   if (!body) return;
   if (!state.baseline) {
-    body.innerHTML = `<div class="empty-state"><div class="es-icon">🏛️</div><div class="es-title">CISO Setup Required</div></div>`;
+    body.innerHTML = `<div class="empty-state"><div class="es-icon">🏛️</div><div class="es-title">CISO Setup Required</div><p>The CISO must complete program setup to select controls and assign owners.</p><button class="btn btn-primary" onclick="goToProgramSetupOrDashboard()" style="margin-top:16px;">${state.cisoComplete ? 'Go to Dashboard →' : 'Go to CISO Setup →'}</button></div>`;
     return;
   }
   // Preserve scroll positions across re-renders so button clicks do not jump to top.
@@ -1699,7 +1709,7 @@ function renderBulkIspDesignPatternModalBody() {
     + '<div style="border:1px solid var(--border);border-radius:10px;max-height:360px;overflow:auto;">'
     + '  <table class="control-table" style="margin:0;">'
     + '    <thead><tr>'
-    + '      <th style="width:42px;"><input type="checkbox" ' + (allFilteredSelected ? 'checked' : '') + ' onchange="bulkIspDesignSelectFiltered(this.checked)" style="accent-color:var(--teal);"></th>'
+    + '      <th style="width:42px;"><input type="checkbox" aria-label="Select all filtered controls" ' + (allFilteredSelected ? 'checked' : '') + ' onchange="bulkIspDesignSelectFiltered(this.checked)" style="accent-color:var(--teal);"></th>'
     + '      <th style="width:95px;">Control</th>'
     + '      <th>Name</th>'
     + '      <th style="width:70px;">Family</th>'
@@ -1710,7 +1720,7 @@ function renderBulkIspDesignPatternModalBody() {
             var checked = !!st.selected[c.id];
             var designed = isControlDesigned(c.id);
             return '<tr>'
-              + '<td><input type="checkbox" ' + (checked ? 'checked' : '') + ' onchange="bulkIspDesignSetOne(\'' + c.id.replace(/'/g, "\\'") + '\',this.checked)" style="accent-color:var(--teal);"></td>'
+              + '<td><input type="checkbox" aria-label="Select ' + escapeHTML(c.id) + '" ' + (checked ? 'checked' : '') + ' onchange="bulkIspDesignSetOne(\'' + c.id.replace(/'/g, "\\'") + '\',this.checked)" style="accent-color:var(--teal);"></td>'
               + '<td><span class="control-id">' + escapeHTML(c.id) + '</span></td>'
               + '<td style="font-size:12px;color:var(--navy);">' + escapeHTML(c.n) + '</td>'
               + '<td><span class="family-badge">' + escapeHTML(c.f) + '</span></td>'
@@ -2082,7 +2092,7 @@ function renderBulkDesignSourceModalBody() {
     + '<div style="border:1px solid var(--border);border-radius:10px;max-height:360px;overflow:auto;">'
     + '  <table class="control-table" style="margin:0;">'
     + '    <thead><tr>'
-    + '      <th style="width:42px;"><input type="checkbox" ' + (allFilteredSelected ? 'checked' : '') + ' onchange="bulkDesignSourceSelectFiltered(this.checked)" style="accent-color:var(--teal);"></th>'
+    + '      <th style="width:42px;"><input type="checkbox" aria-label="Select all filtered controls" ' + (allFilteredSelected ? 'checked' : '') + ' onchange="bulkDesignSourceSelectFiltered(this.checked)" style="accent-color:var(--teal);"></th>'
     + '      <th style="width:95px;">Control</th>'
     + '      <th>Name</th>'
     + '      <th style="width:70px;">Family</th>'
@@ -2094,7 +2104,7 @@ function renderBulkDesignSourceModalBody() {
             var curSource = cs.designSource || (cs.externalDocRef ? 'external' : 'inline');
             var checked = !!st.selected[c.id];
             return '<tr>'
-              + '<td><input type="checkbox" ' + (checked ? 'checked' : '') + ' onchange="bulkDesignSourceSetOne(\'' + c.id.replace(/'/g, "\\'") + '\',this.checked)" style="accent-color:var(--teal);"></td>'
+              + '<td><input type="checkbox" aria-label="Select ' + escapeHTML(c.id) + '" ' + (checked ? 'checked' : '') + ' onchange="bulkDesignSourceSetOne(\'' + c.id.replace(/'/g, "\\'") + '\',this.checked)" style="accent-color:var(--teal);"></td>'
               + '<td><span class="control-id">' + escapeHTML(c.id) + '</span></td>'
               + '<td style="font-size:12px;color:var(--navy);">' + escapeHTML(c.n) + '</td>'
               + '<td><span class="family-badge">' + escapeHTML(c.f) + '</span></td>'
@@ -2511,6 +2521,21 @@ function renderControlDetailForm(ctrl) {
   const designChecklist = getDesignChecklist(ctrl);
   const cid = ctrl.id.replace(/'/g,"\\'");
 
+  // Governing policy (Tier 1 ISP for ISP-tier controls, else the owning domain policy)
+  const govFam = typeof getPolicyFamilyKeyForControl === 'function' ? getPolicyFamilyKeyForControl(ctrl) : ctrl.f;
+  const govIsIsp = govFam === 'ISP';
+  const govTitle = govIsIsp
+    ? 'Information Security Policy'
+    : ((typeof getPolicyMergedTitle === 'function' ? getPolicyMergedTitle(govFam) : govFam) + ' Policy');
+  const govStatus = govIsIsp
+    ? (typeof getISPStatus === 'function' ? getISPStatus() : (((state.policyStatus || {}).ISP || {}).status || 'Not Started'))
+    : (((state.policyStatus || {})[govFam] || {}).status || 'Not Started');
+  const govClickable = !govIsIsp && govStatus !== 'Not Started' && typeof openPolicyDoc === 'function';
+  const govChipStyle = 'display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.25);color:white;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;font-family:inherit;';
+  const govChip = govClickable
+    ? '<button type="button" style="' + govChipStyle + 'cursor:pointer;" title="Open this policy in the Policy Library" onclick="openPolicyDoc(\'' + String(govFam).replace(/'/g, "\\'") + '\')">' + escapeHTML(govTitle) + ' <span style="opacity:0.75;font-weight:500;">· ' + escapeHTML(govStatus) + '</span></button>'
+    : '<span style="' + govChipStyle + '">' + escapeHTML(govTitle) + ' <span style="opacity:0.75;font-weight:500;">· ' + escapeHTML(govStatus) + '</span></span>';
+
   return `
     <!-- ① Control header -->
     <div style="background:var(--navy);color:white;border-radius:10px;padding:18px 20px;margin-bottom:20px;">
@@ -2528,6 +2553,10 @@ function renderControlDetailForm(ctrl) {
           </div>
           <div style="font-size:15px;font-weight:600;margin-bottom:8px;">${ctrl.n}</div>
           <div>${pillsHTML(ctrl.bl)}</div>
+          <div style="margin-top:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <span style="font-size:10px;text-transform:uppercase;letter-spacing:0.5px;opacity:0.72;">Governed by</span>
+            ${govChip}
+          </div>
         </div>
         <div style="text-align:right;flex-shrink:0;">
           <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.5px;opacity:0.7;margin-bottom:4px;">Status</div>
@@ -3076,7 +3105,7 @@ function renderBulkEvidenceRowModalBody() {
     + '<div style="border:1px solid var(--border);border-radius:10px;max-height:360px;overflow:auto;">'
     + '  <table class="control-table" style="margin:0;">'
     + '    <thead><tr>'
-    + '      <th style="width:42px;"><input type="checkbox" ' + (allFilteredSelected ? 'checked' : '') + ' onchange="bulkEvidenceSelectFiltered(this.checked)" style="accent-color:var(--teal);"></th>'
+    + '      <th style="width:42px;"><input type="checkbox" aria-label="Select all filtered controls" ' + (allFilteredSelected ? 'checked' : '') + ' onchange="bulkEvidenceSelectFiltered(this.checked)" style="accent-color:var(--teal);"></th>'
     + '      <th style="width:95px;">Control</th>'
     + '      <th>Name</th>'
     + '      <th style="width:70px;">Family</th>'
@@ -3088,7 +3117,7 @@ function renderBulkEvidenceRowModalBody() {
             var checked = !!st.selected[c.id];
             var evCount = (cs.evidence || []).length;
             return '<tr>'
-              + '<td><input type="checkbox" ' + (checked ? 'checked' : '') + ' onchange="bulkEvidenceSetOne(\'' + c.id.replace(/'/g, "\\'") + '\',this.checked)" style="accent-color:var(--teal);"></td>'
+              + '<td><input type="checkbox" aria-label="Select ' + escapeHTML(c.id) + '" ' + (checked ? 'checked' : '') + ' onchange="bulkEvidenceSetOne(\'' + c.id.replace(/'/g, "\\'") + '\',this.checked)" style="accent-color:var(--teal);"></td>'
               + '<td><span class="control-id">' + escapeHTML(c.id) + '</span></td>'
               + '<td style="font-size:12px;color:var(--navy);">' + escapeHTML(c.n) + '</td>'
               + '<td><span class="family-badge">' + escapeHTML(c.f) + '</span></td>'
@@ -3316,7 +3345,7 @@ function renderBulkControlFieldModalBody() {
     + '<div style="border:1px solid var(--border);border-radius:10px;max-height:360px;overflow:auto;">'
     + '  <table class="control-table" style="margin:0;">'
     + '    <thead><tr>'
-    + '      <th style="width:42px;"><input type="checkbox" ' + (allFilteredSelected ? 'checked' : '') + ' onchange="bulkControlFieldSelectFiltered(this.checked)" style="accent-color:var(--teal);"></th>'
+    + '      <th style="width:42px;"><input type="checkbox" aria-label="Select all filtered controls" ' + (allFilteredSelected ? 'checked' : '') + ' onchange="bulkControlFieldSelectFiltered(this.checked)" style="accent-color:var(--teal);"></th>'
     + '      <th style="width:95px;">Control</th>'
     + '      <th>Name</th>'
     + '      <th style="width:70px;">Family</th>'
@@ -3325,7 +3354,7 @@ function renderBulkControlFieldModalBody() {
     +      (filtered.length ? filtered.map(function(c) {
             var checked = !!st.selected[c.id];
             return '<tr>'
-              + '<td><input type="checkbox" ' + (checked ? 'checked' : '') + ' onchange="bulkControlFieldSetOne(\'' + c.id.replace(/'/g, "\\'") + '\',this.checked)" style="accent-color:var(--teal);"></td>'
+              + '<td><input type="checkbox" aria-label="Select ' + escapeHTML(c.id) + '" ' + (checked ? 'checked' : '') + ' onchange="bulkControlFieldSetOne(\'' + c.id.replace(/'/g, "\\'") + '\',this.checked)" style="accent-color:var(--teal);"></td>'
               + '<td><span class="control-id">' + escapeHTML(c.id) + '</span></td>'
               + '<td style="font-size:12px;color:var(--navy);">' + escapeHTML(c.n) + '</td>'
               + '<td><span class="family-badge">' + escapeHTML(c.f) + '</span></td>'
@@ -3734,7 +3763,7 @@ function renderControlStep3() {
   const body = document.getElementById('control-step-3-body');
   if (!body) return;
   if (!state.baseline) {
-    body.innerHTML = `<div class="empty-state"><div class="es-icon">🏛️</div><div class="es-title">CISO Setup Required</div></div>`;
+    body.innerHTML = `<div class="empty-state"><div class="es-icon">🏛️</div><div class="es-title">CISO Setup Required</div><p>The CISO must complete program setup to select controls and assign owners.</p><button class="btn btn-primary" onclick="goToProgramSetupOrDashboard()" style="margin-top:16px;">${state.cisoComplete ? 'Go to Dashboard →' : 'Go to CISO Setup →'}</button></div>`;
     return;
   }
   const controls = getScopedControls().filter(c =>
@@ -4000,7 +4029,7 @@ function renderBulkAssetOwnerReqModalBody() {
     + '<div style="border:1px solid var(--border);border-radius:10px;max-height:360px;overflow:auto;">'
     + '  <table class="control-table" style="margin:0;">'
     + '    <thead><tr>'
-    + '      <th style="width:42px;"><input type="checkbox" ' + (allFilteredSelected ? 'checked' : '') + ' onchange="bulkAssetOwnerReqSelectFiltered(this.checked)" style="accent-color:var(--teal);"></th>'
+    + '      <th style="width:42px;"><input type="checkbox" aria-label="Select all filtered controls" ' + (allFilteredSelected ? 'checked' : '') + ' onchange="bulkAssetOwnerReqSelectFiltered(this.checked)" style="accent-color:var(--teal);"></th>'
     + '      <th style="width:95px;">Control</th>'
     + '      <th>Name</th>'
     + '      <th style="width:70px;">Family</th>'
@@ -4009,7 +4038,7 @@ function renderBulkAssetOwnerReqModalBody() {
     +      (filtered.length ? filtered.map(function(c) {
             var checked = !!st.selected[c.id];
             return '<tr>'
-              + '<td><input type="checkbox" ' + (checked ? 'checked' : '') + ' onchange="bulkAssetOwnerReqSetOne(\'' + c.id.replace(/'/g, "\\'") + '\',this.checked)" style="accent-color:var(--teal);"></td>'
+              + '<td><input type="checkbox" aria-label="Select ' + escapeHTML(c.id) + '" ' + (checked ? 'checked' : '') + ' onchange="bulkAssetOwnerReqSetOne(\'' + c.id.replace(/'/g, "\\'") + '\',this.checked)" style="accent-color:var(--teal);"></td>'
               + '<td><span class="control-id">' + escapeHTML(c.id) + '</span></td>'
               + '<td style="font-size:12px;color:var(--navy);">' + escapeHTML(c.n) + '</td>'
               + '<td><span class="family-badge">' + escapeHTML(c.f) + '</span></td>'
@@ -4382,7 +4411,7 @@ function renderControlStep4() {
   const body = document.getElementById('control-step-4-body');
   if (!body) return;
   if (!state.baseline) {
-    body.innerHTML = `<div class="empty-state"><div class="es-icon">🏛️</div><div class="es-title">CISO Setup Required</div></div>`;
+    body.innerHTML = `<div class="empty-state"><div class="es-icon">🏛️</div><div class="es-title">CISO Setup Required</div><p>The CISO must complete program setup to select controls and assign owners.</p><button class="btn btn-primary" onclick="goToProgramSetupOrDashboard()" style="margin-top:16px;">${state.cisoComplete ? 'Go to Dashboard →' : 'Go to CISO Setup →'}</button></div>`;
     return;
   }
   const controls = getScopedControls().filter(c =>

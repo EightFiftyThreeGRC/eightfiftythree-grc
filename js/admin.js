@@ -208,12 +208,6 @@ function applyRoleView(userId) {
     if (allRoles.indexOf(rolePriority[rp]) !== -1) { primaryRole = rolePriority[rp]; break; }
   }
   var defaultTab = ROLE_DEFAULT_TAB[primaryRole];
-  if (!defaultTab && typeof getRoleTabs === 'function') {
-    try {
-      var gt = getRoleTabs(primaryRole);
-      if (gt && gt.indexOf('tester') !== -1) defaultTab = 'tester';
-    } catch (e) {}
-  }
   if (!defaultTab) defaultTab = visible[0] || 'reports';
   if (state.cisoComplete && visible.indexOf('home') !== -1) {
     defaultTab = 'home';
