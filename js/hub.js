@@ -17,10 +17,53 @@ function hubJsStringLiteral(s) {
   return String(s || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 }
 
+/** Signed-in user for Command Center queue filtering (null = admin / show all pending). */
+function getHubCurrentUser() {
+  if (!state.currentUserId || !(state.users || []).length) return null;
+  return state.users.find(function (u) { return u.id === state.currentUserId; }) || null;
+}
+
 /** Command Center → open a queued SSP read-only (same path as Reports queue Open). */
 function hubOpenQueuedSsp(scopeId, isProcess) {
-  if (typeof aoOpenQueuedSsp === 'function') aoOpenQueuedSsp(scopeId, !!isProcess);
-  else showToast('Unable to open SSP package.', true);
+  if (typeof ensureBuiltinProgramProcesses === 'function') ensureBuiltinProgramProcesses();
+  if (typeof aoOpenQueuedSsp === 'function') {
+    aoOpenQueuedSsp(scopeId, !!isProcess);
+    return;
+  }
+  if (typeof openSspReadOnlyFromQueue === 'function') {
+    openSspReadOnlyFromQueue(scopeId, !!isProcess, 'reports');
+    return;
+  }
+  showToast('Unable to open SSP package.', true);
+}
+
+/** One delegated listener for hub cards that use data-hub-action (avoids brittle inline onclick). */
+function ensureHubActionDelegation() {
+  if (window._hubActionDelegationBound) return;
+  document.addEventListener('click', function (ev) {
+    var btn = ev.target && ev.target.closest ? ev.target.closest('[data-hub-action]') : null;
+    if (!btn) return;
+    var kind = btn.getAttribute('data-hub-action');
+    if (kind === 'ssp-review') {
+      ev.preventDefault();
+      var scopeId = btn.getAttribute('data-scope-id') || '';
+      var isProcess = btn.getAttribute('data-is-process') === '1';
+      hubOpenQueuedSsp(scopeId, isProcess);
+    }
+  });
+  window._hubActionDelegationBound = true;
+}
+
+function renderHubActionCardHtml(a) {
+  var inner = '<span class="hub-action-icon">' + a.icon + '</span>'
+    + '<div><div class="hub-action-label">' + escapeHTML(a.label) + '</div>'
+    + '<div class="hub-action-desc">' + escapeHTML(a.desc) + '</div></div>'
+    + '<span class="hub-action-arrow">→</span>';
+  if (a.kind === 'ssp-review') {
+    return '<button type="button" class="hub-action-card" data-hub-action="ssp-review" data-scope-id="'
+      + escapeHTML(a.scopeId || '') + '" data-is-process="' + (a.isProcess ? '1' : '0') + '">' + inner + '</button>';
+  }
+  return '<button type="button" class="hub-action-card" onclick="' + a.action + '">' + inner + '</button>';
 }
 
 /** Command Center → Reports → Program library page. */
@@ -110,14 +153,15 @@ function getNextActions() {
   var hubUser = typeof getHubCurrentUser === 'function' ? getHubCurrentUser() : null;
   if (typeof getSspReviewQueueItemsForUser === 'function') {
     getSspReviewQueueItemsForUser(hubUser).slice(0, 5).forEach(function(r) {
-      var sidJson = JSON.stringify(String(r.assetId || ''));
       var isProc = !!r.isProcessSsp;
       actions.push({
         priority: 1,
         icon: '📋',
         label: 'Review SSP: ' + (r.assetName || 'Package'),
         desc: 'Submitted by ' + (r.submittedBy || 'owner') + (r.date ? ' on ' + r.date : ''),
-        action: "showTab('reports');if(typeof aoOpenQueuedSsp==='function')aoOpenQueuedSsp(" + sidJson + ',' + (isProc ? 'true' : 'false') + ');'
+        kind: 'ssp-review',
+        scopeId: String(r.assetId || ''),
+        isProcess: isProc,
       });
     });
   }
@@ -461,14 +505,10 @@ function renderHomeTab() {
   var actions = getNextActions();
 
   var actionHtml = actions.length
-    ? actions.map(function(a) {
-      return '<button type="button" class="hub-action-card" onclick="' + a.action + '">'
-        + '<span class="hub-action-icon">' + a.icon + '</span>'
-        + '<div><div class="hub-action-label">' + escapeHTML(a.label) + '</div>'
-        + '<div class="hub-action-desc">' + escapeHTML(a.desc) + '</div></div>'
-        + '<span class="hub-action-arrow">→</span></button>';
-    }).join('')
+    ? actions.map(function(a) { return renderHubActionCardHtml(a); }).join('')
     : '<div class="hub-empty-actions">You\'re caught up — open a workspace from the sidebar or the cards below.</div>';
+
+  ensureHubActionDelegation();
 
   var workspaces = getHubWorkspaces();
   var designWorkspaces = workspaces.filter(function(w) { return w.group === 'design'; });
@@ -570,4 +610,7 @@ function renderProgramPhaseBar() {
 
 try {
   window.renderProgramPhaseBar = renderProgramPhaseBar;
+  window.getHubCurrentUser = getHubCurrentUser;
+  window.hubOpenQueuedSsp = hubOpenQueuedSsp;
+  window.ensureHubActionDelegation = ensureHubActionDelegation;
 } catch (e) {}

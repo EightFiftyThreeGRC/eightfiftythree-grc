@@ -225,6 +225,17 @@ function processHasScopedPlannedControls(proc) {
   return getControlsScopedToProcess(proc, true).length > 0;
 }
 
+/** Keep built-in process rows while an SSP is submitted or awaiting reviewer action. */
+function processHasActiveSspWorkflow(proc) {
+  if (!proc || !proc.id) return false;
+  var sid = String(proc.id);
+  var sign = getSspSignoffFromState(sid);
+  if (sign && normalizeSspSignoffStatus(sign.status)) return true;
+  return (state.controlReviewQueue || []).some(function (r) {
+    return r && r.type === 'ssp' && String(r.assetId) === sid;
+  });
+}
+
 function builtinProcessDefHasScopedPlannedControls(def) {
   return getControlsScopedToProcess({
     id: def.id,
@@ -249,12 +260,18 @@ function ensureBuiltinProgramProcesses() {
     });
     if (!def) return true;
     if (processHasScopedPlannedControls(p)) return true;
+    if (processHasActiveSspWorkflow(p)) return true;
     touched = true;
     return false;
   });
 
   BUILTIN_PROGRAM_PROCESSES.forEach(function(def) {
-    if (!builtinProcessDefHasScopedPlannedControls(def)) return;
+    var hasPlanned = builtinProcessDefHasScopedPlannedControls(def);
+    var defSign = getSspSignoffFromState(def.id);
+    var hasSsp = (state.controlReviewQueue || []).some(function (r) {
+      return r && r.type === 'ssp' && String(r.assetId) === String(def.id);
+    }) || !!(defSign && normalizeSspSignoffStatus(defSign.status));
+    if (!hasPlanned && !hasSsp) return;
     var existing = state.processes.find(function(p) {
       if (!p) return false;
       if (String(p.id) === def.id) return true;
@@ -1171,10 +1188,28 @@ function _restoreAssetWizardLayoutAfterReadOnly() {
  * @param {string} exitTab 'reports' (default) or 'library' — controls Back navigation.
  */
 function openSspReadOnlyFromQueue(scopeId, isProcess, exitTab) {
+  if (typeof ensureBuiltinProgramProcesses === 'function') ensureBuiltinProgramProcesses();
   var sid = String(scopeId);
   var asset = (state.assets || []).find(function(a) { return String(a.id) === sid; });
   var proc = (state.processes || []).find(function(p) { return String(p.id) === sid; });
   if (!isProcess && proc && !asset) isProcess = true;
+  if (isProcess && !proc) {
+    var stub = BUILTIN_PROGRAM_PROCESSES.find(function (d) { return String(d.id) === sid; });
+    if (stub) {
+      if (!state.processes) state.processes = [];
+      proc = {
+        id: stub.id,
+        name: stub.name,
+        typeKey: stub.typeKey,
+        category: stub.category,
+        description: stub.description || '',
+        owner: (state.programOwner || '').trim(),
+        _builtin: true,
+      };
+      state.processes.push(proc);
+      markDirty();
+    }
+  }
   if (isProcess && !proc) { showToast('Process not found.', true); return; }
   if (!isProcess && !asset) { showToast('Asset not found.', true); return; }
 
@@ -1194,6 +1229,9 @@ function openSspReadOnlyFromQueue(scopeId, isProcess, exitTab) {
   currentStep.asset = 1;
 
   if (typeof showTab === 'function') showTab('asset');
+
+  var assetNavEl = document.getElementById('nav-asset');
+  if (assetNavEl && state._sspReviewerReadOnly) assetNavEl.style.display = '';
 
   var listPanel = document.getElementById('asset-list-panel');
   var wizPanel = document.getElementById('asset-wizard-panel');

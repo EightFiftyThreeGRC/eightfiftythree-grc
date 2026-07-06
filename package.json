@@ -5,9 +5,11 @@
   "scripts": {
     "check:js": "node scripts/check-all.js",
     "test:e2e": "playwright test",
-    "serve": "npx --yes serve . -p 4173"
+    "serve": "npx --yes serve . -p 4173",
+    "build:demo-video": "node scripts/build-demo-video.mjs"
   },
   "devDependencies": {
-    "@playwright/test": "^1.49.0"
+    "@playwright/test": "^1.49.0",
+    "ffmpeg-static": "^5.3.0"
   }
 }

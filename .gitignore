@@ -3,6 +3,8 @@ Thumbs.db
 node_modules/
 test-results/
 playwright-report/
+tools/demo-video-build/
+assets/EightFiftyThree-GRC-demo.mp4
 playwright/.cache/
 *.log
 .fuse_hidden*

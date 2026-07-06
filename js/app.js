@@ -849,7 +849,7 @@ function showTab(tabId) {
     var ctrlNav = document.getElementById('nav-control');
     if (ctrlNav) ctrlNav.classList.add('active');
   }
-  if (tabId === 'asset' && (state._assetLibraryMode || state._assetTypeLibraryMode)) {
+  if (tabId === 'asset' && (state._assetLibraryMode || state._assetTypeLibraryMode || state._sspReviewerReadOnly)) {
     var assetNav = document.getElementById('nav-asset');
     if (assetNav) assetNav.classList.add('active');
   }
@@ -1242,6 +1242,7 @@ function bootAfterStateReady() {
   try { renderSidebarBadges(); } catch (e) { console.warn('renderSidebarBadges:', e); }
   try { applySetupFocusMode(); } catch (e) { console.warn('applySetupFocusMode:', e); }
   try { if (typeof renderProgramPhaseBar === 'function') renderProgramPhaseBar(); } catch (e) { console.warn('renderProgramPhaseBar:', e); }
+  try { if (typeof ensureHubActionDelegation === 'function') ensureHubActionDelegation(); } catch (e) { console.warn('ensureHubActionDelegation:', e); }
   try { showTab('home'); } catch (e) { console.warn('showTab:', e); }
 }
 window.bootAfterStateReady = bootAfterStateReady;
