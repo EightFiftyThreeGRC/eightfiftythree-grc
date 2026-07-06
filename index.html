@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="EightFiftyThree GRC — Free NIST SP 800-53 program management with ISO, SOC 2, and HIPAA crosswalks. Browser-based, no install.">
   <title>EightFiftyThree GRC — NIST 800-53 Program Management</title>
-  <link rel="stylesheet" href="css/landing.css">
+  <link rel="stylesheet" href="css/landing.css?v=20260705">
 </head>
 <body>
 
@@ -77,8 +77,35 @@
   </article>
 </section>
 
+<section class="landing-constraints" id="design">
+  <h2>Built in the open. On purpose.</h2>
+  <p>EightFiftyThree GRC makes deliberate engineering trade-offs. Here is what it is — and what it is not — so you can decide whether it fits before you trust it with a program.</p>
+  <div class="landing-constraints-grid">
+    <article class="landing-feature">
+      <div class="landing-feature-icon">▢</div>
+      <h3>A client-side trust boundary</h3>
+      <p>The whole app runs in your browser. There is no custom application server to breach — sign-in and data access are enforced by your identity provider and Supabase Row-Level Security, scoped to your account. The honest trade-off: a browser-based tool trusts the browser, so it is built to manage a governance program, not to hold secrets.</p>
+    </article>
+    <article class="landing-feature">
+      <div class="landing-feature-icon">⚙</div>
+      <h3>Zero dependencies, no build</h3>
+      <p>Plain HTML, CSS, and vanilla JavaScript — no framework, no bundler, no npm supply chain. The source you read is the source that runs. It loads instantly and will still open in a browser a decade from now.</p>
+    </article>
+    <article class="landing-feature">
+      <div class="landing-feature-icon">⇪</div>
+      <h3>Your data, portable by default</h3>
+      <p>One-click JSON export puts your entire program in a file you keep outside the app. Point the tool at your own Supabase project to self-host it end to end. You are never locked in.</p>
+    </article>
+    <article class="landing-feature">
+      <div class="landing-feature-icon">⊘</div>
+      <h3>What it deliberately is not</h3>
+      <p>Not a 3PAO or a substitute for an assessor's judgment. Not a system-of-record you would run without your own backups. Not multi-tenant SaaS. It is a fast, free, defensible way to stand up and run an 800-53 program.</p>
+    </article>
+  </div>
+</section>
+
 <footer class="landing-footer">
-  <p>Open source under MIT · Program data syncs via Supabase · <a href="app.html">Launch app</a> · <a href="mailto:nistcsftool@gmail.com">Contact</a></p>
+  <p>Open source under MIT · Program data syncs via Supabase · <a href="app.html">Launch app</a> · <a href="#design">Design notes</a> · <a href="mailto:nistcsftool@gmail.com">Contact</a></p>
   <p style="margin-top:8px;">© EightFiftyThree GRC</p>
 </footer>
 

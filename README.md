@@ -64,6 +64,34 @@ Technical characteristics:
 - saved snapshots stored in `localStorage` under `eightfiftythree-grc-snapshots`
 - existing users with data under the legacy `larsen-grc-*` or `hawthorn-grc-*` keys are automatically migrated on first load
 
+## Design Constraints (What This Deliberately Is Not)
+
+These are intentional trade-offs, not gaps:
+
+- **Client-side trust boundary.** All application logic runs in the browser. There is no bespoke backend to compromise — authentication and per-program data access are enforced by Supabase Row-Level Security keyed to the signed-in `auth.uid()` (see `supabase/schema.sql`). A fully client-side tool trusts the browser and a shared anon key, so treat it as a program-management workspace, not a vault for secrets.
+- **Zero dependencies, no build.** No framework, bundler, or npm supply chain. The source that ships is the source that runs — the whole app is auditable in an afternoon and loads instantly.
+- **Portable by default.** The top toolbar's **Export JSON** writes your entire program to a file you control; **Import JSON** restores it. Your program can leave this app at any time.
+- **Not** a 3PAO, a substitute for an assessor's judgment, a system-of-record you would run without your own backups, or multi-tenant SaaS.
+
+### Self-Hosting (Bring Your Own Supabase)
+
+Nothing ties the app to a hosted instance. To run it entirely on infrastructure you own:
+
+1. Create your own Supabase project and apply `supabase/schema.sql`.
+2. Put your project URL and anon key in `js/cloud-config.js` (see `MULTI_USER_SETUP.md`).
+3. Serve the repo root as static files, or fork and deploy your own GitHub Pages.
+
+Combined with first-class JSON export, a cautious adopter always has an out: keep local backups, or host the whole stack yourself.
+
+## Roadmap
+
+EightFiftyThree GRC is a single free tool — there is no paid tier, and no feature is held back for one. Candidate directions, if they prove worth building, land in this app:
+
+- **OSCAL export** — emit SSP / component-definition content as NIST OSCAL for interoperability with federal tooling.
+- **CMMC / NIST SP 800-171 crosswalk** — extend the framework-alignment tab so defense-industrial-base SMBs get a zero-install on-ramp to 800-171 / CMMC Level 2.
+
+These are candidates, not commitments — prioritized by whether they make the tool a more convincing, useful program-management workspace.
+
 ## Local Development
 
 1. Copy or configure `js/cloud-config.js` with your Supabase project URL and anon key (see `MULTI_USER_SETUP.md`).

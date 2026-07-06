@@ -148,6 +148,23 @@ body {
   background: var(--card);
 }
 
+.landing-constraints {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 16px 32px 64px;
+  text-align: center;
+}
+
+.landing-constraints h2 { font-size: 32px; font-weight: 700; letter-spacing: -0.03em; margin-bottom: 12px; }
+.landing-constraints > p { color: var(--muted); max-width: 660px; margin: 0 auto 32px; }
+
+.landing-constraints-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px;
+  text-align: left;
+}
+
 .landing-footer {
   text-align: center;
   padding: 32px;
