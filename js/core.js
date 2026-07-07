@@ -1142,6 +1142,9 @@ const state = {
   customAssetTypeHeaders: [], // user-defined group headers shown in asset coverage
   removedBuiltInAssetTypeKeys: [],   // built-in asset type keys the user has removed
   removedBuiltInAssetTypeGroups: [], // built-in asset type group headers the user has removed
+  customProcessCategories: [],       // [{ id, label }] user-defined process domains
+  customProcessTypes: [],            // [{ typeKey, label, categoryId }] custom process subtypes for control design
+  removedBuiltInProcessCategories: [], // PROCESS_CATEGORIES ids removed from the catalog
   cisoComplete: false,
   infoSecPolicy: null,
   policySelectedControls: null,  // { 'AC': ['AC-1', 'AC-2', ...] }

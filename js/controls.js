@@ -2349,11 +2349,20 @@ function getCtrlCoveredAssetTypes(ctrlId) {
   var cs = state.controlStatus[ctrlId] || {};
   var coverage = cs.assetCoverage || {};
   var result = [];
-  ASSET_TYPES.forEach(function(cat) {
-    cat.types.forEach(function(t) { if (coverage[t.key]) result.push({ key: t.key, label: t.label }); });
-  });
+  if (typeof getActiveAssetTypeCatalog === 'function') {
+    getActiveAssetTypeCatalog().forEach(function(cat) {
+      cat.types.forEach(function(t) { if (coverage[t.key]) result.push({ key: t.key, label: t.label }); });
+    });
+  } else {
+    ASSET_TYPES.forEach(function(cat) {
+      cat.types.forEach(function(t) { if (coverage[t.key]) result.push({ key: t.key, label: t.label }); });
+    });
+  }
   (state.customAssetTypes||[]).forEach(function(at) {
     if (coverage['custom_' + at]) result.push({ key: 'custom_' + at, label: at });
+  });
+  (state.customProcessTypes||[]).forEach(function(pt) {
+    if (coverage[pt.typeKey]) result.push({ key: pt.typeKey, label: pt.label });
   });
   return result;
 }
@@ -3684,6 +3693,17 @@ function buildAssetCoverageHTML(ctrlId) {
     return groupHTML;
   }).join('');
 
+  var customProcHTML = '';
+  (state.customProcessTypes || []).forEach(function(pt) {
+    var chk = (cs.assetCoverage || {})[pt.typeKey];
+    var safeKey = String(pt.typeKey || '').replace(/'/g, "\\'");
+    customProcHTML += '<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--navy);cursor:pointer;padding:3px 0;">'
+      + '<input type="checkbox"' + (chk ? ' checked' : '') + ' style="accent-color:var(--teal);" onchange="setAssetCoverage(\'' + ctrlId + '\',\'' + safeKey + '\',this.checked)">'
+      + _esc(pt.label)
+      + ' <span style="font-size:10px;color:#64748b;">(custom process)</span>'
+      + '</label>';
+  });
+
   var groupedCustom = {};
   customTypes.forEach(function(at) {
     var grp = (state.customAssetTypeGroups || {})[at] || 'Custom';
@@ -3713,7 +3733,7 @@ function buildAssetCoverageHTML(ctrlId) {
     + '</div>';
 
   return '<div id="asset-coverage-' + ctrlId + '" style="display:grid;grid-template-columns:1fr 1fr;gap:2px 12px;margin-bottom:8px;">'
-    + cosaisCalloutHTML + standardHTML + customHTML + addRowHTML
+    + cosaisCalloutHTML + standardHTML + customProcHTML + customHTML + addRowHTML
     + '</div>';
 }
 

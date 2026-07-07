@@ -577,6 +577,264 @@ function restoreAssetTypeCategoryDirect(categoryName) {
   refreshAssetTypeCatalogViews();
 }
 
+// ─── PROCESS TYPE CATALOG (Reports process inventory + control design) ───────
+function ensureProcessTypeMetadata() {
+  if (!state.customProcessCategories) state.customProcessCategories = [];
+  if (!state.customProcessTypes) state.customProcessTypes = [];
+  if (!state.removedBuiltInProcessCategories) state.removedBuiltInProcessCategories = [];
+  state.removedBuiltInProcessCategories = (state.removedBuiltInProcessCategories || []).filter(function(id) {
+    return PROCESS_CATEGORIES.some(function(c) { return c.id === id; });
+  });
+  state.customProcessTypes = (state.customProcessTypes || []).filter(function(t) {
+    return t && t.typeKey && t.label && t.categoryId;
+  });
+}
+
+function slugifyProcessCategoryId(label) {
+  var base = String(label || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'category';
+  var id = base;
+  var n = 2;
+  while (PROCESS_CATEGORIES.some(function(c) { return c.id === id; })
+      || (state.customProcessCategories || []).some(function(c) { return c.id === id; })) {
+    id = base + '-' + n;
+    n += 1;
+  }
+  return id;
+}
+
+function getProcessTypeCategoryId(typeKey) {
+  var def = BUILTIN_PROGRAM_PROCESSES.find(function(p) { return p.typeKey === typeKey; });
+  if (def) return def.category;
+  var custom = (state.customProcessTypes || []).find(function(t) { return t.typeKey === typeKey; });
+  return custom ? custom.categoryId : '';
+}
+
+function getProcessCategoryLabel(categoryId) {
+  var builtIn = PROCESS_CATEGORIES.find(function(c) { return c.id === categoryId; });
+  if (builtIn) return builtIn.label;
+  var custom = (state.customProcessCategories || []).find(function(c) { return c.id === categoryId; });
+  return custom ? custom.label : categoryId || '—';
+}
+
+function getActiveProcessCategories() {
+  ensureProcessTypeMetadata();
+  var removed = state.removedBuiltInProcessCategories || [];
+  var cats = PROCESS_CATEGORIES.filter(function(c) { return removed.indexOf(c.id) === -1; })
+    .map(function(c) { return { id: c.id, label: c.label, isBuiltIn: true }; });
+  (state.customProcessCategories || []).forEach(function(c) {
+    if (!cats.some(function(x) { return x.id === c.id; })) {
+      cats.push({ id: c.id, label: c.label, isBuiltIn: false });
+    }
+  });
+  getActiveProcessTypeRows().forEach(function(row) {
+    if (row.categoryId && !cats.some(function(x) { return x.id === row.categoryId; })) {
+      cats.push({ id: row.categoryId, label: getProcessCategoryLabel(row.categoryId), isBuiltIn: false });
+    }
+  });
+  return cats.sort(function(a, b) { return a.label.localeCompare(b.label); });
+}
+
+function getActiveProcessTypeRows() {
+  ensureProcessTypeMetadata();
+  var rows = [];
+  var removed = state.removedBuiltInAssetTypeKeys || [];
+  var processCat = ASSET_TYPES.find(function(c) { return c.category === 'Process'; });
+  if (processCat) {
+    processCat.types.forEach(function(t) {
+      if (removed.indexOf(t.key) !== -1) return;
+      rows.push({ key: t.key, label: t.label, categoryId: getProcessTypeCategoryId(t.key), isCustom: false });
+    });
+  }
+  (state.customProcessTypes || []).forEach(function(t) {
+    rows.push({ key: t.typeKey, label: t.label, categoryId: t.categoryId, isCustom: true });
+  });
+  return rows;
+}
+
+function clearProcessTypeCoverage(typeKey) {
+  Object.keys(state.controlStatus || {}).forEach(function(cid) {
+    if (state.controlStatus[cid] && state.controlStatus[cid].assetCoverage) {
+      delete state.controlStatus[cid].assetCoverage[typeKey];
+    }
+  });
+}
+
+function applyProcessTypeAdd(label, categoryId) {
+  var name = String(label || '').trim();
+  var catId = String(categoryId || '').trim();
+  if (!name || !catId) return false;
+  ensureProcessTypeMetadata();
+  var builtIn = findBuiltInAssetType(name);
+  if (builtIn && builtIn.category === 'Process') {
+    var catIdx = (state.removedBuiltInProcessCategories || []).indexOf(getProcessTypeCategoryId(builtIn.key));
+    if (catIdx !== -1) state.removedBuiltInProcessCategories.splice(catIdx, 1);
+    return applyAssetTypeAdd(name, 'Process');
+  }
+  if (getActiveProcessTypeRows().some(function(r) { return r.label.toLowerCase() === name.toLowerCase(); })) return false;
+  if (!getActiveProcessCategories().some(function(c) { return c.id === catId; })) return false;
+  if (!state.customProcessTypes) state.customProcessTypes = [];
+  var slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 28) || 'type';
+  var typeKey = 'custom_proc_' + slug;
+  var n = 2;
+  while (state.customProcessTypes.some(function(t) { return t.typeKey === typeKey; })
+      || ASSET_TYPES.some(function(cat) { return cat.types.some(function(t) { return t.key === typeKey; }); })) {
+    typeKey = 'custom_proc_' + slug + '_' + n;
+    n += 1;
+  }
+  state.customProcessTypes.push({ typeKey: typeKey, label: name, categoryId: catId });
+  return true;
+}
+
+function applyProcessTypeDelete(labelOrKey) {
+  var token = String(labelOrKey || '').trim();
+  if (!token) return false;
+  ensureProcessTypeMetadata();
+  var customIdx = (state.customProcessTypes || []).findIndex(function(t) {
+    return t.typeKey === token || t.label === token;
+  });
+  if (customIdx !== -1) {
+    var removed = state.customProcessTypes[customIdx];
+    state.customProcessTypes = state.customProcessTypes.filter(function(t) { return t.typeKey !== removed.typeKey; });
+    clearProcessTypeCoverage(removed.typeKey);
+    return true;
+  }
+  return applyAssetTypeDelete(token);
+}
+
+function applyProcessCategoryAdd(label) {
+  var clean = String(label || '').trim();
+  if (!clean) return false;
+  ensureProcessTypeMetadata();
+  var builtIn = PROCESS_CATEGORIES.find(function(c) {
+    return c.label.toLowerCase() === clean.toLowerCase() || c.id === clean;
+  });
+  if (builtIn) {
+    var idx = (state.removedBuiltInProcessCategories || []).indexOf(builtIn.id);
+    if (idx === -1) return false;
+    state.removedBuiltInProcessCategories.splice(idx, 1);
+    return true;
+  }
+  if (getActiveProcessCategories().some(function(c) { return c.label.toLowerCase() === clean.toLowerCase(); })) return false;
+  if (!state.customProcessCategories) state.customProcessCategories = [];
+  state.customProcessCategories.push({ id: slugifyProcessCategoryId(clean), label: clean });
+  return true;
+}
+
+function removeProcessCategoryCascade(categoryId) {
+  var catId = String(categoryId || '').trim();
+  if (!catId) return false;
+  ensureProcessTypeMetadata();
+  getActiveProcessTypeRows().filter(function(r) { return r.categoryId === catId; }).forEach(function(row) {
+    applyProcessTypeDelete(row.isCustom ? row.typeKey : row.label);
+  });
+  var isBuiltIn = PROCESS_CATEGORIES.some(function(c) { return c.id === catId; });
+  if (isBuiltIn) {
+    if ((state.removedBuiltInProcessCategories || []).indexOf(catId) === -1) {
+      state.removedBuiltInProcessCategories.push(catId);
+    }
+  } else {
+    state.customProcessCategories = (state.customProcessCategories || []).filter(function(c) { return c.id !== catId; });
+  }
+  return true;
+}
+
+function restoreProcessCategory(categoryId, restoreSubtypes) {
+  var catId = String(categoryId || '').trim();
+  if (!catId) return false;
+  ensureProcessTypeMetadata();
+  var builtIn = PROCESS_CATEGORIES.find(function(c) { return c.id === catId; });
+  var changed = false;
+  if (builtIn) {
+    var idx = (state.removedBuiltInProcessCategories || []).indexOf(catId);
+    if (idx !== -1) {
+      state.removedBuiltInProcessCategories.splice(idx, 1);
+      changed = true;
+    }
+  }
+  if (restoreSubtypes !== false && builtIn) {
+    BUILTIN_PROGRAM_PROCESSES.filter(function(p) { return p.category === catId; }).forEach(function(def) {
+      var typeDef = null;
+      ASSET_TYPES.forEach(function(cat) {
+        if (cat.category !== 'Process') return;
+        cat.types.forEach(function(t) { if (t.key === def.typeKey) typeDef = t; });
+      });
+      if (typeDef && applyProcessTypeAdd(typeDef.label, catId)) changed = true;
+    });
+  }
+  return changed;
+}
+
+function updateCustomProcessType(typeKey, label, categoryId) {
+  var key = String(typeKey || '').trim();
+  if (!key) return false;
+  var pt = (state.customProcessTypes || []).find(function(t) { return t.typeKey === key; });
+  if (!pt) return false;
+  var newLabel = String(label || pt.label).trim();
+  var newCat = String(categoryId || pt.categoryId).trim();
+  if (!newLabel || !newCat) return false;
+  if (getActiveProcessTypeRows().some(function(r) {
+    return r.typeKey !== key && r.label.toLowerCase() === newLabel.toLowerCase();
+  })) return false;
+  if (!getActiveProcessCategories().some(function(c) { return c.id === newCat; })) return false;
+  pt.label = newLabel;
+  pt.categoryId = newCat;
+  return true;
+}
+
+function refreshProcessTypeCatalogViews() {
+  if (state._reportsLibraryView === 'processes' && typeof renderReportsLibraryShell === 'function') {
+    setTimeout(function() { renderReportsLibraryShell(); }, 0);
+  }
+}
+
+function applyProcessTypeChangeDirect(action, label, categoryId) {
+  var clean = String(label || '').trim();
+  if (!clean) { showToast('Process subtype name is required.', true); return; }
+  if (action === 'delete') {
+    if (!confirm('Remove process subtype "' + clean + '" from the catalog?\n\nThis clears control design coverage for this type.')) return;
+    if (!applyProcessTypeDelete(clean)) { showToast('No change applied.', true); return; }
+    addAuditEntry('program', 'process-types', 'Process subtype removed by ' + getCurrentActorName() + ': "' + clean + '"');
+    markDirty();
+    showToast('Process subtype removed.');
+  } else {
+    if (!applyProcessTypeAdd(clean, categoryId)) { showToast('Could not add process subtype (duplicate or invalid category).', true); return; }
+    addAuditEntry('program', 'process-types', 'Process subtype added by ' + getCurrentActorName() + ': "' + clean + '" in category "' + getProcessCategoryLabel(categoryId) + '"');
+    markDirty();
+    showToast('Process subtype added.');
+  }
+  refreshProcessTypeCatalogViews();
+}
+
+function applyProcessCategoryChangeDirect(action, labelOrId) {
+  var clean = String(labelOrId || '').trim();
+  if (!clean) { showToast('Process category name is required.', true); return; }
+  if (action === 'delete') {
+    var cat = getActiveProcessCategories().find(function(c) { return c.id === clean || c.label === clean; })
+      || { id: clean, label: getProcessCategoryLabel(clean) };
+    if (!confirm('Remove category "' + cat.label + '" and all process subtypes in it?\n\nThis clears control design coverage for every subtype in this category.')) return;
+    if (!removeProcessCategoryCascade(cat.id)) { showToast('Category could not be removed.', true); return; }
+    addAuditEntry('program', 'process-types', 'Process category removed by ' + getCurrentActorName() + ': "' + cat.label + '" (including all subtypes)');
+    markDirty();
+    showToast('Process category removed.');
+  } else {
+    if (!applyProcessCategoryAdd(clean)) { showToast('Category already exists or could not be added.', true); return; }
+    addAuditEntry('program', 'process-types', 'Process category added by ' + getCurrentActorName() + ': "' + clean + '"');
+    markDirty();
+    showToast('Process category added.');
+  }
+  refreshProcessTypeCatalogViews();
+}
+
+function restoreProcessCategoryDirect(categoryId) {
+  var catId = String(categoryId || '').trim();
+  if (!catId) return;
+  if (!restoreProcessCategory(catId, true)) { showToast('Category could not be restored.', true); return; }
+  addAuditEntry('program', 'process-types', 'Process category restored by ' + getCurrentActorName() + ': "' + getProcessCategoryLabel(catId) + '" (with retired subtypes)');
+  markDirty();
+  showToast('Process category restored.');
+  refreshProcessTypeCatalogViews();
+}
+
 function submitAssetTypeRequest(action, typeName, reason, groupName) {
   var normalizedAction = action === 'delete' ? 'delete' : 'add';
   var cleanType = (typeName || '').trim();

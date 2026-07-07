@@ -118,7 +118,7 @@ function renderReportsLibraryShell() {
   }
 
   if (state._reportsLibraryView === 'processes') {
-    hdr.innerHTML = '<div class="page-header-row"><div><div class="role-badge">⚙️ Process inventory</div><h1>Process inventory</h1><p>Every process type from control design — controls scoped to each type and registered organizational processes.</p></div>'
+    hdr.innerHTML = '<div class="page-header-row"><div><div class="role-badge">⚙️ Process inventory</div><h1>Process inventory</h1><p>Manage process categories and subtypes — changes sync to control design coverage pickers. Removing a category removes all subtypes in it and clears their control scope.</p></div>'
       + '<div class="page-header-actions"><button type="button" class="btn btn-secondary" onclick="goToReportsDashboard()">← Reports dashboard</button></div></div>';
     renderProcessTypesInventory(body);
     return;
@@ -298,17 +298,118 @@ function _invAssetTypeRows() {
   return rows;
 }
 
-function _invProcessTypeRows() {
-  var rows = [];
-  if (typeof getActiveAssetTypeCatalog === 'function') {
-    getActiveAssetTypeCatalog().forEach(function(cat) {
+function _invProcessCategorySections() {
+  if (typeof getActiveProcessCategories !== 'function' || typeof getActiveProcessTypeRows !== 'function') return [];
+  var categories = getActiveProcessCategories();
+  var rows = getActiveProcessTypeRows();
+  return categories.map(function(cat) {
+    return {
+      id: cat.id,
+      label: cat.label,
+      isBuiltIn: cat.isBuiltIn,
+      types: rows.filter(function(r) { return r.categoryId === cat.id; })
+    };
+  });
+}
+
+function _invRetiredProcessCategories() {
+  return (state.removedBuiltInProcessCategories || []).map(function(id) {
+    var builtIn = (typeof PROCESS_CATEGORIES !== 'undefined' ? PROCESS_CATEGORIES : []).find(function(c) { return c.id === id; });
+    return { id: id, label: builtIn ? builtIn.label : id };
+  });
+}
+
+function _invRetiredProcessTypes() {
+  var retired = [];
+  (state.removedBuiltInAssetTypeKeys || []).forEach(function(key) {
+    if (String(key).indexOf('proc_') !== 0) return;
+    ASSET_TYPES.forEach(function(cat) {
       if (cat.category !== 'Process') return;
       cat.types.forEach(function(t) {
-        rows.push({ key: t.key, label: t.label, category: cat.category });
+        if (t.key === key) {
+          retired.push({
+            key: t.key,
+            label: t.label,
+            categoryId: typeof getProcessTypeCategoryId === 'function' ? getProcessTypeCategoryId(t.key) : ''
+          });
+        }
       });
     });
+  });
+  return retired;
+}
+
+function invApplyProcessTypeChange(action, label, categoryId) {
+  if (typeof applyProcessTypeChangeDirect === 'function') {
+    applyProcessTypeChangeDirect(action, label, categoryId);
   }
-  return rows;
+}
+
+function invApplyProcessCategoryChange(action, labelOrId) {
+  if (typeof applyProcessCategoryChangeDirect === 'function') {
+    applyProcessCategoryChangeDirect(action, labelOrId);
+  }
+}
+
+function invRestoreProcessCategory(categoryId) {
+  if (typeof restoreProcessCategoryDirect === 'function') restoreProcessCategoryDirect(categoryId);
+}
+
+function invSubmitNewProcessCategoryFromReports() {
+  var el = document.getElementById('procInvNewCategory');
+  var name = ((el && el.value) || '').trim();
+  if (!name) { showToast('Process category name is required.', true); if (el) el.focus(); return; }
+  invApplyProcessCategoryChange('add', name);
+  if (el) el.value = '';
+}
+
+function invSubmitNewProcessTypeFromReports(categoryId) {
+  var catId = String(categoryId || '').trim();
+  var nameEl = catId ? document.getElementById('procInvSubtype_' + invSafeDomId(catId)) : document.getElementById('procInvNewName');
+  var groupEl = document.getElementById('procInvNewGroup');
+  var name = ((nameEl && nameEl.value) || '').trim();
+  var group = catId || ((groupEl && groupEl.value) || '').trim();
+  if (!name) { showToast('Process subtype name is required.', true); if (nameEl) nameEl.focus(); return; }
+  if (!group) { showToast('Select a process category.', true); return; }
+  invApplyProcessTypeChange('add', name, group);
+  if (nameEl) nameEl.value = '';
+}
+
+function invUpdateCustomProcessType(typeKey, label, categoryId) {
+  if (typeof updateCustomProcessType !== 'function') return;
+  var ok = updateCustomProcessType(typeKey, label, categoryId);
+  if (!ok) { showToast('Could not update process subtype.', true); return; }
+  if (typeof addAuditEntry === 'function') {
+    addAuditEntry('program', 'process-types', 'Custom process subtype updated (Reports process inventory): "' + label + '"');
+  }
+  markDirty();
+  if (typeof refreshProcessTypeCatalogViews === 'function') refreshProcessTypeCatalogViews();
+}
+
+function _invRenderProcessSubtypeRow(row, coverage, categories) {
+  var ctrlIds = coverage[row.key] || [];
+  var procs = _invRegisteredProcessesForType(row.key);
+  var safeKey = String(row.key).replace(/'/g, "\\'");
+  var safeLabel = String(row.label).replace(/'/g, "\\'");
+  var catLabel = typeof getProcessCategoryLabel === 'function' ? getProcessCategoryLabel(row.categoryId) : row.categoryId;
+  var nameCell = row.isCustom
+    ? '<input type="text" class="form-input" style="font-size:12px;font-weight:600;" value="' + escapeHTML(row.label) + '" onchange="invUpdateCustomProcessType(\'' + safeKey + '\',this.value,\'' + String(row.categoryId).replace(/'/g, "\\'") + '\')">'
+    : '<span style="font-weight:600;">' + escapeHTML(row.label) + ' <span style="font-size:10px;color:#64748b;font-weight:400;">(built-in)</span></span>';
+  var catCell = row.isCustom
+    ? '<select class="form-select" style="font-size:12px;" onchange="invUpdateCustomProcessType(\'' + safeKey + '\',\'' + safeLabel + '\',this.value)">'
+      + categories.map(function(c) {
+          return '<option value="' + escapeHTML(c.id) + '"' + (c.id === row.categoryId ? ' selected' : '') + '>' + escapeHTML(c.label) + '</option>';
+        }).join('')
+      + '</select>'
+    : escapeHTML(catLabel);
+  return '<tr data-category="' + escapeHTML(row.categoryId) + '" data-label="' + escapeHTML(row.label.toLowerCase()) + '">'
+    + '<td>' + nameCell + '</td>'
+    + '<td>' + catCell + '</td>'
+    + '<td style="text-align:center;font-weight:700;color:' + (ctrlIds.length ? '#166534' : '#94a3b8') + ';">' + ctrlIds.length + '</td>'
+    + '<td>' + _invControlBadgesHtml(ctrlIds) + '</td>'
+    + '<td>' + _invRegisteredNamesCell(procs, 'None registered') + '</td>'
+    + '<td><button type="button" class="btn btn-sm" style="font-size:10px;padding:3px 8px;background:#fee2e2;color:#991b1b;border:1px solid #fecaca;" onclick="invApplyProcessTypeChange(\'delete\',\'' + safeLabel + '\')">Remove</button></td>'
+    + '</tr>';
 }
 
 function _invRegisteredAssetsForType(row) {
@@ -581,36 +682,116 @@ function filterAssetInvTable() {
 
 function renderProcessTypesInventory(body) {
   if (!body) return;
-  var rows = _invProcessTypeRows();
+  if (typeof ensureProcessTypeMetadata === 'function') ensureProcessTypeMetadata();
+  var sections = _invProcessCategorySections();
   var coverage = _invBuildTypeCoverageIndex();
-  var html = '<div style="background:white;border:1px solid var(--border);border-radius:10px;padding:20px;">'
+  var retiredCats = _invRetiredProcessCategories();
+  var retiredTypes = _invRetiredProcessTypes();
+  var categories = (typeof getActiveProcessCategories === 'function') ? getActiveProcessCategories() : [];
+  var subtypeCount = sections.reduce(function(n, s) { return n + s.types.length; }, 0);
+  var html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">'
+    + '<div style="background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:16px;">'
+    + '<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px;">Add category</div>'
+    + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">Creates a process domain header (e.g. Privacy Operations).</div>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
+    + '<input type="text" id="procInvNewCategory" class="form-input" placeholder="Category name" style="font-size:12px;flex:1;min-width:160px;">'
+    + '<button type="button" class="btn btn-primary btn-sm" onclick="invSubmitNewProcessCategoryFromReports()">+ Add category</button>'
+    + '</div></div>'
+    + '<div style="background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:16px;">'
+    + '<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px;">Add subtype</div>'
+    + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">Adds a process type under a category — appears in control design checkboxes.</div>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">'
+    + '<input type="text" id="procInvNewName" class="form-input" placeholder="Subtype name" style="font-size:12px;flex:1;min-width:140px;">'
+    + '<select id="procInvNewGroup" class="form-select" style="font-size:12px;min-width:160px;">'
+    + categories.map(function(c) { return '<option value="' + escapeHTML(c.id) + '">' + escapeHTML(c.label) + '</option>'; }).join('')
+    + '</select>'
+    + '<button type="button" class="btn btn-primary btn-sm" onclick="invSubmitNewProcessTypeFromReports()">+ Add subtype</button>'
+    + '</div></div></div>'
+    + '<div style="background:white;border:1px solid var(--border);border-radius:10px;padding:20px;">'
     + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px;">'
-    + '<div style="font-size:12px;color:var(--text-muted);">' + rows.length + ' process types · control scope from control design · registered processes from the process inventory</div>'
-    + '<input type="text" id="procInvSearch" placeholder="Search…" oninput="filterProcInvTable()" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;">'
-    + '</div>'
-    + '<div class="table-scroll"><table class="control-table" id="procInvTable"><thead><tr>'
-    + '<th>Process type</th><th style="width:90px;text-align:center;">Controls</th><th>Scoped controls</th><th style="width:220px;">Registered processes</th>'
-    + '</tr></thead><tbody>'
-    + rows.map(function(row) {
-        var ctrlIds = coverage[row.key] || [];
-        var procs = _invRegisteredProcessesForType(row.key);
-        return '<tr data-label="' + escapeHTML(row.label.toLowerCase()) + '">'
-          + '<td style="font-weight:600;">' + escapeHTML(row.label) + '</td>'
-          + '<td style="text-align:center;font-weight:700;color:' + (ctrlIds.length ? '#166534' : '#94a3b8') + ';">' + ctrlIds.length + '</td>'
-          + '<td>' + _invControlBadgesHtml(ctrlIds) + '</td>'
-          + '<td>' + _invRegisteredNamesCell(procs, 'None registered') + '</td>'
-          + '</tr>';
-      }).join('')
-    + '</tbody></table></div></div>';
+    + '<div style="font-size:12px;color:var(--text-muted);">' + sections.length + ' categories · ' + subtypeCount + ' subtypes · synced with control design</div>'
+    + '<input type="text" id="procInvSearch" placeholder="Search categories or subtypes…" oninput="filterProcInvTable()" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;min-width:220px;">'
+    + '</div>';
+
+  if (!sections.length) {
+    html += '<div class="empty-state" style="padding:24px;"><div class="es-title">No process categories</div><p>Add a category above, then add subtypes under it.</p></div>';
+  }
+
+  sections.forEach(function(section) {
+    var safeCatId = String(section.id).replace(/'/g, "\\'");
+    var domId = invSafeDomId(section.id);
+    var badge = section.isBuiltIn
+      ? '<span style="font-size:10px;font-weight:700;color:#1d4ed8;background:#eff6ff;padding:2px 7px;border-radius:6px;margin-left:8px;">Built-in</span>'
+      : '<span style="font-size:10px;font-weight:700;color:#0f766e;background:#ecfdf5;padding:2px 7px;border-radius:6px;margin-left:8px;">Custom</span>';
+    html += '<div class="proc-inv-category" data-category="' + escapeHTML(section.label) + '" data-category-id="' + escapeHTML(section.id) + '" style="margin-bottom:18px;border:1px solid var(--border);border-radius:10px;overflow:hidden;">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 16px;background:#f8fafc;border-bottom:1px solid var(--border);flex-wrap:wrap;">'
+      + '<div style="font-size:14px;font-weight:800;color:var(--navy);">' + escapeHTML(section.label) + badge
+      + ' <span style="font-size:11px;font-weight:600;color:var(--text-muted);">' + section.types.length + ' subtype(s)</span></div>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">'
+      + '<input type="text" id="procInvSubtype_' + domId + '" class="form-input" placeholder="Add subtype…" style="font-size:11px;min-width:160px;padding:5px 8px;">'
+      + '<button type="button" class="btn btn-secondary btn-sm" style="font-size:11px;" onclick="invSubmitNewProcessTypeFromReports(\'' + safeCatId + '\')">+ Subtype</button>'
+      + '<button type="button" class="btn btn-sm" style="font-size:10px;padding:4px 10px;background:#fee2e2;color:#991b1b;border:1px solid #fecaca;" onclick="invApplyProcessCategoryChange(\'delete\',\'' + safeCatId + '\')">Remove category</button>'
+      + '</div></div>';
+    if (section.types.length) {
+      html += '<div class="table-scroll"><table class="control-table proc-inv-subtype-table"><thead><tr>'
+        + '<th>Subtype</th><th style="width:180px;">Category</th><th style="width:72px;text-align:center;">Controls</th><th>Scoped controls</th><th style="width:180px;">Registered processes</th><th style="width:88px;">Actions</th>'
+        + '</tr></thead><tbody>'
+        + section.types.map(function(row) { return _invRenderProcessSubtypeRow(row, coverage, categories); }).join('')
+        + '</tbody></table></div>';
+    } else {
+      html += '<div style="padding:16px;font-size:12px;color:var(--text-muted);">No subtypes yet — use the field above to add one to this category.</div>';
+    }
+    html += '</div>';
+  });
+
+  if (retiredCats.length) {
+    html += '<div style="margin-top:8px;border-top:1px dashed var(--border);padding-top:14px;">'
+      + '<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:6px;">Retired categories (' + retiredCats.length + ')</div>'
+      + '<div style="display:flex;flex-wrap:wrap;gap:8px;">'
+      + retiredCats.map(function(cat) {
+          var safeId = String(cat.id).replace(/'/g, "\\'");
+          return '<span style="display:inline-flex;align-items:center;gap:6px;font-size:11px;padding:4px 10px;border:1px solid #fed7aa;border-radius:999px;background:#fff7ed;color:#9a3412;">'
+            + escapeHTML(cat.label)
+            + '<button type="button" style="border:none;background:none;color:#0369a1;cursor:pointer;font-size:11px;font-weight:700;" onclick="invRestoreProcessCategory(\'' + safeId + '\')">Restore category</button>'
+            + '</span>';
+        }).join('')
+      + '</div></div>';
+  }
+
+  if (retiredTypes.length) {
+    html += '<div style="margin-top:14px;border-top:1px dashed var(--border);padding-top:14px;">'
+      + '<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:6px;">Retired built-in subtypes (' + retiredTypes.length + ')</div>'
+      + '<div style="display:flex;flex-wrap:wrap;gap:8px;">'
+      + retiredTypes.map(function(item) {
+          var safeLabel = String(item.label).replace(/'/g, "\\'");
+          return '<span style="display:inline-flex;align-items:center;gap:6px;font-size:11px;padding:4px 10px;border:1px solid #fed7aa;border-radius:999px;background:#fff7ed;color:#9a3412;">'
+            + escapeHTML(item.label)
+            + '<button type="button" style="border:none;background:none;color:#0369a1;cursor:pointer;font-size:11px;font-weight:700;" onclick="invApplyProcessTypeChange(\'add\',\'' + safeLabel + '\',\'' + String(item.categoryId).replace(/'/g, "\\'") + '\')">Restore</button>'
+            + '</span>';
+        }).join('')
+      + '</div></div>';
+  }
+
+  html += '</div>';
   body.innerHTML = html;
 }
 
 function filterProcInvTable() {
   var q = ((document.getElementById('procInvSearch') || {}).value || '').toLowerCase();
-  var rows = document.querySelectorAll('#procInvTable tbody tr');
-  rows.forEach(function(tr) {
-    var okQ = !q || (tr.textContent || '').toLowerCase().indexOf(q) !== -1;
-    tr.style.display = okQ ? '' : 'none';
+  document.querySelectorAll('.proc-inv-category').forEach(function(block) {
+    var catName = (block.getAttribute('data-category') || '').toLowerCase();
+    var anyVisible = !q || catName.indexOf(q) !== -1;
+    if (!q) {
+      block.style.display = '';
+      block.querySelectorAll('.proc-inv-subtype-table tbody tr').forEach(function(tr) { tr.style.display = ''; });
+      return;
+    }
+    block.querySelectorAll('.proc-inv-subtype-table tbody tr').forEach(function(tr) {
+      var rowMatch = (tr.textContent || '').toLowerCase().indexOf(q) !== -1;
+      tr.style.display = rowMatch ? '' : 'none';
+      if (rowMatch) anyVisible = true;
+    });
+    block.style.display = anyVisible ? '' : 'none';
   });
 }
 
