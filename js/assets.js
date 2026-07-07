@@ -325,6 +325,9 @@ function ensureAssetTypeMetadata() {
   if (!state.customAssetTypeHeaders) state.customAssetTypeHeaders = [];
   if (!state.removedBuiltInAssetTypeKeys) state.removedBuiltInAssetTypeKeys = [];
   if (!state.removedBuiltInAssetTypeGroups) state.removedBuiltInAssetTypeGroups = [];
+  if (!state.assetTypeLabelOverrides) state.assetTypeLabelOverrides = {};
+  if (!state.assetCategoryLabelOverrides) state.assetCategoryLabelOverrides = {};
+  if (!state.processCategoryLabelOverrides) state.processCategoryLabelOverrides = {};
   (state.customAssetTypes || []).forEach(function(t) {
     if (!state.customAssetTypeGroups[t]) state.customAssetTypeGroups[t] = 'Custom';
   });
@@ -353,9 +356,121 @@ function findBuiltInAssetType(typeName) {
       if (String(t.label || '').trim().toLowerCase() === name) {
         return { category: ASSET_TYPES[i].category, key: t.key, label: t.label };
       }
+      if (typeof getAssetTypeDisplayLabel === 'function'
+          && getAssetTypeDisplayLabel(t.key).toLowerCase() === name) {
+        return { category: ASSET_TYPES[i].category, key: t.key, label: t.label };
+      }
     }
   }
   return null;
+}
+
+function getBuiltinTypeDefaultLabel(typeKey) {
+  var key = String(typeKey || '').trim();
+  if (!key) return '';
+  for (var i = 0; i < ASSET_TYPES.length; i++) {
+    for (var j = 0; j < ASSET_TYPES[i].types.length; j++) {
+      if (ASSET_TYPES[i].types[j].key === key) return ASSET_TYPES[i].types[j].label;
+    }
+  }
+  return '';
+}
+
+function getAssetTypeDisplayLabel(typeKey) {
+  var key = String(typeKey || '').trim();
+  if (!key) return '';
+  if ((state.assetTypeLabelOverrides || {})[key]) return state.assetTypeLabelOverrides[key];
+  if (key.indexOf('custom_') === 0) {
+    var customName = key.slice(7);
+    return customName;
+  }
+  return getBuiltinTypeDefaultLabel(key) || key;
+}
+
+function getAssetCategoryDisplayLabel(categoryName) {
+  var canonical = String(categoryName || '').trim();
+  if (!canonical) return '';
+  if ((state.assetCategoryLabelOverrides || {})[canonical]) return state.assetCategoryLabelOverrides[canonical];
+  return canonical;
+}
+
+function setAssetTypeLabelOverride(typeKey, newLabel) {
+  var key = String(typeKey || '').trim();
+  var clean = String(newLabel || '').trim();
+  if (!key || !clean) return false;
+  ensureAssetTypeMetadata();
+  var defaultLabel = getBuiltinTypeDefaultLabel(key);
+  if (!defaultLabel) return false;
+  if (clean === defaultLabel) delete state.assetTypeLabelOverrides[key];
+  else state.assetTypeLabelOverrides[key] = clean;
+  return true;
+}
+
+function setAssetCategoryLabelOverride(categoryName, newLabel) {
+  var canonical = String(categoryName || '').trim();
+  var clean = String(newLabel || '').trim();
+  if (!canonical || !clean) return false;
+  ensureAssetTypeMetadata();
+  var isBuiltIn = ASSET_TYPES.some(function(cat) { return cat.category === canonical; });
+  if (!isBuiltIn && (state.customAssetTypeHeaders || []).indexOf(canonical) === -1) return false;
+  if (isBuiltIn && clean === canonical) delete state.assetCategoryLabelOverrides[canonical];
+  else if (isBuiltIn) state.assetCategoryLabelOverrides[canonical] = clean;
+  else return renameCustomAssetCategory(canonical, clean);
+  return true;
+}
+
+function renameCustomAssetCategory(oldLabel, newLabel) {
+  var oldName = String(oldLabel || '').trim();
+  var newName = String(newLabel || '').trim();
+  if (!oldName || !newName || oldName === newName) return false;
+  ensureAssetTypeMetadata();
+  var idx = (state.customAssetTypeHeaders || []).indexOf(oldName);
+  if (idx === -1) return false;
+  if (getAllAssetTypeGroups().some(function(g) {
+    return g !== oldName && getAssetCategoryDisplayLabel(g).toLowerCase() === newName.toLowerCase();
+  })) return false;
+  state.customAssetTypeHeaders[idx] = newName;
+  Object.keys(state.customAssetTypeGroups || {}).forEach(function(k) {
+    if (state.customAssetTypeGroups[k] === oldName) state.customAssetTypeGroups[k] = newName;
+  });
+  return true;
+}
+
+function renameCustomAssetType(oldName, newName, groupName) {
+  var oldLabel = String(oldName || '').trim();
+  var newLabel = String(newName || '').trim();
+  if (!oldLabel || !newLabel || oldLabel === newLabel) return false;
+  ensureAssetTypeMetadata();
+  if ((state.customAssetTypes || []).indexOf(oldLabel) === -1) return false;
+  if ((state.customAssetTypes || []).indexOf(newLabel) !== -1) return false;
+  if (findBuiltInAssetType(newLabel)) return false;
+  var oldKey = 'custom_' + oldLabel;
+  var newKey = 'custom_' + newLabel;
+  Object.keys(state.controlStatus || {}).forEach(function(cid) {
+    var cov = state.controlStatus[cid] && state.controlStatus[cid].assetCoverage;
+    if (!cov || !cov[oldKey]) return;
+    cov[newKey] = cov[oldKey];
+    delete cov[oldKey];
+  });
+  state.customAssetTypes = (state.customAssetTypes || []).map(function(t) {
+    return t === oldLabel ? newLabel : t;
+  });
+  var grp = groupName || (state.customAssetTypeGroups || {})[oldLabel] || 'Custom';
+  delete state.customAssetTypeGroups[oldLabel];
+  state.customAssetTypeGroups[newLabel] = grp;
+  (state.assets || []).forEach(function(a) {
+    if (String(a.type || '').trim() === oldLabel) a.type = newLabel;
+  });
+  return true;
+}
+
+function renameAssetCategory(canonicalOrCustomName, newLabel) {
+  return setAssetCategoryLabelOverride(canonicalOrCustomName, newLabel);
+}
+
+function renameAssetTypeLabel(typeKeyOrCustomName, newLabel, isCustom) {
+  if (isCustom) return renameCustomAssetType(typeKeyOrCustomName, newLabel);
+  return setAssetTypeLabelOverride(typeKeyOrCustomName, newLabel);
 }
 
 function getActiveAssetTypeCatalog() {
@@ -582,6 +697,8 @@ function ensureProcessTypeMetadata() {
   if (!state.customProcessCategories) state.customProcessCategories = [];
   if (!state.customProcessTypes) state.customProcessTypes = [];
   if (!state.removedBuiltInProcessCategories) state.removedBuiltInProcessCategories = [];
+  if (!state.processCategoryLabelOverrides) state.processCategoryLabelOverrides = {};
+  if (!state.assetTypeLabelOverrides) state.assetTypeLabelOverrides = {};
   state.removedBuiltInProcessCategories = (state.removedBuiltInProcessCategories || []).filter(function(id) {
     return PROCESS_CATEGORIES.some(function(c) { return c.id === id; });
   });
@@ -610,17 +727,48 @@ function getProcessTypeCategoryId(typeKey) {
 }
 
 function getProcessCategoryLabel(categoryId) {
-  var builtIn = PROCESS_CATEGORIES.find(function(c) { return c.id === categoryId; });
+  var id = String(categoryId || '').trim();
+  if ((state.processCategoryLabelOverrides || {})[id]) return state.processCategoryLabelOverrides[id];
+  var builtIn = PROCESS_CATEGORIES.find(function(c) { return c.id === id; });
   if (builtIn) return builtIn.label;
-  var custom = (state.customProcessCategories || []).find(function(c) { return c.id === categoryId; });
-  return custom ? custom.label : categoryId || '—';
+  var custom = (state.customProcessCategories || []).find(function(c) { return c.id === id; });
+  return custom ? custom.label : id || '—';
+}
+
+function renameProcessCategoryLabel(categoryId, newLabel) {
+  var id = String(categoryId || '').trim();
+  var clean = String(newLabel || '').trim();
+  if (!id || !clean) return false;
+  ensureProcessTypeMetadata();
+  var builtIn = PROCESS_CATEGORIES.find(function(c) { return c.id === id; });
+  if (builtIn) {
+    if (clean === builtIn.label) delete state.processCategoryLabelOverrides[id];
+    else state.processCategoryLabelOverrides[id] = clean;
+    return true;
+  }
+  var custom = (state.customProcessCategories || []).find(function(c) { return c.id === id; });
+  if (!custom) return false;
+  if (getActiveProcessCategories().some(function(c) {
+    return c.id !== id && c.label.toLowerCase() === clean.toLowerCase();
+  })) return false;
+  custom.label = clean;
+  return true;
+}
+
+function renameProcessTypeLabel(typeKey, newLabel, isCustom) {
+  if (isCustom) {
+    var pt = (state.customProcessTypes || []).find(function(t) { return t.typeKey === typeKey; });
+    if (!pt) return false;
+    return updateCustomProcessType(typeKey, newLabel, pt.categoryId);
+  }
+  return setAssetTypeLabelOverride(typeKey, newLabel);
 }
 
 function getActiveProcessCategories() {
   ensureProcessTypeMetadata();
   var removed = state.removedBuiltInProcessCategories || [];
   var cats = PROCESS_CATEGORIES.filter(function(c) { return removed.indexOf(c.id) === -1; })
-    .map(function(c) { return { id: c.id, label: c.label, isBuiltIn: true }; });
+    .map(function(c) { return { id: c.id, label: getProcessCategoryLabel(c.id), isBuiltIn: true }; });
   (state.customProcessCategories || []).forEach(function(c) {
     if (!cats.some(function(x) { return x.id === c.id; })) {
       cats.push({ id: c.id, label: c.label, isBuiltIn: false });
@@ -642,7 +790,12 @@ function getActiveProcessTypeRows() {
   if (processCat) {
     processCat.types.forEach(function(t) {
       if (removed.indexOf(t.key) !== -1) return;
-      rows.push({ key: t.key, label: t.label, categoryId: getProcessTypeCategoryId(t.key), isCustom: false });
+      rows.push({
+        key: t.key,
+        label: getAssetTypeDisplayLabel(t.key),
+        categoryId: getProcessTypeCategoryId(t.key),
+        isCustom: false
+      });
     });
   }
   (state.customProcessTypes || []).forEach(function(t) {

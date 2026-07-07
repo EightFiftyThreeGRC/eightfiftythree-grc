@@ -2351,7 +2351,9 @@ function getCtrlCoveredAssetTypes(ctrlId) {
   var result = [];
   if (typeof getActiveAssetTypeCatalog === 'function') {
     getActiveAssetTypeCatalog().forEach(function(cat) {
-      cat.types.forEach(function(t) { if (coverage[t.key]) result.push({ key: t.key, label: t.label }); });
+      cat.types.forEach(function(t) {
+        if (coverage[t.key]) result.push({ key: t.key, label: typeof getAssetTypeDisplayLabel === 'function' ? getAssetTypeDisplayLabel(t.key) : t.label });
+      });
     });
   } else {
     ASSET_TYPES.forEach(function(cat) {
@@ -3683,12 +3685,14 @@ function buildAssetCoverageHTML(ctrlId) {
   }
 
   var standardHTML = getActiveAssetTypeCatalog().map(function(cat) {
-    var groupHTML = '<div style="grid-column:1/-1;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-top:8px;margin-bottom:2px;">' + cat.category + '</div>';
+    var catLabel = typeof getAssetCategoryDisplayLabel === 'function' ? getAssetCategoryDisplayLabel(cat.category) : cat.category;
+    var groupHTML = '<div style="grid-column:1/-1;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-top:8px;margin-bottom:2px;">' + catLabel + '</div>';
     cat.types.forEach(function(t) {
       var chk = (cs.assetCoverage||{})[t.key];
+      var typeLabel = typeof getAssetTypeDisplayLabel === 'function' ? getAssetTypeDisplayLabel(t.key) : t.label;
       groupHTML += '<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--navy);cursor:pointer;padding:3px 0;">'
         + '<input type="checkbox"' + (chk?' checked':'') + ' style="accent-color:var(--teal);" onchange="setAssetCoverage(\'' + ctrlId + '\',\'' + t.key + '\',this.checked)">'
-        + t.label + '</label>';
+        + typeLabel + '</label>';
     });
     return groupHTML;
   }).join('');
@@ -3724,7 +3728,10 @@ function buildAssetCoverageHTML(ctrlId) {
     return groupHeader + rows;
   }).join('');
 
-  var groupOpts = getAllAssetTypeGroups().map(function(g){ return '<option value="' + _esc(g) + '">' + _esc(g) + '</option>'; }).join('');
+  var groupOpts = getAllAssetTypeGroups().map(function(g){
+    var label = typeof getAssetCategoryDisplayLabel === 'function' ? getAssetCategoryDisplayLabel(g) : g;
+    return '<option value="' + _esc(g) + '">' + _esc(label) + '</option>';
+  }).join('');
   var addRowHTML = '<div style="grid-column:1/-1;display:grid;grid-template-columns:1fr 190px auto;align-items:center;gap:6px;margin-top:6px;padding-top:8px;border-top:1px dashed var(--border);">'
     + '<input id="_newAssetTypeName" class="form-input" style="font-size:12px;padding:5px 8px;" placeholder="Add custom type (e.g. IoT Device, Mainframe…)"'
     + ' onkeydown="if(event.key===\'Enter\')addCustomAssetType(\'' + ctrlId + '\')">'

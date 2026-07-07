@@ -111,14 +111,14 @@ function renderReportsLibraryShell() {
   }
 
   if (state._reportsLibraryView === 'assets') {
-    hdr.innerHTML = '<div class="page-header-row"><div><div class="role-badge">🖥️ Asset inventory</div><h1>Asset inventory</h1><p>Manage asset categories and subtypes — changes sync to control design coverage pickers. Removing a category removes all subtypes in it and clears their control scope.</p></div>'
+    hdr.innerHTML = '<div class="page-header-row"><div><div class="role-badge">🖥️ Asset inventory</div><h1>Asset inventory</h1><p>Manage asset categories and subtypes — rename, add, or remove entries. Coverage keys stay stable so control design checkboxes remain checked after renames.</p></div>'
       + '<div class="page-header-actions"><button type="button" class="btn btn-secondary" onclick="goToReportsDashboard()">← Reports dashboard</button></div></div>';
     renderAssetTypesInventory(body);
     return;
   }
 
   if (state._reportsLibraryView === 'processes') {
-    hdr.innerHTML = '<div class="page-header-row"><div><div class="role-badge">⚙️ Process inventory</div><h1>Process inventory</h1><p>Manage process categories and subtypes — changes sync to control design coverage pickers. Removing a category removes all subtypes in it and clears their control scope.</p></div>'
+    hdr.innerHTML = '<div class="page-header-row"><div><div class="role-badge">⚙️ Process inventory</div><h1>Process inventory</h1><p>Manage process categories and subtypes — rename, add, or remove entries. Coverage keys stay stable so control design checkboxes remain checked after renames.</p></div>'
       + '<div class="page-header-actions"><button type="button" class="btn btn-secondary" onclick="goToReportsDashboard()">← Reports dashboard</button></div></div>';
     renderProcessTypesInventory(body);
     return;
@@ -286,7 +286,12 @@ function _invAssetTypeRows() {
     getActiveAssetTypeCatalog().forEach(function(cat) {
       if (cat.category === 'Process') return;
       cat.types.forEach(function(t) {
-        rows.push({ key: t.key, label: t.label, category: cat.category, isCustom: false });
+        rows.push({
+          key: t.key,
+          label: typeof getAssetTypeDisplayLabel === 'function' ? getAssetTypeDisplayLabel(t.key) : t.label,
+          category: cat.category,
+          isCustom: false
+        });
       });
     });
   }
@@ -391,10 +396,9 @@ function _invRenderProcessSubtypeRow(row, coverage, categories) {
   var procs = _invRegisteredProcessesForType(row.key);
   var safeKey = String(row.key).replace(/'/g, "\\'");
   var safeLabel = String(row.label).replace(/'/g, "\\'");
+  var safeCatId = String(row.categoryId).replace(/'/g, "\\'");
   var catLabel = typeof getProcessCategoryLabel === 'function' ? getProcessCategoryLabel(row.categoryId) : row.categoryId;
-  var nameCell = row.isCustom
-    ? '<input type="text" class="form-input" style="font-size:12px;font-weight:600;" value="' + escapeHTML(row.label) + '" onchange="invUpdateCustomProcessType(\'' + safeKey + '\',this.value,\'' + String(row.categoryId).replace(/'/g, "\\'") + '\')">'
-    : '<span style="font-weight:600;">' + escapeHTML(row.label) + ' <span style="font-size:10px;color:#64748b;font-weight:400;">(built-in)</span></span>';
+  var nameCell = '<input type="text" class="form-input" style="font-size:12px;font-weight:600;" value="' + escapeHTML(row.label) + '" onchange="invRenameProcessSubtype(\'' + safeKey + '\',this.value,' + (row.isCustom ? 'true' : 'false') + ',\'' + safeCatId + '\')">';
   var catCell = row.isCustom
     ? '<select class="form-select" style="font-size:12px;" onchange="invUpdateCustomProcessType(\'' + safeKey + '\',\'' + safeLabel + '\',this.value)">'
       + categories.map(function(c) {
@@ -403,7 +407,7 @@ function _invRenderProcessSubtypeRow(row, coverage, categories) {
       + '</select>'
     : escapeHTML(catLabel);
   return '<tr data-category="' + escapeHTML(row.categoryId) + '" data-label="' + escapeHTML(row.label.toLowerCase()) + '">'
-    + '<td>' + nameCell + '</td>'
+    + '<td>' + nameCell + (row.isCustom ? ' <span style="font-size:10px;color:#64748b;font-weight:400;">(custom)</span>' : ' <span style="font-size:10px;color:#64748b;font-weight:400;">(built-in)</span>') + '</td>'
     + '<td>' + catCell + '</td>'
     + '<td style="text-align:center;font-weight:700;color:' + (ctrlIds.length ? '#166534' : '#94a3b8') + ';">' + ctrlIds.length + '</td>'
     + '<td>' + _invControlBadgesHtml(ctrlIds) + '</td>'
@@ -448,7 +452,15 @@ function _invAssetCategorySections() {
   if (typeof ensureAssetTypeMetadata === 'function') ensureAssetTypeMetadata();
   var sections = {};
   function ensureSection(name, isBuiltIn, isCustomHeader) {
-    if (!sections[name]) sections[name] = { name: name, isBuiltIn: !!isBuiltIn, isCustomHeader: !!isCustomHeader, types: [] };
+    if (!sections[name]) {
+      sections[name] = {
+        name: name,
+        displayName: typeof getAssetCategoryDisplayLabel === 'function' ? getAssetCategoryDisplayLabel(name) : name,
+        isBuiltIn: !!isBuiltIn,
+        isCustomHeader: !!isCustomHeader,
+        types: []
+      };
+    }
   }
   if (typeof getActiveAssetTypeCatalog === 'function') {
     getActiveAssetTypeCatalog().forEach(function(cat) {
@@ -528,6 +540,52 @@ function invSubmitNewAssetTypeFromReports(categoryName) {
   if (nameEl) nameEl.value = '';
 }
 
+function invRenameAssetCategory(canonicalName, newLabel) {
+  if (typeof renameAssetCategory !== 'function') return;
+  if (!renameAssetCategory(canonicalName, newLabel)) { showToast('Could not rename category.', true); return; }
+  if (typeof addAuditEntry === 'function') {
+    addAuditEntry('program', 'asset-types', 'Asset category renamed to "' + newLabel + '" (Reports asset inventory)');
+  }
+  markDirty();
+  if (typeof refreshAssetTypeCatalogViews === 'function') refreshAssetTypeCatalogViews();
+}
+
+function invRenameAssetSubtype(typeKey, oldLabel, newLabel, isCustom, categoryCanonical) {
+  var clean = String(newLabel || '').trim();
+  if (!clean || clean === oldLabel) return;
+  var ok = typeof renameAssetTypeLabel === 'function'
+    && renameAssetTypeLabel(isCustom ? oldLabel : typeKey, clean, isCustom);
+  if (!ok) { showToast('Could not rename subtype.', true); return; }
+  if (typeof addAuditEntry === 'function') {
+    addAuditEntry('program', 'asset-types', 'Asset subtype renamed to "' + clean + '" (Reports asset inventory)');
+  }
+  markDirty();
+  if (typeof refreshAssetTypeCatalogViews === 'function') refreshAssetTypeCatalogViews();
+}
+
+function invRenameProcessCategory(categoryId, newLabel) {
+  if (typeof renameProcessCategoryLabel !== 'function') return;
+  if (!renameProcessCategoryLabel(categoryId, newLabel)) { showToast('Could not rename process category.', true); return; }
+  if (typeof addAuditEntry === 'function') {
+    addAuditEntry('program', 'process-types', 'Process category renamed to "' + newLabel + '" (Reports process inventory)');
+  }
+  markDirty();
+  if (typeof refreshProcessTypeCatalogViews === 'function') refreshProcessTypeCatalogViews();
+}
+
+function invRenameProcessSubtype(typeKey, newLabel, isCustom, categoryId) {
+  var clean = String(newLabel || '').trim();
+  if (!clean) return;
+  var ok = typeof renameProcessTypeLabel === 'function'
+    && renameProcessTypeLabel(typeKey, clean, isCustom);
+  if (!ok) { showToast('Could not rename process subtype.', true); return; }
+  if (typeof addAuditEntry === 'function') {
+    addAuditEntry('program', 'process-types', 'Process subtype renamed to "' + clean + '" (Reports process inventory)');
+  }
+  markDirty();
+  if (typeof refreshProcessTypeCatalogViews === 'function') refreshProcessTypeCatalogViews();
+}
+
 function invChangeCustomAssetTypeGroup(typeName, groupName) {
   var name = String(typeName || '').trim();
   var group = String(groupName || 'Custom').trim() || 'Custom';
@@ -544,15 +602,22 @@ function invChangeCustomAssetTypeGroup(typeName, groupName) {
 function _invRenderAssetSubtypeRow(row, coverage, groups) {
   var ctrlIds = coverage[row.key] || [];
   var assets = _invRegisteredAssetsForType(row);
+  var safeKey = String(row.key).replace(/'/g, "\\'");
   var safeLabel = String(row.label).replace(/'/g, "\\'");
   var safeGroup = String(row.category).replace(/'/g, "\\'");
   var catCell = row.isCustom
     ? '<select class="form-select" style="font-size:12px;" onchange="invChangeCustomAssetTypeGroup(\'' + safeLabel + '\',this.value)">'
-      + groups.map(function(g) { return '<option' + (g === row.category ? ' selected' : '') + '>' + escapeHTML(g) + '</option>'; }).join('')
+      + groups.map(function(g) {
+          var display = typeof getAssetCategoryDisplayLabel === 'function' ? getAssetCategoryDisplayLabel(g) : g;
+          return '<option value="' + escapeHTML(g) + '"' + (g === row.category ? ' selected' : '') + '>' + escapeHTML(display) + '</option>';
+        }).join('')
       + '</select>'
-    : escapeHTML(row.category);
+    : escapeHTML(typeof getAssetCategoryDisplayLabel === 'function' ? getAssetCategoryDisplayLabel(row.category) : row.category);
+  var nameCell = row.isCustom
+    ? '<input type="text" class="form-input" style="font-size:12px;font-weight:600;" value="' + escapeHTML(row.label) + '" onchange="invRenameAssetSubtype(\'' + safeKey + '\',\'' + safeLabel + '\',this.value,true,\'' + safeGroup + '\')">'
+    : '<input type="text" class="form-input" style="font-size:12px;font-weight:600;" value="' + escapeHTML(row.label) + '" onchange="invRenameAssetSubtype(\'' + safeKey + '\',\'' + safeLabel + '\',this.value,false,\'' + safeGroup + '\')">';
   return '<tr data-category="' + escapeHTML(row.category) + '" data-label="' + escapeHTML(row.label.toLowerCase()) + '">'
-    + '<td style="font-weight:600;">' + escapeHTML(row.label) + (row.isCustom ? ' <span style="font-size:10px;color:#64748b;font-weight:400;">(custom)</span>' : ' <span style="font-size:10px;color:#64748b;font-weight:400;">(built-in)</span>') + '</td>'
+    + '<td>' + nameCell + (row.isCustom ? ' <span style="font-size:10px;color:#64748b;font-weight:400;">(custom)</span>' : ' <span style="font-size:10px;color:#64748b;font-weight:400;">(built-in)</span>') + '</td>'
     + '<td>' + catCell + '</td>'
     + '<td style="text-align:center;font-weight:700;color:' + (ctrlIds.length ? '#166534' : '#94a3b8') + ';">' + ctrlIds.length + '</td>'
     + '<td>' + _invControlBadgesHtml(ctrlIds) + '</td>'
@@ -584,7 +649,10 @@ function renderAssetTypesInventory(body) {
     + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">'
     + '<input type="text" id="assetInvNewName" class="form-input" placeholder="Subtype name (e.g. OT Device)" style="font-size:12px;flex:1;min-width:140px;">'
     + '<select id="assetInvNewGroup" class="form-select" style="font-size:12px;min-width:160px;">'
-    + groups.map(function(g) { return '<option>' + escapeHTML(g) + '</option>'; }).join('')
+    + groups.map(function(g) {
+        var display = typeof getAssetCategoryDisplayLabel === 'function' ? getAssetCategoryDisplayLabel(g) : g;
+        return '<option value="' + escapeHTML(g) + '">' + escapeHTML(display) + '</option>';
+      }).join('')
     + '</select>'
     + '<button type="button" class="btn btn-primary btn-sm" onclick="invSubmitNewAssetTypeFromReports()">+ Add subtype</button>'
     + '</div></div></div>'
@@ -604,9 +672,11 @@ function renderAssetTypesInventory(body) {
     var badge = section.isBuiltIn
       ? '<span style="font-size:10px;font-weight:700;color:#1d4ed8;background:#eff6ff;padding:2px 7px;border-radius:6px;margin-left:8px;">Built-in</span>'
       : (section.isCustomHeader ? '<span style="font-size:10px;font-weight:700;color:#0f766e;background:#ecfdf5;padding:2px 7px;border-radius:6px;margin-left:8px;">Custom</span>' : '');
-    html += '<div class="asset-inv-category" data-category="' + escapeHTML(section.name) + '" style="margin-bottom:18px;border:1px solid var(--border);border-radius:10px;overflow:hidden;">'
+    html += '<div class="asset-inv-category" data-category="' + escapeHTML(section.displayName || section.name) + '" style="margin-bottom:18px;border:1px solid var(--border);border-radius:10px;overflow:hidden;">'
       + '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 16px;background:#f8fafc;border-bottom:1px solid var(--border);flex-wrap:wrap;">'
-      + '<div style="font-size:14px;font-weight:800;color:var(--navy);">' + escapeHTML(section.name) + badge
+      + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+      + '<input type="text" class="form-input" style="font-size:14px;font-weight:800;color:var(--navy);min-width:180px;max-width:320px;" value="' + escapeHTML(section.displayName || section.name) + '" onchange="invRenameAssetCategory(\'' + safeCat + '\',this.value)" title="Rename category">'
+      + badge
       + ' <span style="font-size:11px;font-weight:600;color:var(--text-muted);">' + section.types.length + ' subtype(s)</span></div>'
       + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">'
       + '<input type="text" id="assetInvSubtype_' + domId + '" class="form-input" placeholder="Add subtype…" style="font-size:11px;min-width:160px;padding:5px 8px;">'
@@ -725,7 +795,9 @@ function renderProcessTypesInventory(body) {
       : '<span style="font-size:10px;font-weight:700;color:#0f766e;background:#ecfdf5;padding:2px 7px;border-radius:6px;margin-left:8px;">Custom</span>';
     html += '<div class="proc-inv-category" data-category="' + escapeHTML(section.label) + '" data-category-id="' + escapeHTML(section.id) + '" style="margin-bottom:18px;border:1px solid var(--border);border-radius:10px;overflow:hidden;">'
       + '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 16px;background:#f8fafc;border-bottom:1px solid var(--border);flex-wrap:wrap;">'
-      + '<div style="font-size:14px;font-weight:800;color:var(--navy);">' + escapeHTML(section.label) + badge
+      + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+      + '<input type="text" class="form-input" style="font-size:14px;font-weight:800;color:var(--navy);min-width:180px;max-width:320px;" value="' + escapeHTML(section.label) + '" onchange="invRenameProcessCategory(\'' + safeCatId + '\',this.value)" title="Rename category">'
+      + badge
       + ' <span style="font-size:11px;font-weight:600;color:var(--text-muted);">' + section.types.length + ' subtype(s)</span></div>'
       + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">'
       + '<input type="text" id="procInvSubtype_' + domId + '" class="form-input" placeholder="Add subtype…" style="font-size:11px;min-width:160px;padding:5px 8px;">'

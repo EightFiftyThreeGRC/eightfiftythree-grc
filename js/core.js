@@ -1145,6 +1145,9 @@ const state = {
   customProcessCategories: [],       // [{ id, label }] user-defined process domains
   customProcessTypes: [],            // [{ typeKey, label, categoryId }] custom process subtypes for control design
   removedBuiltInProcessCategories: [], // PROCESS_CATEGORIES ids removed from the catalog
+  assetTypeLabelOverrides: {},         // { typeKey: displayLabel } built-in asset/process subtypes
+  assetCategoryLabelOverrides: {},     // { canonicalCategoryName: displayLabel }
+  processCategoryLabelOverrides: {},   // { categoryId: displayLabel }
   cisoComplete: false,
   infoSecPolicy: null,
   policySelectedControls: null,  // { 'AC': ['AC-1', 'AC-2', ...] }
