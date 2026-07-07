@@ -999,16 +999,8 @@ function getSidebarScopedIssues() {
 }
 
 function toggleSidebarRiskList(forceOpen) {
-  if (typeof state._sidebarRiskExpanded !== 'boolean') state._sidebarRiskExpanded = false;
-  if (forceOpen === true) state._sidebarRiskExpanded = true;
-  else if (forceOpen === false) state._sidebarRiskExpanded = false;
-  else state._sidebarRiskExpanded = !state._sidebarRiskExpanded;
-  var list = document.getElementById('sidebar-risk-list');
-  var btn = document.getElementById('sidebar-risk-toggle');
-  if (list) list.classList.toggle('sidebar-sub-list--collapsed', !state._sidebarRiskExpanded);
-  if (btn) {
-    btn.textContent = state._sidebarRiskExpanded ? '▾' : '▸';
-    btn.setAttribute('aria-expanded', state._sidebarRiskExpanded ? 'true' : 'false');
+  if (typeof toggleSidebarReportsList === 'function') {
+    toggleSidebarReportsList(forceOpen === false ? false : true);
   }
 }
 
@@ -1017,6 +1009,7 @@ function goToRiskWorkspace() {
     if (typeof showTab === 'function') showTab('ciso');
     return;
   }
+  state._reportsLibraryView = null;
   state._selectedRiskId = null;
   state._selectedIssueId = null;
   if (typeof canSessionTriageRisk === 'function' && canSessionTriageRisk() && getTriagePendingCount() > 0) {
@@ -1024,6 +1017,7 @@ function goToRiskWorkspace() {
   } else {
     state._riskView = 'issues';
   }
+  if (typeof toggleSidebarReportsList === 'function') toggleSidebarReportsList(true);
   showTab('risk');
 }
 
@@ -1047,86 +1041,16 @@ function openIssueFromSidebar(issueId) {
   showTab('risk');
 }
 
-/** Risks & Issues sidebar inventories (Program section, after Reports; visible after setup). */
+/** Risks & Issues Reports sub-nav (visible after setup for roles with risk access). */
 function renderSidebarRiskInventory() {
-  var list = document.getElementById('sidebar-risk-list');
-  var btn = document.getElementById('sidebar-risk-toggle');
-  var navRisk = document.getElementById('nav-risk');
-  if (!list || !navRisk) return;
+  var navRisk = document.getElementById('nav-reports-library-risks');
+  if (!navRisk) return;
 
   var user = state.currentUserId && state.users
     ? state.users.find(function(u) { return u.id === state.currentUserId; })
     : null;
   var live = isPhase2LiveForUser(user);
   navRisk.style.display = live ? '' : 'none';
-  list.style.display = live ? '' : 'none';
-  if (!live) return;
-
-  if (state._phase2SidebarFirstLive) {
-    state._phase2SidebarFirstLive = false;
-    state._sidebarRiskExpanded = true;
-    markDirty();
-  }
-
-  var risks = getSidebarScopedRisks();
-  var issues = getSidebarScopedIssues();
-  var triageCount = typeof getTriagePendingCount === 'function' ? getTriagePendingCount() : 0;
-  var issueInvLabel = hasPm4PoamControl() ? 'Issue inventory (POA&M)' : 'Issue inventory';
-  var today = new Date().toISOString().slice(0, 10);
-  var html = '';
-
-  if (triageCount > 0 && canSessionTriageRisk()) {
-    html += '<div class="sidebar-sub-list-label">Triage queue</div>'
-      + '<div class="sidebar-item sidebar-sub-item" style="padding-left:28px;font-size:12px;cursor:pointer;" onclick="state._riskView=\'triage\';showTab(\'risk\');">'
-      + '<span style="font-weight:700;color:#b45309;">' + triageCount + ' suggestion' + (triageCount === 1 ? '' : 's') + ' to review</span></div>';
-  }
-
-  html += '<div class="sidebar-sub-list-label">Risk inventory</div>';
-  if (risks.length) {
-    risks.forEach(function(r) {
-      var rating = computeRiskRating(r.likelihood, r.impact);
-      var idJs = riskEscJs(r.id);
-      html += '<div class="sidebar-item sidebar-sub-item" style="padding-left:28px;font-size:12px;cursor:pointer;line-height:1.35;" onclick="openRiskFromSidebar(\'' + idJs + '\')">'
-        + '<span class="poam-sev-pill ' + riskRatingClass(rating) + '" style="font-size:9px;margin-right:4px;vertical-align:middle;">' + escapeHTML(rating) + '</span>'
-        + '<span style="font-weight:600;">' + escapeHTML(r.title.slice(0, 40)) + (r.title.length > 40 ? '…' : '') + '</span></div>';
-    });
-    if ((state.risks || []).filter(function(r) { return r.status !== 'Closed'; }).length > risks.length) {
-      html += '<div class="sidebar-item" style="padding-left:28px;font-size:11px;color:var(--text-muted);">+' + ((state.risks || []).filter(function(r) { return r.status !== 'Closed'; }).length - risks.length) + ' more in register</div>';
-    }
-  } else {
-    html += '<div class="sidebar-item" style="padding-left:28px;font-size:11px;color:var(--text-muted);">No open risks yet</div>';
-  }
-
-  html += '<div class="sidebar-sub-list-label">' + escapeHTML(issueInvLabel) + '</div>';
-  if (issues.length) {
-    issues.forEach(function(i) {
-      var idJs = riskEscJs(i.id);
-      var overdue = i.dueDate && i.dueDate < today;
-      html += '<div class="sidebar-item sidebar-sub-item" style="padding-left:28px;font-size:12px;cursor:pointer;line-height:1.35;" onclick="openIssueFromSidebar(\'' + idJs + '\')">'
-        + '<span class="poam-sev-pill ' + issueSeverityClass(i.severity) + '" style="font-size:9px;margin-right:4px;vertical-align:middle;">' + escapeHTML(i.severity) + '</span>'
-        + '<span style="font-weight:600;">' + escapeHTML(i.title.slice(0, 40)) + (i.title.length > 40 ? '…' : '') + '</span>'
-        + (overdue ? '<span style="color:var(--red);font-size:10px;margin-left:4px;" title="Overdue">⚠</span>' : '')
-        + '</div>';
-    });
-    var openIssueTotal = (state.issues || []).filter(issueIsOpen).length;
-    if (openIssueTotal > issues.length) {
-      html += '<div class="sidebar-item" style="padding-left:28px;font-size:11px;color:var(--text-muted);">+' + (openIssueTotal - issues.length) + ' more open</div>';
-    }
-  } else {
-    html += '<div class="sidebar-item" style="padding-left:28px;font-size:11px;color:var(--text-muted);">No open issues yet</div>';
-  }
-
-  html += '<div class="sidebar-item" style="padding-left:28px;font-size:11px;cursor:pointer;color:var(--teal);font-weight:700;margin-top:4px;" onclick="goToRiskWorkspace()">Open workspace →</div>';
-
-  list.innerHTML = html;
-  var hasItems = risks.length || issues.length || triageCount > 0;
-  if (typeof state._sidebarRiskExpanded !== 'boolean') state._sidebarRiskExpanded = !!hasItems;
-  list.classList.toggle('sidebar-sub-list--collapsed', !state._sidebarRiskExpanded);
-  if (btn) {
-    btn.textContent = state._sidebarRiskExpanded ? '▾' : '▸';
-    btn.setAttribute('aria-expanded', state._sidebarRiskExpanded ? 'true' : 'false');
-    btn.style.visibility = 'visible';
-  }
 }
 
 function renderRiskSummaryHtml() {

@@ -857,6 +857,12 @@ function showTab(tabId) {
   var targetNav = document.getElementById('nav-' + tabId);
   if (targetTab) targetTab.classList.add('active');
   if (targetNav) targetNav.classList.add('active');
+  if (tabId === 'risk') {
+    var repNav = document.getElementById('nav-reports');
+    if (repNav) repNav.classList.add('active');
+    if (typeof toggleSidebarReportsList === 'function') toggleSidebarReportsList(true);
+    if (typeof syncReportsLibraryNavActive === 'function') syncReportsLibraryNavActive();
+  }
   if (tabId === 'home')      renderHomeTab();
   if (tabId === 'ciso')     renderCISOTab();
   if (tabId === 'policy')   renderPolicyTab();

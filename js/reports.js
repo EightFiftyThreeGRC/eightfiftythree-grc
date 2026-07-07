@@ -42,11 +42,14 @@ function syncReportsLibraryNavActive() {
   var ctrlNav = document.getElementById('nav-reports-library-controls');
   var assetNav = document.getElementById('nav-reports-library-assets');
   var procNav = document.getElementById('nav-reports-library-processes');
+  var riskNav = document.getElementById('nav-reports-library-risks');
   var _v = state._reportsLibraryView;
-  if (polNav) polNav.classList.toggle('active', _v === 'policies');
-  if (ctrlNav) ctrlNav.classList.toggle('active', _v === 'controls');
-  if (assetNav) assetNav.classList.toggle('active', _v === 'assets');
-  if (procNav) procNav.classList.toggle('active', _v === 'processes');
+  var riskTabActive = !!(document.getElementById('tab-risk') && document.getElementById('tab-risk').classList.contains('active'));
+  if (polNav) polNav.classList.toggle('active', _v === 'policies' && !riskTabActive);
+  if (ctrlNav) ctrlNav.classList.toggle('active', _v === 'controls' && !riskTabActive);
+  if (assetNav) assetNav.classList.toggle('active', _v === 'assets' && !riskTabActive);
+  if (procNav) procNav.classList.toggle('active', _v === 'processes' && !riskTabActive);
+  if (riskNav) riskNav.classList.toggle('active', riskTabActive);
 }
 
 function userHasReportsLibraryAccess(user) {

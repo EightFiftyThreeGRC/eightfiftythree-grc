@@ -377,8 +377,7 @@
     body.setup-focus-mode #sidebar-workspaces-section { display: none; }
     body.setup-focus-mode #sidebar-program-section #nav-reports,
     body.setup-focus-mode #sidebar-program-section #sidebar-reports-list,
-    body.setup-focus-mode #sidebar-program-section #nav-risk,
-    body.setup-focus-mode #sidebar-program-section #sidebar-risk-list,
+    body.setup-focus-mode #sidebar-program-section #nav-reports-library-risks,
     body.setup-focus-mode #sidebar-program-section #nav-frameworks,
     body.setup-focus-mode #sidebar-program-section #nav-users { display: none !important; }
     body.setup-focus-mode #sidebar-program-section .sidebar-section-label { display: none; }
