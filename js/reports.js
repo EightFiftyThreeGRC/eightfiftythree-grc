@@ -111,7 +111,7 @@ function renderReportsLibraryShell() {
   }
 
   if (state._reportsLibraryView === 'assets') {
-    hdr.innerHTML = '<div class="page-header-row"><div><div class="role-badge">🖥️ Asset inventory</div><h1>Asset inventory</h1><p>Manage the asset type catalog — add or remove types here and they appear in control design coverage pickers. Removing a type clears it from all control scope mappings.</p></div>'
+    hdr.innerHTML = '<div class="page-header-row"><div><div class="role-badge">🖥️ Asset inventory</div><h1>Asset inventory</h1><p>Manage asset categories and subtypes — changes sync to control design coverage pickers. Removing a category removes all subtypes in it and clears their control scope.</p></div>'
       + '<div class="page-header-actions"><button type="button" class="btn btn-secondary" onclick="goToReportsDashboard()">← Reports dashboard</button></div></div>';
     renderAssetTypesInventory(body);
     return;
@@ -343,6 +343,39 @@ function _invRegisteredNamesCell(items, emptyLabel) {
   return '<div style="font-weight:600;margin-bottom:2px;">' + items.length + '</div>' + preview;
 }
 
+function _invAssetCategorySections() {
+  if (typeof ensureAssetTypeMetadata === 'function') ensureAssetTypeMetadata();
+  var sections = {};
+  function ensureSection(name, isBuiltIn, isCustomHeader) {
+    if (!sections[name]) sections[name] = { name: name, isBuiltIn: !!isBuiltIn, isCustomHeader: !!isCustomHeader, types: [] };
+  }
+  if (typeof getActiveAssetTypeCatalog === 'function') {
+    getActiveAssetTypeCatalog().forEach(function(cat) {
+      if (cat.category === 'Process') return;
+      ensureSection(cat.category, true, false);
+      cat.types.forEach(function(t) {
+        sections[cat.category].types.push({ key: t.key, label: t.label, category: cat.category, isCustom: false });
+      });
+    });
+  }
+  (state.customAssetTypes || []).forEach(function(name) {
+    if (!name || !String(name).trim()) return;
+    var group = ((state.customAssetTypeGroups || {})[name] || 'Custom').trim() || 'Custom';
+    if (group === 'Process') return;
+    ensureSection(group, false, (state.customAssetTypeHeaders || []).indexOf(group) !== -1);
+    sections[group].types.push({ key: 'custom_' + name, label: name, category: group, isCustom: true });
+  });
+  (state.customAssetTypeHeaders || []).forEach(function(h) {
+    if (!h || !String(h).trim() || h === 'Process') return;
+    ensureSection(h, false, true);
+  });
+  return Object.keys(sections).sort().map(function(k) { return sections[k]; });
+}
+
+function _invRetiredAssetCategories() {
+  return (state.removedBuiltInAssetTypeGroups || []).filter(function(g) { return g !== 'Process'; });
+}
+
 function _invRetiredBuiltInAssetTypes() {
   var retired = [];
   (state.removedBuiltInAssetTypeKeys || []).forEach(function(key) {
@@ -361,12 +394,35 @@ function invApplyAssetTypeChange(action, typeName, groupName) {
   applyAssetTypeChangeDirect(action, typeName, '', groupName || 'Custom');
 }
 
-function invSubmitNewAssetTypeFromReports() {
-  var nameEl = document.getElementById('assetInvNewName');
+function invApplyAssetCategoryChange(action, categoryName) {
+  if (typeof applyAssetTypeHeaderChangeDirect === 'function') {
+    applyAssetTypeHeaderChangeDirect(action, categoryName);
+  }
+}
+
+function invRestoreAssetCategory(categoryName) {
+  if (typeof restoreAssetTypeCategoryDirect === 'function') restoreAssetTypeCategoryDirect(categoryName);
+}
+
+function invSubmitNewAssetCategoryFromReports() {
+  var el = document.getElementById('assetInvNewCategory');
+  var name = ((el && el.value) || '').trim();
+  if (!name) { showToast('Category name is required.', true); if (el) el.focus(); return; }
+  invApplyAssetCategoryChange('add', name);
+  if (el) el.value = '';
+}
+
+function invSafeDomId(str) {
+  return String(str || '').replace(/[^a-zA-Z0-9_-]/g, '_');
+}
+
+function invSubmitNewAssetTypeFromReports(categoryName) {
+  var cat = String(categoryName || '').trim();
+  var nameEl = cat ? document.getElementById('assetInvSubtype_' + invSafeDomId(cat)) : document.getElementById('assetInvNewName');
   var groupEl = document.getElementById('assetInvNewGroup');
   var name = ((nameEl && nameEl.value) || '').trim();
-  var group = ((groupEl && groupEl.value) || 'Custom').trim() || 'Custom';
-  if (!name) { showToast('Asset type name is required.', true); if (nameEl) nameEl.focus(); return; }
+  var group = cat || ((groupEl && groupEl.value) || 'Custom').trim() || 'Custom';
+  if (!name) { showToast('Subtype name is required.', true); if (nameEl) nameEl.focus(); return; }
   invApplyAssetTypeChange('add', name, group);
   if (nameEl) nameEl.value = '';
 }
@@ -379,90 +435,147 @@ function invChangeCustomAssetTypeGroup(typeName, groupName) {
   state.customAssetTypeGroups[name] = group;
   markDirty();
   if (typeof addAuditEntry === 'function') {
-    addAuditEntry('program', 'asset-types', 'Custom asset type "' + name + '" moved to group "' + group + '" (Reports asset inventory)');
+    addAuditEntry('program', 'asset-types', 'Custom asset subtype "' + name + '" moved to category "' + group + '" (Reports asset inventory)');
   }
   setTimeout(function() { renderReportsLibraryShell(); }, 0);
+}
+
+function _invRenderAssetSubtypeRow(row, coverage, groups) {
+  var ctrlIds = coverage[row.key] || [];
+  var assets = _invRegisteredAssetsForType(row);
+  var safeLabel = String(row.label).replace(/'/g, "\\'");
+  var safeGroup = String(row.category).replace(/'/g, "\\'");
+  var catCell = row.isCustom
+    ? '<select class="form-select" style="font-size:12px;" onchange="invChangeCustomAssetTypeGroup(\'' + safeLabel + '\',this.value)">'
+      + groups.map(function(g) { return '<option' + (g === row.category ? ' selected' : '') + '>' + escapeHTML(g) + '</option>'; }).join('')
+      + '</select>'
+    : escapeHTML(row.category);
+  return '<tr data-category="' + escapeHTML(row.category) + '" data-label="' + escapeHTML(row.label.toLowerCase()) + '">'
+    + '<td style="font-weight:600;">' + escapeHTML(row.label) + (row.isCustom ? ' <span style="font-size:10px;color:#64748b;font-weight:400;">(custom)</span>' : ' <span style="font-size:10px;color:#64748b;font-weight:400;">(built-in)</span>') + '</td>'
+    + '<td>' + catCell + '</td>'
+    + '<td style="text-align:center;font-weight:700;color:' + (ctrlIds.length ? '#166534' : '#94a3b8') + ';">' + ctrlIds.length + '</td>'
+    + '<td>' + _invControlBadgesHtml(ctrlIds) + '</td>'
+    + '<td>' + _invRegisteredNamesCell(assets, 'None registered') + '</td>'
+    + '<td><button type="button" class="btn btn-sm" style="font-size:10px;padding:3px 8px;background:#fee2e2;color:#991b1b;border:1px solid #fecaca;" onclick="invApplyAssetTypeChange(\'delete\',\'' + safeLabel + '\',\'' + safeGroup + '\')">Remove</button></td>'
+    + '</tr>';
 }
 
 function renderAssetTypesInventory(body) {
   if (!body) return;
   if (typeof ensureAssetTypeMetadata === 'function') ensureAssetTypeMetadata();
-  var rows = _invAssetTypeRows();
+  var sections = _invAssetCategorySections();
   var coverage = _invBuildTypeCoverageIndex();
-  var retired = _invRetiredBuiltInAssetTypes();
-  var categories = rows.map(function(r) { return r.category; }).filter(function(v, i, arr) { return arr.indexOf(v) === i; }).sort();
-  var groups = (typeof getAllAssetTypeGroups === 'function') ? getAllAssetTypeGroups() : categories.concat(['Custom']);
-  var canEditGroups = typeof userCanApproveAssetTypeRequests === 'function' && userCanApproveAssetTypeRequests();
-  var html = '<div style="background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:14px;">'
-    + '<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px;">Add asset type</div>'
-    + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;line-height:1.45;">New types are added to the program catalog and appear in control design coverage checkboxes. To restore a retired built-in type, use <strong>Restore</strong> below.</div>'
-    + '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">'
-    + '<input type="text" id="assetInvNewName" class="form-input" placeholder="Type name (e.g. OT Device, Mainframe)" style="font-size:12px;min-width:220px;flex:1;">'
-    + '<select id="assetInvNewGroup" class="form-select" style="font-size:12px;min-width:180px;">'
+  var retiredCats = _invRetiredAssetCategories();
+  var retiredTypes = _invRetiredBuiltInAssetTypes();
+  var groups = (typeof getAllAssetTypeGroups === 'function') ? getAllAssetTypeGroups().filter(function(g) { return g !== 'Process'; }) : [];
+  var subtypeCount = sections.reduce(function(n, s) { return n + s.types.length; }, 0);
+  var html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">'
+    + '<div style="background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:16px;">'
+    + '<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px;">Add category</div>'
+    + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">Creates a new section header in control design (e.g. Operational Technology).</div>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
+    + '<input type="text" id="assetInvNewCategory" class="form-input" placeholder="Category name" style="font-size:12px;flex:1;min-width:160px;">'
+    + '<button type="button" class="btn btn-primary btn-sm" onclick="invSubmitNewAssetCategoryFromReports()">+ Add category</button>'
+    + '</div></div>'
+    + '<div style="background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:16px;">'
+    + '<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px;">Add subtype</div>'
+    + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">Adds an asset type under a category — appears in control design checkboxes.</div>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">'
+    + '<input type="text" id="assetInvNewName" class="form-input" placeholder="Subtype name (e.g. OT Device)" style="font-size:12px;flex:1;min-width:140px;">'
+    + '<select id="assetInvNewGroup" class="form-select" style="font-size:12px;min-width:160px;">'
     + groups.map(function(g) { return '<option>' + escapeHTML(g) + '</option>'; }).join('')
     + '</select>'
-    + '<button type="button" class="btn btn-primary btn-sm" onclick="invSubmitNewAssetTypeFromReports()">+ Add type</button>'
-    + '</div></div>'
+    + '<button type="button" class="btn btn-primary btn-sm" onclick="invSubmitNewAssetTypeFromReports()">+ Add subtype</button>'
+    + '</div></div></div>'
     + '<div style="background:white;border:1px solid var(--border);border-radius:10px;padding:20px;">'
     + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px;">'
-    + '<div style="font-size:12px;color:var(--text-muted);">' + rows.length + ' active asset types · synced with control design · ' + (state.assets || []).length + ' registered asset(s)</div>'
-    + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
-    + '<input type="text" id="assetInvSearch" placeholder="Search…" oninput="filterAssetInvTable()" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;">'
-    + '<select id="assetInvCatFilter" onchange="filterAssetInvTable()" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;"><option value="">All categories</option>'
-    + categories.map(function(c) { return '<option value="' + escapeHTML(c) + '">' + escapeHTML(c) + '</option>'; }).join('')
-    + '</select>'
-    + '</div></div>'
-    + '<div class="table-scroll"><table class="control-table" id="assetInvTable"><thead><tr>'
-    + '<th style="width:180px;">Category</th><th>Asset type</th><th style="width:90px;text-align:center;">Controls</th><th>Scoped controls</th><th style="width:200px;">Registered assets</th><th style="width:100px;">Actions</th>'
-    + '</tr></thead><tbody>'
-    + rows.map(function(row) {
-        var ctrlIds = coverage[row.key] || [];
-        var assets = _invRegisteredAssetsForType(row);
-        var safeLabel = String(row.label).replace(/'/g, "\\'");
-        var safeGroup = String(row.category).replace(/'/g, "\\'");
-        var catCell = row.isCustom && canEditGroups
-          ? '<select class="form-select" style="font-size:12px;" onchange="invChangeCustomAssetTypeGroup(\'' + safeLabel + '\',this.value)">'
-            + groups.map(function(g) { return '<option' + (g === row.category ? ' selected' : '') + '>' + escapeHTML(g) + '</option>'; }).join('')
-            + '</select>'
-          : escapeHTML(row.category) + (row.isCustom ? ' <span style="font-size:10px;color:#64748b;">(custom)</span>' : '');
-        return '<tr data-category="' + escapeHTML(row.category) + '" data-label="' + escapeHTML(row.label.toLowerCase()) + '">'
-          + '<td>' + catCell + '</td>'
-          + '<td style="font-weight:600;">' + escapeHTML(row.label) + (row.isCustom ? '' : ' <span style="font-size:10px;color:#64748b;font-weight:400;">(built-in)</span>') + '</td>'
-          + '<td style="text-align:center;font-weight:700;color:' + (ctrlIds.length ? '#166534' : '#94a3b8') + ';">' + ctrlIds.length + '</td>'
-          + '<td>' + _invControlBadgesHtml(ctrlIds) + '</td>'
-          + '<td>' + _invRegisteredNamesCell(assets, 'None registered') + '</td>'
-          + '<td><button type="button" class="btn btn-sm" style="font-size:10px;padding:3px 8px;background:#fee2e2;color:#991b1b;border:1px solid #fecaca;" onclick="invApplyAssetTypeChange(\'delete\',\'' + safeLabel + '\',\'' + safeGroup + '\')">Remove</button></td>'
-          + '</tr>';
-      }).join('')
-    + '</tbody></table></div>'
-    + (retired.length
-      ? '<div style="margin-top:16px;border-top:1px dashed var(--border);padding-top:14px;">'
-        + '<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:6px;">Retired built-in types (' + retired.length + ')</div>'
-        + '<div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;">These were removed from the catalog. Restoring adds them back to control design pickers.</div>'
-        + '<div style="display:flex;flex-wrap:wrap;gap:8px;">'
-        + retired.map(function(item) {
-            var safeLabel = String(item.label).replace(/'/g, "\\'");
-            var safeGroup = String(item.category).replace(/'/g, "\\'");
-            return '<span style="display:inline-flex;align-items:center;gap:6px;font-size:11px;padding:4px 10px;border:1px solid #fed7aa;border-radius:999px;background:#fff7ed;color:#9a3412;">'
-              + escapeHTML(item.label)
-              + ' <span style="color:#78716c;">(' + escapeHTML(item.category) + ')</span>'
-              + '<button type="button" style="border:none;background:none;color:#0369a1;cursor:pointer;font-size:11px;font-weight:700;" onclick="invApplyAssetTypeChange(\'add\',\'' + safeLabel + '\',\'' + safeGroup + '\')">Restore</button>'
-              + '</span>';
-          }).join('')
-        + '</div></div>'
-      : '')
+    + '<div style="font-size:12px;color:var(--text-muted);">' + sections.length + ' categories · ' + subtypeCount + ' subtypes · synced with control design</div>'
+    + '<input type="text" id="assetInvSearch" placeholder="Search categories or subtypes…" oninput="filterAssetInvTable()" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;min-width:220px;">'
     + '</div>';
+
+  if (!sections.length) {
+    html += '<div class="empty-state" style="padding:24px;"><div class="es-title">No asset categories</div><p>Add a category above, then add subtypes under it.</p></div>';
+  }
+
+  sections.forEach(function(section) {
+    var safeCat = String(section.name).replace(/'/g, "\\'");
+    var domId = invSafeDomId(section.name);
+    var badge = section.isBuiltIn
+      ? '<span style="font-size:10px;font-weight:700;color:#1d4ed8;background:#eff6ff;padding:2px 7px;border-radius:6px;margin-left:8px;">Built-in</span>'
+      : (section.isCustomHeader ? '<span style="font-size:10px;font-weight:700;color:#0f766e;background:#ecfdf5;padding:2px 7px;border-radius:6px;margin-left:8px;">Custom</span>' : '');
+    html += '<div class="asset-inv-category" data-category="' + escapeHTML(section.name) + '" style="margin-bottom:18px;border:1px solid var(--border);border-radius:10px;overflow:hidden;">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 16px;background:#f8fafc;border-bottom:1px solid var(--border);flex-wrap:wrap;">'
+      + '<div style="font-size:14px;font-weight:800;color:var(--navy);">' + escapeHTML(section.name) + badge
+      + ' <span style="font-size:11px;font-weight:600;color:var(--text-muted);">' + section.types.length + ' subtype(s)</span></div>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">'
+      + '<input type="text" id="assetInvSubtype_' + domId + '" class="form-input" placeholder="Add subtype…" style="font-size:11px;min-width:160px;padding:5px 8px;">'
+      + '<button type="button" class="btn btn-secondary btn-sm" style="font-size:11px;" onclick="invSubmitNewAssetTypeFromReports(\'' + safeCat + '\')">+ Subtype</button>'
+      + '<button type="button" class="btn btn-sm" style="font-size:10px;padding:4px 10px;background:#fee2e2;color:#991b1b;border:1px solid #fecaca;" onclick="invApplyAssetCategoryChange(\'delete\',\'' + safeCat + '\')">Remove category</button>'
+      + '</div></div>';
+    if (section.types.length) {
+      html += '<div class="table-scroll"><table class="control-table asset-inv-subtype-table"><thead><tr>'
+        + '<th>Subtype</th><th style="width:160px;">Category</th><th style="width:72px;text-align:center;">Controls</th><th>Scoped controls</th><th style="width:180px;">Registered assets</th><th style="width:88px;">Actions</th>'
+        + '</tr></thead><tbody>'
+        + section.types.map(function(row) { return _invRenderAssetSubtypeRow(row, coverage, groups); }).join('')
+        + '</tbody></table></div>';
+    } else {
+      html += '<div style="padding:16px;font-size:12px;color:var(--text-muted);">No subtypes yet — use the field above to add one to this category.</div>';
+    }
+    html += '</div>';
+  });
+
+  if (retiredCats.length) {
+    html += '<div style="margin-top:8px;border-top:1px dashed var(--border);padding-top:14px;">'
+      + '<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:6px;">Retired categories (' + retiredCats.length + ')</div>'
+      + '<div style="display:flex;flex-wrap:wrap;gap:8px;">'
+      + retiredCats.map(function(cat) {
+          var safeCat = String(cat).replace(/'/g, "\\'");
+          return '<span style="display:inline-flex;align-items:center;gap:6px;font-size:11px;padding:4px 10px;border:1px solid #fed7aa;border-radius:999px;background:#fff7ed;color:#9a3412;">'
+            + escapeHTML(cat)
+            + '<button type="button" style="border:none;background:none;color:#0369a1;cursor:pointer;font-size:11px;font-weight:700;" onclick="invRestoreAssetCategory(\'' + safeCat + '\')">Restore category</button>'
+            + '</span>';
+        }).join('')
+      + '</div></div>';
+  }
+
+  if (retiredTypes.length) {
+    html += '<div style="margin-top:14px;border-top:1px dashed var(--border);padding-top:14px;">'
+      + '<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:6px;">Retired built-in subtypes (' + retiredTypes.length + ')</div>'
+      + '<div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;">Individual subtypes removed from the catalog. Restoring adds them back to control design.</div>'
+      + '<div style="display:flex;flex-wrap:wrap;gap:8px;">'
+      + retiredTypes.map(function(item) {
+          var safeLabel = String(item.label).replace(/'/g, "\\'");
+          var safeGroup = String(item.category).replace(/'/g, "\\'");
+          return '<span style="display:inline-flex;align-items:center;gap:6px;font-size:11px;padding:4px 10px;border:1px solid #fed7aa;border-radius:999px;background:#fff7ed;color:#9a3412;">'
+            + escapeHTML(item.label)
+            + ' <span style="color:#78716c;">(' + escapeHTML(item.category) + ')</span>'
+            + '<button type="button" style="border:none;background:none;color:#0369a1;cursor:pointer;font-size:11px;font-weight:700;" onclick="invApplyAssetTypeChange(\'add\',\'' + safeLabel + '\',\'' + safeGroup + '\')">Restore</button>'
+            + '</span>';
+        }).join('')
+      + '</div></div>';
+  }
+
+  html += '</div>';
   body.innerHTML = html;
 }
 
 function filterAssetInvTable() {
   var q = ((document.getElementById('assetInvSearch') || {}).value || '').toLowerCase();
-  var cat = (document.getElementById('assetInvCatFilter') || {}).value || '';
-  var rows = document.querySelectorAll('#assetInvTable tbody tr');
-  rows.forEach(function(tr) {
-    var okQ = !q || (tr.textContent || '').toLowerCase().indexOf(q) !== -1;
-    var okC = !cat || tr.getAttribute('data-category') === cat;
-    tr.style.display = (okQ && okC) ? '' : 'none';
+  document.querySelectorAll('.asset-inv-category').forEach(function(block) {
+    var catName = (block.getAttribute('data-category') || '').toLowerCase();
+    var catMatch = !q || catName.indexOf(q) !== -1 || (block.textContent || '').toLowerCase().indexOf(q) !== -1;
+    block.style.display = catMatch ? '' : 'none';
+    if (!q) {
+      block.querySelectorAll('.asset-inv-subtype-table tbody tr').forEach(function(tr) { tr.style.display = ''; });
+      return;
+    }
+    var anyVisible = catName.indexOf(q) !== -1;
+    block.querySelectorAll('.asset-inv-subtype-table tbody tr').forEach(function(tr) {
+      var rowMatch = (tr.textContent || '').toLowerCase().indexOf(q) !== -1;
+      tr.style.display = rowMatch ? '' : 'none';
+      if (rowMatch) anyVisible = true;
+    });
+    block.style.display = anyVisible ? '' : 'none';
   });
 }
 

@@ -361,12 +361,15 @@ function findBuiltInAssetType(typeName) {
 function getActiveAssetTypeCatalog() {
   ensureAssetTypeMetadata();
   var removed = state.removedBuiltInAssetTypeKeys || [];
+  var removedGroups = state.removedBuiltInAssetTypeGroups || [];
   return ASSET_TYPES.map(function(cat) {
     return {
       category: cat.category,
       types: cat.types.filter(function(t) { return removed.indexOf(t.key) === -1; })
     };
-  }).filter(function(cat) { return cat.types.length > 0; });
+  }).filter(function(cat) {
+    return cat.types.length > 0 && removedGroups.indexOf(cat.category) === -1;
+  });
 }
 
 function getAllAssetTypeGroups() {
@@ -447,10 +450,75 @@ function applyAssetTypeChangeDirect(action, typeName, reason, groupName) {
   addAuditEntry('program', 'asset-types', 'Asset type ' + normalizedAction + ' by ' + getCurrentActorName() + ' for "' + cleanType + '": ' + auditNote);
   markDirty();
   showToast('Asset type ' + (normalizedAction === 'add' ? 'added' : 'removed') + '.');
+  refreshAssetTypeCatalogViews();
+}
+
+function refreshAssetTypeCatalogViews() {
   renderAssetTypeLibrary();
   if (state._reportsLibraryView === 'assets' && typeof renderReportsLibraryShell === 'function') {
     setTimeout(function() { renderReportsLibraryShell(); }, 0);
   }
+}
+
+function applyAssetTypeHeaderAdd(headerName) {
+  var clean = (headerName || '').trim();
+  if (!clean || clean === 'Custom' || clean === 'Process') return false;
+  ensureAssetTypeMetadata();
+  var isBuiltIn = ASSET_TYPES.some(function(cat) { return cat.category === clean; });
+  if (isBuiltIn) {
+    var removedIdx = (state.removedBuiltInAssetTypeGroups || []).indexOf(clean);
+    if (removedIdx === -1) return false;
+    state.removedBuiltInAssetTypeGroups.splice(removedIdx, 1);
+    return true;
+  }
+  var all = getAllAssetTypeGroups().map(function(x) { return x.toLowerCase(); });
+  if (all.indexOf(clean.toLowerCase()) !== -1) return false;
+  if (!state.customAssetTypeHeaders) state.customAssetTypeHeaders = [];
+  state.customAssetTypeHeaders.push(clean);
+  return true;
+}
+
+function restoreAssetTypeCategory(categoryName, restoreSubtypes) {
+  var clean = (categoryName || '').trim();
+  if (!clean) return false;
+  var changed = applyAssetTypeHeaderAdd(clean);
+  if (restoreSubtypes !== false) {
+    ASSET_TYPES.forEach(function(cat) {
+      if (cat.category !== clean) return;
+      cat.types.forEach(function(t) {
+        if ((state.removedBuiltInAssetTypeKeys || []).indexOf(t.key) !== -1) {
+          if (applyAssetTypeAdd(t.label, clean)) changed = true;
+        }
+      });
+    });
+  }
+  return changed;
+}
+
+function removeAssetTypeCategoryCascade(categoryName) {
+  var clean = (categoryName || '').trim();
+  if (!clean || clean === 'Custom' || clean === 'Process') return false;
+  ensureAssetTypeMetadata();
+  var labelsToRemove = [];
+  ASSET_TYPES.forEach(function(cat) {
+    if (cat.category !== clean) return;
+    cat.types.forEach(function(t) {
+      if ((state.removedBuiltInAssetTypeKeys || []).indexOf(t.key) === -1) labelsToRemove.push(t.label);
+    });
+  });
+  (state.customAssetTypes || []).forEach(function(name) {
+    if (((state.customAssetTypeGroups || {})[name] || 'Custom') === clean) labelsToRemove.push(name);
+  });
+  labelsToRemove.forEach(function(label) { applyAssetTypeDelete(label); });
+  var isBuiltIn = ASSET_TYPES.some(function(cat) { return cat.category === clean; });
+  if (isBuiltIn) {
+    if ((state.removedBuiltInAssetTypeGroups || []).indexOf(clean) === -1) {
+      state.removedBuiltInAssetTypeGroups.push(clean);
+    }
+  } else {
+    state.customAssetTypeHeaders = (state.customAssetTypeHeaders || []).filter(function(h) { return h !== clean; });
+  }
+  return true;
 }
 
 function removeAssetTypeHeader(headerName) {
@@ -477,7 +545,36 @@ function removeAssetTypeHeader(headerName) {
     state.customAssetTypeHeaders = (state.customAssetTypeHeaders || []).filter(function(h){ return h !== clean; });
   }
   markDirty();
-  renderAssetTypeLibrary();
+  refreshAssetTypeCatalogViews();
+}
+
+function applyAssetTypeHeaderChangeDirect(action, headerName) {
+  var clean = (headerName || '').trim();
+  if (!clean) { showToast('Category name is required.', true); return; }
+  if (clean === 'Custom' || clean === 'Process') { showToast('That category name is reserved.', true); return; }
+  if (action === 'delete') {
+    if (!confirm('Remove category "' + clean + '" and all asset types in it?\n\nThis clears control design coverage for every subtype in this category.')) return;
+    if (!removeAssetTypeCategoryCascade(clean)) { showToast('Category could not be removed.', true); return; }
+    addAuditEntry('program', 'asset-types', 'Asset category removed by ' + getCurrentActorName() + ': "' + clean + '" (including all subtypes)');
+    markDirty();
+    showToast('Category "' + clean + '" removed.');
+  } else {
+    if (!applyAssetTypeHeaderAdd(clean)) { showToast('Category already exists or could not be added.', true); return; }
+    addAuditEntry('program', 'asset-types', 'Asset category added by ' + getCurrentActorName() + ': "' + clean + '"');
+    markDirty();
+    showToast('Category "' + clean + '" added.');
+  }
+  refreshAssetTypeCatalogViews();
+}
+
+function restoreAssetTypeCategoryDirect(categoryName) {
+  var clean = (categoryName || '').trim();
+  if (!clean) return;
+  if (!restoreAssetTypeCategory(clean, true)) { showToast('Category could not be restored.', true); return; }
+  addAuditEntry('program', 'asset-types', 'Asset category restored by ' + getCurrentActorName() + ': "' + clean + '" (with retired subtypes)');
+  markDirty();
+  showToast('Category "' + clean + '" restored.');
+  refreshAssetTypeCatalogViews();
 }
 
 function submitAssetTypeRequest(action, typeName, reason, groupName) {
