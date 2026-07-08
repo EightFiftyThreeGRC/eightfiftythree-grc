@@ -75,8 +75,8 @@ function getControlDeselectLifecycle(ctrlId) {
 function renderControlLibraryView() {
   var body = document.getElementById('control-library-body');
   if (!body) return;
-  if (!getProgramScopeReady()) {
-    body.innerHTML = '<div class="empty-state"><div class="es-icon">🏛️</div><div class="es-title">Program Setup Required</div><p>Complete category scope in program setup to load the subcategory catalog.</p></div>';
+  if (!state.baseline) {
+    body.innerHTML = '<div class="empty-state"><div class="es-icon">🏛️</div><div class="es-title">CISO Setup Required</div><p>Complete baseline selection to generate the control catalog.</p></div>';
     return;
   }
   var controls = getActiveControls();
@@ -92,7 +92,7 @@ function renderControlLibraryView() {
   var q = (state._controlLibrarySearch || '').toLowerCase();
   var cf = state._controlLibraryColFilters || {};
   function inActiveBaseline(c) {
-    return true;
+    return c.bl && (c.bl.indexOf(state.baseline) !== -1 || (state.privacyOverlay && c.bl.indexOf('P') !== -1));
   }
   var deselectBaselineCount = controls.filter(function(c) {
     var cs = state.controlStatus[c.id] || {};
@@ -189,8 +189,8 @@ function renderControlLibraryView() {
 function renderPublishedControlLibrary(bodyEl) {
   var body = bodyEl || document.getElementById('reports-library-body');
   if (!body) return;
-  if (!getProgramScopeReady()) {
-    body.innerHTML = '<div class="empty-state"><div class="es-icon">🏛️</div><div class="es-title">Program Setup Required</div><p>Complete category scope in program setup to load the subcategory catalog.</p></div>';
+  if (!state.baseline) {
+    body.innerHTML = '<div class="empty-state"><div class="es-icon">🏛️</div><div class="es-title">CISO Setup Required</div><p>Complete baseline selection to generate the control catalog.</p></div>';
     return;
   }
   var plannedPlus = ['Planned', 'In Progress', 'Implemented', 'Not Applicable', 'Inherited'];
@@ -212,7 +212,7 @@ function renderPublishedControlLibrary(bodyEl) {
     + '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px;">'
     + '<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:12px 14px;"><div style="font-size:10px;font-weight:700;color:#1d4ed8;text-transform:uppercase;">In catalog</div><div style="font-size:24px;font-weight:800;color:#1d4ed8;">' + rows.length + '</div></div>'
     + '<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:12px 14px;"><div style="font-size:10px;font-weight:700;color:#166534;text-transform:uppercase;">Designed</div><div style="font-size:24px;font-weight:800;color:#166534;">' + designedCount + '</div></div>'
-    + '<div style="background:#faf5ff;border:1px solid rgba(99,102,241,0.25);border-radius:10px;padding:12px 14px;"><div style="font-size:10px;font-weight:700;color:#6366f1;text-transform:uppercase;">Baseline</div><div style="font-size:24px;font-weight:800;color:#6366f1;">' + escapeHTML(getProgramBaselineLabel()) + '</div></div>'
+    + '<div style="background:#faf5ff;border:1px solid rgba(99,102,241,0.25);border-radius:10px;padding:12px 14px;"><div style="font-size:10px;font-weight:700;color:#6366f1;text-transform:uppercase;">Baseline</div><div style="font-size:24px;font-weight:800;color:#6366f1;">' + escapeHTML(state.baseline === 'L' ? 'Low' : state.baseline === 'M' ? 'Moderate' : 'High') + '</div></div>'
     + '</div>'
     + '<div class="filter-bar" style="margin-bottom:12px;">'
     + '<input class="form-input" value="' + escapeHTML(state._reportsControlLibSearch || '') + '" placeholder="Search control ID or name..." oninput="state._reportsControlLibSearch=this.value;renderPublishedControlLibrary()">'
@@ -468,7 +468,7 @@ function getPendingPolicyFamiliesForUser() {
 function renderControlStep1() {
   const body = document.getElementById('control-step-1-body');
   if (!body) return;
-  if (!getProgramScopeReady()) {
+  if (!state.baseline) {
     body.innerHTML = `<div class="empty-state"><div class="es-icon">🏛️</div><div class="es-title">CISO Setup Required</div><p>The CISO must complete program setup to select controls and assign owners.</p><button class="btn btn-primary" onclick="goToProgramSetupOrDashboard()" style="margin-top:16px;">${state.cisoComplete ? 'Go to Dashboard →' : 'Go to CISO Setup →'}</button></div>`;
     return;
   }
@@ -602,7 +602,7 @@ function renderControlStep1() {
             const cid = c.id.replace(/'/g,"\\'");
             const ownerKey = typeof getControlOwnerFilterKey === 'function' ? getControlOwnerFilterKey(co) : ownerAttr;
             const nameAttr = (c.n || '').replace(/"/g, '&quot;');
-            const deselBaseline = false;
+            const deselBaseline = cs.deselectDecision === 'Approved' && c.bl && (c.bl.includes(state.baseline) || (state.privacyOverlay && c.bl.includes('P')));
             return `<tr data-id="${c.id}" data-name="${nameAttr}" data-family="${c.f}" data-status="${st}" data-owner="${escapeHTML(ownerKey)}" data-designed="${designed ? '1' : '0'}" data-deselected="${deselBaseline?'1':'0'}" class="${deselBaseline?'tr-deselected-baseline':''}" style="cursor:pointer;" onmouseover="this.style.background='rgba(13,148,136,0.04)'" onmouseout="this.style.background=''" onclick="goToControlDetail('${cid}')">
               <td><span class="control-id">${c.id}</span></td>
               <td style="font-size:13px;">${c.n}</td>
@@ -1286,7 +1286,7 @@ function retreatControlStep2() {
 function renderControlStep2() {
   const body = document.getElementById('control-step-2-body');
   if (!body) return;
-  if (!getProgramScopeReady()) {
+  if (!state.baseline) {
     body.innerHTML = `<div class="empty-state"><div class="es-icon">🏛️</div><div class="es-title">CISO Setup Required</div><p>The CISO must complete program setup to select controls and assign owners.</p><button class="btn btn-primary" onclick="goToProgramSetupOrDashboard()" style="margin-top:16px;">${state.cisoComplete ? 'Go to Dashboard →' : 'Go to CISO Setup →'}</button></div>`;
     return;
   }
@@ -1521,7 +1521,7 @@ function getControlScopeDefaultTypeKeys(ctrlId) {
 }
 
 function controlIsInActiveProgramBaseline(ctrlId) {
-  if (!getProgramScopeReady()) return false;
+  if (!state.baseline) return false;
   var ctrl = (typeof CONTROLS !== 'undefined' ? CONTROLS : []).find(function(c) { return c.id === ctrlId; });
   if (!ctrl || !ctrl.bl) return false;
   if (ctrl.bl.indexOf(state.baseline) !== -1) return true;
@@ -1567,7 +1567,7 @@ function ensureControlScopeDefaults(ctrlId) {
 
 /** Seed defaults for all in-baseline controls that have not been scoped yet (e.g. after setup). */
 function seedAllControlScopeDefaults() {
-  if (!getProgramScopeReady() || typeof getActiveControls !== 'function') return 0;
+  if (!state.baseline || typeof getActiveControls !== 'function') return 0;
   var n = 0;
   getActiveControls().forEach(function(c) {
     var before = controlScopeWasTouched(state.controlStatus[c.id] || {});
@@ -3849,7 +3849,7 @@ function buildStep3PolicyContextHtml(ctrl, policyReqs) {
 function renderControlStep3() {
   const body = document.getElementById('control-step-3-body');
   if (!body) return;
-  if (!getProgramScopeReady()) {
+  if (!state.baseline) {
     body.innerHTML = `<div class="empty-state"><div class="es-icon">🏛️</div><div class="es-title">CISO Setup Required</div><p>The CISO must complete program setup to select controls and assign owners.</p><button class="btn btn-primary" onclick="goToProgramSetupOrDashboard()" style="margin-top:16px;">${state.cisoComplete ? 'Go to Dashboard →' : 'Go to CISO Setup →'}</button></div>`;
     return;
   }
@@ -4497,7 +4497,7 @@ function buildControlDesignSelfReviewWarningHtml(conflicts) {
 function renderControlStep4() {
   const body = document.getElementById('control-step-4-body');
   if (!body) return;
-  if (!getProgramScopeReady()) {
+  if (!state.baseline) {
     body.innerHTML = `<div class="empty-state"><div class="es-icon">🏛️</div><div class="es-title">CISO Setup Required</div><p>The CISO must complete program setup to select controls and assign owners.</p><button class="btn btn-primary" onclick="goToProgramSetupOrDashboard()" style="margin-top:16px;">${state.cisoComplete ? 'Go to Dashboard →' : 'Go to CISO Setup →'}</button></div>`;
     return;
   }

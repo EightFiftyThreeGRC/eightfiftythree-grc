@@ -7,7 +7,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <meta name="description" content="EightFiftyThree GRC — NIST Cybersecurity Framework 2.0 program management">
+  <meta name="description" content="EightFiftyThree GRC — NIST SP 800-53 Rev. 5 program management">
   <title>EightFiftyThree GRC — Application</title>
 
     <link rel="stylesheet" href="css/app.css?v=20260707b">
@@ -22,7 +22,7 @@
   <div class="sidebar-logo">
     <div class="brand">EightFiftyThree</div>
     <div class="app-name">GRC</div>
-    <div class="app-sub">NIST CSF 2.0</div>
+    <div class="app-sub">Cyber GRC</div>
   </div>
 
   <div class="profile-btn-wrap">
@@ -43,7 +43,7 @@
 
   <div id="sidebar-workspaces-section">
     <div class="sidebar-section sidebar-advanced" id="sidebar-design-workspace-section">
-      <div class="sidebar-section-label">Policy &amp; implementation design</div>
+      <div class="sidebar-section-label">Policy &amp; control design</div>
       <div class="sidebar-item sidebar-item--expandable" onclick="goToPoliciesHome()" id="nav-policy">
         <button type="button" class="sidebar-expand-btn" id="sidebar-policies-toggle" onclick="event.stopPropagation();toggleSidebarPoliciesList();" aria-expanded="false" aria-controls="sidebar-policies-list" title="Show domains">▸</button>
         <span class="icon">📋</span> Policies
@@ -52,7 +52,7 @@
       <div id="sidebar-policies-list" class="sidebar-sub-list sidebar-sub-list--collapsed"></div>
       <div class="sidebar-item sidebar-item--expandable" onclick="goToControlWorkspace()" id="nav-control">
         <button type="button" class="sidebar-expand-btn" id="sidebar-controls-toggle" onclick="event.stopPropagation();toggleSidebarControlsList();" aria-expanded="false" aria-controls="sidebar-controls-list" title="Show controls">▸</button>
-        <span class="icon">🔧</span> Implementation
+        <span class="icon">🔧</span> Controls
         <span class="sidebar-item-badge" id="badge-control" style="display:none;"></span>
       </div>
       <div id="sidebar-controls-list" class="sidebar-sub-list sidebar-sub-list--collapsed"></div>
@@ -706,23 +706,20 @@
   </div>
 </div>
 
-<script src="js/csf-subcategory-text.js?v=20260708"></script>
-<script src="js/csf-catalog.js?v=20260708"></script>
-<script src="js/core.js?v=20260708"></script>
-<script src="js/csf-snapshots.js?v=20260708"></script>
-<script src="js/policies.js?v=20260708"></script>
-<script src="js/policies-csf-patch.js?v=20260708"></script>
-<script src="js/controls.js?v=20260708"></script>
-<script src="js/controls-csf-patch.js?v=20260708"></script>
-<script src="js/assets.js?v=20260708"></script>
-<script src="js/assets-csf-phase2.js?v=20260708"></script>
-<script src="js/authorization.js?v=20260708"></script>
-<script src="js/frameworks.js?v=20260708"></script>
+<script src="js/nist-control-text.js?v=20260624"></script>
+<script src="js/core.js?v=20260707e"></script>
+<script src="js/policies.js?v=20260707b"></script>
+<script src="js/control-scope-defaults.js?v=20260707b"></script>
+<script src="js/controls.js?v=20260707e"></script>
+<script src="js/assets.js?v=20260707e"></script>
+<script src="js/baseline-elevation.js?v=20260624"></script>
+<script src="js/authorization.js?v=20260704d"></script>
+<script src="js/frameworks.js?v=20260624"></script>
 <script src="js/entra-auth.js?v=20260625a"></script>
-<script src="js/risk.js?v=20260708"></script>
-<script src="js/hub.js?v=20260708"></script>
-<script src="js/reports.js?v=20260708"></script>
-<script src="js/admin.js?v=20260708"></script>
+<script src="js/risk.js?v=20260707b"></script>
+<script src="js/hub.js?v=20260706d"></script>
+<script src="js/reports.js?v=20260707g"></script>
+<script src="js/admin.js?v=20260706e"></script>
 <!-- Cloud sign-in + cross-computer sync via Supabase. See MULTI_USER_SETUP.md. -->
 <script src="js/cloud-config.js?v=20260625a"></script>
 <script>
@@ -735,10 +732,8 @@
 })();
 </script>
 <script src="js/cloud-auth.js?v=20260625a"></script>
-<script src="js/program.js?v=20260708"></script>
-<script src="js/ciso-csf-wizard.js?v=20260708"></script>
-<script src="js/downstream-csf-patch.js?v=20260708"></script>
-<script src="js/app.js?v=20260708"></script>
+<script src="js/program.js?v=20260707"></script>
+<script src="js/app.js?v=20260707a"></script>
 
 </body>
 </html>

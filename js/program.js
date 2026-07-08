@@ -153,11 +153,11 @@ function renderCISOTab() {
 }
 
 function allOwnersAssigned() {
-  if (!getProgramScopeReady()) return false;
-  var masters = getMasterPolicyUnits();
-  return masters.every(function(unit) {
-    return isValidOwnerEmail((state.domainOwners[unit] || {}).email);
-  });
+  if (!state.baseline) return false;
+  const families = getActiveFamilies().filter(f => f !== 'PM');
+  const merges = state.policyMerges || {};
+  const masters = families.filter(f => !merges[f]);
+  return masters.every(fam => isValidOwnerEmail((state.domainOwners[fam] || {}).email));
 }
 
 function updateCISOFinishBtn() {
@@ -276,8 +276,20 @@ function cisoNext(fromStep) {
     }
   }
   if (fromStep===2) {
-    if (typeof getProgramScopeReady === 'function' && !getProgramScopeReady()) {
-      showToast('Select at least one CSF category before continuing.', true);
+    if (state.fismaMode) {
+      if (!Array.isArray(state.programInfoTypes) || state.programInfoTypes.length === 0) {
+        showToast('FISMA / CUI mode is on — pick at least one information type so a baseline can be derived.', true);
+        return;
+      }
+      var _derived = computeBaselineFromInfoTypes(state.programInfoTypes);
+      var _override = state.baselineOverride;
+      var _isTailored = (_override === 'L' || _override === 'M' || _override === 'H') && _override !== _derived;
+      if (_isTailored && !(state.baselineOverrideRationale || '').trim()) {
+        showToast('Tailoring rationale is required when the applied baseline differs from the derived one.', true);
+        return;
+      }
+    } else if (!state.baseline) {
+      showToast('Please select a baseline impact level before continuing.', true);
       return;
     }
   }
@@ -514,27 +526,42 @@ function showToast(msg, isError=false) {
 
 function cisoFinish() {
   if (blockActionIfDemoPlaceholders()) return;
-  var masters = getMasterPolicyUnits();
-  var unassigned = masters.filter(function(u) {
-    return !isValidOwnerEmail((state.domainOwners[u] || {}).email);
-  });
+  // Check if any domain owners are unassigned — do not auto-inject demo identities
+  const families = getActiveFamilies().filter(f => f !== 'PM');
+  const merges = state.policyMerges || {};
+  const masters = families.filter(f => !merges[f]);
+  const unassigned = masters.filter(f => !isValidOwnerEmail((state.domainOwners[f] || {}).email));
 
   if (unassigned.length > 0) {
-    showToast('Assign an owner email for all ' + unassigned.length + ' policy unit(s) before finalizing.', true);
+    showToast('Assign an owner email for all ' + unassigned.length + ' domain(s) before finalizing. Use the program owner button in Step 7.', true);
     return;
   }
   clearScopedUndoStack('program finalization');
 
-  ensureGvSubcategoriesAssignedToCiso();
-  syncCategoryMergesToPolicyMerges();
+  // Auto-assign ISP-tier controls (PM + XX-1) to the program owner when Tier 1 is in scope.
+  if (typeof ensureIspTierControlOwners === 'function') ensureIspTierControlOwners();
+  else (function() {
+    var ownerEmail = (state.programOwnerEmail || '').trim();
+    var ownerName  = (state.programOwner || '').trim() || getOwnerDisplayName({ email: ownerEmail, name: '' });
+    var ownerRole  = (state.programOwnerTitle || '').trim();
+    if (!ownerEmail && !ownerName) return;
+    if (!state.controlOwners) state.controlOwners = {};
+    var pmControls = state.pmControls || {};
+    Object.keys(pmControls).forEach(function(cid) {
+      if (!pmControls[cid]) return;
+      if (hasRealControlOwner(state.controlOwners[cid])) return;
+      state.controlOwners[cid] = { name: ownerName, role: ownerRole, email: ownerEmail };
+    });
+  })();
 
   state.cisoComplete = true;
-  addAuditEntry('program', null, 'Program setup completed');
+  if (typeof seedAllControlScopeDefaults === 'function') seedAllControlScopeDefaults();
+  addAuditEntry('program', null, 'Program setup completed by CISO');
   renderSidebarBadges();
   updateCISOFinishBtn();
   if (typeof applySetupFocusMode === 'function') applySetupFocusMode();
   showTab('home');
-  showToast('Program setup complete! Command Center is your new home base.');
+  showToast('✅ Program setup complete! Command Center is your new home base.');
   state._phase2SidebarFirstLive = true;
   if (typeof renderSidebarRiskInventory === 'function') renderSidebarRiskInventory();
 }
@@ -2240,31 +2267,43 @@ function autoExpandTextareas(root) {
 // suggestions), DOMAIN_SUGGESTED_ROLES (who owns what),
 // priority tiers and deadline helpers.
 // ============================================================
-const FAMILY_DESC = CATEGORY_DESC;
+const FAMILY_DESC = {
+  AC: 'Who can access what, and under what conditions. Covers user accounts, least privilege, and remote access.',
+  AT: 'Security awareness training for all staff, plus role-based training for people with elevated access.',
+  AU: 'What events get logged, how long logs are kept, and how they\'re protected from tampering.',
+  CA: 'How you assess, authorize, and continuously monitor your systems. Includes security assessments and POA&Ms.',
+  CM: 'Rules for how systems are configured, patched, and changed. Covers baselines and change control.',
+  CP: 'What happens when systems go down. Covers backups, recovery plans, and continuity testing.',
+  IA: 'How users and devices prove who they are. Covers passwords, MFA, and authenticator management.',
+  IR: 'How the organization detects, responds to, and recovers from security incidents.',
+  MA: 'How systems are maintained, who can do it, and how remote maintenance is controlled.',
+  MP: 'How sensitive data is handled on physical media — storage, transport, sanitization, and disposal.',
+  PE: 'Physical access to facilities and equipment. Covers badges, visitor logs, and equipment protection.',
+  PL: 'Security planning — system security plans, rules of behavior, and concept of operations.',
+  PS: 'Security requirements for people: screening, access agreements, termination, and transfers.',
+  PT: 'Privacy requirements for collecting, using, and protecting Personally Identifiable Information (PII).',
+  RA: 'How the organization identifies and assesses risk — risk assessments, vuln scanning, and threat modeling.',
+  SA: 'Security requirements for acquiring and maintaining systems and services, including third-party software.',
+  SC: 'Technical controls protecting data in transit and at rest — encryption, segmentation, boundary protection.',
+  SI: 'Detecting and fixing flaws and malicious code — patching, malware protection, and security alerts.',
+  SR: 'Managing supply chain risk — vendor vetting, component integrity, and third-party service oversight.',
+};
 
-const COMMON_MERGES = (typeof COMMON_CATEGORY_MERGES !== 'undefined' ? COMMON_CATEGORY_MERGES : []).map(function(m) {
-  return { label: m.label, families: [m.master].concat(m.slaves || []), reason: m.reason || 'Suggested category merge.' };
-});
 
-function getCisoWizardUnits() {
-  return state.policyStructure === 'function' ? getActiveFunctions() : getActiveCategories();
-}
-
-function countSubcategoriesForPolicyUnit(unit, merges, allUnits) {
-  allUnits = allUnits || getCisoWizardUnits();
-  var merged = allUnits.filter(function(u) { return (merges || {})[u] === unit; });
-  var keys = [unit].concat(merged);
-  if (state.policyStructure === 'function') {
-    return getActiveSubcategories().filter(function(s) { return keys.indexOf(s.fn) !== -1; }).length;
-  }
-  return getActiveSubcategories().filter(function(s) { return keys.indexOf(s.cat) !== -1; }).length;
-}
-
-function unitDisplayName(unit) {
-  if (state.policyStructure === 'function') return (FUNCTIONS && FUNCTIONS[unit]) || unit;
-  var c = typeof getCategoryById === 'function' ? getCategoryById(unit) : null;
-  return c ? unit + ' — ' + c.name : unit;
-}
+const COMMON_MERGES = [
+  { label:'Identity & Access',           families:['AC','IA'],       reason:'Access rules and authentication are always one conversation.' },
+  { label:'Monitoring & Integrity',      families:['AU','SI'],       reason:'Log collection and system integrity monitoring are the same function.' },
+  { label:'Security Operations',         families:['AU','IR'],       reason:'Audit logging and incident response are both core SOC functions.' },
+  { label:'Assessment & Planning',       families:['CA','PL'],       reason:'Security assessments and planning belong to the same owner.' },
+  { label:'Governance & Assessment',     families:['CA','PL','RA'],  reason:'Risk assessment, security planning, and authorization are all governance functions.' },
+  { label:'Resilience',                  families:['CP','IR'],       reason:'Business continuity and incident response are two sides of the same coin.' },
+  { label:'Configuration & Maintenance', families:['CM','MA'],       reason:'Configuration baselines and system maintenance are tightly coupled operations.' },
+  { label:'Physical & Media Security',   families:['MP','PE'],       reason:'Physical security and media handling are both about stuff you can touch.' },
+  { label:'People Security',             families:['AT','PS'],       reason:'Training and HR security are both about your workforce.' },
+  { label:'System Security',             families:['SC','SI'],       reason:'System/communications protection and system integrity are both technical controls.' },
+  { label:'Systems & Communications',    families:['SA','SC'],       reason:'Acquisition security and communications protection are both engineering concerns.' },
+  { label:'Supply Chain & Acquisition',  families:['SA','SR'],       reason:'System acquisition and supply chain risk management share the same vendor oversight process.' },
+];
 
 
 // --- Priority tier helpers ---
@@ -2444,15 +2483,14 @@ function ownerSummaryHTML(masters, families, merges) {
 function renderCISOStep4a() {
   const body = document.getElementById('ciso-step-6-body');
   if (!body) return;
-  if (!getProgramScopeReady()) {
-    body.innerHTML = '<div class="empty-state"><div class="es-icon">⚠️</div><div class="es-title">No categories in scope</div><p>Complete Step 2 first.</p></div>';
+  if (!state.baseline) {
+    body.innerHTML = '<div class="empty-state"><div class="es-icon">⚠️</div><div class="es-title">No Baseline Selected</div><p>Complete Step 2 first.</p></div>';
     return;
   }
-  const families = getCisoWizardUnits();
+  const families = getActiveFamilies().filter(f => f !== 'PM');
   const merges = state.policyMerges || {};
   const masters = families.filter(f => !merges[f]);
   const controls = getActiveControls();
-  const showMerges = state.policyStructure === 'category';
 
   const priorityCounts = { now: 0, soon: 0, later: 0 };
   masters.forEach(f => priorityCounts[getPriority(f)]++);
@@ -2478,7 +2516,7 @@ function renderCISOStep4a() {
     ${renderPolicyPriorityRoadmapHTML(masters, merges, families, controls)}
 
     <!-- Common merges callout -->
-    ${showMerges ? `<div style="border:1px solid #bfdbfe;border-radius:10px;background:#eff6ff;padding:14px 18px;margin-bottom:20px;">
+    <div style="border:1px solid #bfdbfe;border-radius:10px;background:#eff6ff;padding:14px 18px;margin-bottom:20px;">
       <div style="font-size:12px;font-weight:700;color:#1e40af;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
       <span>💡 Common merges for lean teams</span>
       <button type="button" class="btn btn-primary" style="padding:4px 10px;font-size:11px;" data-ciso-apply-all-merges>Apply All Non-Conflicting</button>
@@ -2502,7 +2540,7 @@ function renderCISOStep4a() {
           </div>`;
         }).join('')}
       </div>
-    </div>` : '<div class="info-alert" style="margin-bottom:20px;"><div class="ia-icon">ℹ️</div><div class="ia-text">Function-level policy mode — one policy per CSF function. Category merges are not used.</div></div>'}
+    </div>
 
     <!-- Consolidate + Prioritize table -->
     <div class="table-scroll">
@@ -2521,9 +2559,9 @@ function renderCISOStep4a() {
         </thead>
         <tbody id="tbod-${Math.random().toString(36).slice(2,8)}">
           ${masters.map(fam => {
+            const ctrl = controls.filter(c => c.f === fam);
             const merged = families.filter(f => merges[f] === fam);
-            const subCount = countSubcategoriesForPolicyUnit(fam, merges, families);
-            const mergeOptions = showMerges ? families.filter(f => f !== fam && merges[f] !== fam && !merges[f]) : [];
+            const mergeOptions = families.filter(f => f !== fam && merges[f] !== fam && !merges[f]);
             const tier = getPriority(fam);
             const m = PRIORITY_META[tier];
             const isDefault = !!(PRIORITY_DEFAULTS[fam]);
@@ -2535,8 +2573,8 @@ function renderCISOStep4a() {
                   ${merged.map(mf => `<span class="family-badge" style="font-size:11px;background:#e0f2f1;color:var(--teal);border-color:rgba(13,148,136,0.3);">+${mf} <span role="button" tabindex="0" style="cursor:pointer;" data-ciso-unmerge="${mf}">✕</span></span>`).join('')}
                 </div>
                 <input class="form-input" style="font-size:12px;font-weight:600;margin-bottom:3px;${state.domainCustomNames[fam]?'border-color:#6366f1;background:rgba(99,102,241,0.04);':''}" placeholder="${escapeHTML(getPolicyMergedTitle(fam))}" value="${escapeHTML(state.domainCustomNames[fam]||'')}" oninput="setDomainCustomName('${fam}',this.value);this.style.borderColor=this.value?'#6366f1':'';this.style.background=this.value?'rgba(99,102,241,0.04)':'';">
-                <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">${subCount} subcategor${subCount===1?'y':'ies'}${state.domainCustomNames[fam] ? ' · <span style="color:#6366f1;">✏ custom name</span>' : ''}</div>
-                ${FAMILY_DESC[fam] ? `<div style="font-size:11px;color:#64748b;line-height:1.4;">${escapeHTML(FAMILY_DESC[fam]||unitDisplayName(fam))}</div>` : ''}
+                <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">${ctrl.length + merged.reduce((s,mf)=>s+controls.filter(c=>c.f===mf).length,0)} controls${state.domainCustomNames[fam] ? ' · <span style="color:#6366f1;">✏ custom name</span>' : ''}</div>
+                ${FAMILY_DESC[fam] ? `<div style="font-size:11px;color:#64748b;line-height:1.4;">${[fam, ...merged].map(f => '<strong style="color:#475569;">' + f + ':</strong> ' + (FAMILY_DESC[f]||'')).filter(d => !d.endsWith(' ')).join(' ')}</div>` : ''}
               </td>
               <td>
                 <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
@@ -2550,7 +2588,7 @@ function renderCISOStep4a() {
                 <div class="ciso-merge-dropdown-wrap" style="display:flex;flex-direction:column;gap:6px;align-items:stretch;max-width:220px;">
                   <select class="form-select" style="font-size:11px;padding:4px 6px;" data-ciso-merge-master="${fam}" aria-label="Merge another domain into ${fam}">
                     <option value="">+ Merge…</option>
-                    ${mergeOptions.map(f => `<option value="${f}">${unitDisplayName(f)}</option>`).join('')}
+                    ${mergeOptions.map(f => `<option value="${f}">${f} — ${FAMILIES[f]||f}</option>`).join('')}
                   </select>
                   <button type="button" data-ciso-merge-dropdown-apply data-master="${fam}" style="display:none;font-size:11px;font-weight:700;padding:5px 10px;border-radius:6px;border:1px solid #1e40af;background:#dbeafe;color:#1e40af;cursor:pointer;white-space:nowrap;">
                     Apply merge
@@ -2630,11 +2668,11 @@ function applyProgramOwnerToAllDomains() {
 function renderCISOStep4b() {
   const body = document.getElementById('ciso-step-7-body');
   if (!body) return;
-  if (!getProgramScopeReady()) {
-    body.innerHTML = '<div class="empty-state"><div class="es-icon">⚠️</div><div class="es-title">No categories in scope</div><p>Complete Step 2 first.</p></div>';
+  if (!state.baseline) {
+    body.innerHTML = '<div class="empty-state"><div class="es-icon">⚠️</div><div class="es-title">No Baseline Selected</div><p>Complete Step 2 first.</p></div>';
     return;
   }
-  const families = getCisoWizardUnits();
+  const families = getActiveFamilies().filter(f => f !== 'PM');
   const merges = state.policyMerges || {};
   const masters = families.filter(f => !merges[f]);
 
@@ -2721,7 +2759,7 @@ function renderCISOStep4b() {
       }).join('')}
     </div>
 
-    <p class="owner-step-footnote">GV subcategories stay with the program owner. Draft deadlines come from your Step 6 priorities.</p>
+    <p class="owner-step-footnote">PM controls stay with the program owner. Draft deadlines come from your Step 6 priorities.</p>
   `;
   updateCISOFinishBtn();
 }
@@ -2840,7 +2878,7 @@ function reassignReturnedPolicyByEmail(fam, newEmail) {
 // Clears any pre-existing conflicting slave entries first so manual merges
 // done out-of-order can't permanently block the button.
 window.applyAllMerges = function() {
-  var families = typeof getCisoWizardUnits === 'function' ? getCisoWizardUnits() : getActiveCategories();
+  var families = getActiveFamilies().filter(function(f){ return f !== 'PM'; });
   if (!state.policyMerges) state.policyMerges = {};
 
   // Pass 1: clear any slave entries belonging to in-scope COMMON_MERGES so we

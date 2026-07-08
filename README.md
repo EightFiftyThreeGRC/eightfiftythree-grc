@@ -1,6 +1,6 @@
-# EightFiftyThree GRC — NIST CSF 2.0
+# EightFiftyThree GRC
 
-Browser-based NIST Cybersecurity Framework 2.0 program management tool. Sign in with your work account; program data syncs through Supabase.
+Browser-based NIST SP 800-53 Rev. 5 program management tool. Sign in with your work account; program data syncs through Supabase.
 
 **[Launch the tool](https://eightfiftythreegrc.github.io/eightfiftythree-grc/)** (repo: [EightFiftyThreeGRC/eightfiftythree-grc](https://github.com/EightFiftyThreeGRC/eightfiftythree-grc))
 
