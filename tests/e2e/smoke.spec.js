@@ -5,7 +5,7 @@ test.describe('EightFiftyThree GRC smoke', function() {
 
   test('landing page loads and links to app', async function({ page }) {
     await page.goto('/');
-    await expect(page.locator('h1')).toContainText('NIST 800-53');
+    await expect(page.locator('h1')).toContainText('NIST CSF');
     await expect(page.getByRole('link', { name: /Launch app/i }).first()).toBeVisible();
   });
 
@@ -34,7 +34,10 @@ test.describe('EightFiftyThree GRC smoke', function() {
     await page.evaluate(function() {
       if (window.state) {
         window.state.cisoComplete = true;
-        window.state.baseline = 'L';
+        window.state.selectedCategories = window.state.selectedCategories || {};
+        if (typeof CATEGORIES !== 'undefined') {
+          CATEGORIES.forEach(function(c) { window.state.selectedCategories[c.id] = true; });
+        }
         window.state.orgName = 'Test Org';
       }
     });
@@ -50,8 +53,11 @@ test.describe('EightFiftyThree GRC smoke', function() {
     await page.waitForFunction(function() { return typeof window.addIssue === 'function'; });
     await page.evaluate(function() {
       if (window.state) {
-        window.state.pmControls = window.state.pmControls || {};
-        window.state.pmControls['PM-4'] = true;
+        window.state.selectedCategories = window.state.selectedCategories || {};
+        if (typeof CATEGORIES !== 'undefined') {
+          CATEGORIES.forEach(function(c) { window.state.selectedCategories[c.id] = true; });
+        }
+        window.state.cisoComplete = true;
       }
       window.showTab('risk');
     });
@@ -61,7 +67,7 @@ test.describe('EightFiftyThree GRC smoke', function() {
       window.addIssue({
         title: 'E2E test issue',
         description: 'E2E test finding for automated smoke test',
-        controlIds: ['AC-1'],
+        controlIds: ['GV.PO-01'],
         severity: 'Low',
         dueDate: '2099-01-01',
         assigneeName: 'Tester',
@@ -75,7 +81,13 @@ test.describe('EightFiftyThree GRC smoke', function() {
     await page.goto('/app.html', { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(function() { return typeof window.renderFrameworksTab === 'function'; });
     await page.evaluate(function() {
-      if (window.state) { window.state.baseline = 'L'; window.state.cisoComplete = true; }
+      if (window.state) {
+        window.state.selectedCategories = window.state.selectedCategories || {};
+        if (typeof CATEGORIES !== 'undefined') {
+          CATEGORIES.forEach(function(c) { window.state.selectedCategories[c.id] = true; });
+        }
+        window.state.cisoComplete = true;
+      }
       window.renderFrameworksTab();
     });
     await expect(page.locator('#frameworks-body')).toContainText(/ISO 27001|SOC 2|HIPAA/i);

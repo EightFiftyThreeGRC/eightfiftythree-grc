@@ -80,7 +80,7 @@ function renderOnboardingHome() {
     var title = document.getElementById('home-page-title');
     var subtitle = document.getElementById('home-page-subtitle');
     if (title) title.textContent = 'Welcome — let\u2019s set up your program';
-    if (subtitle) subtitle.textContent = 'Seven short steps to stand up NIST 800-53. You can return here anytime from Command Center.';
+    if (subtitle) subtitle.textContent = 'Seven short steps to stand up NIST CSF 2.0. You can return here anytime from Command Center.';
   }
   if (!body) return;
 
@@ -107,7 +107,7 @@ function renderOnboardingHome() {
   body.innerHTML = ''
     + '<div class="onboard-hero">'
     + '<p class="onboard-eyebrow">EightFiftyThree GRC</p>'
-    + '<h2 class="onboard-title">NIST 800-53.<br>Without the spreadsheet.</h2>'
+    + '<h2 class="onboard-title">NIST CSF 2.0.<br>Without the spreadsheet.</h2>'
     + '<p class="onboard-lead">The landing page got you here — now let\'s stand up your program in <strong>seven short steps</strong>. One screen at a time, no overwhelm.</p>'
     + '<div class="onboard-step-rail">' + stepChips + '</div>'
     + '<div class="onboard-actions">'
@@ -377,7 +377,7 @@ function userHasControlDraftWork(user) {
 }
 
 function userHasFrameworkMapping() {
-  if (!state.baseline) return false;
+  if (!getProgramScopeReady()) return false;
   var fw = typeof getActiveFrameworkIds === 'function' ? getActiveFrameworkIds() : [];
   var laws = typeof getActiveComplianceLawIds === 'function' ? getActiveComplianceLawIds() : [];
   return fw.length > 0 || laws.length > 0;
@@ -485,7 +485,7 @@ function updateCommandCenterPageHeader() {
   var subtitle = document.getElementById('home-page-subtitle');
   if (!subtitle || !state.cisoComplete) return;
   var org = (state.orgName || '').trim() || 'Your organization';
-  var baseline = state.baseline ? (state.baseline === 'L' ? 'Low' : state.baseline === 'M' ? 'Moderate' : 'High') : '—';
+  var baseline = getProgramScopeReady() ? getProgramBaselineLabel() : '—';
   subtitle.textContent = org + ' · ' + baseline + ' baseline · posture and next actions';
 }
 

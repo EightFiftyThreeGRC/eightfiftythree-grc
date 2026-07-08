@@ -7,7 +7,9 @@
     "test:e2e": "playwright test",
     "serve": "npx --yes serve . -p 4173",
     "build:demo-video": "node scripts/build-demo-video.mjs",
-    "build:control-scope-defaults": "node scripts/build-control-scope-defaults.mjs"
+    "build:control-scope-defaults": "node scripts/build-control-scope-defaults.mjs",
+    "build:csf-catalog": "node scripts/build-csf-catalog.mjs",
+    "build:csf-snapshots": "node scripts/build-csf-snapshots.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.0",

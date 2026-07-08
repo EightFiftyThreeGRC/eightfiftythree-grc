@@ -53,7 +53,7 @@ function syncReportsLibraryNavActive() {
 }
 
 function userHasReportsLibraryAccess(user) {
-  if (!state.baseline) return false;
+  if (!getProgramScopeReady()) return false;
   if (!user) return true;
   if (typeof getPersonVisibleTabIds === 'function') {
     return getPersonVisibleTabIds(user).indexOf('reports') !== -1;
@@ -78,7 +78,7 @@ function renderReportsLibraryShell() {
 
   if (!body || !hdr) return;
 
-  if (!state.baseline) {
+  if (!getProgramScopeReady()) {
     hdr.innerHTML = '<div class="role-badge">📚 Library</div><h1>Program Library</h1><p>Published policies and control requirements.</p>';
     body.innerHTML = '<div class="empty-state"><div class="es-icon">🏛️</div><div class="es-title">Setup Required</div><p>Complete program setup before the library is available.</p></div>';
     return;
@@ -1350,7 +1350,7 @@ function renderTeamWorkloadPanelHtml(controls, families) {
 }
 
 function renderProgramDashboard(controls, families) {
-  const baseline    = state.baseline==='L'?'Low':state.baseline==='M'?'Moderate':'High';
+  const baseline    = getProgramBaselineLabel();
   const privSuffix  = state.privacyOverlay ? ' + Privacy' : '';
   const policyFams  = families.filter(f => f !== 'PM');
 
@@ -2255,8 +2255,8 @@ function renderReports() {
 
   const body = document.getElementById('reports-body');
   if (!body) return;
-  if (!state.baseline) {
-    body.innerHTML = `<div class="empty-state"><div class="es-icon">\uD83D\uDCCA</div><div class="es-title">Reports Unavailable \u2014 Setup Required</div><p>The CISO must complete all 7 program setup steps (baseline selection, PM controls, security policy, and role assignments) before reports can be generated. Go to the CISO tab to continue.</p></div>`;
+  if (!getProgramScopeReady()) {
+    body.innerHTML = `<div class="empty-state"><div class="es-icon">\uD83D\uDCCA</div><div class="es-title">Reports Unavailable \u2014 Setup Required</div><p>The CISO must complete all 7 program setup steps (category scope, Govern outcomes, governance policy, and role assignments) before reports can be generated. Go to the CISO tab to continue.</p></div>`;
     return;
   }
 
@@ -2346,7 +2346,7 @@ function renderReports() {
       <div class="metric-card">
         <div class="mc-value">${authTotalInReports}</div>
         <div class="mc-label">Total Controls in Scope</div>
-        <div class="mc-sub" style="color:var(--text-muted);">${state.baseline==='L'?'Low':state.baseline==='M'?'Moderate':'High'}${state.privacyOverlay?'+Privacy':''} Baseline</div>
+        <div class="mc-sub" style="color:var(--text-muted);">${getProgramBaselineLabel()}${state.privacyOverlay?'+Privacy':''} Baseline</div>
       </div>
       <div class="metric-card">
         <div class="mc-value" style="color:var(--green);">${coveragePct}%</div>
