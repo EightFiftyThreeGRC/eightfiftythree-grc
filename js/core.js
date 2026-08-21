@@ -1105,10 +1105,24 @@ const state = {
   programInfoTypes: [],     // [info-type id, ...] — 800-60 types selected by CISO when fismaMode is on; drives derived baseline
   baselineOverride: null,   // 'L'|'M'|'H'|null — FISMA-mode tailoring override (NIST 800-37 / 800-60 allows raising or lowering the derived baseline with justification)
   baselineOverrideRationale: '', // free-text justification for the tailoring decision (required if override differs from derived)
+  // Derived recommendations + the decisions the CISO actually made (setup Steps 2 and 3).
+  // Persisted so an auditor can see what was recommended, what was chosen, and why they differ.
+  baselineRecommendation: {},  // { level, label, summary, factors:[{label,detail}], caveat, computedAt, profileKey }
+  baselineDecision: {},        // { selected, recommended, deviation, justification, decidedAt, decidedBy }
+  regMappingRecommendation: {},// { standards:{id:{recommended,certainty,reason}}, laws:{...}, computedAt, profileKey }
+  regMappingDecision: {},      // { standards:[], laws:[], declined:[{id,kind,label,certainty}], added:[...], justification, decidedAt, decidedBy }
   orgName: '',              // organization / agency name
   orgOwnership: '',         // 'government' | 'private' — step 1 org classification (level 1)
   orgGovLevel: '',          // 'federal' | 'slg' — step 1 when orgOwnership is government (level 2)
   orgSector: '',            // sector id — context-specific options (level 2 private, level 3 gov)
+  // Organization profile (setup Step 1). Small, high-signal set that drives the
+  // provisional baseline recommendation (Step 2) and the framework / law
+  // recommendations (Step 3). See ORG_PROFILE docs in js/frameworks.js.
+  orgSizeBand: '',          // '' | 'lt50' | '50_250' | '250_1000' | 'gt1000' — workforce size (aggregation signal only)
+  orgDataTypes: [],         // ['phi','cui','card','finrep','pii'] or ['none'] — regulated / sensitive data in scope
+  orgImpactProfile: '',     // '' | 'limited' | 'serious' | 'severe' — FIPS 199 style worst-case consequence
+  orgNonUsFootprint: '',    // '' | 'yes' | 'no' — non-US entities, operations, or markets (ISO 27001 signal)
+  orgSoc2Demand: '',        // '' | 'yes' | 'no' — customers / investors require a SOC 2 report (SOC 2 signal)
   customRegFrameworks: [],  // [{ id, label, subtitle, kind:'standard'|'law', color, active }]
   programOwner: '',         // program owner full name (CISO / SAISO)
   programOwnerTitle: 'Chief Information Security Officer',  // title/role
@@ -1149,6 +1163,15 @@ const state = {
   assetCategoryLabelOverrides: {},     // { canonicalCategoryName: displayLabel }
   processCategoryLabelOverrides: {},   // { categoryId: displayLabel }
   cisoComplete: false,
+  // First-run program path. Empty until the operator chooses on Command Center.
+  // 'build' = draft ISP + domain policies (existing 7-step wizard).
+  // 'map'   = catalog existing documents and align them to 800-53 (Path B).
+  programPath: '',
+  policyCatalog: [],         // Path B: [{ id, title, type, ownerName, ownerEmail, ownerRole, sourceNote, familyCodes[], controlIds[], coverageNote, isProgramPolicy }]
+  policyMapConfirmed: false, // Path B: coverage review confirmed \u2014 domainPolicies / policyStatus written
+  policyMapStep: 1,          // Path B wizard step 1\u20136 (org, baseline, catalog, map, coverage, owners)
+  _policyMapEditId: '',      // Path B catalog editor selection (transient)
+  _policyMapExpandedDocId: '', // Path B map-step accordion (transient)
   infoSecPolicy: null,
   policySelectedControls: null,  // { 'AC': ['AC-1', 'AC-2', ...] }
   domainPolicies: null,          // { 'AC': { title, purpose, scope, roles, requirements, ... } }
@@ -1920,6 +1943,44 @@ function escapeHTML(str) {
   return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 const _esc = escapeHTML;
+
+// ============================================================
+// SHARED "RECOMMENDED, AND HERE'S WHY" PANEL
+// ============================================================
+// CISO setup Step 2 (baseline) and Step 3 (frameworks / laws) both derive a
+// recommendation from the Step 1 organization profile. Both render it through
+// this one helper so the two screens read as a single coherent system rather
+// than two separately-bolted-on features. Styles live in the appended
+// "Derived recommendation panels" block at the end of css/app.css.
+//
+// opts:
+//   heading   \u2014 short panel title, e.g. 'Why this recommendation'
+//   verdict   \u2014 the recommendation itself, one line
+//   tone      \u2014 'ok' | 'info' | 'warn' (border/background accent only)
+//   summary   \u2014 sentence or two explaining the recommendation
+//   factors   \u2014 [{ label, detail }] the actual profile signals that drove it
+//   caveat    \u2014 honest limitation (FIPS 199 authority, legal applicability, \u2026)
+//   extraHtml \u2014 optional trailing HTML (justification textarea, buttons)
+function renderRecommendationPanelHtml(opts) {
+  var o = opts || {};
+  var tone = (o.tone === 'warn' || o.tone === 'info') ? o.tone : 'ok';
+  var factors = Array.isArray(o.factors) ? o.factors.filter(Boolean) : [];
+  var factorHtml = factors.length
+    ? '<ul class="rec-factors">' + factors.map(function(f) {
+        var label = escapeHTML(String((f && f.label) || ''));
+        var detail = (f && f.detail) ? ' <span class="rec-factor-detail">' + escapeHTML(String(f.detail)) + '</span>' : '';
+        return '<li class="rec-factor"><span class="rec-factor-label">' + label + '</span>' + detail + '</li>';
+      }).join('') + '</ul>'
+    : '';
+  return '<div class="rec-panel rec-panel-' + tone + '">'
+    + (o.heading ? '<div class="rec-heading">' + escapeHTML(String(o.heading)) + '</div>' : '')
+    + (o.verdict ? '<div class="rec-verdict">' + escapeHTML(String(o.verdict)) + '</div>' : '')
+    + (o.summary ? '<div class="rec-summary">' + escapeHTML(String(o.summary)) + '</div>' : '')
+    + factorHtml
+    + (o.caveat ? '<div class="rec-caveat">' + escapeHTML(String(o.caveat)) + '</div>' : '')
+    + (o.extraHtml || '')
+    + '</div>';
+}
 
 function buildPersistedPayload() {
   var payload = {};

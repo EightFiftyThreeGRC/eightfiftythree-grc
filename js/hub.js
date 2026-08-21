@@ -1,10 +1,14 @@
 // js/hub.js — Command Center (post-setup home dashboard)
 
 function getSetupProgressSummary() {
+  if (typeof getResolvedProgramPath === 'function' && getResolvedProgramPath() === 'map'
+      && typeof getPolicyMapProgressSummary === 'function') {
+    return getPolicyMapProgressSummary();
+  }
   var step = (typeof currentStep !== 'undefined' && currentStep.ciso) ? currentStep.ciso : 1;
   var pct = Math.round((step / 7) * 100);
   var labels = ['Organization', 'Baseline', 'Reg mapping', 'PM Controls', 'InfoSec Policy', 'Consolidate', 'Assign Owners'];
-  return { step: step, pct: pct, label: labels[step - 1] || 'Organization' };
+  return { step: step, pct: pct, label: labels[step - 1] || 'Organization', total: 7 };
 }
 
 function startProgramSetup() {
@@ -72,57 +76,91 @@ function hubOpenReportsLibrary(page) {
   else if (typeof showTab === 'function') showTab('reports');
 }
 
+function renderOnboardingRingHtml(step, total, label) {
+  var circ = 326.73;
+  var frac = Math.max(0.08, Math.min(1, (Number(step) || 1) / (Number(total) || 7)));
+  var offset = (circ * (1 - frac)).toFixed(2);
+  var aria = 'Step ' + step + ' of ' + total + (label ? ', ' + label : '');
+  return ''
+    + '<div class="onboard-ring" role="img" aria-label="' + escapeHTML(aria) + '">'
+    + '<svg viewBox="0 0 120 120" aria-hidden="true" focusable="false">'
+    + '<circle class="onboard-ring-track" cx="60" cy="60" r="52" fill="none" stroke-width="8"/>'
+    + '<circle class="onboard-ring-fill" cx="60" cy="60" r="52" fill="none" stroke-width="8"'
+    + ' stroke-dasharray="' + circ + '" stroke-dashoffset="' + offset + '"'
+    + ' transform="rotate(-90 60 60)"/>'
+    + '</svg>'
+    + '<div class="onboard-ring-fig">'
+    + '<span class="onboard-ring-num">' + escapeHTML(String(step)) + '</span>'
+    + '<span class="onboard-ring-den">of ' + escapeHTML(String(total)) + '</span>'
+    + '</div>'
+    + '</div>';
+}
+
 function renderOnboardingHome() {
   var body = document.getElementById('home-body');
-  // The hero below is this screen's only headline, so the standard page header
+  // The cover below is this screen's only headline, so the standard page header
   // would just restate it. renderHomeTab() restores the header for the dashboard.
   var pageHeader = document.querySelector('#tab-home .page-header');
   if (pageHeader) pageHeader.style.display = 'none';
   if (!body) return;
 
+  var chosen = typeof getResolvedProgramPath === 'function' ? getResolvedProgramPath() : (state.programPath || '');
   var progress = getSetupProgressSummary();
   var hasStarted = !!(String(state.orgName || '').trim() || String(state.programOwner || '').trim() || state.baseline);
+  var total = progress.total || (chosen === 'map' ? 6 : 7);
 
-  var steps = [
-    { n: 1, label: 'Organization' },
-    { n: 2, label: 'Baseline' },
-    { n: 3, label: 'Reg mapping' },
-    { n: 4, label: 'PM controls' },
-    { n: 5, label: 'InfoSec policy' },
-    { n: 6, label: 'Consolidate' },
-    { n: 7, label: 'Assign owners' }
-  ];
+  // Nothing chosen yet: two equal-weight path cards. Do not auto-select.
+  if (!chosen) {
+    body.innerHTML = ''
+      + '<div class="onboard onboard--cover onboard--paths">'
+      + '<div class="onboard-cover-copy">'
+      + '<p class="onboard-eyebrow">Program setup</p>'
+      + '<h1 class="onboard-title">How do you want to start?</h1>'
+      + '<p class="onboard-lead">Stand up policy from a blank page, or map documents you already have to NIST 800-53.</p>'
+      + '</div>'
+      + '<div class="onboard-path-grid" role="group" aria-label="Program setup path">'
+      + '<button type="button" class="onboard-path-card" onclick="chooseProgramPath(\'build\')">'
+      + '<p class="onboard-path-kicker">Path A</p>'
+      + '<h2 class="onboard-path-title">Build from scratch</h2>'
+      + '<p class="onboard-path-desc">ISP, domain policies, and control assignments in seven steps.</p>'
+      + '<span class="onboard-path-cta">Start Path A</span>'
+      + '</button>'
+      + '<button type="button" class="onboard-path-card" onclick="chooseProgramPath(\'map\')">'
+      + '<p class="onboard-path-kicker">Path B</p>'
+      + '<h2 class="onboard-path-title">Map what you have</h2>'
+      + '<p class="onboard-path-desc">Catalog existing policies and align them to NIST 800-53. See coverage gaps.</p>'
+      + '<span class="onboard-path-cta">Start Path B</span>'
+      + '</button>'
+      + '</div>'
+      + '<p class="onboard-path-foot">You can switch later. Mapping work and drafted policies are kept.</p>'
+      + '</div>';
+    return;
+  }
 
-  var rail = steps.map(function(s) {
-    var cls = 'onboard-tick';
-    if (hasStarted && s.n < progress.step) cls += ' done';
-    if (hasStarted && s.n === progress.step) cls += ' current';
-    return '<span class="' + cls + '" title="Step ' + s.n + ' \u2014 ' + escapeHTML(s.label) + '"></span>';
-  }).join('');
+  var isMap = chosen === 'map';
+  var continueFn = isMap ? 'continuePolicyMapSetup()' : 'startProgramSetup()';
+  var pathLabel = isMap ? 'Map what you have' : 'Build from scratch';
+  var title = hasStarted
+    ? escapeHTML(progress.label || 'Continue')
+    : (isMap ? 'Map your existing policies' : 'Stand up your program');
+  var lead = hasStarted
+    ? 'Everything you\u2019ve entered is saved. This is the next screen.'
+    : (isMap
+      ? 'Catalog the documents you already have, map them to NIST 800-53, then close the gaps.'
+      : 'Seven short steps. Baseline, policies, controls, owners. One screen at a time.');
+  var cta = hasStarted ? 'Continue' : (isMap ? 'Start mapping' : 'Start setup');
 
   body.innerHTML = ''
-    + '<div class="onboard">'
-    + '<div class="onboard-hero">'
-    + '<p class="onboard-eyebrow">Program setup</p>'
-    + '<h1 class="onboard-title">' + (hasStarted ? 'Pick up where you left off' : 'Let\u2019s stand up your program') + '</h1>'
-    + '<p class="onboard-lead">' + (hasStarted
-      ? 'Your program is part-way built and everything you\u2019ve entered is saved. Continue from step ' + progress.step + '.'
-      : 'Seven short steps to a defensible NIST 800-53 program \u2014 baseline, policies, controls, and owners. One screen at a time.') + '</p>'
-    + '<div class="onboard-progress">'
-    + '<div class="onboard-rail" aria-hidden="true">' + rail + '</div>'
-    + '<p class="onboard-progress-meta">' + (hasStarted
-      ? 'Step ' + progress.step + ' of 7 \u2014 <strong>' + escapeHTML(progress.label) + '</strong>'
-      : '7 steps \u00b7 about 15\u201320 minutes') + '</p>'
+    + '<div class="onboard onboard--cover onboard--resume">'
+    + '<div class="onboard-cover-copy">'
+    + '<p class="onboard-eyebrow">Program setup \u00b7 ' + escapeHTML(pathLabel) + '</p>'
+    + '<h1 class="onboard-title">' + title + '</h1>'
+    + '<p class="onboard-lead">' + lead + '</p>'
+    + '<button type="button" class="btn onboard-cta" onclick="' + continueFn + '">' + cta + '</button>'
+    + '<p class="onboard-path-switch"><button type="button" class="onboard-path-switch-btn" onclick="promptSwitchProgramPath()">Choose a different path</button></p>'
     + '</div>'
-    + '<button type="button" class="btn btn-primary onboard-cta" onclick="startProgramSetup()">' + (hasStarted ? 'Continue setup' : 'Start program setup') + '</button>'
-    + '</div>'
-    + '<div class="onboard-next">'
-    + '<p class="onboard-next-label">Unlocked after setup</p>'
-    + '<ul class="onboard-next-list">'
-    + '<li><strong>Policies</strong><span>Draft domain policies and route them for approval.</span></li>'
-    + '<li><strong>Controls</strong><span>Assign owners, design controls, attach evidence.</span></li>'
-    + '<li><strong>Assets &amp; SSP</strong><span>Inventory systems and submit attestation packages.</span></li>'
-    + '</ul>'
+    + '<div class="onboard-cover-progress">'
+    + renderOnboardingRingHtml(progress.step || 1, total, progress.label)
     + '</div>'
     + '</div>';
 }
@@ -133,7 +171,15 @@ function getNextActions() {
 
   if (!state.cisoComplete) {
     var p = getSetupProgressSummary();
-    actions.push({ priority: 1, icon: '🏛️', label: 'Continue program setup', desc: 'Step ' + p.step + ' of 7 — ' + p.label + '.', action: "startProgramSetup();" });
+    var total = p.total || 7;
+    var isMap = typeof getResolvedProgramPath === 'function' && getResolvedProgramPath() === 'map';
+    actions.push({
+      priority: 1,
+      icon: '🏛️',
+      label: 'Continue program setup',
+      desc: 'Step ' + p.step + ' of ' + total + ' \u2014 ' + p.label + '.',
+      action: isMap ? 'continuePolicyMapSetup();' : 'startProgramSetup();'
+    });
     return actions;
   }
 
@@ -568,14 +614,9 @@ function renderProgramPhaseBar() {
   var phase1Complete = !!state.cisoComplete;
   var tab = getActiveTabIdFromDom();
 
-  // Nothing entered yet: the roadmap is one active card plus a locked card and a
-  // "coming soon" card, so on the first-run home screen it only competes with the
-  // single action available. It returns as soon as setup is underway.
-  var setupUntouched = !phase1Complete
-    && !String(state.orgName || '').trim()
-    && !String(state.programOwner || '').trim()
-    && !state.baseline;
-  if (setupUntouched && tab === 'home') {
+  // First-run and resume-setup Command Center: the cover is the UI. A three-card
+  // phase roadmap on top of it is competing chrome.
+  if (!phase1Complete && tab === 'home') {
     bar.innerHTML = '';
     bar.style.display = 'none';
     return;
@@ -618,20 +659,15 @@ function renderProgramPhaseBar() {
     }
   ];
 
-  var html = '<div class="program-phase-track">';
+  var html = '<div class="program-phase-caption">';
   phases.forEach(function(p, idx) {
-    if (idx > 0) {
-      html += '<div class="program-phase-connector' + (phases[idx - 1].state === 'complete' ? ' program-phase-connector--done' : '') + '" aria-hidden="true"></div>';
-    }
-    var cls = 'program-phase-step program-phase-step--' + p.state + (p.focused ? ' program-phase-step--active' : '');
-    var inner = '<span class="program-phase-eyebrow">' + escapeHTML(p.label) + '</span>'
-      + '<span class="program-phase-title">' + escapeHTML(p.title) + '</span>'
-      + '<span class="program-phase-desc">' + escapeHTML(p.desc) + '</span>'
-      + '<span class="program-phase-status">' + escapeHTML(p.status) + '</span>';
+    if (idx > 0) html += '<span class="program-phase-caption-sep" aria-hidden="true">/</span>';
+    var cls = 'program-phase-caption-item program-phase-caption-item--' + p.state + (p.focused ? ' is-active' : '');
+    var inner = escapeHTML(p.label) + ' \u00b7 ' + escapeHTML(p.status);
     if (p.action && p.state !== 'locked' && p.state !== 'planned') {
       html += '<button type="button" class="' + cls + '" onclick="' + p.action + '">' + inner + '</button>';
     } else {
-      html += '<div class="' + cls + '" title="' + (p.state === 'planned' ? 'Planned: ongoing assessment and internal audit workflows' : 'Complete Phase 1 first') + '">' + inner + '</div>';
+      html += '<span class="' + cls + '">' + inner + '</span>';
     }
   });
   html += '</div>';
