@@ -74,14 +74,10 @@ function hubOpenReportsLibrary(page) {
 
 function renderOnboardingHome() {
   var body = document.getElementById('home-body');
+  // The hero below is this screen's only headline, so the standard page header
+  // would just restate it. renderHomeTab() restores the header for the dashboard.
   var pageHeader = document.querySelector('#tab-home .page-header');
-  if (pageHeader) {
-    pageHeader.style.display = '';
-    var title = document.getElementById('home-page-title');
-    var subtitle = document.getElementById('home-page-subtitle');
-    if (title) title.textContent = 'Welcome — let\u2019s set up your program';
-    if (subtitle) subtitle.textContent = 'Seven short steps to stand up NIST 800-53. You can return here anytime from Command Center.';
-  }
+  if (pageHeader) pageHeader.style.display = 'none';
   if (!body) return;
 
   var progress = getSetupProgressSummary();
@@ -97,30 +93,37 @@ function renderOnboardingHome() {
     { n: 7, label: 'Assign owners' }
   ];
 
-  var stepChips = steps.map(function(s) {
-    var done = s.n < progress.step;
-    var current = s.n === progress.step;
-    var cls = 'onboard-step-chip' + (done ? ' done' : '') + (current ? ' current' : '');
-    return '<span class="' + cls + '"><span class="onboard-step-num">' + (done ? '✓' : s.n) + '</span>' + escapeHTML(s.label) + '</span>';
+  var rail = steps.map(function(s) {
+    var cls = 'onboard-tick';
+    if (hasStarted && s.n < progress.step) cls += ' done';
+    if (hasStarted && s.n === progress.step) cls += ' current';
+    return '<span class="' + cls + '" title="Step ' + s.n + ' \u2014 ' + escapeHTML(s.label) + '"></span>';
   }).join('');
 
   body.innerHTML = ''
+    + '<div class="onboard">'
     + '<div class="onboard-hero">'
-    + '<p class="onboard-eyebrow">EightFiftyThree GRC</p>'
-    + '<h2 class="onboard-title">NIST 800-53.<br>Without the spreadsheet.</h2>'
-    + '<p class="onboard-lead">The landing page got you here — now let\'s stand up your program in <strong>seven short steps</strong>. One screen at a time, no overwhelm.</p>'
-    + '<div class="onboard-step-rail">' + stepChips + '</div>'
-    + '<div class="onboard-actions">'
+    + '<p class="onboard-eyebrow">Program setup</p>'
+    + '<h1 class="onboard-title">' + (hasStarted ? 'Pick up where you left off' : 'Let\u2019s stand up your program') + '</h1>'
+    + '<p class="onboard-lead">' + (hasStarted
+      ? 'Your program is part-way built and everything you\u2019ve entered is saved. Continue from step ' + progress.step + '.'
+      : 'Seven short steps to a defensible NIST 800-53 program \u2014 baseline, policies, controls, and owners. One screen at a time.') + '</p>'
+    + '<div class="onboard-progress">'
+    + '<div class="onboard-rail" aria-hidden="true">' + rail + '</div>'
+    + '<p class="onboard-progress-meta">' + (hasStarted
+      ? 'Step ' + progress.step + ' of 7 \u2014 <strong>' + escapeHTML(progress.label) + '</strong>'
+      : '7 steps \u00b7 about 15\u201320 minutes') + '</p>'
+    + '</div>'
     + '<button type="button" class="btn btn-primary onboard-cta" onclick="startProgramSetup()">' + (hasStarted ? 'Continue setup' : 'Start program setup') + '</button>'
     + '</div>'
-    + (hasStarted
-      ? '<p class="onboard-resume">You\'re on step ' + progress.step + ' — <strong>' + escapeHTML(progress.label) + '</strong>. Pick up where you left off.</p>'
-      : '<p class="onboard-resume">Most teams finish setup in 15–20 minutes. Step 3 maps ISO, SOC 2, CIS, and sector-specific laws.</p>')
+    + '<div class="onboard-next">'
+    + '<p class="onboard-next-label">Unlocked after setup</p>'
+    + '<ul class="onboard-next-list">'
+    + '<li><strong>Policies</strong><span>Draft domain policies and route them for approval.</span></li>'
+    + '<li><strong>Controls</strong><span>Assign owners, design controls, attach evidence.</span></li>'
+    + '<li><strong>Assets &amp; SSP</strong><span>Inventory systems and submit attestation packages.</span></li>'
+    + '</ul>'
     + '</div>'
-    + '<div class="onboard-features">'
-    + '<div class="onboard-feature"><span>📋</span><div><strong>Policies</strong><p>Build AC, AU, SC, and the rest after setup.</p></div></div>'
-    + '<div class="onboard-feature"><span>🔧</span><div><strong>Controls</strong><p>Design obligations and link SharePoint evidence.</p></div></div>'
-    + '<div class="onboard-feature"><span>🖥️</span><div><strong>Assets &amp; SSP</strong><p>Inventory systems and submit attestation packages.</p></div></div>'
     + '</div>';
 }
 
@@ -564,6 +567,21 @@ function renderProgramPhaseBar() {
 
   var phase1Complete = !!state.cisoComplete;
   var tab = getActiveTabIdFromDom();
+
+  // Nothing entered yet: the roadmap is one active card plus a locked card and a
+  // "coming soon" card, so on the first-run home screen it only competes with the
+  // single action available. It returns as soon as setup is underway.
+  var setupUntouched = !phase1Complete
+    && !String(state.orgName || '').trim()
+    && !String(state.programOwner || '').trim()
+    && !state.baseline;
+  if (setupUntouched && tab === 'home') {
+    bar.innerHTML = '';
+    bar.style.display = 'none';
+    return;
+  }
+  bar.style.display = '';
+
   var phase1Tabs = { ciso: 1, policy: 1, control: 1, asset: 1 };
   var focusPhase = !phase1Complete ? 1 : (tab === 'risk' ? 2 : (phase1Tabs[tab] ? 1 : 2));
 
