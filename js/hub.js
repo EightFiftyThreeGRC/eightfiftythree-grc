@@ -450,7 +450,17 @@ function userHasAssetWorkspaceContent(user) {
   return false;
 }
 
-/** Command Center workspace tiles — only surfaces areas with content for this viewer. */
+/** Policy workspace blurb: ISP is Govern; remaining families package as function policies. */
+function hubPolicyWorkspaceCopy(publishedPolicies, policyDraft, canEdit) {
+  var shape = 'ISP (Govern) and function policies';
+  if (canEdit) return shape;
+  if (publishedPolicies > 0) {
+    return publishedPolicies + ' approved polic' + (publishedPolicies === 1 ? 'y' : 'ies') + ' in catalog';
+  }
+  return policyDraft ? shape : 'Policy catalog';
+}
+
+/** Command Center workspace tiles \u2014 role-visible workspaces, not a leftover content filter. */
 function getHubWorkspaces() {
   var user = getHubSessionUser();
   var tabs = getHubVisibleTabIds();
@@ -459,32 +469,62 @@ function getHubWorkspaces() {
   var policyDraft = userHasPolicyDraftWork(user);
   var implementedControls = countImplementedControls();
   var controlDraft = userHasControlDraftWork(user);
+  var canPolicy = tabs.indexOf('policy') !== -1;
+  var canControl = tabs.indexOf('control') !== -1;
 
-  if (publishedPolicies > 0 || policyDraft) {
-    var policyFn = (policyDraft && tabs.indexOf('policy') !== -1) ? 'goToPoliciesHome()' : 'goToPolicyLibrary()';
-    var policyDesc = policyDraft && tabs.indexOf('policy') !== -1
-      ? (publishedPolicies > 0 ? 'Your drafts & approved catalog' : 'Domain policy drafts & ISP')
-      : (publishedPolicies > 0 ? publishedPolicies + ' approved polic' + (publishedPolicies === 1 ? 'y' : 'ies') + ' in catalog' : 'Policy catalog');
-    workspaces.push({ icon: '📋', label: 'Policies', desc: policyDesc, fn: policyFn, group: 'design' });
+  if (canPolicy || publishedPolicies > 0 || policyDraft) {
+    var policyFn = (policyDraft && canPolicy) ? 'goToPoliciesHome()' : 'goToPolicyLibrary()';
+    workspaces.push({
+      icon: '\uD83D\uDCCB',
+      label: 'Policies',
+      desc: hubPolicyWorkspaceCopy(publishedPolicies, policyDraft, policyDraft && canPolicy),
+      fn: policyFn,
+      group: 'design'
+    });
   }
 
-  if (implementedControls > 0 || controlDraft) {
-    var ctrlFn = (controlDraft && tabs.indexOf('control') !== -1) ? 'goToControlWorkspace()' : 'goToControlLibrary()';
-    var ctrlDesc = controlDraft && tabs.indexOf('control') !== -1
-      ? (implementedControls > 0 ? 'Draft designs & ' + implementedControls + ' live controls' : 'Control implementation drafts')
-      : (implementedControls > 0 ? implementedControls + ' implemented control' + (implementedControls === 1 ? '' : 's') + ' in catalog' : 'Control catalog');
-    workspaces.push({ icon: '🔧', label: 'Controls', desc: ctrlDesc, fn: ctrlFn, group: 'design' });
+  if (canControl || implementedControls > 0 || controlDraft) {
+    var ctrlFn = (controlDraft && canControl) ? 'goToControlWorkspace()' : 'goToControlLibrary()';
+    var ctrlDesc = canControl
+      ? 'Control design and implementation'
+      : (implementedControls > 0
+        ? implementedControls + ' implemented control' + (implementedControls === 1 ? '' : 's') + ' in catalog'
+        : 'Control catalog');
+    workspaces.push({ icon: '\uD83D\uDD27', label: 'Controls', desc: ctrlDesc, fn: ctrlFn, group: 'design' });
   }
 
-  if (userHasAssetWorkspaceContent(user)) {
-    workspaces.push({ icon: '🖥️', label: 'Assets & SSP', desc: 'Inventory & attestations', fn: 'goToAssetWorkspace()', group: 'compliance' });
+  if (tabs.indexOf('frameworks') !== -1) {
+    workspaces.push({
+      icon: '\u25C7',
+      label: 'Frameworks',
+      desc: 'CSF 2.0 outcomes \u2014 ISO, SOC 2, HIPAA, SOX overlays',
+      fn: "showTab('frameworks')",
+      group: 'design'
+    });
+  }
+
+  if (tabs.indexOf('asset') !== -1) {
+    workspaces.push({
+      icon: '\uD83D\uDDA5',
+      label: 'Assets & SSP',
+      desc: 'Inventory & attestations',
+      fn: 'goToAssetWorkspace()',
+      group: 'compliance'
+    });
+  }
+
+  if (tabs.indexOf('risk') !== -1) {
+    var riskOpen = getScopedRiskIssueOpenCount(user);
+    var riskNoun = typeof hasPm4PoamControl === 'function' && hasPm4PoamControl() ? 'POA&M & risks' : 'risks & issues';
+    var riskDesc = riskOpen > 0 ? (riskOpen + ' open ' + riskNoun) : 'Register, issues, and triage';
+    workspaces.push({ icon: '\u26A1', label: 'Risks & Issues', desc: riskDesc, fn: "showTab('risk')", group: 'compliance' });
   }
 
   if (tabs.indexOf('reports') !== -1) {
-    workspaces.push({ icon: '📊', label: 'Reports', desc: 'Program dashboard', fn: "showTab('reports')", group: 'program' });
+    workspaces.push({ icon: '\uD83D\uDCCA', label: 'Reports', desc: 'Program dashboard', fn: "showTab('reports')", group: 'program' });
     if (typeof userHasReportsLibraryAccess === 'function' && userHasReportsLibraryAccess(user)) {
       workspaces.push({
-        icon: '📚',
+        icon: '\uD83D\uDCDA',
         label: 'Program library',
         desc: 'Published policies & control requirements',
         fn: "goToReportsLibrary('policies')",
@@ -493,14 +533,14 @@ function getHubWorkspaces() {
     }
   }
 
-  if (tabs.indexOf('frameworks') !== -1 && userHasFrameworkMapping()) {
-    workspaces.push({ icon: '◇', label: 'Frameworks', desc: 'ISO / SOC 2 / CIS alignment', fn: "showTab('frameworks')", group: 'program' });
-  }
-
-  var riskOpen = getScopedRiskIssueOpenCount(user);
-  if (tabs.indexOf('risk') !== -1 && riskOpen > 0) {
-    var riskLabel = typeof hasPm4PoamControl === 'function' && hasPm4PoamControl() ? 'POA&M & risks' : 'Risks & issues';
-    workspaces.push({ icon: '⚡', label: 'Risks & Issues', desc: riskOpen + ' open ' + riskLabel, fn: "showTab('risk')", group: 'program' });
+  if (tabs.indexOf('users') !== -1) {
+    workspaces.push({
+      icon: '\uD83D\uDC65',
+      label: 'Users & roles',
+      desc: 'Program roster and roles',
+      fn: "showTab('users')",
+      group: 'program'
+    });
   }
 
   return workspaces;
@@ -580,7 +620,7 @@ function renderHomeTab() {
     ? renderHubWorkspaceGroupHtml('Policy & control design', designWorkspaces)
       + renderHubWorkspaceGroupHtml('Asset & process compliance', complianceWorkspaces)
       + (programWorkspaces.length ? renderHubWorkspaceGroupHtml('Program', programWorkspaces) : '')
-    : '<div class="hub-empty-actions">No workspaces with content for your role right now.</div>';
+    : '<div class="hub-empty-actions">No workspaces for your role right now.</div>';
 
   body.innerHTML = ''
     + '<div class="hub-dashboard">'
@@ -590,10 +630,11 @@ function renderHomeTab() {
     + '<div class="hub-kpi"><div class="hub-kpi-val">' + (state.assets || []).length + '</div><div class="hub-kpi-label">Assets in inventory</div></div>'
     + '<div class="hub-kpi"><div class="hub-kpi-val">' + (typeof getCombinedOpenRiskIssueCount === 'function' ? getCombinedOpenRiskIssueCount() : 0) + '</div><div class="hub-kpi-label">Open risks &amp; issues</div></div>'
     + '</div>'
+    + (typeof renderCsfCoverageStripHtml === 'function' ? renderCsfCoverageStripHtml('strip') : '')
     + (shouldShowHubFrameworkStrip() && typeof renderFrameworkDashboardStripHtml === 'function' ? renderFrameworkDashboardStripHtml() : '')
     + '<div class="hub-lower-grid">'
     + '<div class="hub-section hub-section-card"><h3 class="hub-section-title">Your next actions</h3><div class="hub-actions">' + actionHtml + '</div></div>'
-    + '<div class="hub-section hub-section-card"><h3 class="hub-section-title">Workspaces</h3><div class="hub-workspace-grid">'
+    + '<div class="hub-section hub-section-card"><h3 class="hub-section-title">Workspaces</h3><div class="hub-workspace-groups">'
     + workspaceHtml
     + '</div></div>'
     + '</div>'
