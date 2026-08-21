@@ -6,9 +6,10 @@ function getSetupProgressSummary() {
     return getPolicyMapProgressSummary();
   }
   var step = (typeof currentStep !== 'undefined' && currentStep.ciso) ? currentStep.ciso : 1;
-  var pct = Math.round((step / 7) * 100);
-  var labels = ['Organization', 'Baseline', 'Reg mapping', 'PM Controls', 'InfoSec Policy', 'Consolidate', 'Assign Owners'];
-  return { step: step, pct: pct, label: labels[step - 1] || 'Organization', total: 7 };
+  var total = (typeof CISO_WIZARD_STEPS === 'number') ? CISO_WIZARD_STEPS : 8;
+  var labels = (typeof CISO_STEP_LABELS !== 'undefined') ? CISO_STEP_LABELS : ['Organization', 'Profile', 'Baseline', 'Reg mapping', 'PM Controls', 'InfoSec Policy', 'Consolidate', 'Assign Owners'];
+  var pct = Math.round((step / total) * 100);
+  return { step: step, pct: pct, label: labels[step - 1] || 'Organization', total: total };
 }
 
 function startProgramSetup() {
@@ -122,7 +123,7 @@ function renderOnboardingHome() {
       + '<button type="button" class="onboard-path-card" onclick="chooseProgramPath(\'build\')">'
       + '<p class="onboard-path-kicker">Path A</p>'
       + '<h2 class="onboard-path-title">Build from scratch</h2>'
-      + '<p class="onboard-path-desc">ISP, domain policies, and control assignments in seven steps.</p>'
+      + '<p class="onboard-path-desc">ISP, domain policies, and control assignments. Identity first, then a short profile.</p>'
       + '<span class="onboard-path-cta">Start Path A</span>'
       + '</button>'
       + '<button type="button" class="onboard-path-card" onclick="chooseProgramPath(\'map\')">'
@@ -147,7 +148,7 @@ function renderOnboardingHome() {
     ? 'Everything you\u2019ve entered is saved. This is the next screen.'
     : (isMap
       ? 'Catalog the documents you already have, map them to NIST 800-53, then close the gaps.'
-      : 'Seven short steps. Baseline, policies, controls, owners. One screen at a time.');
+      : 'Start with who owns the program. Then a few questions so we can recommend a baseline.');
   var cta = hasStarted ? 'Continue' : (isMap ? 'Start mapping' : 'Start setup');
 
   body.innerHTML = ''
@@ -171,7 +172,7 @@ function getNextActions() {
 
   if (!state.cisoComplete) {
     var p = getSetupProgressSummary();
-    var total = p.total || 7;
+    var total = p.total || ((typeof CISO_WIZARD_STEPS === 'number') ? CISO_WIZARD_STEPS : 8);
     var isMap = typeof getResolvedProgramPath === 'function' && getResolvedProgramPath() === 'map';
     actions.push({
       priority: 1,

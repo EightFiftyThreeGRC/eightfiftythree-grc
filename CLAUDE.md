@@ -43,7 +43,7 @@ js/core.js                  — STATE shape, STATE_DEFAULTS, ROLE_TABS, persiste
                               importProgramFromFile / validateProgramShape /
                               applyLoadedState / addAuditEntry / logFieldChange /
                               getDemoPlaceholderNames / blockActionIfDemoPlaceholders)
-js/program.js               — CISO setup wizard (7 steps, CISO_STEP_LABELS);
+js/program.js               — CISO setup wizard (8 steps, CISO_STEP_LABELS);
                               prefillDemoOwners; prefillDemoControlOwners; sidebar badges
 js/policies.js              — Domain Policies wizard (4 steps) + policy library
 js/controls.js              — Control Implementation wizard (4 steps) + control library
@@ -207,15 +207,16 @@ Top of main content: **program phase roadmap** (Phase 1 governance · Phase 2 ri
 Top-right toolbar provides: Save indicator, Save now, Export JSON, Import JSON, Snapshots, Reset.
 Top-left of sidebar has the profile button (`showRolePicker()` → role picker overlay listing every rostered person plus an Admin mode button).
 
-### CISO Setup Wizard (7 steps — `CISO_STEP_LABELS` in `js/program.js`)
+### CISO Setup Wizard (8 steps — `CISO_STEP_LABELS` in `js/program.js`)
 
-1. **Organization** — org name, CISO / program-owner identity
-2. **Baseline** — NIST baseline (L/M/H), privacy overlay toggle
-3. **Reg mapping** — voluntary standards (ISO 27001, SOC 2) and compliance laws (HIPAA) crosswalk selection
-4. **PM Controls** — select which Program Management controls apply (PM-18–PM-27 auto-selected when privacy overlay is on)
-5. **InfoSec Policy** — build the org-level ISP: sections, requirements, review cycle, approver
-6. **Consolidate** — review and prioritize domain policies, suggest merges (e.g., PS+AT, CP+IR, MP+PE, SR+SA)
-7. **Assign Owners** — assign the 20 NIST control families to domain policy owners, set priorities and deadlines
+1. **Organization** — org name and program-owner identity (name, title, email)
+2. **Profile** — org type/sector, workforce, impact, regulated data, non-US footprint, SOC 2 demand (feeds baseline + framework recommendations)
+3. **Baseline** — NIST baseline (L/M/H), privacy overlay toggle
+4. **Reg mapping** — voluntary standards (ISO 27001, SOC 2) and compliance laws (HIPAA) crosswalk selection
+5. **PM Controls** — select which Program Management controls apply (PM-18–PM-27 auto-selected when privacy overlay is on)
+6. **InfoSec Policy** — build the org-level ISP: sections, requirements, review cycle, approver
+7. **Consolidate** — review and prioritize domain policies, suggest merges (e.g., PS+AT, CP+IR, MP+PE, SR+SA)
+8. **Assign Owners** — assign the 20 NIST control families to domain policy owners, set priorities and deadlines
 
 **Phantom-owner safety net:** `prefillDemoOwners()` and `prefillDemoControlOwners(fam)` (in `js/program.js`) inject synthetic identities ("Alex Rivera", "Jordan Patel", etc.) for demos. Each entry point is now confirmation-gated, every demo record is tagged with `isDemoPlaceholder: true`, and `blockActionIfDemoPlaceholders()` (called from `cisoFinish`, `submitSSP`, `submitProcessSSP`, `submitControlDesign`, `confirmSubmitDomainPolicy`, `openAtoDecisionModal`, `submitAtoDecisionFromModal`) refuses to advance until placeholders are replaced. The legacy `prefillFakeOwners` / `prefillFakeControlOwners` names remain as `@deprecated` thin wrappers — do not call them in new code.
 

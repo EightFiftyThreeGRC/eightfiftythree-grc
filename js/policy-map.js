@@ -2,8 +2,8 @@
 // Globals only. Load after program.js and app.js so hooks can wrap the CISO wizard.
 // Path A (build-from-scratch) stays in js/program.js unchanged.
 
-var POLICY_MAP_STEPS = 6;
-var POLICY_MAP_STEP_LABELS = ['Organization', 'Baseline', 'Catalog', 'Map', 'Coverage', 'Assign owners'];
+var POLICY_MAP_STEPS = 7;
+var POLICY_MAP_STEP_LABELS = ['Organization', 'Profile', 'Baseline', 'Catalog', 'Map', 'Coverage', 'Assign owners'];
 var POLICY_MAP_DOC_TYPES = [
   { id: 'policy', label: 'Policy', hint: 'Intent \u2014 what must be true' },
   { id: 'standard', label: 'Standard', hint: 'Measurable requirement' },
@@ -22,6 +22,7 @@ function getResolvedProgramPath() {
 }
 
 function getPolicyMapProgressSummary() {
+  migratePolicyMapWizardRev();
   var step = parseInt(state.policyMapStep, 10) || 1;
   if (step < 1) step = 1;
   if (step > POLICY_MAP_STEPS) step = POLICY_MAP_STEPS;
@@ -31,6 +32,21 @@ function getPolicyMapProgressSummary() {
     pct: Math.round((step / POLICY_MAP_STEPS) * 100),
     label: POLICY_MAP_STEP_LABELS[step - 1] || 'Organization'
   };
+}
+
+/**
+ * v1 Path B was 6 steps (org, baseline, catalog, map, coverage, owners).
+ * v2 inserts Profile as step 2, shifting catalog+ by +1. Run once per saved program.
+ */
+function migratePolicyMapWizardRev() {
+  var rev = parseInt(state.policyMapWizardRev, 10) || 0;
+  if (rev >= 2) return;
+  var s = parseInt(state.policyMapStep, 10) || 1;
+  if (s >= 3 && s <= 6) {
+    state.policyMapStep = Math.min(s + 1, POLICY_MAP_STEPS);
+  }
+  state.policyMapWizardRev = 2;
+  if (typeof markDirty === 'function') markDirty();
 }
 
 function shouldRenderPolicyMapSetup() {
@@ -358,21 +374,32 @@ function promptSwitchProgramPath() {
 
 function continuePolicyMapSetup() {
   if (state.programPath !== 'map') state.programPath = 'map';
+  migratePolicyMapWizardRev();
   var step = parseInt(state.policyMapStep, 10) || 1;
   policyMapGoTo(step);
 }
 
 function policyMapGoTo(step) {
+  migratePolicyMapWizardRev();
   step = parseInt(step, 10) || 1;
   if (step < 1) step = 1;
   if (step > POLICY_MAP_STEPS) step = POLICY_MAP_STEPS;
-  if (step > 1 && !(state.orgName || '').trim()) {
-    showToast('Please enter your Organization / Agency Name before continuing.', true);
+  if (step > 1 && typeof toastCisoIdentityIncomplete === 'function' && toastCisoIdentityIncomplete()) {
+    step = 1;
+  } else if (step > 1 && (!(state.orgName || '').trim())) {
+    if (typeof showToast === 'function') showToast('Please enter your Organization / Agency Name before continuing.', true);
     step = 1;
   }
-  if (step > 2 && !state.baseline) {
+  if (step > 2) {
+    var profileMsg = typeof getOrgProfileIncompleteMessage === 'function' ? getOrgProfileIncompleteMessage() : '';
+    if (profileMsg) {
+      if (typeof showToast === 'function') showToast(profileMsg, true);
+      step = 2;
+    }
+  }
+  if (step > 3 && !state.baseline) {
     showToast('Please select a baseline impact level first.', true);
-    step = 2;
+    step = 3;
   }
   state.policyMapStep = step;
   markDirty();
@@ -382,19 +409,27 @@ function policyMapGoTo(step) {
 
 function policyMapValidateUpTo(fromStep) {
   if (fromStep >= 1) {
-    if (!(state.orgName || '').trim()) { showToast('Please enter your Organization / Agency Name before continuing.', true); return false; }
-    if (!(state.programOwner || '').trim()) { showToast('Please enter the Security Program Owner name before continuing.', true); return false; }
-    if (!(state.programOwnerTitle || '').trim()) { showToast('Please enter the Program Owner title before continuing.', true); return false; }
-    if (typeof isValidOwnerEmail === 'function' && !isValidOwnerEmail(state.programOwnerEmail)) {
-      showToast('Please enter the program owner email before continuing.', true);
-      return false;
-    }
-    if (typeof isOrgClassificationComplete === 'function' && !isOrgClassificationComplete()) {
-      showToast('Select organization type' + (state.orgOwnership === 'government' ? ', government level,' : '') + ' and sector before continuing.', true);
-      return false;
+    if (typeof toastCisoIdentityIncomplete === 'function') {
+      if (toastCisoIdentityIncomplete()) return false;
+    } else {
+      if (!(state.orgName || '').trim()) { showToast('Please enter your Organization / Agency Name before continuing.', true); return false; }
+      if (!(state.programOwner || '').trim()) { showToast('Please enter the Security Program Owner name before continuing.', true); return false; }
+      if (!(state.programOwnerTitle || '').trim()) { showToast('Please enter the Program Owner title before continuing.', true); return false; }
+      if (typeof isValidOwnerEmail === 'function' && !isValidOwnerEmail(state.programOwnerEmail)) {
+        showToast('Please enter the program owner email before continuing.', true);
+        return false;
+      }
     }
   }
   if (fromStep >= 2) {
+    if (typeof toastCisoProfileIncomplete === 'function') {
+      if (toastCisoProfileIncomplete()) return false;
+    } else if (typeof getOrgProfileIncompleteMessage === 'function') {
+      var msg = getOrgProfileIncompleteMessage();
+      if (msg) { showToast(msg, true); return false; }
+    }
+  }
+  if (fromStep >= 3) {
     if (state.fismaMode) {
       if (!Array.isArray(state.programInfoTypes) || state.programInfoTypes.length === 0) {
         showToast('FISMA / CUI mode is on \u2014 pick at least one information type so a baseline can be derived.', true);
@@ -405,7 +440,7 @@ function policyMapValidateUpTo(fromStep) {
       return false;
     }
   }
-  if (fromStep >= 3) {
+  if (fromStep >= 4) {
     ensurePolicyCatalog();
     var named = state.policyCatalog.filter(function(d) { return d && String(d.title || '').trim(); });
     if (!named.length) {
@@ -413,7 +448,7 @@ function policyMapValidateUpTo(fromStep) {
       return false;
     }
   }
-  if (fromStep >= 4) {
+  if (fromStep >= 5) {
     var anyMapped = state.policyCatalog.some(function(d) {
       return d && ((d.familyCodes && d.familyCodes.length) || (d.controlIds && d.controlIds.length) || d.isProgramPolicy);
     });
@@ -427,7 +462,7 @@ function policyMapValidateUpTo(fromStep) {
 
 function policyMapNext(fromStep) {
   if (!policyMapValidateUpTo(fromStep)) return;
-  if (fromStep === 2) policyMapEnsurePmDefaults();
+  if (fromStep === 3) policyMapEnsurePmDefaults();
   policyMapGoTo(fromStep + 1);
 }
 
@@ -462,26 +497,22 @@ function policyMapUpdateProgress(step) {
 }
 
 function policyMapPatchPathAFooters(step) {
-  var btn2 = document.querySelector('#ciso-step-2 .wizard-step-footer .btn-primary');
-  if (btn2) {
-    btn2.textContent = 'Next: Catalog documents \u2192';
-    btn2.setAttribute('onclick', 'policyMapNext(2)');
+  var btn3 = document.querySelector('#ciso-step-3 .wizard-step-footer .btn-primary');
+  if (btn3) {
+    btn3.textContent = 'Next: Catalog documents \u2192';
+    btn3.setAttribute('onclick', 'policyMapNext(3)');
   }
-  var btn1 = document.querySelector('#ciso-step-1 .wizard-step-footer .btn-primary');
-  if (btn1) {
-    btn1.textContent = 'Next: Baseline \u2192';
-    btn1.setAttribute('onclick', 'policyMapNext(1)');
-  }
-  if (step === 6) {
-    var back = document.querySelector('#ciso-step-7 .wizard-step-footer .btn-secondary');
+  if (step === 7) {
+    var back = document.querySelector('#ciso-step-8 .wizard-step-footer .btn-secondary');
     if (back) {
-      back.setAttribute('onclick', 'policyMapGoTo(5)');
+      back.setAttribute('onclick', 'policyMapGoTo(6)');
       back.textContent = '\u2190 Back to coverage';
     }
   }
 }
 
 function renderPolicyMapCisoTab() {
+  migratePolicyMapWizardRev();
   var tabCiso = document.getElementById('tab-ciso');
   if (tabCiso) {
     var ph = tabCiso.querySelector('.page-header');
@@ -490,7 +521,7 @@ function renderPolicyMapCisoTab() {
   var step = parseInt(state.policyMapStep, 10) || 1;
   policyMapUpdateProgress(step);
 
-  if (step <= 2) {
+  if (step <= 3) {
     policyMapSetChrome('pathA');
     if (typeof currentStep !== 'undefined') currentStep.ciso = step;
     if (typeof window._policyMapOrigGoToStep === 'function') {
@@ -505,13 +536,13 @@ function renderPolicyMapCisoTab() {
     return;
   }
 
-  if (step === 6) {
+  if (step === 7) {
     policyMapSetChrome('pathA');
-    if (typeof currentStep !== 'undefined') currentStep.ciso = 7;
-    if (typeof renderCISOStep === 'function') renderCISOStep(7);
+    if (typeof currentStep !== 'undefined') currentStep.ciso = 8;
+    if (typeof renderCISOStep === 'function') renderCISOStep(8);
     if (typeof updateCISOFinishBtn === 'function') updateCISOFinishBtn();
-    policyMapPatchPathAFooters(6);
-    policyMapUpdateProgress(6);
+    policyMapPatchPathAFooters(7);
+    policyMapUpdateProgress(7);
     return;
   }
 
@@ -523,13 +554,13 @@ function renderPolicyMapWizardBody(step) {
   var root = document.getElementById('pmap-root');
   if (!root) return;
   var inner = '';
-  if (step === 3) inner = renderPolicyMapCatalogHtml();
-  else if (step === 4) inner = renderPolicyMapAlignHtml();
+  if (step === 4) inner = renderPolicyMapCatalogHtml();
+  else if (step === 5) inner = renderPolicyMapAlignHtml();
   else inner = renderPolicyMapCoverageHtml();
 
   var backStep = step - 1;
-  var nextLabel = step === 3 ? 'Next: Map to NIST \u2192' : step === 4 ? 'Next: Coverage review \u2192' : 'Confirm mapping \u2192';
-  var nextFn = step === 5 ? 'policyMapConfirmCoverage()' : 'policyMapNext(' + step + ')';
+  var nextLabel = step === 4 ? 'Next: Map to NIST \u2192' : step === 5 ? 'Next: Coverage review \u2192' : 'Confirm mapping \u2192';
+  var nextFn = step === 6 ? 'policyMapConfirmCoverage()' : 'policyMapNext(' + step + ')';
 
   root.innerHTML = ''
     + '<div class="wizard-step active pmap-step">'
@@ -543,7 +574,7 @@ function renderPolicyMapWizardBody(step) {
 function policyMapRerender() {
   setTimeout(function() {
     var step = parseInt(state.policyMapStep, 10) || 1;
-    if (step === 3 || step === 4 || step === 5) renderPolicyMapWizardBody(step);
+    if (step === 4 || step === 5 || step === 6) renderPolicyMapWizardBody(step);
   }, 0);
 }
 
@@ -782,7 +813,7 @@ function policyMapConfirmCoverage() {
     addAuditEntry('program', null, 'Existing-policy mapping confirmed (' + (state.policyCatalog || []).length + ' documents)');
   } catch (e) { /* ignore */ }
   showToast('Mapped documents now count as policy coverage for those families.');
-  policyMapGoTo(6);
+  policyMapGoTo(7);
 }
 
 function policyMapDraftMissing(fam) {
@@ -796,7 +827,7 @@ function policyMapDraftMissing(fam) {
 }
 
 function policyMapAddAnother() {
-  state.policyMapStep = 3;
+  state.policyMapStep = 4;
   policyMapAddDocument();
 }
 
@@ -817,7 +848,7 @@ function renderPolicyMapCoverageHtml() {
       actions = '<button type="button" class="btn btn-secondary btn-sm" onclick="policyMapAddAnother()">Map another doc</button>'
         + ' <button type="button" class="btn btn-secondary btn-sm" onclick="policyMapDraftMissing(\'' + r.fam + '\')">Draft missing policy</button>';
     } else if (r.status === 'partial') {
-      actions = '<button type="button" class="btn btn-secondary btn-sm" onclick="state.policyMapStep=4;policyMapRerender()">Refine mapping</button>'
+      actions = '<button type="button" class="btn btn-secondary btn-sm" onclick="state.policyMapStep=5;policyMapRerender()">Refine mapping</button>'
         + ' <button type="button" class="btn btn-secondary btn-sm" onclick="policyMapAddAnother()">Map another doc</button>';
     } else {
       actions = '<span class="pmap-muted">Existing documents cover this family</span>';
@@ -843,7 +874,7 @@ function renderPolicyMapCoverageHtml() {
     + '<div class="pmap-card"><div class="pmap-card-head"><div><div class="pmap-card-title">Organization ISP (Tier 1)</div>'
     + '<div class="pmap-card-meta">Govern (GV) is this ISP \u2014 XX-1 policy-and-procedures controls and selected PM controls. Mapped from: ' + ispDocs + '</div></div>'
     + ispChip + '</div>'
-    + (cov.ispMapped ? '' : '<div class="pmap-card-actions" style="margin-top:10px;"><button type="button" class="btn btn-secondary btn-sm" onclick="state.policyMapStep=4;policyMapRerender()">Mark a document as the ISP</button></div>')
+    + (cov.ispMapped ? '' : '<div class="pmap-card-actions" style="margin-top:10px;"><button type="button" class="btn btn-secondary btn-sm" onclick="state.policyMapStep=5;policyMapRerender()">Mark a document as the ISP</button></div>')
     + '</div>'
     + (typeof renderCsfFunctionGroupingHtml === 'function'
       ? '<div class="csf-merge-pathb-note">Domain policies default-group by CSF Function (Identify / Protect / Detect / Respond / Recover). Family coverage in the table still stands; a mapped Function policy covers every family in that group.</div>'
@@ -867,7 +898,7 @@ function installPolicyMapHooks() {
     window._policyMapOrigGoToStep = goToStep;
     goToStep = function(tabId, step) {
       if (tabId === 'ciso' && shouldRenderPolicyMapSetup()) {
-        if (step <= 2) {
+        if (step <= 3) {
         state.policyMapStep = step;
         window._policyMapInsideGoToStep = true;
         try {
@@ -878,13 +909,13 @@ function installPolicyMapHooks() {
           return ret;
         } finally { window._policyMapInsideGoToStep = false; }
         }
-        if (step >= 3 && step <= 6) {
-          state.policyMapStep = 3;
+        if (step >= 4 && step <= 7) {
+          state.policyMapStep = 4;
           renderPolicyMapCisoTab();
           return;
         }
-        if (step === 7) {
-          state.policyMapStep = 6;
+        if (step === 8) {
+          state.policyMapStep = 7;
           renderPolicyMapCisoTab();
           return;
         }

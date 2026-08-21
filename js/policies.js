@@ -918,7 +918,7 @@ function renderPolicyList(bodyEl) {
   const body = bodyEl || document.getElementById('policy-list-body');
   if (!body) return;
   if (!state.baseline) {
-    body.innerHTML = '<div class="empty-state"><div class="es-icon">\uD83C\uDFDB\uFE0F</div><div class="es-title">CISO Setup Required</div><p>The CISO must complete all 7 steps of program setup before policy owners can begin. Ask your CISO to finish baseline selection, PM controls, security policy, and role assignments.</p></div>';
+    body.innerHTML = '<div class="empty-state"><div class="es-icon">\uD83C\uDFDB\uFE0F</div><div class="es-title">CISO Setup Required</div><p>The CISO must complete program setup before policy owners can begin. Ask your CISO to finish baseline selection, PM controls, security policy, and role assignments.</p></div>';
     return;
   }
 
@@ -1963,7 +1963,7 @@ function renderPolicyStep1() {
   const helpEl = document.getElementById('policy-step-1-help');
   const body = document.getElementById('policy-step-1-body');
   if (!fam || !state.baseline) {
-    if (body) body.innerHTML = '<div class="empty-state"><div class="es-icon">\uD83C\uDFDB\uFE0F</div><div class="es-title">CISO Setup Required</div><p>The CISO must complete all 7 steps of program setup before policy owners can begin. Ask your CISO to finish baseline selection, PM controls, security policy, and role assignments.</p></div>';
+    if (body) body.innerHTML = '<div class="empty-state"><div class="es-icon">\uD83C\uDFDB\uFE0F</div><div class="es-title">CISO Setup Required</div><p>The CISO must complete program setup before policy owners can begin. Ask your CISO to finish baseline selection, PM controls, security policy, and role assignments.</p></div>';
     return;
   }
   const owner = state.domainOwners[fam] || {};
@@ -2165,7 +2165,7 @@ function confirmReturnToCISO(fam) {
   }
   var ownerTitle = state.programOwnerTitle || 'Program Owner';
   addAuditEntry('policy', fam, 'Policy returned to ' + ownerTitle + ' by ' + previousOwner);
-  showToast('\u21A9 Policy returned to ' + ownerTitle + '. Switch to Admin view \u2192 Program Setup Step 5 to reassign.');
+  showToast('\u21A9 Policy returned to ' + ownerTitle + '. Switch to Admin view \u2192 Program Setup Step 8 to reassign.');
   exitPolicyWizard();
 }
 
@@ -2193,7 +2193,7 @@ function renderPolicyStep2() {
   const helpEl = document.getElementById('policy-step-2-help');
   const body = document.getElementById('policy-step-2-body');
   if (!state.baseline) {
-    if (body) body.innerHTML = '<div class="empty-state"><div class="es-icon">\uD83C\uDFDB\uFE0F</div><div class="es-title">CISO Setup Required</div><p>The CISO must complete all 7 setup steps first, including baseline selection and control assignment.</p></div>';
+    if (body) body.innerHTML = '<div class="empty-state"><div class="es-icon">\uD83C\uDFDB\uFE0F</div><div class="es-title">CISO Setup Required</div><p>The CISO must complete program setup first, including baseline selection and control assignment.</p></div>';
     return;
   }
   const families = getActiveFamilies().filter(function(f){ return f !== 'PM'; });

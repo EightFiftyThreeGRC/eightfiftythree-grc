@@ -1112,12 +1112,12 @@ const state = {
   regMappingRecommendation: {},// { standards:{id:{recommended,certainty,reason}}, laws:{...}, computedAt, profileKey }
   regMappingDecision: {},      // { standards:[], laws:[], declined:[{id,kind,label,certainty}], added:[...], justification, decidedAt, decidedBy }
   orgName: '',              // organization / agency name
-  orgOwnership: '',         // 'government' | 'private' — step 1 org classification (level 1)
-  orgGovLevel: '',          // 'federal' | 'slg' — step 1 when orgOwnership is government (level 2)
-  orgSector: '',            // sector id — context-specific options (level 2 private, level 3 gov)
-  // Organization profile (setup Step 1). Small, high-signal set that drives the
-  // provisional baseline recommendation (Step 2) and the framework / law
-  // recommendations (Step 3). See ORG_PROFILE docs in js/frameworks.js.
+  orgOwnership: '',         // 'government' | 'private' \u2014 Step 2 org classification (level 1)
+  orgGovLevel: '',          // 'federal' | 'slg' \u2014 Step 2 when orgOwnership is government (level 2)
+  orgSector: '',            // sector id \u2014 context-specific options (level 2 private, level 3 gov)
+  // Organization profile (setup Step 2). Small, high-signal set that drives the
+  // provisional baseline recommendation (Step 3) and the framework / law
+  // recommendations (Step 4). See ORG_PROFILE docs in js/frameworks.js.
   orgSizeBand: '',          // '' | 'lt50' | '50_250' | '250_1000' | 'gt1000' — workforce size (aggregation signal only)
   orgDataTypes: [],         // ['phi','cui','card','finrep','pii'] or ['none'] — regulated / sensitive data in scope
   orgImpactProfile: '',     // '' | 'limited' | 'serious' | 'severe' — FIPS 199 style worst-case consequence
@@ -1164,12 +1164,13 @@ const state = {
   processCategoryLabelOverrides: {},   // { categoryId: displayLabel }
   cisoComplete: false,
   // First-run program path. Empty until the operator chooses on Command Center.
-  // 'build' = draft ISP + domain policies (existing 7-step wizard).
+  // 'build' = draft ISP + domain policies (8-step wizard).
   // 'map'   = catalog existing documents and align them to 800-53 (Path B).
   programPath: '',
   policyCatalog: [],         // Path B: [{ id, title, type, ownerName, ownerEmail, ownerRole, sourceNote, familyCodes[], controlIds[], coverageNote, isProgramPolicy }]
   policyMapConfirmed: false, // Path B: coverage review confirmed \u2014 domainPolicies / policyStatus written
-  policyMapStep: 1,          // Path B wizard step 1\u20136 (org, baseline, catalog, map, coverage, owners)
+  policyMapStep: 1,          // Path B wizard step 1\u20137 (org, profile, baseline, catalog, map, coverage, owners)
+  policyMapWizardRev: 0,     // 2+ = Profile step already inserted into Path B numbering
   _policyMapEditId: '',      // Path B catalog editor selection (transient)
   _policyMapExpandedDocId: '', // Path B map-step accordion (transient)
   infoSecPolicy: null,
@@ -1948,8 +1949,8 @@ const _esc = escapeHTML;
 // ============================================================
 // SHARED "RECOMMENDED, AND HERE'S WHY" PANEL
 // ============================================================
-// CISO setup Step 2 (baseline) and Step 3 (frameworks / laws) both derive a
-// recommendation from the Step 1 organization profile. Both render it through
+// CISO setup Step 3 (baseline) and Step 4 (frameworks / laws) both derive a
+// recommendation from the Step 2 organization profile. Both render it through
 // this one helper so the two screens read as a single coherent system rather
 // than two separately-bolted-on features. Styles live in the appended
 // "Derived recommendation panels" block at the end of css/app.css.

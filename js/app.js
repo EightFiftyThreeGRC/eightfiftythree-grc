@@ -792,7 +792,7 @@ function goToProgramSetupOrDashboard() {
 function goToDomainOwnersFromDashboard() {
   if (!state.currentUserId) {
     showTab('ciso');
-    goToStep('ciso', 7);
+    goToStep('ciso', 8);
     return;
   }
   if (state.cisoComplete) {
@@ -800,7 +800,7 @@ function goToDomainOwnersFromDashboard() {
     return;
   }
   showTab('ciso');
-  goToStep('ciso', 7);
+  goToStep('ciso', 8);
 }
 
 function showTab(tabId) {
@@ -905,7 +905,7 @@ function enhanceKeyboardAccessibility() {
 const currentStep = { ciso:1, policy:1, control:1, asset:1 };
 
 function goToStep(tabId, step) {
-  const maxSteps = { ciso:7, policy:4, control:4, asset:4 };
+  const maxSteps = { ciso: (typeof CISO_WIZARD_STEPS === 'number' ? CISO_WIZARD_STEPS : 8), policy:4, control:4, asset:4 };
   const max = maxSteps[tabId] || 4;
   if (step < 1 || step > max) return;
   if (tabId === 'asset') {
@@ -917,11 +917,20 @@ function goToStep(tabId, step) {
   }
   // Validate CISO step progression
   if (tabId === 'ciso' && step > 1) {
-    if (!state.orgName || !state.orgName.trim()) { showToast('Please enter your Organization / Agency Name before continuing.', true); document.getElementById('orgNameInput')?.focus(); return; }
-    if (!state.programOwner || !state.programOwner.trim()) { showToast('Please enter the Security Program Owner name before continuing.', true); document.getElementById('programOwnerInput')?.focus(); return; }
-    if (!state.programOwnerTitle || !state.programOwnerTitle.trim()) { showToast('Please enter the Program Owner title before continuing.', true); document.getElementById('programOwnerTitleInput')?.focus(); return; }
+    if (typeof toastCisoIdentityIncomplete === 'function') {
+      if (toastCisoIdentityIncomplete()) return;
+    } else {
+      if (!state.orgName || !state.orgName.trim()) { showToast('Please enter your Organization / Agency Name before continuing.', true); return; }
+      if (!state.programOwner || !state.programOwner.trim()) { showToast('Please enter the Security Program Owner name before continuing.', true); return; }
+      if (!state.programOwnerTitle || !state.programOwnerTitle.trim()) { showToast('Please enter the Program Owner title before continuing.', true); return; }
+    }
   }
-  if (tabId === 'ciso' && step > 2 && !state.baseline) {
+  if (tabId === 'ciso' && step > 2) {
+    if (typeof toastCisoProfileIncomplete === 'function') {
+      if (toastCisoProfileIncomplete()) return;
+    }
+  }
+  if (tabId === 'ciso' && step > 3 && !state.baseline) {
     showToast('Please select a baseline impact level first.', true);
     return;
   }

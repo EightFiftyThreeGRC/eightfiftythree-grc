@@ -3609,6 +3609,100 @@
     .csf-merge-empty { font-size: 12px; color: var(--text-muted); }
     .csf-merge-standalone { margin-top: 14px; }
     .csf-merge-standalone-label { font-size: 12px; font-weight: 700; color: var(--navy); margin-bottom: 4px; }
-    .csf-merge-pathb-note { font-size: 12px; color: var(--text-muted); margin: 12px 0 8px; line-height: 1.45; }
+    .ciso-identity-stack,
+    .ciso-profile-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      margin-top: 8px;
+      max-width: 720px;
+    }
+    .ciso-identity-owner-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 12px;
+    }
+    .ciso-identity-opt {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      color: var(--text-muted);
+      cursor: pointer;
+      user-select: none;
+    }
+    .ciso-identity-opt input {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+    .org-profile-fields {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .org-profile-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .org-data-list {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      border: 1px solid var(--hairline);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+    }
+    .org-data-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 8px 12px;
+      cursor: pointer;
+      user-select: none;
+      background: var(--white);
+    }
+    .org-data-row + .org-data-row {
+      border-top: 1px solid var(--hairline);
+    }
+    .org-data-row input {
+      width: 15px;
+      height: 15px;
+      margin-top: 2px;
+      accent-color: var(--accent);
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .org-data-row-text {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      min-width: 0;
+    }
+    .org-data-row-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .org-data-row-hint {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    .org-data-row-on {
+      background: var(--ink-0);
+    }
+    .org-data-row-none {
+      background: #fafafa;
+    }
+    @media (max-width: 800px) {
+      .ciso-identity-owner-grid,
+      .org-profile-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+
 
 

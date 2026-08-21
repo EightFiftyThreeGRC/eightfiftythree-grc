@@ -52,13 +52,12 @@ var SLG_SECTOR_OPTIONS = [
   { id: 'justice_public_safety', label: 'Justice / public safety' }
 ];
 
-// ─── ORGANIZATION PROFILE (setup Step 1) ───────────────────────────────────
-// Five extra questions, deliberately kept to one screen. They are the only
-// inputs to two derived recommendations:
-//   \u2022 Step 2 \u2014 a provisional NIST 800-53 baseline (recommendBaseline, js/program.js)
-//   \u2022 Step 3 \u2014 voluntary standards + laws (recommendRegMapping, below)
-// Nothing here is asked twice: sector / government level already live in the
-// org classification fields above, and are reused by both engines.
+// ─── ORGANIZATION PROFILE (setup Step 2) ───────────────────────────────────
+// Inputs to two derived recommendations:
+//   \u2022 Step 3 \u2014 a provisional NIST 800-53 baseline (recommendBaseline, js/program.js)
+//   \u2022 Step 4 \u2014 voluntary standards + laws (recommendRegMapping, below)
+// Sector / government level live in the classification fields and are reused
+// by both engines. Identity (org name + owner) is Step 1.
 var ORG_SIZE_OPTIONS = [
   { id: '', label: 'Select workforce size\u2026' },
   { id: 'lt50', label: 'Under 50 people' },
@@ -67,26 +66,23 @@ var ORG_SIZE_OPTIONS = [
   { id: 'gt1000', label: 'Over 1,000 people' }
 ];
 
-// FIPS 199 talks about the adverse effect of a loss of confidentiality,
-// integrity, or availability. These three options are that scale in plain
-// English so a non-federal CISO can answer it honestly.
 var ORG_IMPACT_OPTIONS = [
   { id: '', label: 'Select worst realistic consequence\u2026' },
-  { id: 'limited', label: 'Limited \u2014 disruptive but recoverable, no lasting harm' },
+  { id: 'limited', label: 'Limited \u2014 disruptive but recoverable' },
   { id: 'serious', label: 'Serious \u2014 significant financial, legal, or operational harm' },
-  { id: 'severe', label: 'Severe or catastrophic \u2014 safety of life, national security, or existential loss' }
+  { id: 'severe', label: 'Severe \u2014 safety of life, national security, or existential loss' }
 ];
 
 var ORG_NON_US_OPTIONS = [
   { id: '', label: 'Select\u2026' },
-  { id: 'no', label: 'No \u2014 US operations and US customers only' },
+  { id: 'no', label: 'No \u2014 US only' },
   { id: 'yes', label: 'Yes \u2014 non-US entities, operations, or customers' }
 ];
 
 var ORG_SOC2_OPTIONS = [
   { id: '', label: 'Select\u2026' },
-  { id: 'no', label: 'No \u2014 nobody has asked for one' },
-  { id: 'yes', label: 'Yes \u2014 customers or investors require (or will require) one' }
+  { id: 'no', label: 'No \u2014 nobody has asked' },
+  { id: 'yes', label: 'Yes \u2014 customers or investors require one' }
 ];
 
 // 'none' is mutually exclusive with the rest so "no regulated data" is an
@@ -123,6 +119,23 @@ function isOrgProfileComplete() {
     && getOrgDataTypes().length > 0;
 }
 
+/** First missing required field on the Profile step (classification + profile). */
+function getOrgProfileIncompleteMessage() {
+  if (!state.orgOwnership) return 'Select organization type before continuing.';
+  if (state.orgOwnership === 'government' && !state.orgGovLevel) return 'Select government level before continuing.';
+  if (!state.orgSector) return 'Select sector before continuing.';
+  if (!state.orgSizeBand) return 'Select workforce size before continuing.';
+  if (!state.orgImpactProfile) return 'Select the worst realistic consequence before continuing.';
+  if (!getOrgDataTypes().length) return 'Select which data is in scope (or None of the above) before continuing.';
+  if (!state.orgNonUsFootprint) return 'Say whether you operate outside the US before continuing.';
+  if (!state.orgSoc2Demand) return 'Say whether customers or investors require a SOC 2 before continuing.';
+  return '';
+}
+
+function isOrgSetupProfileComplete() {
+  return !getOrgProfileIncompleteMessage();
+}
+
 /**
  * Stable fingerprint of the profile. Stored alongside each recommendation so
  * the UI can tell whether a persisted decision was made against the current
@@ -146,13 +159,14 @@ function setOrgProfileField(field, value) {
   var prev = state[field] || '';
   if (prev === value) return;
   state[field] = value;
-  // Any profile change invalidates the reg-mapping seeding so Step 3
+  // Any profile change invalidates the reg-mapping seeding so Step 4
   // re-derives against the new answers.
   state._regMappingInitialized = false;
   logFieldChange(field, prev, value);
   markDirty();
-  if (typeof renderCISOStep1 === 'function') renderCISOStep1();
-  if (typeof refreshCurrentCisoStep === 'function') refreshCurrentCisoStep();
+  setTimeout(function() {
+    if (typeof refreshCurrentCisoStep === 'function') refreshCurrentCisoStep();
+  }, 0);
 }
 
 /** Toggle one regulated-data type. 'none' is exclusive with every other option. */
@@ -172,9 +186,7 @@ function toggleOrgDataType(id) {
   state._regMappingInitialized = false;
   logFieldChange('orgDataTypes', prev, list.slice().sort().join(','));
   markDirty();
-  // Checkbox change triggers a full re-render of the step it lives on.
   setTimeout(function() {
-    if (typeof renderCISOStep1 === 'function') renderCISOStep1();
     if (typeof refreshCurrentCisoStep === 'function') refreshCurrentCisoStep();
   }, 0);
 }
@@ -344,8 +356,9 @@ function setOrgClassification(field, value) {
   if (prev !== value) state._regMappingInitialized = false;
   logFieldChange(field, prev, value);
   markDirty();
-  if (typeof renderCISOStep1 === 'function') renderCISOStep1();
-  if (typeof refreshCurrentCisoStep === 'function') refreshCurrentCisoStep();
+  setTimeout(function() {
+    if (typeof refreshCurrentCisoStep === 'function') refreshCurrentCisoStep();
+  }, 0);
 }
 
 function renderOrgClassificationFieldsHtml() {
@@ -360,7 +373,7 @@ function renderOrgClassificationFieldsHtml() {
       return '<option value="' + escapeHTML(opt.id) + '"' + ((state.orgOwnership || '') === opt.id ? ' selected' : '') + '>' + escapeHTML(opt.label) + '</option>';
     }).join('')
     + '</select>'
-    + '<div class="form-hint">Government programs use a different mapping path than private sector.</div>'
+    + '<div class="form-hint">Private or government.</div>'
     + '</div>'
     + (showGov
       ? '<div class="form-group" style="margin-bottom:0;">'
@@ -370,7 +383,7 @@ function renderOrgClassificationFieldsHtml() {
           return '<option value="' + escapeHTML(opt.id) + '"' + ((state.orgGovLevel || '') === opt.id ? ' selected' : '') + '>' + escapeHTML(opt.label) + '</option>';
         }).join('')
         + '</select>'
-        + '<div class="form-hint">Federal vs state &amp; local (SLG).</div>'
+        + '<div class="form-hint">Federal or state &amp; local.</div>'
         + '</div>'
       : '')
     + (showSector
@@ -381,10 +394,9 @@ function renderOrgClassificationFieldsHtml() {
           return '<option value="' + escapeHTML(opt.id) + '"' + ((state.orgSector || '') === opt.id ? ' selected' : '') + '>' + escapeHTML(opt.label) + '</option>';
         }).join('')
         + '</select>'
-        + '<div class="form-hint">Drives tailored suggestions in Step 3.</div>'
+        + '<div class="form-hint">Shapes framework and law suggestions.</div>'
         + '</div>'
-      : '')
-    + renderOrgProfileFieldsHtml();
+      : '');
 }
 
 /** One profile <select>. Field ids are internal constants, so no escaping trap here. */
@@ -408,32 +420,30 @@ function renderOrgProfileSelectHtml(label, field, options, hint) {
 function renderOrgProfileFieldsHtml() {
   var dataRows = ORG_DATA_TYPE_OPTIONS.map(function(opt) {
     var on = hasOrgDataType(opt.id);
-    return '<label class="org-data-chip' + (on ? ' org-data-chip-on' : '') + '">'
+    return '<label class="org-data-row' + (on ? ' org-data-row-on' : '') + (opt.id === 'none' ? ' org-data-row-none' : '') + '">'
       + '<input type="checkbox"' + (on ? ' checked' : '') + ' onchange="toggleOrgDataType(\'' + opt.id + '\')">'
-      + '<span><span class="org-data-chip-label">' + escapeHTML(opt.label) + '</span>'
-      + '<span class="org-data-chip-hint">' + escapeHTML(opt.hint) + '</span></span>'
+      + '<span class="org-data-row-text"><span class="org-data-row-label">' + escapeHTML(opt.label) + '</span>'
+      + '<span class="org-data-row-hint">' + escapeHTML(opt.hint) + '</span></span>'
       + '</label>';
   }).join('');
 
-  return '<div class="org-profile-block">'
-    + '<div class="org-profile-title">Organization profile</div>'
-    + '<div class="org-profile-sub">Five questions. They drive the baseline recommended in Step 2 and the standards and laws recommended in Step 3 \u2014 nothing here is asked again later.</div>'
+  return '<div class="org-profile-fields">'
     + '<div class="org-profile-grid">'
     + renderOrgProfileSelectHtml('Workforce size', 'orgSizeBand', ORG_SIZE_OPTIONS,
-        'Used as a data-aggregation signal only \u2014 size alone never sets a baseline.')
-    + renderOrgProfileSelectHtml('Worst realistic consequence of compromise or outage', 'orgImpactProfile', ORG_IMPACT_OPTIONS,
-        'Maps to the FIPS 199 adverse-effect scale for confidentiality, integrity, and availability.')
+        'Aggregation signal only.')
+    + renderOrgProfileSelectHtml('Worst realistic consequence', 'orgImpactProfile', ORG_IMPACT_OPTIONS,
+        'Compromise or outage \u2014 used to recommend a baseline.')
     + '</div>'
     + '<div class="form-group" style="margin-bottom:0;">'
-    + '<label class="form-label">Regulated or sensitive data in scope <span class="required">*</span></label>'
-    + '<div class="org-data-grid">' + dataRows + '</div>'
-    + '<div class="form-hint">Select every category your systems will hold. This determines which laws Step 3 recommends.</div>'
+    + '<label class="form-label">Regulated or sensitive data <span class="required">*</span></label>'
+    + '<div class="org-data-list">' + dataRows + '</div>'
+    + '<div class="form-hint">Pick every category in scope, or None of the above.</div>'
     + '</div>'
     + '<div class="org-profile-grid">'
-    + renderOrgProfileSelectHtml('Do you operate outside the US?', 'orgNonUsFootprint', ORG_NON_US_OPTIONS,
-        'Non-US entities, operations, or markets are the main driver for ISO 27001 certification.')
-    + renderOrgProfileSelectHtml('Do customers or investors require a SOC 2?', 'orgSoc2Demand', ORG_SOC2_OPTIONS,
-        'SOC 2 is contract-driven \u2014 it matters when someone in your sales or funding path asks for the report.')
+    + renderOrgProfileSelectHtml('Operate outside the US?', 'orgNonUsFootprint', ORG_NON_US_OPTIONS,
+        'Main signal for ISO 27001.')
+    + renderOrgProfileSelectHtml('Customers or investors require a SOC 2?', 'orgSoc2Demand', ORG_SOC2_OPTIONS,
+        'Main signal for SOC 2.')
     + '</div>'
     + '</div>';
 }
@@ -629,7 +639,7 @@ function toggleActiveFramework(fwId) {
   markDirty();
   renderFrameworksTab();
   if (typeof refreshCurrentCisoStep === 'function') refreshCurrentCisoStep();
-  else if (typeof renderCISOStep3Integrations === 'function' && document.getElementById('ciso-step-3-body')) renderCISOStep3Integrations();
+  else if (typeof renderCISOStep3Integrations === 'function' && document.getElementById('ciso-step-4-body')) renderCISOStep3Integrations();
 }
 
 function toggleActiveComplianceLaw(lawId) {
@@ -644,7 +654,7 @@ function toggleActiveComplianceLaw(lawId) {
   markDirty();
   renderFrameworksTab();
   if (typeof refreshCurrentCisoStep === 'function') refreshCurrentCisoStep();
-  else if (typeof renderCISOStep3Integrations === 'function' && document.getElementById('ciso-step-3-body')) renderCISOStep3Integrations();
+  else if (typeof renderCISOStep3Integrations === 'function' && document.getElementById('ciso-step-4-body')) renderCISOStep3Integrations();
 }
 
 function computeFrameworkCoverage(fwId) {
@@ -833,7 +843,7 @@ function renderFrameworkSetupSectionHtml() {
   }).join('');
   var sectorHint = isOrgClassificationComplete()
     ? '<div class="form-hint" style="margin-bottom:12px;"><strong>' + escapeHTML(getOrgClassificationSummary()) + '</strong> — use the switches to enable lenses; <span class="fw-setup-suggested-inline">Suggested</span> items fit your profile.</div>'
-    : '<div class="form-hint" style="margin-bottom:12px;">Complete organization type, level, and sector in Step 1 to see tailored suggestions.</div>';
+    : '<div class="form-hint" style="margin-bottom:12px;">Complete organization type, level, and sector in Step 2 to see tailored suggestions.</div>';
   return '<div class="fw-setup-section">'
     + '<div class="section-title" style="margin-bottom:4px;">Voluntary standards &amp; frameworks</div>'
     + '<div class="section-subtitle" style="margin-bottom:8px;">NIST 800-53 is your anchor. CSF 2.0 is always on as the outcome language for this program \u2014 it is not an optional overlay. Enable other lenses below to see ISO, SOC 2, and similar crosswalks on every control.</div>'
