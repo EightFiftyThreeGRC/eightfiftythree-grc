@@ -38,7 +38,7 @@ function buildProgramRoleSelectOptions(selectedValue) {
   var html = '<option value="">— select role —</option>';
   Object.keys(ROLE_META).forEach(function(r) {
     var _m = getProgramRoleMeta(r);
-    html += '<option value="' + _esc(r) + '"' + (selectedValue === r ? ' selected' : '') + '>' + _esc(_m.icon + ' ' + _m.label) + '</option>';
+    html += '<option value="' + _esc(r) + '"' + (selectedValue === r ? ' selected' : '') + '>' + _esc(_m.label) + '</option>';
   });
   (state.customProgramRoles || []).forEach(function(c) {
     if (!c || !c.slug) return;
@@ -240,7 +240,7 @@ function renderRolePickerProfiles() {
       + 'style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:20px;cursor:pointer;transition:all 0.15s;" '
       + 'onmouseenter="this.style.background=\'rgba(255,255,255,0.12)\';this.style.borderColor=\'' + pm.color + '\';" '
       + 'onmouseleave="this.style.background=\'rgba(255,255,255,0.06)\';this.style.borderColor=\'rgba(255,255,255,0.1)\';">'
-      + '<div style="font-size:24px;margin-bottom:10px;">' + pm.icon + '</div>'
+      + '<div style="margin-bottom:10px;color:rgba(255,255,255,0.9);">' + (typeof icon === 'function' ? icon(pm.icon, 22) : _esc(pm.icon)) + '</div>'
       + '<div style="color:white;font-weight:600;font-size:15px;margin-bottom:8px;">' + _esc(person.needsProfile ? (person.email || person.name) : person.name) + '</div>'
       + (person.needsProfile ? '<div style="color:rgba(255,255,255,0.45);font-size:11px;margin:-4px 0 8px;">Add name and title on first use</div>' : '')
       + '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;">';
@@ -758,7 +758,7 @@ function renderUsersTab() {
   Object.keys(ROLE_META).forEach(function(r) {
     const m = getProgramRoleMeta(r);
     html += '<div style="background:' + m.color + '18;border:1px solid ' + m.color + '44;border-radius:8px;padding:8px 16px;display:flex;align-items:center;gap:8px;">'
-      + '<span style="font-size:16px;">' + m.icon + '</span>'
+      + '<span style="display:inline-flex;color:' + m.color + ';">' + (typeof icon === 'function' ? icon(m.icon, 16) : m.icon) + '</span>'
       + '<span style="font-size:13px;font-weight:600;color:' + m.color + ';">' + (counts[r]||0) + '</span>'
       + '<span style="font-size:12px;color:#64748b;">' + m.label + '</span>'
       + '</div>';
@@ -802,7 +802,7 @@ function renderUsersTab() {
                ? ' <button type="button" onclick="removeCustomProgramRole(' + sq + ')" style="color:#b91c1c;border:1px solid #fca5a5;background:#fef2f2;border-radius:6px;padding:4px 8px;font-size:12px;cursor:pointer;">Delete</button>'
                : (row.overridden ? ' <button type="button" onclick="resetRoleLabel(' + sq + ')" style="color:#475569;border:1px solid #e2e8f0;background:#f8fafc;border-radius:6px;padding:4px 8px;font-size:12px;cursor:pointer;">Reset</button>' : '')));
         return '<tr style="border-bottom:1px solid #f1f5f9;">'
-          + '<td style="padding:10px;"><span style="font-size:15px;">' + row.icon + '</span> <span style="font-weight:600;color:' + row.color + ';">' + _esc(row.label) + '</span>' + (row.overridden ? ' <span title="Renamed" style="font-size:10px;color:#0d9488;">&bull; renamed</span>' : '') + '</td>'
+          + '<td style="padding:10px;"><span style="display:inline-flex;vertical-align:middle;margin-right:6px;">' + (typeof icon === 'function' ? icon(row.icon, 16) : row.icon) + '</span> <span style="font-weight:600;color:' + row.color + ';">' + _esc(row.label) + '</span>' + (row.overridden ? ' <span title="Renamed" style="font-size:10px;color:#0d9488;">&bull; renamed</span>' : '') + '</td>'
           + '<td style="padding:10px;color:#64748b;">' + row.type + '</td>'
           + '<td style="padding:10px;font-family:monospace;color:#94a3b8;">' + _esc(row.slug) + '</td>'
           + '<td style="padding:10px;color:#64748b;">' + row.tabs + '</td>'
@@ -863,7 +863,7 @@ function renderUsersTab() {
           ? (u.controls && u.controls.length ? u.controls.slice(0,6).map(function(c){ return '<span style="font-family:monospace;font-size:11px;background:#f1f5f9;padding:1px 5px;border-radius:3px;">' + c + '</span>'; }).join(' ') + (u.controls.length > 6 ? ' <span style="color:#94a3b8;">+' + (u.controls.length-6) + ' more</span>' : '') : '<span style="color:#94a3b8;">No controls assigned</span>')
           : '';
       html += '<div style="background:white;border:1px solid #e2e8f0;border-radius:10px;padding:16px 20px;display:flex;align-items:center;gap:16px;">'
-        + '<div style="font-size:28px;">' + m.icon + '</div>'
+        + '<div style="color:var(--ink-7);">' + (typeof icon === 'function' ? icon(m.icon, 22) : m.icon) + '</div>'
         + '<div style="flex:1;min-width:0;">'
         + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
         + '<span style="font-weight:700;font-size:15px;color:#1e293b;">' + _esc(u.name) + '</span>'

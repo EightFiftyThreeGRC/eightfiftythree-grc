@@ -107,6 +107,23 @@
       -moz-osx-font-smoothing: grayscale;
     }
 
+    .icon {
+      display: inline-block;
+      vertical-align: -0.125em;
+      flex-shrink: 0;
+    }
+    .hub-action-icon,
+    .hub-workspace-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--accent);
+    }
+    .hub-action-arrow {
+      display: inline-flex;
+      color: var(--ink-5);
+    }
+
     /* body owns the flex row. html must stay a block: as a flex item, body would
        size to its own content, and .main's width: calc(100% - sidebar) would
        resolve against that instead of the viewport, collapsing main to its

@@ -55,10 +55,10 @@ function ensureHubActionDelegation() {
 }
 
 function renderHubActionCardHtml(a) {
-  var inner = '<span class="hub-action-icon">' + a.icon + '</span>'
+  var inner = '<span class="hub-action-icon">' + (typeof icon === 'function' ? icon(a.icon, 18) : a.icon) + '</span>'
     + '<div><div class="hub-action-label">' + escapeHTML(a.label) + '</div>'
     + '<div class="hub-action-desc">' + escapeHTML(a.desc) + '</div></div>'
-    + '<span class="hub-action-arrow">→</span>';
+    + '<span class="hub-action-arrow">' + (typeof icon === 'function' ? icon('arrow-right', 16) : '\u2192') + '</span>';
   if (a.kind === 'ssp-review') {
     return '<button type="button" class="hub-action-card" data-hub-action="ssp-review" data-scope-id="'
       + escapeHTML(a.scopeId || '') + '" data-is-process="' + (a.isProcess ? '1' : '0') + '">' + inner + '</button>';
@@ -466,7 +466,7 @@ function renderHubWorkspaceGroupHtml(title, items) {
     + '<div class="hub-workspace-group-label">' + escapeHTML(title) + '</div>'
     + '<div class="hub-workspace-grid">' + items.map(function(w) {
       return '<button type="button" class="hub-workspace-card" onclick="' + w.fn + '">'
-        + '<span class="hub-workspace-icon">' + w.icon + '</span>'
+        + '<span class="hub-workspace-icon">' + (typeof icon === 'function' ? icon(w.icon, 20) : w.icon) + '</span>'
         + '<span class="hub-workspace-label">' + escapeHTML(w.label) + '</span>'
         + '<span class="hub-workspace-desc">' + escapeHTML(w.desc) + '</span></button>';
     }).join('') + '</div></div>';
