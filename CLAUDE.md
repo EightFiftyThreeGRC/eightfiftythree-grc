@@ -75,8 +75,9 @@ js/app.js                   — App shell only: TAB_IDS, currentStep, showTab, g
                               reapplySessionRoleView, DOMContentLoaded
 scripts/check-all.js        — syntax check across all JS modules (npm run check:js)
 tests/e2e/smoke.spec.js     — Playwright smoke tests (npm run test:e2e)
-supabase/                   — UNUSED. Leftover schema/edge functions from the retired
-                              cloud sign-in mode; no client code references them.
+.github/workflows/          — validate.yml only (JS syntax check on push/PR). Pages
+                              publishes straight from the `main` branch; do not add
+                              a Pages deploy workflow.
 README.md                   — public GitHub README + operator smoke-test runbook
 CONTROL_OWNER_SPEC.md       — compliance + UX spec for the Control Owner flow
 ```

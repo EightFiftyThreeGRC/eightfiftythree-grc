@@ -1,8 +1,0 @@
-# Minimal Supabase CLI config for Edge Functions deployment.
-# See MULTI_USER_SETUP.md for deploy + optional SENDGRID_API_KEY instructions.
-
-[functions.send-isp-approval-request]
-verify_jwt = true
-
-[functions.auth-send-email]
-verify_jwt = false
