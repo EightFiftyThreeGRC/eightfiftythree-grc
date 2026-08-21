@@ -3,7 +3,6 @@ const { test, expect } = require('@playwright/test');
 
 function seedSspReviewFixture(reviewerIsSubmitter) {
   return function (isSamePerson) {
-    if (typeof window.hideCloudSignInGate === 'function') window.hideCloudSignInGate();
     window.state.cisoComplete = true;
     window.state.baseline = 'L';
     window.state.orgName = 'Kraper & Dramer';

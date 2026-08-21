@@ -1,5 +1,5 @@
-
-    /* CSS Variables — Apple-inspired calm palette */
+﻿
+    /* CSS Variables â€” Apple-inspired calm palette */
     :root {
       --navy: #1d1d1f;
       --navy-glass: rgba(251, 251, 253, 0.82);
@@ -54,7 +54,7 @@
       color: var(--text);
     }
 
-    /* Sidebar — light frosted glass */
+    /* Sidebar â€” light frosted glass */
     .sidebar {
       position: fixed;
       left: 0;
@@ -373,7 +373,7 @@
       overflow: hidden;
     }
 
-    /* Setup focus — calmer first-run experience (keep Program setup in sidebar) */
+    /* Setup focus â€” calmer first-run experience (keep Program setup in sidebar) */
     body.setup-focus-mode #sidebar-workspaces-section { display: none; }
     body.setup-focus-mode #sidebar-program-section #nav-reports,
     body.setup-focus-mode #sidebar-program-section #sidebar-reports-list,
@@ -382,7 +382,6 @@
     body.setup-focus-mode #sidebar-program-section #nav-users { display: none !important; }
     body.setup-focus-mode #sidebar-program-section .sidebar-section-label { display: none; }
     body.setup-focus-mode .profile-btn-wrap { opacity: 0.65; }
-    body.cloud-session-active.setup-focus-mode .profile-btn-wrap { opacity: 1; }
     body.setup-focus-mode .persist-advanced { display: none !important; }
     body.setup-focus-mode #resetBtn { display: none !important; }
     body.setup-focus-mode #ciso-step-nav-panel { display: none; }
@@ -416,7 +415,7 @@
     }
     .setup-page-header h1 { letter-spacing: -0.03em; }
 
-    /* Onboarding home — matches landing tone */
+    /* Onboarding home â€” matches landing tone */
     .onboard-hero {
       max-width: 720px;
       margin: 0 auto 40px;
@@ -749,7 +748,7 @@
     }
 
     .baseline-card.selected::after {
-      content: '✓';
+      content: 'âœ“';
       position: absolute;
       top: 12px;
       right: 12px;
@@ -1878,7 +1877,7 @@
       }
     }
 
-    /* Small phones — tighten further so the persist toolbar doesn't crowd
+    /* Small phones â€” tighten further so the persist toolbar doesn't crowd
        the reset button or the hamburger. */
     @media (max-width: 480px) {
       #app-persist-toolbar {
@@ -1908,7 +1907,7 @@
       }
     }
 
-    /* Tablet portrait (~600–900px) — keep the sidebar visible but narrow it,
+    /* Tablet portrait (~600â€“900px) â€” keep the sidebar visible but narrow it,
        and let the wizard step nav stay on the left. */
     @media (min-width: 769px) and (max-width: 900px) {
       .sidebar {
@@ -2181,7 +2180,7 @@
     }
 
     /* Role-picker overlay (extracted from inline styles) */
-    #cloudAccountOverlay {
+    #rolePickerOverlay {
       position: fixed;
       inset: 0;
       background: rgba(2, 6, 23, 0.72);
@@ -2241,7 +2240,7 @@
       gap: 12px;
     }
 
-    /* Skip link — invisible until focused, lets keyboard users jump past
+    /* Skip link â€” invisible until focused, lets keyboard users jump past
        the sidebar to the main content. */
     .skip-link {
       position: absolute;
@@ -2259,7 +2258,7 @@
       top: 0;
     }
 
-    /* ── Framework alignment ── */
+    /* â”€â”€ Framework alignment â”€â”€ */
     .fw-intro { margin-bottom: 24px; }
     .fw-intro p { font-size: 15px; line-height: 1.6; color: var(--text-muted); max-width: 720px; }
     .fw-coverage-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin-bottom: 28px; }
@@ -2422,47 +2421,7 @@
     .fw-dash-chip-pct { font-size: 22px; font-weight: 800; letter-spacing: -0.03em; color: var(--text); }
     .fw-dash-chip-sub { font-size: 10px; color: var(--text-muted); }
 
-    /* Microsoft Entra ID */
-    .entra-setup-card {
-      background: var(--white);
-      border: 1px solid rgba(0,0,0,0.06);
-      border-radius: 14px;
-      padding: 20px;
-      margin-bottom: 24px;
-    }
-    .entra-setup-card-compact { margin: 16px 0; }
-    .entra-setup-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 14px; }
-    .entra-setup-title { font-size: 16px; font-weight: 700; letter-spacing: -0.02em; }
-    .entra-setup-sub { font-size: 13px; color: var(--text-muted); margin-top: 4px; line-height: 1.45; }
-    .entra-setup-fields { display: flex; flex-direction: column; gap: 12px; }
-    .entra-setup-off { font-size: 13px; color: var(--text-muted); }
-    .entra-setup-help { font-size: 12px; color: var(--text-muted); margin-top: 8px; }
-    .entra-setup-help summary { cursor: pointer; font-weight: 600; color: var(--accent); }
-    .entra-setup-help ol { margin: 10px 0 0 18px; line-height: 1.6; }
     .btn-link { background: none; border: none; padding: 0; color: var(--accent); font-size: inherit; font-weight: 600; cursor: pointer; text-decoration: underline; }
-    .entra-picker-panel { margin-bottom: 18px; padding-bottom: 18px; border-bottom: 1px solid rgba(255,255,255,0.1); }
-    .entra-picker-head { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 14px; }
-    .entra-picker-title { color: #fff; font-weight: 700; font-size: 15px; }
-    .entra-picker-sub { color: rgba(255,255,255,0.55); font-size: 12px; margin-top: 4px; line-height: 1.45; }
-    .entra-picker-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
-    .entra-signin-btn {
-      display: inline-flex; align-items: center; gap: 10px;
-      background: #2f2f2f; color: #fff; border: 1px solid #4a4a4a;
-      padding: 10px 18px; border-radius: 6px; font-weight: 600; font-size: 14px;
-    }
-    .entra-signin-btn:hover { background: #1a1a1a; }
-    .entra-signed-in-bar {
-      display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px;
-      background: rgba(0,120,212,0.15); border: 1px solid rgba(0,120,212,0.35);
-      border-radius: 10px; padding: 12px 14px; color: rgba(255,255,255,0.9); font-size: 13px;
-    }
-    .entra-picker-divider {
-      display: flex; align-items: center; gap: 12px; margin-top: 16px;
-      color: rgba(255,255,255,0.35); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em;
-    }
-    .entra-picker-divider::before, .entra-picker-divider::after {
-      content: ''; flex: 1; height: 1px; background: rgba(255,255,255,0.12);
-    }
 
     /* Sidebar badges & sub-nav */
     .sidebar-item-badge {
@@ -2613,7 +2572,7 @@
       .page-body { padding: 0 20px 28px; }
     }
 
-    /* Step 6 — consolidate priority roadmap */
+    /* Step 6 â€” consolidate priority roadmap */
     .priority-roadmap {
       background: var(--white);
       border: 1px solid rgba(15, 23, 42, 0.08);
@@ -2777,7 +2736,7 @@
       }
     }
 
-    /* Step 7 — assign owners */
+    /* Step 7 â€” assign owners */
     .owner-step-hero {
       background: var(--white);
       border: 1px solid rgba(13, 148, 136, 0.18);
@@ -3007,7 +2966,7 @@
     /* ============================================================
        MULTI-USER CLOUD SIGN-IN GATE + ACCOUNT MENU
        ============================================================ */
-    /* Dedicated returned-ISP revision workspace (policy tab — not program setup). */
+    /* Dedicated returned-ISP revision workspace (policy tab â€” not program setup). */
     .isp-revision-badge {
       background: rgba(245, 158, 11, 0.14);
       border-color: rgba(245, 158, 11, 0.35);
@@ -3049,187 +3008,4 @@
       background: linear-gradient(180deg, rgba(255,255,255,0) 0%, var(--white) 24%);
       border-top: 1px solid var(--border);
     }
-
-    /* Hide the legacy admin shell until cloud sign-in completes. */
-    html.cloud-auth-pending .sidebar,
-    html.cloud-auth-pending #app-persist-toolbar,
-    html.cloud-auth-pending main,
-    html.cloud-auth-pending #cloudAccountOverlay {
-      display: none !important;
-    }
-
-    #cloudSignInGate {
-      position: fixed;
-      inset: 0;
-      z-index: 12000;
-      display: none;
-      align-items: center;
-      justify-content: center;
-      padding: 24px;
-      background: linear-gradient(160deg, #0b1220 0%, #111c33 60%, #0b1220 100%);
-    }
-    .cloud-gate-card {
-      width: min(440px, 94vw);
-      background: var(--white);
-      border-radius: 18px;
-      padding: 36px 32px 28px;
-      box-shadow: 0 30px 90px rgba(0,0,0,0.45);
-      text-align: center;
-    }
-    .cloud-gate-brand {
-      font-size: 13px;
-      font-weight: 800;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      color: var(--teal, #0d9488);
-      margin-bottom: 14px;
-    }
-    .cloud-gate-title {
-      font-size: 22px;
-      font-weight: 800;
-      color: var(--navy, #0f172a);
-      margin-bottom: 8px;
-    }
-    .cloud-gate-sub {
-      font-size: 13.5px;
-      line-height: 1.55;
-      color: var(--text-muted, #64748b);
-      margin: 0 0 22px;
-    }
-    .cloud-gate-message {
-      font-size: 13px;
-      line-height: 1.5;
-      color: #92400e;
-      background: #fef3c7;
-      border-radius: 10px;
-      padding: 10px 12px;
-      margin-bottom: 18px;
-      text-align: left;
-    }
-    .cloud-gate-buttons {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-    .cloud-signin-btn {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 12px;
-      width: 100%;
-      padding: 13px 16px;
-      font-size: 15px;
-      font-weight: 700;
-      color: #1f2937;
-      background: var(--white);
-      border: 1.5px solid #d8dee9;
-      border-radius: 11px;
-      cursor: pointer;
-      transition: border-color 0.15s, box-shadow 0.15s, transform 0.05s;
-    }
-    .cloud-signin-btn:hover {
-      border-color: #94a3b8;
-      box-shadow: 0 4px 14px rgba(15,23,42,0.10);
-    }
-    .cloud-signin-btn:active { transform: translateY(1px); }
-    .cloud-gate-status {
-      font-size: 12.5px;
-      color: var(--text-muted, #64748b);
-      margin-top: 16px;
-    }
-    .cloud-gate-foot {
-      margin-top: 22px;
-      padding-top: 18px;
-      border-top: 1px solid #eef1f5;
-    }
-    .cloud-account-card {
-      grid-column: 1 / -1;
-      text-align: center;
-      padding: 28px 20px;
-      color: #fff;
-    }
-    .cloud-account-name { font-size: 18px; font-weight: 800; }
-    .cloud-account-email { font-size: 13px; color: rgba(255,255,255,0.7); margin-top: 4px; }
-    .cloud-account-role {
-      display: inline-block;
-      margin-top: 12px;
-      font-size: 12px;
-      font-weight: 700;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-      color: var(--teal, #2dd4bf);
-      background: rgba(45,212,191,0.12);
-      border-radius: 999px;
-      padding: 4px 12px;
-    }
-
-    /* Email/password form inside the cloud sign-in gate */
-    .cloud-gate-form {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-    .cloud-gate-link-btn {
-      margin-top: 4px;
-      padding: 0;
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--teal, #0d9488);
-      background: none;
-      border: none;
-      cursor: pointer;
-      text-decoration: underline;
-      text-underline-offset: 2px;
-    }
-    .cloud-gate-link-btn:hover { color: #0b8076; }
-    .cloud-gate-forgot-row {
-      display: flex;
-      justify-content: flex-end;
-      margin: -4px 0 2px;
-    }
-    .cloud-gate-forgot-btn {
-      font-size: 13px;
-      margin-top: 0;
-    }
-    .cloud-gate-email {
-      width: 100%;
-      padding: 12px 14px;
-      font-size: 15px;
-      border: 1.5px solid #d8dee9;
-      border-radius: 11px;
-      box-sizing: border-box;
-      outline: none;
-      transition: border-color 0.15s, box-shadow 0.15s;
-    }
-    .cloud-gate-email:focus {
-      border-color: var(--teal, #0d9488);
-      box-shadow: 0 0 0 3px rgba(13,148,136,0.12);
-    }
-    .cloud-signin-primary {
-      color: #fff;
-      background: var(--teal, #0d9488);
-      border-color: var(--teal, #0d9488);
-      justify-content: center;
-    }
-    .cloud-signin-primary:hover {
-      background: #0b8076;
-      border-color: #0b8076;
-      box-shadow: 0 4px 14px rgba(13,148,136,0.30);
-    }
-    .cloud-gate-divider {
-      display: flex;
-      align-items: center;
-      text-align: center;
-      color: #94a3b8;
-      font-size: 12px;
-      margin: 6px 0;
-    }
-    .cloud-gate-divider::before,
-    .cloud-gate-divider::after {
-      content: "";
-      flex: 1;
-      height: 1px;
-      background: #e5e9f0;
-    }
-    .cloud-gate-divider span { padding: 0 12px; }
 

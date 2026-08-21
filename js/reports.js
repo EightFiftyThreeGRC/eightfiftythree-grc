@@ -1078,11 +1078,7 @@ function cisoApprovePolicy(fam) {
   markDirty();
   document.getElementById('cisoReviewOverlay')?.remove();
   showToast('✅ Policy approved — ' + getPolicyMergedTitle(fam));
-  if (typeof cloudPushNow === 'function' && typeof isCloudSessionActive === 'function' && isCloudSessionActive()) {
-    cloudPushNow().finally(renderReports);
-  } else {
-    renderReports();
-  }
+  renderReports();
 }
 
 function cisoReturnPolicy(fam) {
@@ -1136,11 +1132,7 @@ function cisoReturnPolicy(fam) {
   markDirty();
   document.getElementById('cisoReviewOverlay')?.remove();
   showToast('↩ Policy returned to submitter — ' + getPolicyMergedTitle(fam));
-  if (typeof cloudPushNow === 'function' && typeof isCloudSessionActive === 'function' && isCloudSessionActive()) {
-    cloudPushNow().finally(renderReports);
-  } else {
-    renderReports();
-  }
+  renderReports();
 }
 
 // ─── TEAM WORKLOAD PANEL ─────────────────────────────────────────────────────
@@ -1840,11 +1832,7 @@ function approveISP() {
     if (typeof exitISPPolicyViewer === 'function') exitISPPolicyViewer();
     else showTab('reports');
   };
-  if (typeof cloudPushNow === 'function' && typeof isCloudSessionActive === 'function' && isCloudSessionActive()) {
-    cloudPushNow().finally(afterApprove);
-  } else {
-    afterApprove();
-  }
+  afterApprove();
 }
 
 function returnISPToEditor() {
@@ -1892,11 +1880,7 @@ function returnISPToEditor() {
     if (typeof exitISPPolicyViewer === 'function') exitISPPolicyViewer();
     else showTab('reports');
   };
-  if (typeof cloudPushNow === 'function' && typeof isCloudSessionActive === 'function' && isCloudSessionActive()) {
-    cloudPushNow().finally(afterReturn);
-  } else {
-    afterReturn();
-  }
+  afterReturn();
 }
 
 function renderReturnedWorkCallout(user) {
@@ -2055,11 +2039,7 @@ function aoApproveQueuedSsp(scopeId, isProcess, opts) {
       renderReports();
     }
   };
-  if (typeof cloudPushNow === 'function' && typeof isCloudSessionActive === 'function' && isCloudSessionActive()) {
-    cloudPushNow().finally(afterApprove);
-  } else {
-    afterApprove();
-  }
+  afterApprove();
 }
 
 function aoReturnQueuedSsp(scopeId, isProcess, opts) {
@@ -2114,11 +2094,7 @@ function aoReturnQueuedSsp(scopeId, isProcess, opts) {
       renderReports();
     }
   };
-  if (typeof cloudPushNow === 'function' && typeof isCloudSessionActive === 'function' && isCloudSessionActive()) {
-    cloudPushNow().finally(afterReturn);
-  } else {
-    afterReturn();
-  }
+  afterReturn();
 }
 
 function renderSspApprovalQueueHtml(user) {

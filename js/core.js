@@ -1216,8 +1216,6 @@ const state = {
   activeComplianceLaws: {}, // laws & regulations (HIPAA, GLBA, …) tracked separately
   _regMappingInitialized: false,
   sharePointConfig: { enabled: false, siteUrl: '', libraryName: 'Evidence', defaultFolder: 'GRC/Evidence' },
-  entraConfig: { enabled: false, clientId: '', tenantId: 'organizations', redirectUri: '' },
-  entraSession: null, // { email, name, oid, matchedUserId, signedInAt } when signed in via Entra
   _frameworkFilter: '',
   _frameworkSearch: '',
   _riskView: 'triage',           // 'triage' | 'risks' | 'issues'
@@ -1633,7 +1631,7 @@ function valuesEqualForChangeLog(a, b) {
 function logFieldChange(path, oldVal, newVal) {
   if (valuesEqualForChangeLog(oldVal, newVal)) return;
   if (!state.changeLog) state.changeLog = [];
-  var uid = state.currentUserId || (state.entraSession && state.entraSession.email) || 'admin';
+  var uid = state.currentUserId || 'admin';
   state.changeLog.push({
     t: new Date().toISOString(),
     u: uid,
@@ -1945,16 +1943,9 @@ function saveToStorage() {
     localStorage.setItem(STORAGE_KEY + '-ts', new Date().toISOString());
     _updateSaveIndicator(true);
     window.isDirty = false;
-    // In multi-user (cloud) mode, also push the program to the shared backend.
-    if (typeof cloudPushDebounced === 'function' && typeof isCloudSessionActive === 'function' && isCloudSessionActive()) {
-      cloudPushDebounced();
-    }
   } catch (e) {
     console.warn('saveToStorage', e);
-    var cloud = typeof isCloudSessionActive === 'function' && isCloudSessionActive();
-    showToast(cloud
-      ? 'Could not sync your program. Check your connection and try again.'
-      : 'Could not save to browser storage (quota or private mode).', true);
+    showToast('Could not save to browser storage (quota or private mode).', true);
   }
 }
 
@@ -2036,14 +2027,11 @@ function importProgramFromFile(ev) {
       showToast('Current program saved as auto-backup snapshot before import.');
       if (!applyLoadedState(saved)) throw new Error('apply');
       Object.keys(currentStep).forEach(function(k) { currentStep[k] = 1; });
-      if (typeof isCloudSessionActive === 'function' && isCloudSessionActive()
-          && typeof mapCloudIdentityToRoleView === 'function') {
-        mapCloudIdentityToRoleView();
-      }
+      if (typeof reapplySessionRoleView === 'function') reapplySessionRoleView();
       showTab('ciso');
       goToStep('ciso', 1);
       saveToStorage();
-      showToast('Program imported from file.');
+      showToast('Program imported from file. Data saved to this browser.');
     } catch (err) {
       console.warn('importProgramFromFile', err);
       showToast('Could not import that file. Choose a valid program JSON export.', true);
@@ -2088,12 +2076,11 @@ window.markDirty = markDirty;
 function _updateSaveIndicator(saved) {
   var el = document.getElementById('saveIndicator');
   if (!el) return;
-  var cloud = typeof isCloudSessionActive === 'function' && isCloudSessionActive();
   if (saved) {
-    el.textContent = cloud ? '✓ Synced' : '✓ Saved';
+    el.textContent = '✓ Saved';
     el.style.color = 'var(--teal)';
   } else {
-    el.textContent = cloud ? '… Syncing' : '… Saving';
+    el.textContent = '… Saving';
     el.style.color = 'var(--text-muted)';
   }
 }

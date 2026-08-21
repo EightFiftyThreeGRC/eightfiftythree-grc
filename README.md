@@ -1,6 +1,6 @@
 # EightFiftyThree GRC
 
-Browser-based NIST SP 800-53 Rev. 5 program management tool. Sign in with your work account; program data syncs through Supabase.
+Browser-based NIST SP 800-53 Rev. 5 program management tool. No account, no backend — your program lives in your browser, and you switch between program roles to see each person's workspace.
 
 **[Launch the tool](https://eightfiftythreegrc.github.io/eightfiftythree-grc/)** (repo: [EightFiftyThreeGRC/eightfiftythree-grc](https://github.com/EightFiftyThreeGRC/eightfiftythree-grc))
 
@@ -28,16 +28,14 @@ The application guides teams through a full governance workflow:
 
 ## Architecture
 
-Zero-dependency, no-build static web app. UI and logic run client-side; the canonical program lives in Supabase (`programs.state` JSONB). Each signed-in browser also mirrors state to `localStorage` as an offline cache.
+Zero-dependency, no-build static web app. UI and logic run client-side and the program is stored only in this browser's `localStorage`. There is no login: you work in Admin mode or impersonate a rostered person from the sidebar role picker.
 
 ```
 index.html                  public landing page (links to app.html)
-app.html                    UI shell, sidebar, tab containers, cloud sign-in gate
+app.html                    UI shell, sidebar, tab containers, role picker overlay
 css/landing.css             landing page styles
 css/app.css                 all app styles (single mobile breakpoint)
-js/cloud-config.js          Supabase connection settings
-js/cloud-auth.js            Sign-in, program load/sync, account menu
-js/entra-auth.js            Microsoft Entra ID (OAuth) sign-in support
+js/session.js               acting identity + permission / separation-of-duties helpers
 js/nist-control-text.js     verbatim NIST 800-53 control text lookup
 js/core.js                  STATE shape, defaults, persistence, audit/change log
 js/program.js               CISO setup wizard + demo snapshots
@@ -60,7 +58,7 @@ tests/e2e/                  Playwright smoke tests (npm run test:e2e)
 Technical characteristics:
 
 - no framework, no build pipeline
-- program state synced to Supabase; mirrored in `localStorage` under `eightfiftythree-grc-v1` for the signed-in browser
+- program state stored in `localStorage` under `eightfiftythree-grc-v1`
 - saved snapshots stored in `localStorage` under `eightfiftythree-grc-snapshots`
 - existing users with data under the legacy `larsen-grc-*` or `hawthorn-grc-*` keys are automatically migrated on first load
 
@@ -68,20 +66,15 @@ Technical characteristics:
 
 These are intentional trade-offs, not gaps:
 
-- **Client-side trust boundary.** All application logic runs in the browser. There is no bespoke backend to compromise — authentication and per-program data access are enforced by Supabase Row-Level Security keyed to the signed-in `auth.uid()` (see `supabase/schema.sql`). A fully client-side tool trusts the browser and a shared anon key, so treat it as a program-management workspace, not a vault for secrets.
+- **Client-side trust boundary.** All application logic runs in the browser and there is no backend — your program never leaves the machine you typed it on. Nothing is transmitted anywhere.
+- **Roles are a modelling tool, not enforced access control.** Anyone with the browser can switch into any role, so role separation exists to design and rehearse a program's accountability structure, not to keep one colleague out of another's workspace. Treat it as a program-management workspace, not a vault for secrets.
 - **Zero dependencies, no build.** No framework, bundler, or npm supply chain. The source that ships is the source that runs — the whole app is auditable in an afternoon and loads instantly.
 - **Portable by default.** The top toolbar's **Export JSON** writes your entire program to a file you control; **Import JSON** restores it. Your program can leave this app at any time.
 - **Not** a 3PAO, a substitute for an assessor's judgment, a system-of-record you would run without your own backups, or multi-tenant SaaS.
 
-### Self-Hosting (Bring Your Own Supabase)
+### Self-Hosting
 
-Nothing ties the app to a hosted instance. To run it entirely on infrastructure you own:
-
-1. Create your own Supabase project and apply `supabase/schema.sql`.
-2. Put your project URL and anon key in `js/cloud-config.js` (see `MULTI_USER_SETUP.md`).
-3. Serve the repo root as static files, or fork and deploy your own GitHub Pages.
-
-Combined with first-class JSON export, a cautious adopter always has an out: keep local backups, or host the whole stack yourself.
+Nothing ties the app to a hosted instance — it is static files with no server component. Serve the repo root from any static file server, or fork it and deploy your own GitHub Pages. Combined with first-class JSON export, a cautious adopter always has an out: keep local backups of the exported JSON.
 
 ## Roadmap
 
@@ -94,17 +87,16 @@ These are candidates, not commitments — prioritized by whether they make the t
 
 ## Local Development
 
-1. Copy or configure `js/cloud-config.js` with your Supabase project URL and anon key (see `MULTI_USER_SETUP.md`).
-2. Serve the repository root from any static file server, for example `python -m http.server 8765` or `npx serve .`.
-3. Open `app.html` in a modern browser and sign in (or create an account).
-4. Complete program setup or continue an existing cloud program.
+1. Serve the repository root from any static file server, for example `python -m http.server 8765` or `npx serve .`.
+2. Open `app.html` in a modern browser — it loads straight into Admin mode.
+3. Complete program setup, or import an existing program JSON export.
 
 ### Smoke test before shipping
 
 1. `node --check js/<each file>.js` — syntax validation across all modules.
-2. Sign in and walk the CISO wizard end to end (Step 1 → Step 5, including the "different approver" path on Step 3).
-3. Reset the program and confirm the cloud program returns to a fresh state.
-4. Add roster users and confirm each role sees the intended tabs after signing in with that account.
+2. Walk the CISO wizard end to end (Step 1 → Step 5, including the "different approver" path on Step 3).
+3. Reset the program and confirm it returns to a fresh state.
+4. Add roster users, then use the sidebar profile button to act as each one and confirm they see only the intended tabs.
 
 ## Documentation
 

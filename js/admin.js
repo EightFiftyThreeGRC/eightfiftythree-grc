@@ -142,39 +142,159 @@ function getPersonIdentityKey(user) {
 }
 
 function renderProfileButtonContent(user) {
-  if (typeof isCloudLocked === 'function' && isCloudLocked()) {
-    var display = typeof getCloudSessionDisplayName === 'function'
-      ? getCloudSessionDisplayName()
-      : ((typeof getCloudSessionName === 'function' ? getCloudSessionName() : '') || (typeof getCloudSessionEmail === 'function' ? getCloudSessionEmail() : '') || 'Signed in');
-    var roleHint = 'Signed in · Sign out';
-    if (!user && typeof isCloudOwnerSession === 'function' && isCloudOwnerSession()) {
-      var ownerName = typeof resolveProgramOwnerActorName === 'function' ? resolveProgramOwnerActorName() : '';
-      if (ownerName) display = ownerName;
-      roleHint = 'Program owner · Sign out';
-    } else if (user) {
-      var rm = getProgramRoleMeta(user.role);
-      if (rm && rm.label) roleHint = rm.label + ' · Sign out';
-    }
-    return ''
-      + '<span class="profile-btn-line"><span>👤</span><span>' + _esc(display) + '</span></span>'
-      + '<span class="profile-btn-sub">' + _esc(roleHint) + '</span>';
+  var displayName = user
+    ? (userNeedsProfileSetup(user) ? (user.email || user.name) : getOwnerDisplayName(user))
+    : 'Admin mode';
+  var icon = user ? '👤' : '🔑';
+  var sub = 'Switch role / preview';
+  if (user) {
+    var rm = getProgramRoleMeta(user.role);
+    if (rm && rm.label) sub = rm.label + ' · Switch role';
   }
   return ''
-    + '<span class="profile-btn-line"><span>👤</span><span>Sign in</span></span>'
-    + '<span class="profile-btn-sub">Account</span>';
+    + '<span class="profile-btn-line">'
+    + '<span>' + icon + '</span>'
+    + '<span>' + _esc(displayName) + '</span>'
+    + '</span>'
+    + '<span class="profile-btn-sub">' + _esc(sub) + '</span>';
 }
 
+function showRolePicker() {
+  const overlay = document.getElementById('rolePickerOverlay');
+  if (!overlay) return;
+  syncUsersFromState();
+  renderRolePickerProfiles();
+  overlay.style.display = 'flex';
+}
+
+// Kept for stale onclick references that predate the role picker restore.
 function openProfileMenu() {
-  if (typeof isCloudSessionActive === 'function' && isCloudSessionActive()) {
-    if (typeof showCloudAccountMenu === 'function') showCloudAccountMenu();
+  showRolePicker();
+}
+
+function renderRolePickerProfiles() {
+  const container = document.getElementById('rolePickerProfiles');
+  if (!container) return;
+  if (!state.users || state.users.length === 0) {
+    container.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:32px;color:rgba(255,255,255,0.35);font-size:14px;">'
+      + 'No users have been added yet.<br><span style="font-size:12px;margin-top:6px;display:block;">Add people in the Users &amp; Roles section, then switch into their workspace here.</span></div>';
     return;
   }
-  if (typeof showCloudSignInGate === 'function') showCloudSignInGate();
+
+  // ── Group users by PERSON (email preferred, else name), merging roles ──
+  var roleOrder = ['ciso','ao','assessor','issm','control-owner','asset-owner','custodian','approver'];
+  var byPerson = {};
+  var personOrder = [];
+  state.users.forEach(function(u) {
+    var key = getPersonIdentityKey(u);
+    if (!key) return;
+    if (!byPerson[key]) {
+      byPerson[key] = {
+        name: getOwnerDisplayName(u),
+        email: u.email || '',
+        records: [],
+        roles: [],
+        primaryId: u.id,
+        needsProfile: userNeedsProfileSetup(u)
+      };
+      personOrder.push(key);
+    }
+    byPerson[key].records.push(u);
+    if (byPerson[key].roles.indexOf(u.role) === -1) byPerson[key].roles.push(u.role);
+    if (userNeedsProfileSetup(u)) byPerson[key].needsProfile = true;
+  });
+
+  personOrder.sort(function(a, b) {
+    var ra = 99, rb = 99;
+    byPerson[a].roles.forEach(function(r){ var i = roleOrder.indexOf(r); if (i !== -1 && i < ra) ra = i; });
+    byPerson[b].roles.forEach(function(r){ var i = roleOrder.indexOf(r); if (i !== -1 && i < rb) rb = i; });
+    return ra - rb;
+  });
+
+  var buildAssignText = function(records) {
+    var parts = [];
+    records.forEach(function(u) {
+      if ((u.role === 'issm' || u.role === 'custodian') && u.families && u.families.length)
+        parts.push(u.families.join(', '));
+      else if (u.role === 'control-owner' && u.controls && u.controls.length)
+        parts.push(u.controls.length + ' control(s)');
+      else if (u.role === 'asset-owner' && u.assets && u.assets.length)
+        parts.push(u.assets.length + ' asset(s)');
+    });
+    return parts.join(' · ');
+  };
+
+  var html = '';
+  personOrder.forEach(function(key) {
+    var person = byPerson[key];
+    var primaryRole = person.roles[0] || 'custodian';
+    for (var rp = 0; rp < roleOrder.length; rp++) {
+      if (person.roles.indexOf(roleOrder[rp]) !== -1) { primaryRole = roleOrder[rp]; break; }
+    }
+    var pm = getProgramRoleMeta(primaryRole);
+    var assignText = buildAssignText(person.records);
+    // Use the first record's ID — applyRoleView finds all sibling records by name/email.
+    var loginId = person.primaryId;
+
+    html += '<div onclick="selectUserProfile(\'' + loginId + '\')" '
+      + 'style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:20px;cursor:pointer;transition:all 0.15s;" '
+      + 'onmouseenter="this.style.background=\'rgba(255,255,255,0.12)\';this.style.borderColor=\'' + pm.color + '\';" '
+      + 'onmouseleave="this.style.background=\'rgba(255,255,255,0.06)\';this.style.borderColor=\'rgba(255,255,255,0.1)\';">'
+      + '<div style="font-size:24px;margin-bottom:10px;">' + pm.icon + '</div>'
+      + '<div style="color:white;font-weight:600;font-size:15px;margin-bottom:8px;">' + _esc(person.needsProfile ? (person.email || person.name) : person.name) + '</div>'
+      + (person.needsProfile ? '<div style="color:rgba(255,255,255,0.45);font-size:11px;margin:-4px 0 8px;">Add name and title on first use</div>' : '')
+      + '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;">';
+    person.roles.forEach(function(role) {
+      var rm = getProgramRoleMeta(role);
+      html += '<span style="display:inline-block;background:' + rm.color + '22;color:' + rm.color + ';font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;">' + _esc(rm.label) + '</span>';
+    });
+    html += '</div>';
+    if (assignText) {
+      html += '<div style="color:rgba(255,255,255,0.4);font-size:12px;font-family:monospace;">' + _esc(assignText) + '</div>';
+    }
+    html += '</div>';
+  });
+
+  container.innerHTML = html;
 }
 
-// Legacy name kept for any stale onclick references.
-function showRolePicker() {
-  openProfileMenu();
+function selectUserProfile(userId) {
+  // Block impersonation of demo placeholder users — any attestation made while
+  // acting as one of them would have no real signatory, which is a
+  // non-repudiation violation in a real program.
+  if (userId && userId !== 'admin') {
+    var pickedUser = (state.users || []).find(function(x){ return x.id === userId; });
+    if (pickedUser && pickedUser.isDemoPlaceholder) {
+      showToast('Cannot act as a demo placeholder user. Replace ' + (pickedUser.name || 'this user') + ' under Users & roles, or stay in Admin mode for demos.', true);
+      return;
+    }
+  }
+  if (typeof window !== 'undefined') {
+    window.selectedControl = null;
+    window.selectedDomain = null;
+    if (state) state._policyDomain = null;
+  }
+  const origOpacity = document.body.style.opacity;
+  document.body.style.opacity = '0.7';
+  setTimeout(function() { document.body.style.opacity = origOpacity; }, 300);
+
+  const overlay = document.getElementById('rolePickerOverlay');
+  if (overlay) overlay.style.display = 'none';
+  if (userId === 'admin') {
+    state._currentPersonIds = null;
+    if (typeof hideProfileSetupModal === 'function') hideProfileSetupModal();
+  }
+  applyRoleView(userId);
+  if (userId === 'admin') {
+    showTab(state.cisoComplete ? 'home' : 'ciso');
+    showToast('🔑 Admin mode');
+  } else {
+    const u = (state.users || []).find(function(x){ return x.id === userId; });
+    if (u) {
+      showToast('👤 Now acting as ' + getOwnerDisplayName(u));
+      maybePromptProfileSetup(u);
+    }
+  }
 }
 
 function applyRoleView(userId) {
@@ -192,8 +312,8 @@ function applyRoleView(userId) {
   const btn = document.getElementById('profileBtn');
   if (btn) {
     btn.innerHTML = renderProfileButtonContent(user);
-    btn.title = 'Your account';
-    btn.setAttribute('aria-label', 'Your account');
+    btn.title = 'Switch role or preview another user profile';
+    btn.setAttribute('aria-label', 'Switch role or preview another user profile');
   }
 
   // Admin: show all tabs and clear any impersonation context
@@ -755,6 +875,7 @@ function renderUsersTab() {
         + (u.note ? '<div style="color:#94a3b8;font-size:12px;margin-top:4px;">' + _esc(u.note) + '</div>' : '')
         + '</div>'
         + '<div style="display:flex;gap:8px;">'
+        + '<button onclick="previewAsUser(\'' + u.id + '\')" title="Work as this user" style="background:#f0f9ff;color:#0369a1;border:1px solid #bae6fd;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;">👁 Preview</button>'
         + '<button ' + (readOnly ? 'disabled ' : 'onclick="openEditUserModal(\'' + u.id + '\')"') + ' title="Edit user" style="background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;">✏️ Edit</button>'
         + '<button ' + (readOnly ? 'disabled ' : 'onclick="removeUser(\'' + u.id + '\')"') + ' title="Remove user" style="background:#fef2f2;color:#dc2626;border:1px solid #fca5a5;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;">✕</button>'
         + '</div>'
@@ -846,15 +967,14 @@ function saveNewUser() {
 function removeUser(id) {
   if (isUsersReadOnlyForCurrentUser()) { showToast('Read-only: AO cannot modify users.', true); return; }
   state.users = (state.users || []).filter(function(u){ return u.id !== id; });
-  if (state.currentUserId === id) {
-    if (typeof mapCloudIdentityToRoleView === 'function' && typeof isCloudSessionActive === 'function' && isCloudSessionActive()) {
-      mapCloudIdentityToRoleView();
-    } else {
-      applyRoleView('admin');
-    }
-  }
+  if (state.currentUserId === id) applyRoleView('admin');
   renderUsersTab();
   showToast('User removed');
+}
+
+/** Users tab shortcut — jump straight into another person's workspace. */
+function previewAsUser(id) {
+  selectUserProfile(id);
 }
 
 function openEditUserModal(id) {

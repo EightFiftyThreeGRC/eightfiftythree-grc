@@ -683,7 +683,6 @@ function resetApp() {
   state._currentPersonIds = null;
   state._sidebarPoliciesExpanded = false;
   state.currentUserId = null;
-  state.entraSession = null;
   // Reset step counters
   Object.keys(currentStep).forEach(function(k){ currentStep[k] = 1; });
   reapplySessionRoleView();
@@ -691,11 +690,6 @@ function resetApp() {
   showTab('ciso');
   goToStep('ciso', 1);
   try { localStorage.removeItem(STORAGE_KEY); localStorage.removeItem(STORAGE_KEY + '-ts'); } catch(e) {}
-  try {
-    if (typeof cloudPushNow === 'function' && typeof isCloudSessionActive === 'function' && isCloudSessionActive()) {
-      cloudPushNow();
-    }
-  } catch (ePush) { console.warn('cloudPushNow after reset:', ePush); }
   showToast('\u21BA Program reset. Starting fresh.');
 }
 
@@ -1242,8 +1236,8 @@ document.addEventListener('keydown', function(ev) {
   }
 });
 
-// Render the app UI once `state` has been loaded from the shared backend.
-// Safe to call more than once (cloud realtime re-invokes it after a remote update).
+// Render the app UI once `state` has been loaded from this browser's storage.
+// Safe to call more than once.
 function bootAfterStateReady() {
   try { renderSidebarBadges(); } catch (e) { console.warn('renderSidebarBadges:', e); }
   try { applySetupFocusMode(); } catch (e) { console.warn('applySetupFocusMode:', e); }
@@ -1253,44 +1247,33 @@ function bootAfterStateReady() {
 }
 window.bootAfterStateReady = bootAfterStateReady;
 
+// Called after reset / import / snapshot restore, when the acting identity may
+// no longer exist on the roster. Admin mode is always a valid landing spot.
 function reapplySessionRoleView() {
-  if (typeof isCloudSessionActive === 'function' && isCloudSessionActive()
-      && typeof mapCloudIdentityToRoleView === 'function') {
-    mapCloudIdentityToRoleView();
-    return;
-  }
+  var actingId = state.currentUserId;
+  var stillOnRoster = actingId && (state.users || []).some(function(u) { return u.id === actingId; });
+  try { applyRoleView(stillOnRoster ? actingId : 'admin'); } catch (e) { console.warn('applyRoleView:', e); }
 }
 
+// Load the program from this browser and show the app in Admin mode. Use the
+// sidebar profile button to act as any rostered person instead.
+function bootLocalMode() {
+  try { loadFromStorage(); } catch (e) { console.warn('loadFromStorage:', e); }
+  try { applyRoleView('admin'); } catch (e) { console.warn('applyRoleView:', e); }
+  bootAfterStateReady();
+}
+window.bootLocalMode = bootLocalMode;
+
 document.addEventListener('DOMContentLoaded', function() {
-  // Auth-independent UI wiring.
   try { setupMobileNav(); } catch (e) { console.warn('setupMobileNav:', e); }
   window.addEventListener('beforeunload', function(ev) {
     if (!window.isDirty) return;
     try { saveToStorage(); } catch (e2) {}
-    if (typeof cloudPushNow === 'function' && typeof isCloudSessionActive === 'function' && isCloudSessionActive()) {
-      try { cloudPushNow(); } catch (e3) {}
-    }
     if (window.isDirty) {
       ev.preventDefault();
       ev.returnValue = '';
     }
   });
 
-  try {
-    if (typeof initCloudAuth === 'function') {
-      initCloudAuth().catch(function(e) {
-        console.warn('initCloudAuth:', e);
-        if (typeof showCloudSignInGate === 'function') {
-          showCloudSignInGate('Sign-in failed to initialize. Check your connection and try again.');
-        }
-      });
-    } else if (typeof showCloudSignInGate === 'function') {
-      showCloudSignInGate('Sign-in is not available. Reload the page or check your deployment.');
-    }
-  } catch (e) {
-    console.warn('initCloudAuth threw:', e);
-    if (typeof showCloudSignInGate === 'function') {
-      showCloudSignInGate('Sign-in failed to initialize. Check your connection and try again.');
-    }
-  }
+  try { bootLocalMode(); } catch (e) { console.warn('bootLocalMode:', e); }
 });

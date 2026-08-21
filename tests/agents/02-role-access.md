@@ -4,7 +4,7 @@ Goal: every role sees exactly its tabs; separation-of-duties rules hold.
 
 ## Checklist
 1. Build a program (or load an XMPL snapshot), seed one user per role: ciso, issm, control-owner, asset-owner, custodian, assessor, ao, approver.
-2. For each role, sign in / impersonate and assert visible tabs match `ROLE_TABS` in `js/core.js` (read the current mapping first — it is the source of truth, not this file).
+2. For each role, impersonate via the sidebar role picker and assert visible tabs match `ROLE_TABS` in `js/core.js` (read the current mapping first — it is the source of truth, not this file).
    - Spot expectations as of 2026-07: assessor → risk + reports; ao → asset + risk + reports + users, with an "Authorization status" panel + Record decision button on the Reports dashboard; no dedicated tester/ato tabs exist.
 3. AO decision: `openAtoDecisionModal` only actionable when `atoCanDecide(boundary)` is true; non-AO roles never see Record decision.
 4. SoD: issue verification must be blocked when verifier == assignee; risk acceptance only available to program owner / AO.

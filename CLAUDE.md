@@ -19,21 +19,24 @@ Repository source: this workspace/repo is the primary source intended for public
 
 ## Architecture
 
-Zero-dependency, no-build static web application. UI and logic run client-side; the canonical program lives in Supabase (`programs.state` JSONB). Each signed-in browser mirrors state to `localStorage` as an offline cache. Primary dev is in Cursor; this file is written so Claude (or any LLM) can make targeted edits when called on.
+Zero-dependency, no-build static web application. UI and logic run client-side and the program lives only in this browser's `localStorage` (key `eightfiftythree-grc-v1`). There is no backend and no login: you work in Admin mode or impersonate a rostered person via the sidebar role picker. Primary dev is in Cursor; this file is written so Claude (or any LLM) can make targeted edits when called on.
 
 ### File Structure
 
-The original monolithic `js/app.js` was refactored in commit `c08deff` (2026-04-23) into per-domain modules. Globals only — no modules, no bundler, no transpilation. Actual `<script>` load order in `app.html` (source of truth — check the tags, not this list): nist-control-text → core → policies → controls → assets → baseline-elevation → authorization → frameworks → entra-auth → risk → hub → reports → admin → cloud-config → cloud-auth → program → app. Script/CSS tags carry `?v=YYYYMMDD` cache-busters — bump them for any file you edit.
+The original monolithic `js/app.js` was refactored in commit `c08deff` (2026-04-23) into per-domain modules. Globals only — no modules, no bundler, no transpilation. Actual `<script>` load order in `app.html` (source of truth — check the tags, not this list): nist-control-text → core → policies → control-scope-defaults → controls → assets → baseline-elevation → authorization → frameworks → risk → hub → reports → admin → session → program → app. Script/CSS tags carry `?v=YYYYMMDD` cache-busters — bump them for any file you edit.
 
 ```
 index.html                  — public landing page (links to app.html)
-app.html                    — UI shell, sidebar, tab containers, cloud sign-in gate
+app.html                    — UI shell, sidebar, tab containers, role picker overlay
 css/landing.css             — landing page styles
 css/app.css                 — all app styles (~12 media-query blocks: 900px primary,
                               plus 768/600/480/1024px and @media print)
-js/cloud-config.js          — Supabase connection settings
-js/cloud-auth.js            — Sign-in, program load/sync, account menu
-js/entra-auth.js            — Microsoft Entra ID (Azure AD) sign-in via MSAL.js
+js/session.js               — acting identity + permission helpers (getActingUser,
+                              getSessionActorName, isCloudOwnerSession = Admin mode,
+                              canSessionApprove*, separation-of-duties validation).
+                              Several helpers keep legacy `*Cloud*` names because they
+                              are called from ~200 sites; isCloudSessionActive() is
+                              now always false and isCloudLocked() always false.
 js/nist-control-text.js     — verbatim NIST 800-53 control requirement text lookup
 js/core.js                  — STATE shape, STATE_DEFAULTS, ROLE_TABS, persistence
                               (saveToStorage / loadFromStorage / markDirty /
@@ -64,13 +67,16 @@ js/risk.js                  — Risks & Issues tab (`risk`): triage queue, risk 
 js/reports.js               — Reports & Dashboard, audit/change-log views, review queues
                               (composes renderAuthorizationStatusPanelHtml into the
                               dashboard so AOs can record decisions inline)
-js/admin.js                 — Users & roles tab, profile / account menu (openProfileMenu,
-                              applyRoleView for cloud identity mapping)
+js/admin.js                 — Users & roles tab, role picker / impersonation
+                              (showRolePicker, renderRolePickerProfiles,
+                              selectUserProfile, previewAsUser, applyRoleView)
 js/app.js                   — App shell only: TAB_IDS, currentStep, showTab, goToStep,
-                              snapshot modal, beforeunload handler, DOMContentLoaded
+                              snapshot modal, beforeunload handler, bootLocalMode,
+                              reapplySessionRoleView, DOMContentLoaded
 scripts/check-all.js        — syntax check across all JS modules (npm run check:js)
 tests/e2e/smoke.spec.js     — Playwright smoke tests (npm run test:e2e)
-supabase/                   — schema.sql, config, edge functions
+supabase/                   — UNUSED. Leftover schema/edge functions from the retired
+                              cloud sign-in mode; no client code references them.
 README.md                   — public GitHub README + operator smoke-test runbook
 CONTROL_OWNER_SPEC.md       — compliance + UX spec for the Control Owner flow
 ```
@@ -138,9 +144,11 @@ Risks & Issues (Phase 2 — `js/risk.js`, tab id `risk`)
 - UI flags: `_riskView`, `_riskFilter`, `_riskSearch`, `_issueFilter`, `_issueSearch`, `_sidebarRiskExpanded`, `_phase2SidebarFirstLive`, `_selectedRiskId`, `_selectedIssueId`
 - PM-4 selected in CISO wizard → issues sub-view labeled **Issues (POA&M)** + CSV export
 
-Users / auth
-- `users` — `[{ id, name, email, role, families[], controls[], note, isDemoPlaceholder? }]`
-- `currentUserId` — `null` = admin mode; string id = signed-in user
+Users / acting identity
+- `users` — `[{ id, name, email, role, families[], controls[], note, isDemoPlaceholder? }]`, built by `syncUsersFromState()` from the wizard's owner assignments
+- `currentUserId` — `null` = Admin mode (full program-owner oversight); string id = impersonating that roster record
+- `_currentPersonIds` — every roster row belonging to the impersonated person (one human can hold several roles); `null` in Admin mode
+- Switch identity with `selectUserProfile(id | 'admin')` from the sidebar role picker. Impersonating a user with `isDemoPlaceholder` is blocked so attestations always have a real signatory.
 - Role → tabs mapping: `ROLE_TABS` in `js/core.js` (~line 1075). Roles: `ciso`, `issm`, `control-owner`, `asset-owner`, `custodian`, `assessor`, `ao`, `approver`. Every role's list includes `home` (Command Center). The `risk` tab is on most implementation/review roles (`ciso`, `issm`, `control-owner`, `asset-owner`, `assessor`, `ao`). As of 2026-04-27 the dedicated Control Assessment (`tester`) and Authorization (`ato`) tabs were removed. `ao` now sees `home` + `asset` + `risk` + `reports` + `users`; `assessor` sees `home` + `risk` + `reports`. Admins can also define custom role slugs via `state.customProgramRoles[]` (resolved by `getRoleTabs()` in `js/app.js` using `tabsTemplate: 'assessor' | 'reports-only'`). AO decisions are recorded via `openAtoDecisionModal()` which is launched from the Authorization status panel on the Reports dashboard. Tab visibility is enforced in `showTab()` (redirects out-of-role tab ids), not just hidden nav.
 
 Accountability
@@ -196,7 +204,7 @@ Top of main content: **program phase roadmap** (Phase 1 governance · Phase 2 ri
 `TAB_IDS` in `js/app.js` is `['home','ciso','policy','control','asset','frameworks','risk','reports','users']`. Library views are reached from the Reports sub-items and workspace toggles rather than a dedicated sidebar section.
 
 Top-right toolbar provides: Save indicator, Save now, Export JSON, Import JSON, Snapshots, Reset.
-Top-left of sidebar has the account button (`openProfileMenu()` → cloud sign-in gate or account menu with sign-out).
+Top-left of sidebar has the profile button (`showRolePicker()` → role picker overlay listing every rostered person plus an Admin mode button).
 
 ### CISO Setup Wizard (7 steps — `CISO_STEP_LABELS` in `js/program.js`)
 
@@ -269,7 +277,7 @@ When `privacyOverlay` is true, the ISP auto-injects tiered privacy requirements 
 3. Confirm `localStorage` keys are `eightfiftythree-grc-v1` and `eightfiftythree-grc-snapshots`, and that the legacy-key migration runs once and cleans up both `larsen-grc-*` and `hawthorn-grc-*` prefixes
 4. "Snapshots" modal → load each XMPL snapshot, then Reset and confirm no ghost state
 5. Sidebar badges and counts update correctly after state changes
-6. Role-picker: sign in as each role, confirm only the intended tabs are visible (assessor sees `reports` only; AO sees `asset` + `reports` + `users`; the AO sees an "Authorization status" panel on the dashboard with a Record decision button per boundary)
+6. Role-picker: impersonate each role, confirm only the intended tabs are visible (assessor sees `reports` only; AO sees `asset` + `reports` + `users`; the AO sees an "Authorization status" panel on the dashboard with a Record decision button per boundary), then switch back to Admin mode
 7. Demo placeholder gating: prefill demo owners, then attempt to finalize → must be blocked with a toast naming the demo identities
 
 ## Work Style
@@ -293,7 +301,7 @@ When the user asks to **"QA the app"** (or run tests / run the QA regime / test 
 2. Agents report findings only — the orchestrator makes all code edits, then re-runs the affected agent.
 3. Finish with a fresh Agent 6 (`tests/agents/06-verifier.md`) reviewing the run's full diff. Green = all agents PASS + verifier approves.
 4. Write the scorecard to `tests/agents/LAST_RUN.md` (overwrite each run; per-agent PASS/FAIL + open findings).
-5. Hard rules: never test against the live Supabase program with real sign-in (local server only); nothing destructive without a snapshot/backup first; "quick QA" = Agent 0 only.
+5. Hard rules: always test against a local server so the live site's browser storage is untouched; nothing destructive without a snapshot/backup first; "quick QA" = Agent 0 only.
 
 ## Reference Documents
 

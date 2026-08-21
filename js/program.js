@@ -349,11 +349,6 @@ function resubmitISPForApproval() {
   exitISPRevisionEditor();
   markDirty();
   try { if (typeof saveToStorage === 'function') saveToStorage(); } catch (e) { /* ignore */ }
-  if (typeof isCloudSessionActive === 'function' && isCloudSessionActive() && typeof cloudPushNow === 'function') {
-    cloudPushNow().finally(function() {
-      if (typeof renderHomeTab === 'function') renderHomeTab();
-    });
-  }
   showTab('home');
 }
 
@@ -444,15 +439,13 @@ function submitISPForApproval(silent, options) {
       ? 'ISP revised and resubmitted for approval — routed to ' + approverName + (approverRole ? ' (' + approverRole + ')' : '')
       : 'ISP submitted for approval — routed to ' + approverName + (approverRole ? ' (' + approverRole + ')' : '');
     try { addAuditEntry('policy', 'ISP', auditMsg); } catch (e) { console.warn('audit log failed:', e); }
-    var cloudActive = typeof isCloudSessionActive === 'function' && isCloudSessionActive();
-    var willEmail = wantApproverEmail
-      && typeof sendISPApprovalRequestEmail === 'function'
-      && cloudActive;
-    if (!silent && !willEmail) {
-      if (isCustom && approverEmail && !cloudActive) {
-        showToast('ISP submitted to ' + approverName + '. Sign in (cloud mode) to email ' + approverEmail + ' a sign-up link.', true);
-      } else if (isCustom && approverEmail && current === 'Approved') {
-        showToast('ISP is already approved — no approver email sent.', true);
+    if (!silent) {
+      if (isCustom && approverEmail && current === 'Approved') {
+        showToast('ISP is already approved — no review requested.', true);
+      } else if (wantApproverEmail) {
+        // No email is sent: the approver is rostered so you can switch into
+        // their profile from the sidebar and review the ISP as them.
+        showToast('📨 ISP routed to ' + approverName + '. Switch to their profile to review it.');
       } else if (forceResubmit) {
         showToast('📨 ISP resubmitted to ' + approverName + ' for review.');
       } else {
@@ -461,48 +454,9 @@ function submitISPForApproval(silent, options) {
     }
   }
 
-  if (wantApproverEmail && typeof sendISPApprovalRequestEmail === 'function') {
-    // Roster the approver and push to cloud before emailing so RLS lets them in when they click the link.
-    try { if (typeof syncUsersFromState === 'function') syncUsersFromState(); } catch (e) { console.warn('syncUsersFromState failed:', e); }
-    try { markDirty(); } catch (e) { console.warn('markDirty failed:', e); }
-    var pushThenEmail = Promise.resolve();
-    if (typeof isCloudSessionActive === 'function' && isCloudSessionActive() && typeof cloudPushNow === 'function') {
-      pushThenEmail = cloudPushNow().catch(function(e) {
-        console.warn('cloudPushNow before approver email', e);
-      });
-    }
-    pushThenEmail.then(function() {
-      return sendISPApprovalRequestEmail({
-        approverEmail: approverEmail,
-        approverName: approverName,
-        programOwnerName: (state.programOwner || '').trim(),
-        orgName: state.orgName || 'your organization'
-      });
-    }).then(function(res) {
-      if (res && res.ok) {
-        if (!silent) {
-          showToast('📨 ISP submitted to ' + approverName + '. Sign-up email sent to ' + approverEmail + '.');
-        }
-        try { addAuditEntry('policy', 'ISP', 'Approver sign-in link sent to ' + approverEmail); } catch (e) { /* ignore */ }
-      } else if (res && res.reason === 'not_cloud') {
-        if (!silent) showToast('ISP submitted to ' + approverName + '. Sign in (cloud mode) to email ' + approverEmail + ' a sign-up link.', true);
-      } else if (!silent) {
-        var fmtFail = typeof formatApproverEmailFailure === 'function' ? formatApproverEmailFailure : function(r) { return r || 'unknown error'; };
-        var detail = (res && res.reason) ? fmtFail(res.reason) : 'unknown error';
-        showToast('ISP submitted, but could not email ' + approverEmail + ': ' + detail, true);
-      }
-    }).catch(function(err) {
-      console.warn('submitISPForApproval email', err);
-      if (!silent) {
-        var fmtErr = typeof formatApproverEmailFailure === 'function' ? formatApproverEmailFailure : function(r) { return r || 'unknown error'; };
-        var msg = fmtErr(err && err.message ? err.message : String(err));
-        showToast('Could not send approver email: ' + msg, true);
-      }
-    });
-  } else {
-    try { if (typeof syncUsersFromState === 'function') syncUsersFromState(); } catch (e) { console.warn('syncUsersFromState failed:', e); }
-    try { markDirty(); } catch (e) { console.warn('markDirty failed:', e); }
-  }
+  // Roster the approver so they show up in the role picker as a reviewable profile.
+  try { if (typeof syncUsersFromState === 'function') syncUsersFromState(); } catch (e) { console.warn('syncUsersFromState failed:', e); }
+  try { markDirty(); } catch (e) { console.warn('markDirty failed:', e); }
 
   try { renderSidebarBadges(); } catch (e) { console.warn('renderSidebarBadges failed:', e); }
 }

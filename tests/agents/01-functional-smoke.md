@@ -1,6 +1,6 @@
 # Agent 1 — Functional Smoke (model: sonnet, bash + browser/Playwright)
 
-Goal: core flows work on a locally served copy. NEVER test against the live Supabase-backed site with real sign-in — use a local server so cloud state is untouched.
+Goal: core flows work on a locally served copy. Use a local server so the live site's browser storage is untouched.
 
 ## Setup
 - Serve the repo: `npx serve` or `python3 -m http.server` from repo root (in sandbox, copy repo to /tmp first if the OneDrive mount misbehaves).

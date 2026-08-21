@@ -1971,15 +1971,9 @@ function sspRevEscJs(s) {
 }
 
 function getSspReviewSessionUser() {
+  if (typeof getActingUser === 'function') return getActingUser();
   if (state.currentUserId && state.users) {
-    var u = (state.users || []).find(function(x) { return x.id === state.currentUserId; });
-    if (u) return u;
-  }
-  if (typeof findProgramUserForEntraIdentity === 'function') {
-    var sessionEmail = typeof getSessionEmailForApproval === 'function' ? getSessionEmailForApproval() : '';
-    var sessionName = typeof getSessionActorName === 'function' ? getSessionActorName('') : '';
-    var matched = findProgramUserForEntraIdentity(sessionEmail, sessionName);
-    if (matched) return matched;
+    return (state.users || []).find(function(x) { return x.id === state.currentUserId; }) || null;
   }
   return null;
 }
