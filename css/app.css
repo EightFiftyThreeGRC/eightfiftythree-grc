@@ -37,8 +37,7 @@
       box-sizing: border-box;
     }
 
-    html, body {
-      display: flex;
+    html {
       min-height: 100vh;
       font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Segoe UI', system-ui, sans-serif;
       background: var(--bg-gradient);
@@ -47,8 +46,13 @@
       -moz-osx-font-smoothing: grayscale;
     }
 
+    /* body owns the flex row. html must stay a block: as a flex item, body would
+       size to its own content, and .main's width: calc(100% - sidebar) would
+       resolve against that instead of the viewport, collapsing main to its
+       content width and leaving the rest of the screen bare. */
     body {
       display: flex;
+      width: 100%;
       min-height: 100vh;
       background-color: var(--bg);
       color: var(--text);
