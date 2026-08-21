@@ -934,10 +934,16 @@ function renderPolicyList(bodyEl) {
   // Helper: look up COMMON_MERGES label for a set of families
   function mergeLabel(masterFam, slaves) {
     if (!slaves || !slaves.length) return null;
-    const allFams = [masterFam].concat(slaves).sort().join(',');
+    if (typeof getCsfFunctionPolicyTitleForMaster === 'function') {
+      var csfTitle = getCsfFunctionPolicyTitleForMaster(masterFam);
+      if (csfTitle) return csfTitle;
+    }
+    var active = (typeof getActiveFamilies === 'function' ? getActiveFamilies() : []).filter(function(f){ return f !== 'PM'; });
+    var allFams = [masterFam].concat(slaves).sort().join(',');
     for (var i = 0; i < COMMON_MERGES.length; i++) {
       const cm = COMMON_MERGES[i];
-      if (cm.families.slice().sort().join(',') === allFams) return cm.label;
+      var preset = cm.families.filter(function(f){ return active.indexOf(f) !== -1; }).slice().sort().join(',');
+      if (preset === allFams) return cm.label;
     }
     return null;
   }
@@ -1750,13 +1756,18 @@ function exitPolicyWizard() {
 function getPolicyMergedTitle(fam) {
   // Custom name takes priority
   if (state.domainCustomNames && state.domainCustomNames[fam]) return state.domainCustomNames[fam];
+  if (typeof getCsfFunctionPolicyTitleForMaster === 'function') {
+    var csfTitle = getCsfFunctionPolicyTitleForMaster(fam);
+    if (csfTitle) return csfTitle;
+  }
   var merges = state.policyMerges || {};
   var families = getActiveFamilies().filter(function(f){ return f !== 'PM'; });
   var slaves = families.filter(function(f){ return merges[f] === fam; });
   if (slaves.length) {
     var allFamsStr = [fam].concat(slaves).sort().join(',');
     for (var i = 0; i < COMMON_MERGES.length; i++) {
-      if (COMMON_MERGES[i].families.slice().sort().join(',') === allFamsStr) return COMMON_MERGES[i].label;
+      var presetFams = COMMON_MERGES[i].families.filter(function(f){ return families.indexOf(f) !== -1; }).slice().sort().join(',');
+      if (presetFams === allFamsStr) return COMMON_MERGES[i].label;
     }
   }
   var dd = DOMAIN_DEFAULTS[fam] || DOMAIN_DEFAULT_GENERIC;

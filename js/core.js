@@ -1177,6 +1177,7 @@ const state = {
   domainPolicies: null,          // { 'AC': { title, purpose, scope, roles, requirements, ... } }
   controlOwners: null,           // { 'AC-1': { name, role, email, dueDate } }
   policyMerges: {},              // { 'IA': 'AC' } = IA is merged under AC's owner card
+  csfFunctionGroupingApplied: false, // true after CSF 2.0 Function packaging was applied (or reset)
   policyPriorities: {},          // { 'AC': 'now'|'soon'|'later' }
   domainDeadlines: {},           // { 'AC': 'YYYY-MM-DD' } per-domain deadline overrides
   domainCustomNames: {},         // { 'AC': 'Custom Policy Name' } user-defined policy titles

@@ -801,6 +801,7 @@ function policyMapAddAnother() {
 }
 
 function renderPolicyMapCoverageHtml() {
+  if (typeof ensureCsfFunctionGrouping === 'function') ensureCsfFunctionGrouping();
   var cov = getPolicyMapCoverage();
   var ispChip = cov.ispMapped
     ? '<span class="pmap-status mapped">Mapped</span>'
@@ -832,17 +833,25 @@ function renderPolicyMapCoverageHtml() {
 
   return ''
     + '<div class="section-title">Coverage review</div>'
-    + '<div class="section-subtitle">Families with mapped documents will count as policy coverage for control implementation. Gaps stay available to map another existing document or draft in-app.</div>'
+    + '<div class="section-subtitle">Families with mapped documents will count as policy coverage for control implementation. Gaps stay available to map another existing document or draft in-app. Mapped 800-53 controls are also shown as CSF 2.0 outcomes below \u2014 aligned to CSF 2.0, not a CSF Profile.</div>'
+    + (typeof renderCsfCoverageStripHtml === 'function' ? renderCsfCoverageStripHtml('embed') : '')
     + '<div class="pmap-kpi">'
     + '<div class="pmap-kpi-card"><div class="pmap-kpi-val">' + cov.mapped + '</div><div class="pmap-kpi-label">Mapped families</div></div>'
     + '<div class="pmap-kpi-card"><div class="pmap-kpi-val">' + cov.partial + '</div><div class="pmap-kpi-label">Partial</div></div>'
     + '<div class="pmap-kpi-card"><div class="pmap-kpi-val">' + cov.gap + '</div><div class="pmap-kpi-label">Gaps</div></div>'
     + '</div>'
     + '<div class="pmap-card"><div class="pmap-card-head"><div><div class="pmap-card-title">Organization ISP (Tier 1)</div>'
-    + '<div class="pmap-card-meta">XX-1 policy-and-procedures controls and selected PM controls read this status. Mapped from: ' + ispDocs + '</div></div>'
+    + '<div class="pmap-card-meta">Govern (GV) is this ISP \u2014 XX-1 policy-and-procedures controls and selected PM controls. Mapped from: ' + ispDocs + '</div></div>'
     + ispChip + '</div>'
     + (cov.ispMapped ? '' : '<div class="pmap-card-actions" style="margin-top:10px;"><button type="button" class="btn btn-secondary btn-sm" onclick="state.policyMapStep=4;policyMapRerender()">Mark a document as the ISP</button></div>')
     + '</div>'
+    + (typeof renderCsfFunctionGroupingHtml === 'function'
+      ? '<div class="csf-merge-pathb-note">Domain policies default-group by CSF Function (Identify / Protect / Detect / Respond / Recover). Family coverage in the table still stands; a mapped Function policy covers every family in that group.</div>'
+        + renderCsfFunctionGroupingHtml(
+          (typeof getActiveFamilies === 'function' ? getActiveFamilies() : []).filter(function(f){ return f !== 'PM'; }),
+          (typeof state !== 'undefined' && state.policyMerges) ? state.policyMerges : {}
+        )
+      : '')
     + '<div class="table-scroll"><table class="control-table pmap-table"><thead><tr>'
     + '<th>Family</th><th>Coverage</th><th>Controls</th><th>Documents</th><th>Action</th>'
     + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
