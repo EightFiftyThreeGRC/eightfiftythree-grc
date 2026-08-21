@@ -2731,9 +2731,10 @@
     .hub-section { margin-bottom: 28px; }
     .hub-section-title { font-family: var(--font-display); font-size: var(--text-md); font-weight: 600; letter-spacing: var(--tracking-tight); margin-bottom: 14px; }
     .hub-actions { display: flex; flex-direction: column; gap: 8px; }
+    .hub-workspace-groups { display: flex; flex-direction: column; }
     .hub-workspace-grid {
       display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 10px;
     }
     .hub-workspace-group + .hub-workspace-group { margin-top: 18px; }
@@ -2748,6 +2749,7 @@
       flex-direction: column;
       align-items: flex-start;
       gap: 4px;
+      min-width: 0;
       padding: 14px 16px;
       border: 1px solid var(--hairline);
       border-radius: var(--radius-md);
@@ -3127,6 +3129,75 @@
       margin: 0;
       line-height: 1.5;
     }
+    .owner-step-hero-name {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--navy);
+      letter-spacing: -0.02em;
+      line-height: 1.2;
+    }
+    .owner-step-hero-mail {
+      margin-top: 4px;
+      font-size: 12px;
+      color: var(--text-muted);
+      word-break: break-all;
+    }
+    .owner-step-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+      max-width: 100%;
+      padding: 8px 12px;
+      background: var(--white);
+      border: 1px solid var(--hairline);
+      border-radius: var(--radius-md);
+    }
+    .owner-step-chip--hero {
+      padding: 10px 14px;
+      margin-top: 2px;
+    }
+    .owner-step-chip-glyph {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--accent-soft);
+      color: var(--navy);
+      flex-shrink: 0;
+    }
+    .owner-step-chip-text {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      gap: 1px;
+    }
+    .owner-step-chip-name {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--navy);
+      line-height: 1.25;
+    }
+    .owner-step-chip-email {
+      font-size: 11px;
+      color: var(--text-muted);
+      word-break: break-all;
+    }
+    .owner-step-id {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-width: 0;
+    }
+    .owner-step-id--chip {
+      flex-direction: row;
+      align-items: center;
+      gap: 8px;
+    }
+    .owner-step-name { font-size: 12px; padding: 8px 10px; min-width: 0; }
+    .owner-step-chip-edit { flex-shrink: 0; padding: 4px 10px; font-size: 11px; }
     @media (max-width: 768px) {
       .owner-step-hero-top { flex-direction: column; }
       .owner-step-hero-stat { text-align: left; }
@@ -3136,6 +3207,7 @@
       }
       .owner-step-row-status { display: none; }
       .owner-step-list-head { flex-direction: column; align-items: flex-start; }
+      .owner-step-id--chip { flex-wrap: wrap; }
     }
 
     #profileSetupOverlay {
@@ -3489,5 +3561,54 @@
       }
     }
 
+    /* CSF Function policy grouping (CISO Step 6 / Path B coverage) */
+    .csf-merge-panel {
+      background: var(--white);
+      border: 1px solid var(--hairline);
+      border-radius: var(--radius-lg);
+      padding: 18px 20px;
+      margin: 8px 0 8px;
+    }
+    .csf-merge-panel-head {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      gap: 16px; flex-wrap: wrap; margin-bottom: 14px;
+    }
+    .csf-merge-panel-title { font-size: 15px; font-weight: 700; color: var(--navy); letter-spacing: -0.02em; }
+    .csf-merge-panel-sub { font-size: 13px; color: var(--text-muted); line-height: 1.5; max-width: 720px; margin-top: 4px; }
+    .csf-merge-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .csf-merge-status { font-size: 11px; font-weight: 700; color: #166534; background: #dcfce7; border-radius: 6px; padding: 4px 10px; }
+    .csf-merge-isp {
+      display: flex; gap: 12px; align-items: flex-start;
+      background: #f5f3ff; border: 1px solid #ddd6fe; border-radius: 10px;
+      padding: 12px 14px; margin-bottom: 14px; font-size: 13px; color: var(--ink-7); line-height: 1.45;
+    }
+    .csf-merge-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px;
+    }
+    .csf-merge-card {
+      border: 1px solid var(--hairline); border-radius: 10px; padding: 12px 14px; background: #fafafa;
+    }
+    .csf-merge-card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+    .csf-merge-card-title { font-size: 13px; font-weight: 700; color: var(--navy); }
+    .csf-merge-card-reason { font-size: 11px; color: var(--text-muted); margin: 0 0 10px; line-height: 1.4; }
+    .csf-merge-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .csf-merge-chip {
+      display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap;
+      background: #fff; border: 1px solid var(--hairline); border-radius: 8px; padding: 4px 6px;
+    }
+    .csf-merge-chip-anchor { border-color: #c4b5fd; background: #f5f3ff; }
+    .csf-merge-x {
+      border: none; background: transparent; cursor: pointer; font-size: 14px; line-height: 1;
+      color: #94a3b8; padding: 0 2px;
+    }
+    .csf-merge-x:hover { color: #b91c1c; }
+    .csf-merge-move {
+      font-size: 10px; padding: 2px 4px; border: 1px solid #e2e8f0; border-radius: 4px;
+      background: #fff; color: #475569; max-width: 110px;
+    }
+    .csf-merge-empty { font-size: 12px; color: var(--text-muted); }
+    .csf-merge-standalone { margin-top: 14px; }
+    .csf-merge-standalone-label { font-size: 12px; font-weight: 700; color: var(--navy); margin-bottom: 4px; }
+    .csf-merge-pathb-note { font-size: 12px; color: var(--text-muted); margin: 12px 0 8px; line-height: 1.45; }
 
 

@@ -1007,7 +1007,7 @@ function renderCISOStep1() {
         <div class="form-group" style="margin-bottom:0;">
           <label class="form-label">Email Address <span class="required">*</span></label>
           <input class="form-input" id="programOwnerEmailInput" type="email" placeholder="e.g., jsmith@agency.gov" value="${escapeHTML(state.programOwnerEmail)}" oninput="state.programOwnerEmail=this.value; window.markDirty();">
-          <div class="form-hint">Used for the owner roster and sign-in. Domain owners only need email during setup — they add name and title on first login.</div>
+          <div class="form-hint">Email is the unique key on the local roster. Switch profiles in the sidebar to act as this person.</div>
         </div>
       </div>
       <label style="display:inline-flex;align-items:center;gap:10px;margin-top:4px;padding:10px 16px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;cursor:pointer;user-select:none;">
@@ -1019,6 +1019,262 @@ function renderCISOStep1() {
       </label>
     </div>
   `;
+}
+
+// ============================================================
+// ORGANIZATIONAL BASELINE RECOMMENDATION (SETUP STEP 2)
+// ============================================================
+// What Step 2 actually selects is the *organization's* starting baseline: the
+// default, centrally-implemented, inheritable control set (common controls, the
+// PM family, enterprise policies, org-defined parameters). It is deliberately
+// NOT a claim that every system in the estate is categorized at that level.
+//
+// Individual systems are categorized separately under FIPS 199 inside their own
+// authorization boundary. The high-water mark is taken across the information
+// types *within one system*; it does not propagate across the organization. A
+// system that categorizes above the organizational floor is raised through the
+// baseline-elevation review in Assets & SSP (js/baseline-elevation.js), which
+// creates an elevated system-class subtype and leaves the org floor alone.
+//
+// So this engine produces a defensible *provisional organizational* starting
+// point from the Step 1 profile, expressed in adverse-effect terms wherever it
+// can be. It skews to Low on purpose: for most small commercial organizations a
+// Low organizational floor plus per-system elevation is the correct
+// architecture, not under-scoping.
+var BASELINE_LABELS = { L: 'Low', M: 'Moderate', H: 'High' };
+
+function baselineRank(letter) {
+  return { L: 1, M: 2, H: 3 }[letter] || 0;
+}
+
+function baselineLabel(letter) {
+  return BASELINE_LABELS[letter] || '';
+}
+
+/** Caveat shared by every baseline rationale. Wording matters \u2014 see the block comment above. */
+function getOrgBaselineScopeCaveat(level) {
+  var base = 'This is your organization-wide starting baseline and common control set \u2014 the floor every system inherits. '
+    + 'It is not a statement that every system is categorized at this level. Individual systems are categorized separately '
+    + 'under FIPS 199 within their own authorization boundary and may land higher or lower than this organizational default.';
+  if (level === 'L') {
+    base += ' Choosing a Low organizational floor does not claim that no system needs more \u2014 a higher-impact system is raised '
+      + 'on its own merits through the baseline-elevation review in Assets & SSP, which creates an elevated system class '
+      + 'without moving the organizational floor.';
+  } else {
+    base += ' Systems above this floor are handled by the baseline-elevation review in Assets & SSP rather than by raising the organizational default again.';
+  }
+  return base;
+}
+
+/**
+ * Derive a provisional organizational baseline from the Step 1 profile.
+ *
+ * Returns:
+ *   available    \u2014 false when the profile is incomplete (no recommendation is invented)
+ *   level        \u2014 'L' | 'M' | 'H'
+ *   summary      \u2014 one-or-two-sentence rationale, in adverse-effect terms
+ *   factors      \u2014 [{ label, detail }] the actual profile signals, in priority order
+ *   caveat       \u2014 organizational-vs-system scope caveat
+ *   fismaSuggested \u2014 profile indicates a federal / CUI program, so the
+ *                    info-types-driven FISMA path is the better fit
+ *
+ * The rules are intentionally flat and legible so they can be tuned later.
+ */
+function recommendBaseline() {
+  var profileReady = typeof isOrgProfileComplete === 'function' && isOrgProfileComplete();
+  var data = typeof getOrgDataTypes === 'function' ? getOrgDataTypes() : [];
+  var has = function(id) { return data.indexOf(id) >= 0; };
+  var isGov = state.orgOwnership === 'government';
+  var isFederal = isGov && state.orgGovLevel === 'federal';
+  var sector = state.orgSector || '';
+  var size = state.orgSizeBand || '';
+  var impact = state.orgImpactProfile || '';
+  var hasRegulatedData = data.length > 0 && !has('none');
+
+  var level = 'L';
+  var factors = [];
+  var drivers = [];
+
+  // raise() only ever moves the recommendation up, and records why.
+  function raise(to, label, detail) {
+    if (baselineRank(to) > baselineRank(level)) level = to;
+    drivers.push({ level: to, label: label, detail: detail });
+    factors.push({ label: label, detail: detail });
+  }
+
+  // ── HIGH: severe or catastrophic adverse effect ─────────────────────────
+  if (impact === 'severe') {
+    raise('H', 'Severe or catastrophic worst-case consequence',
+      'Safety-of-life, national-security, or existential loss indicates a High availability and integrity impact rating.');
+  }
+  if (isFederal && (sector === 'defense' || sector === 'intelligence')) {
+    raise('H', 'Federal defense or intelligence mission',
+      'National-security systems carry a High confidentiality impact as a matter of course.');
+  }
+
+  // ── MODERATE: serious adverse effect, regulated data, or public mission ──
+  if (impact === 'serious') {
+    raise('M', 'Serious worst-case consequence',
+      'Significant financial, legal, or operational harm indicates a Moderate impact rating.');
+  }
+  if (has('phi')) {
+    raise('M', 'Protected health information in scope',
+      'PHI carries a Moderate confidentiality impact and a statutory breach-notification obligation.');
+  }
+  if (has('cui')) {
+    raise('M', 'CUI or federal contract information in scope',
+      'CUI is handled at Moderate confidentiality under the federal CUI program and NIST SP 800-171 flow-down.');
+  }
+  if (has('card')) {
+    raise('M', 'Cardholder data in scope',
+      'Payment card data carries a Moderate confidentiality impact and contractual PCI DSS obligations.');
+  }
+  if (has('finrep')) {
+    raise('M', 'Financial-reporting-relevant data in scope',
+      'Systems feeding the financial statements carry a Moderate integrity impact.');
+  }
+  if (sector === 'healthcare' || sector === 'medicare_integrator') {
+    raise('M', 'Healthcare sector', 'Health-sector information is normally categorized at Moderate or above.');
+  }
+  if (sector === 'financial') {
+    raise('M', 'Financial services sector', 'Financial-services data carries a Moderate confidentiality and integrity impact.');
+  }
+  if (sector === 'critical_infra') {
+    raise('M', 'Critical infrastructure sector', 'Service-continuity dependence raises the availability impact to at least Moderate.');
+  }
+  if (sector === 'justice_public_safety' || sector === 'law_enforcement') {
+    raise('M', 'Justice or public-safety mission', 'Law-enforcement information is normally categorized at Moderate.');
+  }
+  if (isGov && baselineRank(level) < 2) {
+    raise('M', 'Government program',
+      'Public-sector systems are rarely categorized Low once citizen or mission data is aggregated.');
+  }
+  // Size is an aggregation signal only \u2014 it never sets a baseline on its own.
+  if (size === 'gt1000' && hasRegulatedData && baselineRank(level) < 2) {
+    raise('M', 'Regulated data aggregated across a large workforce',
+      'Over 1,000 people holding regulated data concentrates enough records that the confidentiality impact of a single breach reaches Moderate.');
+  }
+
+  // ── LOW: nothing above a limited adverse effect ─────────────────────────
+  if (!drivers.length) {
+    if (size) factors.push({ label: labelFromOptions(ORG_SIZE_OPTIONS, size), detail: 'Small enough estate to run one common control set.' });
+    if (sector) factors.push({ label: getOrgClassificationSummary(), detail: 'No sector-specific impact escalation applies.' });
+    factors.push({
+      label: has('none') ? 'No regulated or sensitive data in scope' : 'No regulated data triggering escalation',
+      detail: 'Nothing in scope carries a statutory or contractual confidentiality floor above Low.'
+    });
+    if (impact === 'limited') {
+      factors.push({ label: 'Limited worst-case consequence', detail: 'A loss of confidentiality, integrity, or availability would be disruptive but recoverable.' });
+    }
+  }
+
+  var summary;
+  if (level === 'L') {
+    summary = 'A Low organizational baseline is the appropriate starting point. Nothing in your profile indicates more than a limited '
+      + 'adverse effect from a loss of confidentiality, integrity, or availability at the organization level, so a Low common control '
+      + 'set is the right floor to build and inherit from.';
+  } else {
+    var top = drivers.filter(function(d) { return d.level === level; })[0] || drivers[0];
+    summary = 'A ' + baselineLabel(level) + ' organizational baseline is the appropriate starting point. '
+      + (top ? top.detail + ' ' : '')
+      + 'That raises the floor for every system that inherits your common controls.';
+  }
+
+  var fismaSuggested = isGov || has('cui');
+
+  return {
+    available: profileReady,
+    level: level,
+    label: baselineLabel(level),
+    summary: summary,
+    factors: factors,
+    caveat: getOrgBaselineScopeCaveat(level),
+    fismaSuggested: fismaSuggested,
+    profileKey: typeof getOrgProfileSignature === 'function' ? getOrgProfileSignature() : ''
+  };
+}
+
+/** Persist the recommendation snapshot + the decision the CISO actually made. */
+function recordBaselineDecision(selected, previous) {
+  var rec = recommendBaseline();
+  state.baselineRecommendation = rec.available ? {
+    level: rec.level,
+    label: rec.label,
+    summary: rec.summary,
+    factors: rec.factors,
+    caveat: rec.caveat,
+    computedAt: new Date().toISOString(),
+    profileKey: rec.profileKey
+  } : {};
+
+  var deviation = rec.available && selected !== rec.level;
+  var existing = (state.baselineDecision && typeof state.baselineDecision === 'object') ? state.baselineDecision : {};
+  var actor = typeof getSessionActorName === 'function' ? getSessionActorName('Program Owner') : 'Program Owner';
+  state.baselineDecision = {
+    selected: selected,
+    recommended: rec.available ? rec.level : '',
+    deviation: !!deviation,
+    // Re-picking the same deviating baseline keeps the justification already written.
+    justification: (deviation && existing.selected === selected) ? String(existing.justification || '') : '',
+    decidedAt: new Date().toISOString(),
+    decidedBy: actor
+  };
+
+  if (previous !== selected && typeof addAuditEntry === 'function') {
+    var msg;
+    if (!rec.available) {
+      msg = 'Organizational baseline set to ' + baselineLabel(selected) + ' (' + selected + '). '
+        + 'Organization profile incomplete \u2014 no derived recommendation to compare against.';
+    } else if (deviation) {
+      msg = 'Organizational baseline set to ' + baselineLabel(selected) + ' (' + selected + ') \u2014 DEVIATION from the recommended '
+        + rec.label + ' (' + rec.level + '). Recommendation basis: ' + rec.summary;
+    } else {
+      msg = 'Organizational baseline set to ' + baselineLabel(selected) + ' (' + selected + '), matching the recommendation derived '
+        + 'from the organization profile. Basis: ' + rec.summary;
+    }
+    addAuditEntry('program', 'baseline', msg);
+  }
+  if (typeof logFieldChange === 'function') logFieldChange('baseline', previous || '', selected);
+  if (typeof markDirty === 'function') markDirty();
+}
+
+/** Free-text justification for choosing a baseline other than the recommended one. */
+function setBaselineDecisionJustification(text) {
+  if (!state.baselineDecision || typeof state.baselineDecision !== 'object') state.baselineDecision = {};
+  var prev = String(state.baselineDecision.justification || '');
+  state.baselineDecision.justification = text || '';
+  if (typeof logFieldChange === 'function') logFieldChange('baselineDecision.justification', prev, state.baselineDecision.justification);
+  if (typeof markDirty === 'function') markDirty();
+}
+
+/** True when the manual (non-FISMA) pick differs from the recommendation and has no justification yet. */
+function baselineDeviationNeedsJustification() {
+  if (state.fismaMode) return false;
+  var d = state.baselineDecision;
+  if (!d || typeof d !== 'object' || !d.deviation) return false;
+  return !String(d.justification || '').trim();
+}
+
+/** Short rationale line reused in the Selected Program Scope summary panel. */
+function getBaselineRationaleSummaryText() {
+  var d = (state.baselineDecision && typeof state.baselineDecision === 'object') ? state.baselineDecision : {};
+  var r = (state.baselineRecommendation && typeof state.baselineRecommendation === 'object') ? state.baselineRecommendation : {};
+  if (state.fismaMode) {
+    var derived = computeBaselineFromInfoTypes(state.programInfoTypes);
+    var ov = state.baselineOverride;
+    if (ov && ov !== derived) {
+      return 'Tailored from the ' + baselineLabel(derived) + ' baseline derived from your selected information types.'
+        + ((state.baselineOverrideRationale || '').trim() ? ' Rationale: ' + state.baselineOverrideRationale : '');
+    }
+    return 'Derived from the FIPS 199 high-water mark across the information types selected for this program.';
+  }
+  if (!r.level) return 'Selected manually \u2014 complete the organization profile in Step 1 for a derived recommendation.';
+  if (d.deviation) {
+    return 'Recommended ' + baselineLabel(r.level) + ' (' + r.level + '); '
+      + baselineLabel(d.selected) + ' selected instead.'
+      + (String(d.justification || '').trim() ? ' Justification: ' + d.justification : ' Justification outstanding.');
+  }
+  return 'Matches the recommended ' + baselineLabel(r.level) + ' baseline. ' + (r.summary || '');
 }
 
 function renderCISOStep2Baseline() {
@@ -1039,6 +1295,7 @@ function renderCISOStep2Baseline() {
   const privCount = typeof getPrivacyOnlyCatalogControlCount === 'function' ? getPrivacyOnlyCatalogControlCount() : 0;
   const isFisma = !!state.fismaMode;
   const selectedTypes = Array.isArray(state.programInfoTypes) ? state.programInfoTypes : [];
+  const rec = recommendBaseline();
 
   const fismaToggleCard = `
     <div class="privacy-toggle-card ${isFisma?'selected':''}" onclick="toggleProgramFismaMode()" style="margin-bottom:14px;border-color:${isFisma?'#7c3aed':'var(--border)'};${isFisma?'background:#f5f3ff;':''}">
@@ -1046,38 +1303,77 @@ function renderCISOStep2Baseline() {
       <div class="pt-info">
         <div class="pt-name">FISMA / CUI program (info-types-driven baseline)</div>
         <div class="pt-desc">Turn on if this program must comply with FISMA, FedRAMP, DoD RMF, or handle CUI. Derives baseline from NIST 800-60 information types.</div>
+        ${!isFisma && rec.fismaSuggested ? `<div class="pt-desc" style="margin-top:6px;color:#6d28d9;font-weight:600;">Your organization profile indicates a federal or CUI-handling program \u2014 this path is the better fit for you.</div>` : ''}
       </div>
       <div class="toggle-switch ${isFisma?'on':''}"></div>
     </div>`;
 
   let baselineBlock = '';
   if (!isFisma) {
+    // The RECOMMENDED badge is derived from the Step 1 profile, never hardcoded.
+    const recBadge = (letter) => rec.available && rec.level === letter
+      ? ' <span style="background:#0d9488;color:white;font-size:10px;padding:2px 6px;border-radius:10px;margin-left:4px;font-weight:700;">RECOMMENDED</span>'
+      : '';
+    const decision = (state.baselineDecision && typeof state.baselineDecision === 'object') ? state.baselineDecision : {};
+    const isDeviation = rec.available && !!state.baseline && state.baseline !== rec.level;
+
+    let recPanel = '';
+    if (!rec.available) {
+      recPanel = renderRecommendationPanelHtml({
+        tone: 'info',
+        heading: 'No recommendation yet',
+        verdict: 'Complete the organization profile in Step 1',
+        summary: 'Once workforce size, worst-case consequence, regulated data, non-US footprint, and SOC 2 demand are answered, this step '
+          + 'recommends a starting baseline and writes down why. Until then, pick the level you believe is right.',
+        caveat: getOrgBaselineScopeCaveat('')
+      });
+    } else {
+      const extra = isDeviation
+        ? `<div class="rec-deviation">
+             <div class="rec-deviation-title">Documented deviation \u2014 ${escapeHTML(baselineLabel(state.baseline))} selected, ${escapeHTML(rec.label)} recommended</div>
+             <div class="rec-deviation-body">Record why the recommended baseline is not the right organizational floor for you. This is stored with the recommendation and written to the audit trail.</div>
+             <textarea class="form-input" rows="2" placeholder="e.g. A single regulated workload drives the estate, so we are standardising the whole common control set at Moderate rather than elevating per system."
+               oninput="setBaselineDecisionJustification(this.value)">${escapeHTML(String(decision.justification || ''))}</textarea>
+           </div>`
+        : '';
+      recPanel = renderRecommendationPanelHtml({
+        tone: isDeviation ? 'warn' : 'ok',
+        heading: 'Why this recommendation',
+        verdict: 'Recommended organizational baseline: ' + rec.label + ' (' + rec.level + ')',
+        summary: rec.summary,
+        factors: rec.factors,
+        caveat: rec.caveat,
+        extraHtml: extra
+      });
+    }
+
     baselineBlock = `
       <div style="margin-bottom:8px;">
-        <div class="section-title" style="margin-bottom:2px;">Select Your NIST 800-53 Baseline</div>
-        <div class="section-subtitle">Choose the impact level for your information system. This determines which controls apply to your program.</div>
+        <div class="section-title" style="margin-bottom:2px;">Select Your Organizational NIST 800-53 Baseline</div>
+        <div class="section-subtitle">This is the default control set your systems inherit \u2014 your common controls, PM family, and enterprise policy floor. Individual systems are categorized separately.</div>
       </div>
 
       <div class="baseline-grid">
         <div class="baseline-card bc-low ${state.baseline==='L'?'selected':''}" onclick="selectBaseline('L')">
-          <div class="bc-label">LOW IMPACT</div>
+          <div class="bc-label">LOW IMPACT${recBadge('L')}</div>
           <div class="bc-name">Low Baseline</div>
-          <div class="bc-desc">For systems where compromise would have limited adverse effects on operations, assets, or individuals.</div>
+          <div class="bc-desc">Where compromise would have limited adverse effects on operations, assets, or individuals. A common starting floor for smaller organizations.</div>
           <div class="bc-count">${lCount} controls incl. enhancements (NIST 800-53B)</div>
         </div>
         <div class="baseline-card bc-mod ${state.baseline==='M'?'selected':''}" onclick="selectBaseline('M')">
-          <div class="bc-label">MODERATE IMPACT <span style="background:#0d9488;color:white;font-size:10px;padding:2px 6px;border-radius:10px;margin-left:4px;font-weight:700;">RECOMMENDED</span></div>
+          <div class="bc-label">MODERATE IMPACT${recBadge('M')}</div>
           <div class="bc-name">Moderate Baseline</div>
-          <div class="bc-desc">For systems where compromise would have serious adverse effects. The most commonly used baseline for federal systems.</div>
+          <div class="bc-desc">Where compromise would have serious adverse effects. Substantially more to implement and sustain across an estate.</div>
           <div class="bc-count">${mCount} controls incl. enhancements (NIST 800-53B)</div>
         </div>
         <div class="baseline-card bc-high ${state.baseline==='H'?'selected':''}" onclick="selectBaseline('H')">
-          <div class="bc-label">HIGH IMPACT</div>
+          <div class="bc-label">HIGH IMPACT${recBadge('H')}</div>
           <div class="bc-name">High Baseline</div>
-          <div class="bc-desc">For systems where compromise would have severe or catastrophic effects. Used for national security and critical infrastructure.</div>
+          <div class="bc-desc">Where compromise would have severe or catastrophic effects \u2014 safety of life, national security, or critical infrastructure.</div>
           <div class="bc-count">${hCount} controls incl. enhancements (NIST 800-53B)</div>
         </div>
-      </div>`;
+      </div>
+      ${recPanel}`;
   } else {
     const derivedBaseline = computeBaselineFromInfoTypes(selectedTypes);
     const override = (state.baselineOverride === 'L' || state.baselineOverride === 'M' || state.baselineOverride === 'H') ? state.baselineOverride : null;
@@ -1132,6 +1428,13 @@ function renderCISOStep2Baseline() {
               <strong>Effective baseline: ${labelOf(effectiveBaseline)} (${effectiveBaseline}) — ${effectiveCount} controls.</strong> Matches the FIPS 199 high-water mark across your selected information types. Click a different card above to tailor up or down.
             </div>`
       }
+      ${renderRecommendationPanelHtml({
+        tone: 'info',
+        heading: 'What this baseline covers',
+        summary: 'FISMA / CUI mode derives your organizational floor from the information types below, so the profile-based recommendation is '
+          + 'superseded by the stronger signal.',
+        caveat: getOrgBaselineScopeCaveat(resolveProgramBaseline() || '')
+      })}
       <div style="margin:14px 0 8px;">
         <div class="section-title" style="margin-bottom:2px;">Information types this program will handle</div>
         <div class="section-subtitle">Select every category your systems will create, store, or process. Each one carries a NIST 800-60 suggested C/I/A — the highest across your selections sets the derived baseline.</div>
@@ -1166,6 +1469,7 @@ function renderCISOStep2Baseline() {
     ${cisoStepProgressHtml(2, 'Baseline & scope')}
     ${fismaToggleCard}
     ${baselineBlock}
+    ${typeof renderCsfPrepareNoteHtml === 'function' ? renderCsfPrepareNoteHtml() : ''}
 
     <div class="privacy-toggle-card ${state.privacyOverlay?'selected':''}" onclick="togglePrivacy()" style="margin-top:8px;">
       <div class="pt-icon">🔒</div>
@@ -1179,7 +1483,8 @@ function renderCISOStep2Baseline() {
     ${state.baseline ? `
     <div class="summary-box">
       <h3>📊 Selected Program Scope</h3>
-      <div class="summary-kv"><span class="sk">Baseline:</span><span class="sv">${state.baseline==='L'?'Low Impact':state.baseline==='M'?'Moderate Impact':'High Impact'}</span></div>
+      <div class="summary-kv"><span class="sk">Organizational baseline:</span><span class="sv">${state.baseline==='L'?'Low Impact':state.baseline==='M'?'Moderate Impact':'High Impact'}</span></div>
+      <div class="summary-kv" style="grid-column:1/-1;"><span class="sk">Basis for this baseline:</span><span class="sv" style="font-weight:500;line-height:1.55;">${escapeHTML(getBaselineRationaleSummaryText())}</span></div>
       <div class="summary-kv"><span class="sk">Privacy Overlay:</span><span class="sv">${state.privacyOverlay?'Yes — PT (Privacy) family included':'No'}</span></div>
       <div class="summary-kv"><span class="sk">Total Controls in Scope:</span><span class="sv">${BASELINE_COUNTS[state.baseline] || 0} controls across ${getActiveFamilies().filter(f=>f!=='PM').length} families${Object.values(state.pmControls||{}).filter(Boolean).length ? ' + ' + Object.values(state.pmControls||{}).filter(Boolean).length + ' PM controls' : ''}</span></div>
       <div class="summary-kv"><span class="sk">Organization:</span><span class="sv">${state.orgName||'Not yet set'}</span></div>
@@ -2079,7 +2384,10 @@ function renderRequirementsSection(unmappedPM) {
             <span style="cursor:grab;color:var(--text-muted);font-size:14px;" title="Drag to reorder">⠿</span>
             <span style="font-size:12px;font-weight:800;color:var(--teal);background:rgba(13,148,136,0.1);padding:4px 12px;border-radius:12px;letter-spacing:0.3px;">${req.id}</span>
             <div style="display:flex;flex-wrap:wrap;gap:4px;">
-              ${req.controls.map(cid => `<span style="display:inline-flex;align-items:center;gap:3px;background:white;border:1px solid rgba(13,148,136,0.3);border-radius:14px;padding:2px 8px;font-size:11px;font-weight:600;color:var(--teal);font-family:monospace;">${cid}<span style="cursor:pointer;color:var(--red);margin-left:1px;font-family:sans-serif;" onclick="removeReqControl(${oi},'${cid}')">✕</span></span>`).join('')}
+              ${req.controls.map(cid => {
+                var csf = (typeof renderCsfTagsHtml === 'function') ? renderCsfTagsHtml(cid) : '';
+                return `<span style="display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;background:white;border:1px solid rgba(13,148,136,0.3);border-radius:14px;padding:4px 8px;font-size:11px;font-weight:600;color:var(--teal);"><span style="font-family:monospace;">${cid}</span>${csf}<span style="cursor:pointer;color:var(--red);margin-left:1px;font-family:sans-serif;" onclick="removeReqControl(${oi},'${cid}')">\u2715</span></span>`;
+              }).join('')}
               <button onclick="addReqControl(${oi})" style="background:none;border:1px dashed var(--border);border-radius:14px;padding:2px 8px;font-size:11px;color:var(--text-muted);cursor:pointer;">+ control</button>
             </div>
           </div>
@@ -2094,7 +2402,7 @@ function renderRequirementsSection(unmappedPM) {
   }).join('');
   return `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-      <div style="font-size:11px;color:var(--text-muted);">Each requirement is a control objective mapped to specific NIST 800-53 controls.</div>
+      <div style="font-size:11px;color:var(--text-muted);">Each requirement is a control objective mapped to specific NIST 800-53 controls. CSF 2.0 tags are outcome labels on those controls.</div>
       <button class="btn btn-secondary btn-sm" onclick="addPolicyReq()">+ Add Requirement</button>
     </div>
     <div id="policy-reqs-list">
@@ -2175,11 +2483,12 @@ function renderControlsSection(activeControls, mappedControls, allActivePM) {
     <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px;">All controls referenced in policy requirements and active PM controls are listed below (${relatedControls.length} controls).</div>
     <div class="table-scroll" style="max-height:320px;">
       <table class="control-table">
-        <thead><tr><th style="width:80px;">Control ID</th><th>Control Name</th><th style="width:100px;">Family</th><th>Control Owner</th></tr></thead>
+        <thead><tr><th style="width:80px;">Control ID</th><th style="width:120px;">CSF 2.0</th><th>Control Name</th><th style="width:100px;">Family</th><th>Control Owner</th></tr></thead>
         <tbody id="tbod-${Math.random().toString(36).slice(2,8)}">
           ${relatedControls.map(c => `
           <tr>
             <td><span class="control-id">${c.id}</span></td>
+            <td>${typeof renderCsfTagsHtml === 'function' ? renderCsfTagsHtml(c.id, { compact: true }) : ''}</td>
             <td style="font-size:12px;">${c.n}</td>
             <td><span class="family-badge">${c.f}</span></td>
             <td style="font-size:12px;color:var(--text-muted);">
@@ -2217,8 +2526,8 @@ function autoExpandTextareas(root) {
 
 // ============================================================
 // DOMAIN POLICY — CONFIG & CONSTANTS
-// FAMILY_DESC (one-liners), COMMON_MERGES (lean-team merge
-// suggestions), DOMAIN_SUGGESTED_ROLES (who owns what),
+// FAMILY_DESC (one-liners), COMMON_MERGES (CSF Function packaging
+// defaults — partition, not overlapping pairs), DOMAIN_SUGGESTED_ROLES,
 // priority tiers and deadline helpers.
 // ============================================================
 const FAMILY_DESC = {
@@ -2245,24 +2554,17 @@ const FAMILY_DESC = {
 
 
 const COMMON_MERGES = [
-  { label:'Identity & Access',           families:['AC','IA'],       reason:'Access rules and authentication are always one conversation.' },
-  { label:'Monitoring & Integrity',      families:['AU','SI'],       reason:'Log collection and system integrity monitoring are the same function.' },
-  { label:'Security Operations',         families:['AU','IR'],       reason:'Audit logging and incident response are both core SOC functions.' },
-  { label:'Assessment & Planning',       families:['CA','PL'],       reason:'Security assessments and planning belong to the same owner.' },
-  { label:'Governance & Assessment',     families:['CA','PL','RA'],  reason:'Risk assessment, security planning, and authorization are all governance functions.' },
-  { label:'Resilience',                  families:['CP','IR'],       reason:'Business continuity and incident response are two sides of the same coin.' },
-  { label:'Configuration & Maintenance', families:['CM','MA'],       reason:'Configuration baselines and system maintenance are tightly coupled operations.' },
-  { label:'Physical & Media Security',   families:['MP','PE'],       reason:'Physical security and media handling are both about stuff you can touch.' },
-  { label:'People Security',             families:['AT','PS'],       reason:'Training and HR security are both about your workforce.' },
-  { label:'System Security',             families:['SC','SI'],       reason:'System/communications protection and system integrity are both technical controls.' },
-  { label:'Systems & Communications',    families:['SA','SC'],       reason:'Acquisition security and communications protection are both engineering concerns.' },
-  { label:'Supply Chain & Acquisition',  families:['SA','SR'],       reason:'System acquisition and supply chain risk management share the same vendor oversight process.' },
+  { label: 'Identify', families: ['RA', 'PL', 'SA', 'SR'], reason: 'Risk, planning, acquisition, and supply chain.', fn: 'ID', master: 'RA' },
+  { label: 'Protect', families: ['AC', 'IA', 'AT', 'PS', 'MP', 'PE', 'SC', 'CM', 'MA', 'PT'], reason: 'Access, people, media, physical, configuration, and communications.', fn: 'PR', master: 'AC' },
+  { label: 'Detect', families: ['AU', 'SI', 'CA'], reason: 'Logging, integrity monitoring, and continuous assessment.', fn: 'DE', master: 'AU' },
+  { label: 'Respond', families: ['IR'], reason: 'Incident response.', fn: 'RS', master: 'IR' },
+  { label: 'Recover', families: ['CP'], reason: 'Contingency planning and recovery.', fn: 'RC', master: 'CP' }
 ];
 
 
 // --- Priority tier helpers ---
 const PRIORITY_TIERS = { now: 45, soon: 90, later: 150 };
-const PRIORITY_DEFAULTS = { IR:'now', AC:'now', IA:'now', CP:'now', AT:'later', PE:'later', PT:'soon' };
+const PRIORITY_DEFAULTS = { IR:'now', AC:'now', IA:'now', CP:'now', RA:'soon', AU:'soon', AT:'later', PE:'later', PT:'soon' };
 const PRIORITY_META = {
   now:   { label:'Now',   bg:'#fee2e2', fg:'#991b1b', bar:'#dc2626', hint:'30–60 days' },
   soon:  { label:'Soon',  bg:'#fef3c7', fg:'#92400e', bar:'#f59e0b', hint:'60–120 days' },
@@ -2428,6 +2730,165 @@ function ownerSummaryHTML(masters, families, merges) {
   </div>`;
 }
 
+function getCsfActiveFamilySet() {
+  var set = {};
+  (typeof getActiveFamilies === 'function' ? getActiveFamilies() : []).forEach(function(f) {
+    if (f !== 'PM') set[f] = true;
+  });
+  return set;
+}
+
+function getCsfResolvedPolicyGroups() {
+  var groups = (typeof getCsfFunctionPolicyGroups === 'function')
+    ? getCsfFunctionPolicyGroups()
+    : COMMON_MERGES.map(function(mg) {
+      return { fn: mg.fn, title: mg.label, master: mg.master, families: mg.families.slice(), reason: mg.reason };
+    });
+  var famSet = getCsfActiveFamilySet();
+  return groups.map(function(g) {
+    var present = (g.families || []).filter(function(f) { return famSet[f]; });
+    var master = g.master;
+    if (!famSet[master] && present.length) master = present[0];
+    return {
+      fn: g.fn,
+      title: g.title,
+      reason: g.reason,
+      master: master,
+      families: present
+    };
+  }).filter(function(g) { return g.master; });
+}
+
+function applyCsfFunctionGrouping(opts) {
+  opts = opts || {};
+  var families = Object.keys(getCsfActiveFamilySet());
+  if (!state.policyMerges) state.policyMerges = {};
+  if (!state.domainCustomNames) state.domainCustomNames = {};
+  if (opts.replace) {
+    families.forEach(function(f) { delete state.policyMerges[f]; });
+  }
+  var applied = 0;
+  getCsfResolvedPolicyGroups().forEach(function(g) {
+    if (!g.families.length) return;
+    g.families.forEach(function(f) {
+      if (f === g.master) return;
+      if (state.policyMerges[f] !== g.master) {
+        state.policyMerges[f] = g.master;
+        applied++;
+      }
+    });
+    if (opts.replace || !state.domainCustomNames[g.master]) {
+      state.domainCustomNames[g.master] = g.title;
+    }
+  });
+  state.csfFunctionGroupingApplied = true;
+  if (typeof markDirty === 'function') markDirty();
+  try {
+    addAuditEntry('program', null, 'Applied CSF 2.0 Function packaging (ISP + Identify / Protect / Detect / Respond / Recover)');
+  } catch (e) { /* ignore */ }
+  return applied;
+}
+
+function ensureCsfFunctionGrouping() {
+  if (state.csfFunctionGroupingApplied) return false;
+  var merges = state.policyMerges || {};
+  var hasMerges = Object.keys(merges).some(function(k) { return !!merges[k]; });
+  if (hasMerges) return false;
+  applyCsfFunctionGrouping({ replace: false });
+  return true;
+}
+
+function moveFamilyToCsfFunction(fam, fn) {
+  var groups = getCsfResolvedPolicyGroups();
+  var target = null;
+  for (var i = 0; i < groups.length; i++) {
+    if (groups[i].fn === fn) { target = groups[i]; break; }
+  }
+  if (!target || !target.master) {
+    showToast('That CSF Function has no policy yet.', true);
+    return;
+  }
+  if (fam === target.master) return;
+  if (!state.policyMerges) state.policyMerges = {};
+  var families = Object.keys(getCsfActiveFamilySet());
+  var slaves = families.filter(function(f) { return state.policyMerges[f] === fam; });
+  if (slaves.length && !state.policyMerges[fam]) {
+    var newMaster = slaves[0];
+    slaves.slice(1).forEach(function(sf) { state.policyMerges[sf] = newMaster; });
+    delete state.policyMerges[newMaster];
+    if (state.domainCustomNames && state.domainCustomNames[fam] && !state.domainCustomNames[newMaster]) {
+      state.domainCustomNames[newMaster] = state.domainCustomNames[fam];
+    }
+  }
+  mergePolicy(fam, target.master);
+}
+
+function renderCsfFunctionGroupingHtml(families, merges) {
+  var groups = getCsfResolvedPolicyGroups();
+  var claimed = {};
+  var cards = groups.map(function(g) {
+    var members = [];
+    families.forEach(function(f) {
+      if (f === g.master && !merges[f]) members.push(f);
+      else if (merges[f] === g.master) members.push(f);
+    });
+    members.forEach(function(f) { claimed[f] = true; });
+    var moveOpts = groups.filter(function(o) { return o.fn !== g.fn; }).map(function(o) {
+      return '<option value="' + o.fn + '">' + escapeHTML(o.title) + '</option>';
+    }).join('');
+    var chips = members.map(function(f) {
+      var isAnchor = f === g.master;
+      var unmerge = isAnchor ? ''
+        : ' <button type="button" class="csf-merge-x" data-ciso-unmerge="' + f + '" title="Unmerge to its own policy">\u00d7</button>';
+      var mover = '<select class="csf-merge-move" data-ciso-csf-move="' + f + '" aria-label="Move ' + f + ' to another Function"><option value="">Move\u2026</option>' + moveOpts + '</select>';
+      return '<span class="csf-merge-chip' + (isAnchor ? ' csf-merge-chip-anchor' : '') + '">'
+        + '<span class="family-badge">' + escapeHTML(f) + '</span>'
+        + unmerge + mover + '</span>';
+    }).join('');
+    if (!members.length) {
+      chips = '<span class="csf-merge-empty">No families in this Function \u2014 add one from Standalone below.</span>';
+    }
+    return '<div class="csf-merge-card csf-fn-' + String(g.fn || '').toLowerCase() + '">'
+      + '<div class="csf-merge-card-head"><span class="csf-fn-code">' + escapeHTML(g.fn) + '</span>'
+      + '<span class="csf-merge-card-title">' + escapeHTML(g.title) + '</span></div>'
+      + '<p class="csf-merge-card-reason">' + escapeHTML(g.reason) + '</p>'
+      + '<div class="csf-merge-chips">' + chips + '</div></div>';
+  }).join('');
+
+  var standalones = families.filter(function(f) { return !merges[f] && !claimed[f]; });
+  var addOpts = groups.map(function(g) {
+    return '<option value="' + g.fn + '">' + escapeHTML(g.title) + '</option>';
+  }).join('');
+  var standaloneHtml = standalones.length
+    ? '<div class="csf-merge-standalone"><div class="csf-merge-standalone-label">Standalone policies</div>'
+      + '<p class="csf-merge-card-reason">Unmerged families are their own domain policy. Add one back into a Function, or merge two standalones in the table below.</p>'
+      + standalones.map(function(f) {
+        return '<span class="csf-merge-chip"><span class="family-badge">' + escapeHTML(f) + '</span>'
+          + '<select class="csf-merge-move" data-ciso-csf-move="' + f + '" aria-label="Add ' + f + ' to a Function"><option value="">Add to Function\u2026</option>'
+          + addOpts + '</select></span>';
+      }).join('') + '</div>'
+    : '';
+
+  var applied = !!state.csfFunctionGroupingApplied;
+  var actionBtn = applied
+    ? '<button type="button" class="btn btn-secondary btn-sm" data-ciso-csf-reset>Reset to CSF defaults</button>'
+    : '<button type="button" class="btn btn-primary btn-sm" data-ciso-csf-apply>Use CSF function grouping</button>';
+  var status = applied
+    ? '<span class="csf-merge-status">Applied \u2014 customize any family</span>'
+    : '<span class="csf-merge-status">Not applied yet</span>';
+
+  return '<div class="csf-merge-panel">'
+    + '<div class="csf-merge-panel-head">'
+    + '<div><div class="csf-merge-panel-title">CSF 2.0 Function packaging</div>'
+    + '<div class="csf-merge-panel-sub">Default packaging by CSF 2.0 Function \u2014 change any family. This is organizational document structure, not a NIST-required merge. Each family is in at most one Function by default.</div></div>'
+    + '<div class="csf-merge-actions">' + status + actionBtn + '</div></div>'
+    + '<div class="csf-merge-isp" role="note"><span class="csf-fn-code">GV</span>'
+    + '<div><strong>Govern is the Information Security Policy.</strong> Program Management (PM) controls and XX-1 policy-and-procedures statements live in the ISP. There is no separate Govern domain-policy card.</div></div>'
+    + '<div class="csf-merge-grid">' + cards + '</div>'
+    + standaloneHtml
+    + '</div>';
+}
+
 // ============================================================
 // CISO STEP 4 — Consolidate & Prioritize (merge families, priorities)
 // CISO STEP 5 — Assign owners & deadlines
@@ -2441,6 +2902,7 @@ function renderCISOStep4a() {
     body.innerHTML = '<div class="empty-state"><div class="es-icon">⚠️</div><div class="es-title">No Baseline Selected</div><p>Complete Step 2 first.</p></div>';
     return;
   }
+  ensureCsfFunctionGrouping();
   const families = getActiveFamilies().filter(f => f !== 'PM');
   const merges = state.policyMerges || {};
   const masters = families.filter(f => !merges[f]);
@@ -2455,46 +2917,21 @@ function renderCISOStep4a() {
     </div>
 
     <div class="section-title">Consolidate &amp; Prioritize Policies</div>
-    <div class="section-subtitle">First, merge any domains that belong in a single policy document. Then set the urgency for each — this drives the draft deadlines in the next step.</div>
+    <div class="section-subtitle">Lean teams start with the ISP plus five CSF Function policies. Unmerge a family, move it to another Function, or add a custom merge. Then set urgency \u2014 that drives draft deadlines in the next step.</div>
+
+    ${renderCsfFunctionGroupingHtml(families, merges)}
 
     <!-- Priority summary pills -->
-    <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;">
+    <div style="display:flex;gap:10px;margin:20px 0 16px;flex-wrap:wrap;">
       ${Object.entries(PRIORITY_META).map(([tier,m]) => `
       <div style="background:${m.bg};border-radius:8px;padding:8px 16px;display:flex;align-items:center;gap:8px;">
         <div style="width:8px;height:8px;border-radius:50%;background:${m.bar};"></div>
         <span style="font-size:12px;font-weight:700;color:${m.fg};">${m.label}</span>
-        <span style="font-size:12px;color:${m.fg};opacity:0.8;">${priorityCounts[tier]} domain${priorityCounts[tier]!==1?'s':''} · ${m.hint}</span>
+        <span style="font-size:12px;color:${m.fg};opacity:0.8;">${priorityCounts[tier]} domain${priorityCounts[tier]!==1?'s':''} \u00b7 ${m.hint}</span>
       </div>`).join('')}
     </div>
 
     ${renderPolicyPriorityRoadmapHTML(masters, merges, families, controls)}
-
-    <!-- Common merges callout -->
-    <div style="border:1px solid #bfdbfe;border-radius:10px;background:#eff6ff;padding:14px 18px;margin-bottom:20px;">
-      <div style="font-size:12px;font-weight:700;color:#1e40af;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
-      <span>💡 Common merges for lean teams</span>
-      <button type="button" class="btn btn-primary" style="padding:4px 10px;font-size:11px;" data-ciso-apply-all-merges>Apply All Non-Conflicting</button>
-</div>
-      <div style="display:flex;flex-direction:column;gap:6px;">
-        ${COMMON_MERGES.filter(mg => mg.families.every(f => families.includes(f))).map(mg => {
-          const alreadyMerged = mg.families.slice(1).every(f => merges[f] === mg.families[0]);
-          const masterFam = mg.families[0];
-          const slaveFams = mg.families.slice(1);
-          return `<div style="display:flex;align-items:center;gap:10px;background:white;border:1px solid #bfdbfe;border-radius:8px;padding:8px 12px;">
-            <div style="display:flex;gap:4px;flex-shrink:0;">
-              ${mg.families.map(f => `<span class="family-badge" style="font-size:11px;">${f}</span>`).join('<span style="font-size:11px;color:#93c5fd;font-weight:700;">+</span>')}
-            </div>
-            <div style="flex:1;">
-              <span style="font-size:12px;font-weight:700;color:#1e40af;">${mg.label}</span>
-              <span style="font-size:11px;color:#3b82f6;margin-left:6px;">${mg.reason}</span>
-            </div>
-            ${alreadyMerged
-              ? `<span style="font-size:11px;font-weight:700;color:#166534;background:#dcfce7;border-radius:6px;padding:3px 10px;">✓ Merged</span>`
-              : `<button type="button" data-ciso-merge-apply data-master="${masterFam}" data-slaves="${slaveFams.join(',')}" style="font-size:11px;font-weight:700;color:#1e40af;background:#dbeafe;border:none;border-radius:6px;padding:4px 12px;cursor:pointer;white-space:nowrap;">Apply merge</button>`}
-          </div>`;
-        }).join('')}
-      </div>
-    </div>
 
     <!-- Consolidate + Prioritize table -->
     <div class="table-scroll">
@@ -2508,7 +2945,7 @@ function renderCISOStep4a() {
           <tr>
             <th>Policy Domain</th>
             <th>Priority</th>
-            <th>Merge Into</th>
+            <th>Custom extra merge</th>
           </tr>
         </thead>
         <tbody id="tbod-${Math.random().toString(36).slice(2,8)}">
@@ -2557,7 +2994,7 @@ function renderCISOStep4a() {
 
     <div class="info-alert" style="margin-top:16px;">
       <div class="ia-icon">💡</div>
-      <div class="ia-text"><strong>Now</strong> = audit-critical or high-risk (IR, AC, IA, CP). <strong>Soon</strong> = important but not blocking. <strong>Later</strong> = real but low-urgency. These drive the default deadlines in the next step — you can still override per domain.</div>
+      <div class="ia-text">A lean program is the ISP plus five Function policies. <strong>Now</strong> = audit-critical (Respond, Protect access, Recover). <strong>Soon</strong> = important but not blocking. <strong>Later</strong> = real but low-urgency. These drive default deadlines in the next step \u2014 you can still override per domain.</div>
     </div>
 
   `;
@@ -2573,6 +3010,62 @@ function ensureDefaultDeadlinesForMasters(masters) {
     }
   });
   if (changed && typeof markDirty === 'function') markDirty();
+}
+
+function isSameOwnerEmail(a, b) {
+  var left = typeof normalizeOwnerEmail === 'function' ? normalizeOwnerEmail(a) : String(a || '').trim().toLowerCase();
+  var right = typeof normalizeOwnerEmail === 'function' ? normalizeOwnerEmail(b) : String(b || '').trim().toLowerCase();
+  return !!left && left === right;
+}
+
+function applyProgramOwnerMetaIfMatchingEmail(fam) {
+  var o = state.domainOwners && state.domainOwners[fam];
+  if (!o || !isSameOwnerEmail(o.email, state.programOwnerEmail)) return false;
+  var name = (state.programOwner || '').trim();
+  var role = (state.programOwnerTitle || '').trim() || (typeof getDefaultProgramOwnerTitle === 'function' ? getDefaultProgramOwnerTitle() : '');
+  var changed = false;
+  if (name && !(o.name || '').trim()) {
+    o.name = name;
+    changed = true;
+  }
+  if (role && !(o.role || '').trim()) {
+    o.role = role;
+    changed = true;
+  }
+  return changed;
+}
+
+function ownerStepChipHtml(name, email, extraClass) {
+  var glyph = (typeof icon === 'function') ? icon('user', 16) : '';
+  var cls = 'owner-step-chip' + (extraClass ? ' ' + extraClass : '');
+  return '<div class="' + cls + '">'
+    + (glyph ? '<span class="owner-step-chip-glyph" aria-hidden="true">' + glyph + '</span>' : '')
+    + '<span class="owner-step-chip-text">'
+    + '<span class="owner-step-chip-name">' + escapeHTML(name || '') + '</span>'
+    + (email ? '<span class="owner-step-chip-email">' + escapeHTML(email) + '</span>' : '')
+    + '</span></div>';
+}
+
+function beginCisoOwnerRowEdit(fam) {
+  state._cisoOwnerEditFam = fam;
+  setTimeout(function() { renderActiveCisoSetupStep(); }, 0);
+}
+
+function setDomainOwnerGroup(fam, field, value) {
+  var merges = state.policyMerges || {};
+  var families = getActiveFamilies().filter(function(f) { return f !== 'PM'; });
+  setDomainOwner(fam, field, value);
+  families.filter(function(f) { return merges[f] === fam; }).forEach(function(mf) {
+    setDomainOwner(mf, field, value);
+  });
+}
+
+function commitCisoOwnerEmail(fam) {
+  var o = state.domainOwners[fam] || {};
+  if (isSameOwnerEmail(o.email, state.programOwnerEmail) && (o.name || '').trim()) {
+    if (state._cisoOwnerEditFam === fam) delete state._cisoOwnerEditFam;
+  }
+  setTimeout(function() { renderActiveCisoSetupStep(); }, 0);
 }
 
 function applyOwnerEmailToFamilies(famList, email, meta) {
@@ -2601,8 +3094,9 @@ function applyOwnerEmailToFamilies(famList, email, meta) {
 
 function applyProgramOwnerToAllDomains() {
   var email = (state.programOwnerEmail || '').trim();
-  if (!isValidOwnerEmail(email)) {
-    showToast('Add the program owner email in Step 1 first.', true);
+  var name = (state.programOwner || '').trim();
+  if (!name || !isValidOwnerEmail(email)) {
+    showToast('Add the program owner name and email in Step 1 first.', true);
     goToStep('ciso', 1);
     return;
   }
@@ -2611,10 +3105,11 @@ function applyProgramOwnerToAllDomains() {
   var masters = families.filter(function(f) { return !merges[f]; });
   ensureDefaultDeadlinesForMasters(masters);
   applyOwnerEmailToFamilies(masters, email, {
-    name: (state.programOwner || '').trim(),
+    name: name,
     role: (state.programOwnerTitle || '').trim() || getDefaultProgramOwnerTitle()
   });
-  showToast('Program owner email assigned to all ' + masters.length + ' policy domains. Owners complete name and title on first sign-in.');
+  delete state._cisoOwnerEditFam;
+  showToast('Assigned ' + name + ' as owner of all ' + masters.length + ' policy domains. Switch profiles in the sidebar to act as them.');
   renderActiveCisoSetupStep();
 }
 
@@ -2626,9 +3121,19 @@ function renderCISOStep4b() {
     body.innerHTML = '<div class="empty-state"><div class="es-icon">⚠️</div><div class="es-title">No Baseline Selected</div><p>Complete Step 2 first.</p></div>';
     return;
   }
+  ensureCsfFunctionGrouping();
   const families = getActiveFamilies().filter(f => f !== 'PM');
   const merges = state.policyMerges || {};
   const masters = families.filter(f => !merges[f]);
+
+  var backfilled = false;
+  masters.forEach(function(fam) {
+    if (applyProgramOwnerMetaIfMatchingEmail(fam)) backfilled = true;
+    families.filter(function(f) { return merges[f] === fam; }).forEach(function(mf) {
+      if (applyProgramOwnerMetaIfMatchingEmail(mf)) backfilled = true;
+    });
+  });
+  if (backfilled && typeof markDirty === 'function') markDirty();
 
   const assigned = masters.filter(f => isValidOwnerEmail((state.domainOwners[f] || {}).email)).length;
   const pct = Math.round(assigned / masters.length * 100);
@@ -2636,19 +3141,35 @@ function renderCISOStep4b() {
   const returnedFams = families.filter(f => (state.policyStatus[f]||{}).status === 'Returned');
   ensureDefaultDeadlinesForMasters(masters);
 
+  var programOwnerName = (state.programOwner || '').trim();
   var programOwnerEmail = (state.programOwnerEmail || '').trim();
   var canApplyOwner = isValidOwnerEmail(programOwnerEmail);
+  var heroIdentity;
+  if (programOwnerName && canApplyOwner) {
+    heroIdentity = '<div class="owner-step-hero-label">Program owner</div>'
+      + ownerStepChipHtml(programOwnerName, programOwnerEmail, 'owner-step-chip--hero');
+  } else if (programOwnerName) {
+    heroIdentity = '<div class="owner-step-hero-label">Program owner</div>'
+      + '<div class="owner-step-hero-name">' + escapeHTML(programOwnerName) + '</div>'
+      + '<div class="owner-step-hero-mail"><span class="owner-step-hero-missing">Add email in Step 1</span></div>';
+  } else if (canApplyOwner) {
+    heroIdentity = '<div class="owner-step-hero-label">Program owner</div>'
+      + '<div class="owner-step-hero-name owner-step-hero-missing">Add name in Step 1</div>'
+      + '<div class="owner-step-hero-mail">' + escapeHTML(programOwnerEmail) + '</div>';
+  } else {
+    heroIdentity = '<div class="owner-step-hero-label">Program owner</div>'
+      + '<span class="owner-step-hero-missing">Add name and email in Step 1</span>';
+  }
 
   body.innerHTML = `
     ${cisoStepProgressHtml(7, 'Assign owners')}
     <div class="section-title">Assign owners</div>
-    <div class="section-subtitle">Add people by email only. They enter name and title on first sign-in.</div>
+    <div class="section-subtitle">Roster people locally with a name and email. Email is the unique key \u2014 switch profiles in the sidebar to act as them.</div>
 
     <div class="owner-step-hero${pct === 100 ? ' owner-step-hero--complete' : ''}">
       <div class="owner-step-hero-top">
         <div>
-          <div class="owner-step-hero-label">Program owner email</div>
-          <div class="owner-step-hero-email">${canApplyOwner ? escapeHTML(programOwnerEmail) : '<span class="owner-step-hero-missing">Add email in Step 1</span>'}</div>
+          ${heroIdentity}
         </div>
         <div class="owner-step-hero-stat">
           <div class="owner-step-hero-stat-num">${assigned}<span>/${masters.length}</span></div>
@@ -2657,10 +3178,10 @@ function renderCISOStep4b() {
       </div>
       <div class="owner-step-hero-bar" aria-hidden="true"><div class="owner-step-hero-bar-fill" style="width:${pct}%;"></div></div>
       <div class="owner-step-hero-actions">
-        ${canApplyOwner
+        ${canApplyOwner && programOwnerName
           ? '<button type="button" class="btn btn-primary" onclick="applyProgramOwnerToAllDomains()">Assign all domains</button>'
-          : '<button type="button" class="btn btn-secondary" onclick="goToStep(\'ciso\',1)">Go to Step 1 — add email</button>'}
-        ${state.cisoIsISSM && canApplyOwner ? '<p class="owner-step-hero-note">Program owner also owns domain policies — click when ready.</p>' : ''}
+          : '<button type="button" class="btn btn-secondary" onclick="goToStep(\'ciso\',1)">Go to Step 1 \u2014 add name and email</button>'}
+        ${state.cisoIsISSM && canApplyOwner && programOwnerName ? '<p class="owner-step-hero-note">Program owner also owns domain policies \u2014 click when ready.</p>' : ''}
       </div>
     </div>
     ${returnedFams.length ? `
@@ -2680,7 +3201,7 @@ function renderCISOStep4b() {
 
     <div class="owner-step-list-head">
       <span>Domain roster</span>
-      <span class="owner-step-list-hint">Override email or deadline per domain if needed</span>
+      <span class="owner-step-list-hint">Override owner or deadline per domain if needed</span>
     </div>
     <div class="owner-step-list">
       ${masters.map(fam => {
@@ -2693,6 +3214,22 @@ function renderCISOStep4b() {
         const isCustomDeadline = !!state.domainDeadlines[fam];
         const hasOwner = isValidOwnerEmail(o.email);
         const policyTitle = state.domainCustomNames[fam] || getPolicyMergedTitle(fam);
+        const isPo = isSameOwnerEmail(o.email, programOwnerEmail);
+        const ownerName = (o.name || '').trim() || (isPo ? programOwnerName : '');
+        const editing = state._cisoOwnerEditFam === fam;
+        const showChip = hasOwner && ownerName && !editing;
+        var identityHtml;
+        if (showChip) {
+          identityHtml = '<div class="owner-step-id owner-step-id--chip">'
+            + ownerStepChipHtml(ownerName, o.email)
+            + '<button type="button" class="btn btn-secondary btn-sm owner-step-chip-edit" onclick="beginCisoOwnerRowEdit(\'' + fam + '\')">Change</button>'
+            + '</div>';
+        } else {
+          identityHtml = '<div class="owner-step-id">'
+            + '<input class="form-input owner-step-name" type="text" autocomplete="name" placeholder="Full name" value="' + escapeHTML(ownerName) + '" aria-label="Owner name for ' + fam + '" oninput="setDomainOwnerGroup(\'' + fam + '\',\'name\',this.value)">'
+            + '<input class="form-input owner-step-email' + (hasOwner ? ' owner-step-email--set' : '') + '" type="email" autocomplete="email" placeholder="owner@company.com" value="' + escapeHTML(o.email || '') + '" aria-label="Owner email for ' + fam + '" oninput="setDomainOwnerGroup(\'' + fam + '\',\'email\',this.value)" onchange="commitCisoOwnerEmail(\'' + fam + '\')">'
+            + '</div>';
+        }
         return `
         <div class="owner-step-row${hasOwner ? ' owner-step-row--assigned' : ''}${isReturned ? ' owner-step-row--returned' : ''}">
           <div class="owner-step-row-main">
@@ -2704,8 +3241,7 @@ function renderCISOStep4b() {
             <div class="owner-step-row-title">${escapeHTML(policyTitle)}</div>
           </div>
           <div class="owner-step-row-fields">
-            <input class="form-input owner-step-email${hasOwner ? ' owner-step-email--set' : ''}" type="email" placeholder="owner@company.com" value="${escapeHTML(o.email||'')}"
-              oninput="setDomainOwner('${fam}','email',this.value);${merged.map(mf=>`setDomainOwner('${mf}','email',this.value);`).join('')}">
+            ${identityHtml}
             <input type="date" class="owner-step-date${isCustomDeadline ? ' owner-step-date--custom' : ''}" value="${deadline}" onchange="setDomainDeadline('${fam}',this.value)" title="Draft deadline">
           </div>
           <div class="owner-step-row-status">${hasOwner ? '✓' : '—'}</div>
@@ -2713,7 +3249,7 @@ function renderCISOStep4b() {
       }).join('')}
     </div>
 
-    <p class="owner-step-footnote">PM controls stay with the program owner. Draft deadlines come from your Step 6 priorities.</p>
+    <p class="owner-step-footnote">PM controls stay with the program owner. Draft deadlines follow each domain\u2019s priority. Switch profiles in the sidebar to work as a rostered owner.</p>
   `;
   updateCISOFinishBtn();
 }
@@ -2828,71 +3364,42 @@ function reassignReturnedPolicyByEmail(fam, newEmail) {
   return true;
 }
 
-// Apply all COMMON_MERGES that don't conflict with each other (first-entry-wins).
-// Clears any pre-existing conflicting slave entries first so manual merges
-// done out-of-order can't permanently block the button.
-window.applyAllMerges = function() {
-  var families = getActiveFamilies().filter(function(f){ return f !== 'PM'; });
-  if (!state.policyMerges) state.policyMerges = {};
-
-  // Pass 1: clear any slave entries belonging to in-scope COMMON_MERGES so we
-  // always start from a clean slate (makes the button idempotent).
-  COMMON_MERGES.forEach(function(mg) {
-    if (!mg.families.every(function(f){ return families.includes(f); })) return;
-    mg.families.slice(1).forEach(function(sf){ delete state.policyMerges[sf]; });
-  });
-
-  // Pass 2: apply non-conflicting merges (within COMMON_MERGES, first entry wins
-  // when two groups share a slave family, e.g. AU+SI takes SI before SC+SI).
-  var applied = 0;
-  COMMON_MERGES.forEach(function(mg) {
-    if (!mg.families.every(function(f){ return families.includes(f); })) return;
-    var masterFam = mg.families[0];
-    var slaveFams = mg.families.slice(1);
-    var conflict = slaveFams.some(function(sf){
-      return state.policyMerges[sf] && state.policyMerges[sf] !== masterFam;
-    });
-    if (conflict) return;
-    slaveFams.forEach(function(sf){
-      if (!state.policyMerges[sf]) {
-        state.policyMerges[sf] = masterFam;
-        var masterOwner = state.domainOwners[masterFam];
-        if (masterOwner && (isValidOwnerEmail(masterOwner.email) || getOwnerDisplayName(masterOwner) !== '—')) {
-          state.domainOwners[sf] = Object.assign({}, masterOwner);
-        }
-        addAuditEntry('program', null, 'Merged ' + sf + ' into ' + masterFam);
-        applied++;
-      }
-    });
-  });
-
-  window.markDirty && window.markDirty();
-  showToast(applied > 0 ? ('✅ Applied ' + applied + ' recommended merge(s).') : 'Recommended merges already applied.');
-  renderActiveCisoSetupStep();
+// Apply CSF 2.0 Function packaging (partition). Replaces the old overlapping
+// pair-list "Apply all non-conflicting" helper.
+window.applyCsfFunctionGroupingUi = function(replace) {
+  applyCsfFunctionGrouping({ replace: !!replace });
+  showToast(replace
+    ? 'Reset to CSF 2.0 Function grouping (ISP + Identify / Protect / Detect / Respond / Recover).'
+    : 'Applied CSF 2.0 Function grouping.');
+  setTimeout(function() { renderActiveCisoSetupStep(); }, 0);
 };
+window.applyAllMerges = function() { window.applyCsfFunctionGroupingUi(true); };
 
 function mergePolicy(slaveFam, masterFam) {
-  var prevMerge = state.policyMerges ? state.policyMerges[slaveFam] : undefined;
+  if (!slaveFam || !masterFam || slaveFam === masterFam) return;
+  var prevMerges = cloneStateValue(state.policyMerges || {});
   var prevSlaveOwner = cloneStateValue(state.domainOwners[slaveFam] || {});
   pushScopedUndo({
     label: 'Merged ' + slaveFam + ' into ' + masterFam,
     undo: function() {
-      if (!state.policyMerges) state.policyMerges = {};
-      if (prevMerge === undefined) delete state.policyMerges[slaveFam];
-      else state.policyMerges[slaveFam] = prevMerge;
+      state.policyMerges = prevMerges;
       state.domainOwners[slaveFam] = prevSlaveOwner;
       try { renderActiveCisoSetupStep(); } catch (eR) {}
     }
   });
   if (!state.policyMerges) state.policyMerges = {};
+  // Flatten: if slaveFam is itself a master, retarget its members to the new master.
+  Object.keys(state.policyMerges).forEach(function(f) {
+    if (state.policyMerges[f] === slaveFam) state.policyMerges[f] = masterFam;
+  });
   state.policyMerges[slaveFam] = masterFam;
   const masterOwner = state.domainOwners[masterFam];
-  if (masterOwner && (isValidOwnerEmail(masterOwner.email) || getOwnerDisplayName(masterOwner) !== '—')) {
+  if (masterOwner && (isValidOwnerEmail(masterOwner.email) || getOwnerDisplayName(masterOwner) !== '\u2014')) {
     state.domainOwners[slaveFam] = Object.assign({}, masterOwner);
   }
   addAuditEntry('program', null, 'Merged ' + slaveFam + ' into ' + masterFam);
   try { window.markDirty && window.markDirty(); } catch (e) {}
-  renderActiveCisoSetupStep();
+  setTimeout(function() { renderActiveCisoSetupStep(); }, 0);
 }
 
 function unmergePolicy(fam) {
@@ -2909,7 +3416,7 @@ function unmergePolicy(fam) {
   if (state.policyMerges) delete state.policyMerges[fam];
   addAuditEntry('program', null, 'Unmerged ' + fam + ' from its master policy');
   try { window.markDirty && window.markDirty(); } catch (e) {}
-  renderActiveCisoSetupStep();
+  setTimeout(function() { renderActiveCisoSetupStep(); }, 0);
 }
 
 window.mergePolicy = mergePolicy;
@@ -2922,9 +3429,14 @@ window.unmergePolicy = unmergePolicy;
   document.addEventListener('click', function(ev) {
     var t = ev.target;
     if (!t || !t.closest) return;
-    if (t.closest('[data-ciso-apply-all-merges]')) {
+    if (t.closest('[data-ciso-csf-apply]')) {
       ev.preventDefault();
-      if (typeof window.applyAllMerges === 'function') window.applyAllMerges();
+      if (typeof window.applyCsfFunctionGroupingUi === 'function') window.applyCsfFunctionGroupingUi(false);
+      return;
+    }
+    if (t.closest('[data-ciso-csf-reset]') || t.closest('[data-ciso-apply-all-merges]')) {
+      ev.preventDefault();
+      if (typeof window.applyCsfFunctionGroupingUi === 'function') window.applyCsfFunctionGroupingUi(true);
       return;
     }
     var mergeBtn = t.closest('[data-ciso-merge-apply]');
@@ -2971,6 +3483,16 @@ window.unmergePolicy = unmergePolicy;
     var btn = wrap && wrap.querySelector('[data-ciso-merge-dropdown-apply]');
     if (btn) btn.style.display = sel.value ? '' : 'none';
   });
+  document.addEventListener('change', function(ev) {
+    var sel = ev.target;
+    if (!sel || sel.tagName !== 'SELECT') return;
+    var fam = sel.getAttribute('data-ciso-csf-move');
+    if (!fam) return;
+    var fn = (sel.value || '').trim();
+    sel.value = '';
+    if (!fn) return;
+    setTimeout(function() { moveFamilyToCsfFunction(fam, fn); }, 0);
+  });
 })();
 
 
@@ -2983,6 +3505,7 @@ function setDomainOwner(fam, field, value) {
     delete state.domainOwners[fam].isDemoPlaceholder;
   }
   logFieldChange(path, prev, value);
+  if (field === 'email') applyProgramOwnerMetaIfMatchingEmail(fam);
   if (field === 'name' || field === 'email') {
     updateCISOFinishBtn();
     autoPopulateControlOwnersFromDomain(fam);
