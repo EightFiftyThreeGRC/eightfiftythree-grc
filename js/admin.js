@@ -141,22 +141,31 @@ function getPersonIdentityKey(user) {
   return nameKey ? 'name:' + nameKey : 'id:' + user.id;
 }
 
+function profileInitials(name) {
+  var s = String(name || '').trim();
+  if (!s) return 'A';
+  var parts = s.split(/\s+/);
+  var a = parts[0].charAt(0);
+  var b = parts.length > 1 ? parts[parts.length - 1].charAt(0) : (parts[0].charAt(1) || '');
+  return (a + b).toUpperCase();
+}
+
 function renderProfileButtonContent(user) {
   var displayName = user
     ? (userNeedsProfileSetup(user) ? (user.email || user.name) : getOwnerDisplayName(user))
-    : 'Admin mode';
-  var icon = user ? '👤' : '🔑';
-  var sub = 'Switch role / preview';
+    : 'Admin';
+  var sub = 'Oversight \u00b7 Switch role';
   if (user) {
     var rm = getProgramRoleMeta(user.role);
-    if (rm && rm.label) sub = rm.label + ' · Switch role';
+    if (rm && rm.label) sub = rm.label + ' \u00b7 Switch role';
   }
+  var initials = user ? profileInitials(displayName) : 'A';
   return ''
-    + '<span class="profile-btn-line">'
-    + '<span>' + icon + '</span>'
-    + '<span>' + _esc(displayName) + '</span>'
-    + '</span>'
-    + '<span class="profile-btn-sub">' + _esc(sub) + '</span>';
+    + '<span class="profile-avatar" aria-hidden="true">' + _esc(initials) + '</span>'
+    + '<span class="profile-btn-meta">'
+    + '<span class="profile-btn-name">' + _esc(displayName) + '</span>'
+    + '<span class="profile-btn-sub">' + _esc(sub) + '</span>'
+    + '</span>';
 }
 
 function showRolePicker() {
