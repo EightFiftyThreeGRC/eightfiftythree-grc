@@ -171,6 +171,9 @@ function minBaselinePill(bl) {
 }
 
 function chipHTML(status) {
+  if (status === 'Mapped') {
+    return '<span class="chip chip-green">Mapped (existing)</span>';
+  }
   const map = {
     'Implemented': 'chip-green', 'Planned': 'chip-amber',
     'Not Started': 'chip-red', 'Not Applicable': 'chip-gray',
@@ -178,7 +181,8 @@ function chipHTML(status) {
     'Pass': 'chip-green', 'Fail': 'chip-red', 'Partial': 'chip-amber',
     'Draft': 'chip-blue', 'Approved': 'chip-green', 'Under Review': 'chip-amber',
     'Attested': 'chip-green', 'Pending': 'chip-amber',
-    'Returned': 'chip-red'
+    'Returned': 'chip-red',
+    'Mapped': 'chip-green'
   };
   return `<span class="chip ${map[status]||'chip-gray'}">${status||'—'}</span>`;
 }
@@ -373,7 +377,7 @@ function getMyControls(userId) {
 // Returns the right control list for the current session:
 // - Control owners see only planned controls (assigned + policy ready)
 // - Admins in the workspace see the same planned queue (not the full baseline)
-var CONTROL_POLICY_READY = ['Draft', 'Under Review', 'Approved', 'Returned'];
+var CONTROL_POLICY_READY = ['Draft', 'Under Review', 'Approved', 'Returned', 'Mapped'];
 
 function isControlIspTier(ctrl) {
   if (!ctrl || !ctrl.id) return false;

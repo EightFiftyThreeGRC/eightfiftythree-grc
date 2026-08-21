@@ -1366,7 +1366,7 @@ function renderProgramDashboard(controls, families) {
   });
   const polDraft      = policyFams.filter(f => (state.policyStatus[f]||{}).status === 'Draft').length;
   const polReturned   = policyFams.filter(f => (state.policyStatus[f]||{}).status === 'Returned').length;
-  const polNotStarted = policyFams.filter(f => !['Approved','Under Review','Draft','Returned'].includes((state.policyStatus[f]||{}).status)).length;
+  const polNotStarted = policyFams.filter(f => !['Approved','Under Review','Draft','Returned','Mapped'].includes((state.policyStatus[f]||{}).status)).length;
   const polPct        = policyFams.length ? Math.round((polApproved/policyFams.length)*100) : 0;
 
   // ── Control stats ──
@@ -2355,7 +2355,7 @@ function renderReports() {
       </div>
       <div style="background:white; border:1px solid var(--border); border-radius:10px; padding:20px;">
         <div style="font-weight:700; font-size:14px; margin-bottom:14px; color:var(--navy);">Policy Status</div>
-        ${[['Approved',policyStatuses['Approved']||0,'var(--green)'],['Under Review',policyStatuses['Under Review']||0,'var(--amber)'],['Returned',policyStatuses['Returned']||0,'#dc2626'],['Draft',policyStatuses['Draft']||0,'var(--blue)'],['Not Started',policyStatuses['Not Started']||families.length-(policyStatuses['Approved']||0)-(policyStatuses['Under Review']||0)-(policyStatuses['Draft']||0)-(policyStatuses['Returned']||0),'var(--slate)']].map(([label,count,color])=>`
+        ${[['Approved',policyStatuses['Approved']||0,'var(--green)'],['Mapped',policyStatuses['Mapped']||0,'var(--teal)'],['Under Review',policyStatuses['Under Review']||0,'var(--amber)'],['Returned',policyStatuses['Returned']||0,'#dc2626'],['Draft',policyStatuses['Draft']||0,'var(--blue)'],['Not Started',policyStatuses['Not Started']||families.length-(policyStatuses['Approved']||0)-(policyStatuses['Mapped']||0)-(policyStatuses['Under Review']||0)-(policyStatuses['Draft']||0)-(policyStatuses['Returned']||0),'var(--slate)']].map(([label,count,color])=>`
         <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
           <span style="width:100px; font-size:13px;">${label}</span>
           <div style="flex:1; background:var(--border); border-radius:4px; height:10px; overflow:hidden;">
@@ -2426,7 +2426,7 @@ function renderPolicyRoadmap(families) {
     const status = (state.policyStatus[fam]||{}).status || 'Not Started';
     const deadline = state.domainDeadlines[fam] || deadlineFromPriority(fam);
     const deadlineDate = new Date(deadline);
-    const progress = status === 'Approved' ? 100 : status === 'Under Review' ? 60 : status === 'Draft' ? 30 : 0;
+    const progress = status === 'Approved' || status === 'Mapped' ? 100 : status === 'Under Review' ? 60 : status === 'Draft' ? 30 : 0;
     const isOverdue = deadlineDate < today && progress < 100;
     const title = getPolicyMergedTitle(fam);
     return { fam, title, status, deadline, deadlineDate, progress, isOverdue };

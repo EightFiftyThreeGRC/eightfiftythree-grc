@@ -232,6 +232,9 @@ function getDomainPolicyPrimaryAction(fam, status) {
   if (status === 'Approved') {
     return { label: 'View Policy \u2192', handler: "openPolicyDoc('" + esc + "')" };
   }
+  if (status === 'Mapped') {
+    return { label: 'View mapped policy \u2192', handler: "openPolicyDoc('" + esc + "')" };
+  }
   if (status === 'Draft' && ((state.policyStatus || {})[fam] || {})._wasReturnedRevision
       && typeof isSessionDomainPolicyOwnerActor === 'function'
       && isSessionDomainPolicyOwnerActor(fam)) {
@@ -593,14 +596,14 @@ function renderISSMWorkspace(user) {
     var isOverdue = deadline && deadline < today;
     var isDueSoon = deadline && !isOverdue && deadline <= new Date(Date.now() + 14*86400000).toISOString().slice(0,10);
 
-    if (status === 'Approved' || status === 'Under Review') submittedCount++;
+    if (status === 'Approved' || status === 'Under Review' || status === 'Mapped') submittedCount++;
     else draftCount++;
-    // Approved policies never go to needsWork even if the deadline has passed
-    if (status !== 'Approved' && (isOverdue || status === 'Returned' || status === 'Not Started')) needsWork.push(fam);
+    // Approved / mapped-existing policies never go to needsWork even if the deadline has passed
+    if (status !== 'Approved' && status !== 'Mapped' && (isOverdue || status === 'Returned' || status === 'Not Started')) needsWork.push(fam);
     else ready.push(fam);
 
-    var borderColor = isOverdue ? '#ef4444' : status === 'Returned' ? '#f59e0b' : status === 'Approved' ? 'rgba(13,148,136,0.3)' : status === 'Under Review' ? 'rgba(99,102,241,0.3)' : 'var(--border)';
-    var bgColor = isOverdue ? '#fef2f2' : status === 'Returned' ? '#fffbeb' : status === 'Approved' ? 'rgba(13,148,136,0.02)' : 'white';
+    var borderColor = isOverdue ? '#ef4444' : status === 'Returned' ? '#f59e0b' : (status === 'Approved' || status === 'Mapped') ? 'rgba(13,148,136,0.3)' : status === 'Under Review' ? 'rgba(99,102,241,0.3)' : 'var(--border)';
+    var bgColor = isOverdue ? '#fef2f2' : status === 'Returned' ? '#fffbeb' : (status === 'Approved' || status === 'Mapped') ? 'rgba(13,148,136,0.02)' : 'white';
 
     var deadlineHTML = '';
     if (deadline) {
@@ -760,7 +763,7 @@ function renderPolicyLibraryCatalog() {
   families.forEach(function(f){ if (merges[f]) { if (!slavesOf[merges[f]]) slavesOf[merges[f]] = []; slavesOf[merges[f]].push(f); } });
 
   function statusStyle(st) {
-    if (st === 'Approved') return {bg:'rgba(13,148,136,0.06)',border:'rgba(13,148,136,0.25)',text:'var(--teal)'};
+    if (st === 'Approved' || st === 'Mapped') return {bg:'rgba(13,148,136,0.06)',border:'rgba(13,148,136,0.25)',text:'var(--teal)'};
     if (st === 'Under Review') return {bg:'rgba(99,102,241,0.06)',border:'rgba(99,102,241,0.25)',text:'#6366f1'};
     if (st === 'In Progress' || st === 'Draft') return {bg:'rgba(245,158,11,0.06)',border:'rgba(245,158,11,0.25)',text:'#d97706'};
     return {bg:'rgba(100,116,139,0.06)',border:'rgba(100,116,139,0.2)',text:'#64748b'};
@@ -1074,7 +1077,7 @@ function renderPolicyList(bodyEl) {
 
   // ── Full Policy Library — show ALL policies with status ──
   function statusStyle(st) {
-    if (st === 'Approved') return {bg:'rgba(13,148,136,0.06)',border:'rgba(13,148,136,0.25)',text:'var(--teal)'};
+    if (st === 'Approved' || st === 'Mapped') return {bg:'rgba(13,148,136,0.06)',border:'rgba(13,148,136,0.25)',text:'var(--teal)'};
     if (st === 'Under Review') return {bg:'rgba(99,102,241,0.06)',border:'rgba(99,102,241,0.25)',text:'#6366f1'};
     if (st === 'In Progress' || st === 'Draft') return {bg:'rgba(245,158,11,0.06)',border:'rgba(245,158,11,0.25)',text:'#d97706'};
     return {bg:'rgba(100,116,139,0.06)',border:'rgba(100,116,139,0.2)',text:'#64748b'};
@@ -1206,7 +1209,8 @@ function buildRequirementControlBadgeHtml(controlIds, maxVisible) {
   if (!ids.length) return '';
   var lim = maxVisible || 8;
   var shown = ids.slice(0, lim).map(function(cid) {
-    return '<span style="font-size:10px;font-family:monospace;background:#e0f2fe;border:1px solid #bae6fd;border-radius:4px;padding:1px 6px;color:#0f172a;">' + escapeHTML(cid) + '</span>';
+    var csf = (typeof renderCsfTagsHtml === 'function') ? renderCsfTagsHtml(cid, { compact: true }) : '';
+    return '<span class="csf-obj-badge"><span style="font-size:10px;font-family:monospace;background:#e0f2fe;border:1px solid #bae6fd;border-radius:4px;padding:1px 6px;color:#0f172a;">' + escapeHTML(cid) + '</span>' + csf + '</span>';
   }).join(' ');
   if (ids.length > lim) shown += ' <span style="font-size:10px;color:var(--text-muted);">+' + (ids.length - lim) + ' more</span>';
   return shown;
@@ -2262,6 +2266,7 @@ function renderPolicyStep2() {
               onchange="selectAllDomainControls('${fam}', this.checked ? 'all' : 'none');"
               ${selected.length===allFamControls.length?'checked':''}></th>
             <th style="width:90px;">Control ID</th>
+            <th style="width:120px;">CSF 2.0</th>
             <th>Name</th>
             <th style="width:110px;">Baseline</th>
           </tr>
@@ -2278,6 +2283,7 @@ function renderPolicyStep2() {
               <span class="control-id">${c.id}</span>
               ${!inProgramBaseline?'<div style="font-size:9px;font-weight:700;color:#64748b;letter-spacing:0.4px;margin-top:2px;">OPTIONAL</div>':''}
             </td>
+            <td>${typeof renderCsfTagsHtml === 'function' ? renderCsfTagsHtml(c.id, { compact: true }) : ''}</td>
             <td style="font-size:13px;color:${inProgramBaseline?'var(--navy)':'var(--text-muted)'};">
               ${c.n}
               <div style="font-size:11px;color:var(--text-muted);font-weight:400;margin-top:2px;line-height:1.35;">${ctrlShortDesc(c)}</div>
@@ -3784,14 +3790,17 @@ function _renderDomainRequirements(fam, dp, selected) {
   // Controls available to add to a new requirement (in selected but not yet in any req)
   const unmapped = selected.filter(function(cid){ return !allMapped.includes(cid); });
 
-  let html = '<div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;line-height:1.55;">Each row is a <strong>policy-level control objective</strong> in plain language. Map <strong>one or more</strong> controls from this family (including enhancements) to the same objective where that makes sense. The control design wizard is where owners operationalize literal NIST text (parts a–e, enhancements, parameters) so implementation meets both this objective and the official control statement.</div>';
+  let html = '<div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;line-height:1.55;">Each row is a <strong>policy-level control objective</strong> in plain language. Map <strong>one or more</strong> controls from this family (including enhancements) to the same objective where that makes sense. CSF 2.0 tags next to each 800-53 ID are outcome labels (Function / Category) \u2014 aligned to CSF 2.0, not a substitute for your organization\u2019s CSF Profile. The control design wizard is where owners operationalize literal NIST text (parts a\u2013e, enhancements, parameters) so implementation meets both this objective and the official control statement.</div>';
 
   (dp.requirements||[]).forEach(function(req, qi) {
     const ctrlTags = (req.controls||[]).map(function(cid) {
       const ctrl = CONTROLS.find(function(c){ return c.id===cid; });
-      return '<span style="display:inline-flex;align-items:center;gap:3px;font-family:monospace;font-size:11px;font-weight:700;background:rgba(13,148,136,0.12);color:var(--teal);padding:2px 6px;border-radius:10px;margin-right:4px;">' +
-        cid + (ctrl?'<span style="font-family:sans-serif;font-size:10px;font-weight:400;color:var(--text-muted);max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"> '+ctrl.n+'</span>':'') +
-        '<button style="background:none;border:none;color:var(--teal);cursor:pointer;font-size:11px;padding:0 0 0 2px;line-height:1;" onclick="removeDomainReqCtrl(\''+esc_fam+'\','+qi+',\''+cid+'\')">×</button>' +
+      const csf = (typeof renderCsfTagsHtml === 'function') ? renderCsfTagsHtml(cid) : '';
+      return '<span style="display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:11px;background:rgba(13,148,136,0.08);color:var(--teal);padding:4px 8px;border-radius:10px;margin-right:4px;">' +
+        '<span style="font-family:monospace;font-weight:700;">' + cid + '</span>' +
+        (ctrl?'<span style="font-family:sans-serif;font-size:10px;font-weight:400;color:var(--text-muted);max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+ctrl.n+'</span>':'') +
+        csf +
+        '<button style="background:none;border:none;color:var(--teal);cursor:pointer;font-size:11px;padding:0 0 0 2px;line-height:1;" onclick="removeDomainReqCtrl(\''+esc_fam+'\','+qi+',\''+cid+'\')">\u00d7</button>' +
       '</span>';
     }).join('');
 
