@@ -1339,7 +1339,25 @@ function normalizeStateShape() {
   migrateRegMappingStateShape();
   migrateISPWorkflowStatus();
   migratePoamItemsToIssues();
+  stripLegacyDemoPlaceholderFlags();
   ensurePmControlsAssignedToCiso();
+}
+
+/**
+ * One-time migration: drop the retired `isDemoPlaceholder` tag from owner and roster
+ * records. The flag once drove a submit gate that only ever recognised prefilled demo
+ * identities; leaving it on loaded state would keep those records unusable (blocked from
+ * impersonation and roster matching) with no remaining UI to clear it.
+ */
+function stripLegacyDemoPlaceholderFlags() {
+  function strip(rec) {
+    if (rec && typeof rec === 'object' && 'isDemoPlaceholder' in rec) delete rec.isDemoPlaceholder;
+  }
+  [state.domainOwners, state.controlOwners].forEach(function(map) {
+    if (!isPlainObject(map)) return;
+    Object.keys(map).forEach(function(k) { strip(map[k]); });
+  });
+  if (Array.isArray(state.users)) state.users.forEach(strip);
 }
 
 /** One-time migration: legacy Phase-1 poamItems → Phase-2 issues records. */
