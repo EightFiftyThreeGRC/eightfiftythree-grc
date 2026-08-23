@@ -2732,8 +2732,13 @@ function applyCsfFunctionGrouping(opts) {
   var families = Object.keys(getCsfActiveFamilySet());
   if (!state.policyMerges) state.policyMerges = {};
   if (!state.domainCustomNames) state.domainCustomNames = {};
+  if (!state.policyFamilyHome) state.policyFamilyHome = {};
   if (opts.replace) {
-    families.forEach(function(f) { delete state.policyMerges[f]; });
+    families.forEach(function(f) {
+      delete state.policyMerges[f];
+      if (state.domainCustomNames) delete state.domainCustomNames[f];
+    });
+    state.policyFamilyHome = {};
   }
   var applied = 0;
   getCsfResolvedPolicyGroups().forEach(function(g) {
@@ -2767,94 +2772,24 @@ function ensureCsfFunctionGrouping() {
 }
 
 function moveFamilyToCsfFunction(fam, fn) {
-  var groups = getCsfResolvedPolicyGroups();
-  var target = null;
-  for (var i = 0; i < groups.length; i++) {
-    if (groups[i].fn === fn) { target = groups[i]; break; }
-  }
-  if (!target || !target.master) {
-    showToast('That CSF Function has no policy yet.', true);
+  if (typeof policyBoardMoveFamilyToSlot === 'function') {
+    var slot = 'fn:' + String(fn || '').toUpperCase();
+    var model = typeof getPolicyBoardDocuments === 'function' ? getPolicyBoardDocuments() : { docs: [] };
+    model.docs.forEach(function(d) {
+      if (d.fnIds && d.fnIds.indexOf(fn) !== -1 && !d.empty) slot = d.slot;
+    });
+    if (policyBoardMoveFamilyToSlot(fam, slot)) {
+      if (typeof policyBoardRerender === 'function') policyBoardRerender();
+      else setTimeout(function() { renderActiveCisoSetupStep(); }, 0);
+    }
     return;
   }
-  if (fam === target.master) return;
-  if (!state.policyMerges) state.policyMerges = {};
-  var families = Object.keys(getCsfActiveFamilySet());
-  var slaves = families.filter(function(f) { return state.policyMerges[f] === fam; });
-  if (slaves.length && !state.policyMerges[fam]) {
-    var newMaster = slaves[0];
-    slaves.slice(1).forEach(function(sf) { state.policyMerges[sf] = newMaster; });
-    delete state.policyMerges[newMaster];
-    if (state.domainCustomNames && state.domainCustomNames[fam] && !state.domainCustomNames[newMaster]) {
-      state.domainCustomNames[newMaster] = state.domainCustomNames[fam];
-    }
-  }
-  mergePolicy(fam, target.master);
+  showToast('That CSF Function has no policy yet.', true);
 }
 
 function renderCsfFunctionGroupingHtml(families, merges) {
-  var groups = getCsfResolvedPolicyGroups();
-  var claimed = {};
-  var cards = groups.map(function(g) {
-    var members = [];
-    families.forEach(function(f) {
-      if (f === g.master && !merges[f]) members.push(f);
-      else if (merges[f] === g.master) members.push(f);
-    });
-    members.forEach(function(f) { claimed[f] = true; });
-    var moveOpts = groups.filter(function(o) { return o.fn !== g.fn; }).map(function(o) {
-      return '<option value="' + o.fn + '">' + escapeHTML(o.title) + '</option>';
-    }).join('');
-    var chips = members.map(function(f) {
-      var isAnchor = f === g.master;
-      var unmerge = isAnchor ? ''
-        : ' <button type="button" class="csf-merge-x" data-ciso-unmerge="' + f + '" title="Unmerge to its own policy">\u00d7</button>';
-      var mover = '<select class="csf-merge-move" data-ciso-csf-move="' + f + '" aria-label="Move ' + f + ' to another Function"><option value="">Move\u2026</option>' + moveOpts + '</select>';
-      return '<span class="csf-merge-chip' + (isAnchor ? ' csf-merge-chip-anchor' : '') + '">'
-        + '<span class="family-badge">' + escapeHTML(f) + '</span>'
-        + unmerge + mover + '</span>';
-    }).join('');
-    if (!members.length) {
-      chips = '<span class="csf-merge-empty">No families in this Function \u2014 add one from Standalone below.</span>';
-    }
-    return '<div class="csf-merge-card csf-fn-' + String(g.fn || '').toLowerCase() + '">'
-      + '<div class="csf-merge-card-head"><span class="csf-fn-code">' + escapeHTML(g.fn) + '</span>'
-      + '<span class="csf-merge-card-title">' + escapeHTML(g.title) + '</span></div>'
-      + '<p class="csf-merge-card-reason">' + escapeHTML(g.reason) + '</p>'
-      + '<div class="csf-merge-chips">' + chips + '</div></div>';
-  }).join('');
-
-  var standalones = families.filter(function(f) { return !merges[f] && !claimed[f]; });
-  var addOpts = groups.map(function(g) {
-    return '<option value="' + g.fn + '">' + escapeHTML(g.title) + '</option>';
-  }).join('');
-  var standaloneHtml = standalones.length
-    ? '<div class="csf-merge-standalone"><div class="csf-merge-standalone-label">Standalone policies</div>'
-      + '<p class="csf-merge-card-reason">Unmerged families are their own domain policy. Add one back into a Function, or merge two standalones in the table below.</p>'
-      + standalones.map(function(f) {
-        return '<span class="csf-merge-chip"><span class="family-badge">' + escapeHTML(f) + '</span>'
-          + '<select class="csf-merge-move" data-ciso-csf-move="' + f + '" aria-label="Add ' + f + ' to a Function"><option value="">Add to Function\u2026</option>'
-          + addOpts + '</select></span>';
-      }).join('') + '</div>'
-    : '';
-
-  var applied = !!state.csfFunctionGroupingApplied;
-  var actionBtn = applied
-    ? '<button type="button" class="btn btn-secondary btn-sm" data-ciso-csf-reset>Reset to CSF defaults</button>'
-    : '<button type="button" class="btn btn-primary btn-sm" data-ciso-csf-apply>Use CSF function grouping</button>';
-  var status = applied
-    ? '<span class="csf-merge-status">Applied \u2014 customize any family</span>'
-    : '<span class="csf-merge-status">Not applied yet</span>';
-
-  return '<div class="csf-merge-panel">'
-    + '<div class="csf-merge-panel-head">'
-    + '<div><div class="csf-merge-panel-title">CSF 2.0 Function packaging</div>'
-    + '<div class="csf-merge-panel-sub">Default packaging by CSF 2.0 Function \u2014 change any family. This is organizational document structure, not a NIST-required merge. Each family is in at most one Function by default.</div></div>'
-    + '<div class="csf-merge-actions">' + status + actionBtn + '</div></div>'
-    + '<div class="csf-merge-isp" role="note"><span class="csf-fn-code">GV</span>'
-    + '<div><strong>Govern is the Information Security Policy.</strong> Program Management (PM) controls and XX-1 policy-and-procedures statements live in the ISP. There is no separate Govern domain-policy card.</div></div>'
-    + '<div class="csf-merge-grid">' + cards + '</div>'
-    + standaloneHtml
-    + '</div>';
+  if (typeof renderPolicyBoardPanelHtml === 'function') return renderPolicyBoardPanelHtml({ mode: 'pathA' });
+  return '';
 }
 
 // ============================================================
@@ -2886,7 +2821,7 @@ function renderCISOStep4a() {
     </div>
 
     <div class="section-title">Consolidate &amp; Prioritize Policies</div>
-    <div class="section-subtitle">Document structure first: the ISP (Govern) plus five CSF Function policy documents. Do not draft AC, AT, AU\u2026 as separate policies while Function grouping is the default. Unmerge a family only if it should be its own document. Then set urgency \u2014 that drives draft deadlines in the next step.</div>
+    <div class="section-subtitle">Document structure first: the ISP (Govern) plus Function policy documents. Drag families between documents, or use Move and Merge. Then set urgency \u2014 that drives draft deadlines in the next step.</div>
 
     ${renderCsfFunctionGroupingHtml(families, merges)}
 
@@ -2906,22 +2841,19 @@ function renderCISOStep4a() {
     <div class="table-scroll">
       <table class="control-table" style="table-layout:auto;width:100%;">
         <colgroup>
-          <col style="width:38%;">
-          <col style="width:40%;">
-          <col style="width:22%;">
+          <col style="width:50%;">
+          <col style="width:50%;">
         </colgroup>
         <thead>
           <tr>
             <th>Policy document</th>
             <th>Priority</th>
-            <th>Custom extra merge</th>
           </tr>
         </thead>
         <tbody id="tbod-${Math.random().toString(36).slice(2,8)}">
           ${masters.map(fam => {
             const ctrl = controls.filter(c => c.f === fam);
             const merged = families.filter(f => merges[f] === fam);
-            const mergeOptions = families.filter(f => f !== fam && merges[f] !== fam && !merges[f]);
             const tier = getPriority(fam);
             const m = PRIORITY_META[tier];
             const isDefault = !!(PRIORITY_DEFAULTS[fam]);
@@ -2934,7 +2866,7 @@ function renderCISOStep4a() {
                 <div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:4px;">${escapeHTML(fnDocTitle || getPolicyMergedTitle(fam))}</div>
                 <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:3px;">
                   <span class="family-badge">${fam}</span>
-                  ${merged.map(mf => `<span class="family-badge" style="font-size:11px;background:#e0f2f1;color:var(--teal);border-color:rgba(13,148,136,0.3);">+${mf} <span role="button" tabindex="0" style="cursor:pointer;" data-ciso-unmerge="${mf}">✕</span></span>`).join('')}
+                  ${merged.map(mf => `<span class="family-badge" style="font-size:11px;background:#e0f2f1;color:var(--teal);border-color:rgba(13,148,136,0.3);">+${mf}</span>`).join('')}
                 </div>
                 <input class="form-input" style="font-size:12px;font-weight:600;margin-bottom:3px;${state.domainCustomNames[fam]?'border-color:#6366f1;background:rgba(99,102,241,0.04);':''}" placeholder="${escapeHTML(fnDocTitle || getPolicyMergedTitle(fam))}" value="${escapeHTML(state.domainCustomNames[fam]||'')}" oninput="setDomainCustomName('${fam}',this.value);this.style.borderColor=this.value?'#6366f1':'';this.style.background=this.value?'rgba(99,102,241,0.04)':'';">
                 <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">${ctrl.length + merged.reduce((s,mf)=>s+controls.filter(c=>c.f===mf).length,0)} controls${state.domainCustomNames[fam] ? ' · <span style="color:#6366f1;">✏ custom name</span>' : ''}</div>
@@ -2946,18 +2878,6 @@ function renderCISOStep4a() {
                   <button onclick="setPolicyPriority('${fam}','${t}')" style="padding:5px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;border:2px solid ${tier===t?pm.bar:'#e2e8f0'};background:${tier===t?pm.bg:'white'};color:${tier===t?pm.fg:'#94a3b8'};transition:all 0.15s;">${pm.label}</button>`).join('')}
                   ${isDefault ? `<span style="font-size:10px;color:var(--text-muted);margin-left:2px;">suggested</span>` : ''}
                 </div>
-              </td>
-              <td>
-                ${mergeOptions.length > 0 ? `
-                <div class="ciso-merge-dropdown-wrap" style="display:flex;flex-direction:column;gap:6px;align-items:stretch;max-width:220px;">
-                  <select class="form-select" style="font-size:11px;padding:4px 6px;" data-ciso-merge-master="${fam}" aria-label="Merge another domain into ${fam}">
-                    <option value="">+ Merge…</option>
-                    ${mergeOptions.map(f => `<option value="${f}">${f} — ${FAMILIES[f]||f}</option>`).join('')}
-                  </select>
-                  <button type="button" data-ciso-merge-dropdown-apply data-master="${fam}" style="display:none;font-size:11px;font-weight:700;padding:5px 10px;border-radius:6px;border:1px solid #1e40af;background:#dbeafe;color:#1e40af;cursor:pointer;white-space:nowrap;">
-                    Apply merge
-                  </button>
-                </div>` : '<span style="font-size:11px;color:var(--text-muted);">—</span>'}
               </td>
             </tr>`;
           }).join('')}
@@ -3349,18 +3269,21 @@ window.applyCsfFunctionGroupingUi = function(replace) {
 };
 window.applyAllMerges = function() { window.applyCsfFunctionGroupingUi(true); };
 
-function mergePolicy(slaveFam, masterFam) {
+function mergePolicy(slaveFam, masterFam, opts) {
   if (!slaveFam || !masterFam || slaveFam === masterFam) return;
+  opts = opts || {};
   var prevMerges = cloneStateValue(state.policyMerges || {});
   var prevSlaveOwner = cloneStateValue(state.domainOwners[slaveFam] || {});
-  pushScopedUndo({
-    label: 'Merged ' + slaveFam + ' into ' + masterFam,
-    undo: function() {
-      state.policyMerges = prevMerges;
-      state.domainOwners[slaveFam] = prevSlaveOwner;
-      try { renderActiveCisoSetupStep(); } catch (eR) {}
-    }
-  });
+  if (!opts.silent) {
+    pushScopedUndo({
+      label: 'Merged ' + slaveFam + ' into ' + masterFam,
+      undo: function() {
+        state.policyMerges = prevMerges;
+        state.domainOwners[slaveFam] = prevSlaveOwner;
+        try { renderActiveCisoSetupStep(); } catch (eR) {}
+      }
+    });
+  }
   if (!state.policyMerges) state.policyMerges = {};
   // Flatten: if slaveFam is itself a master, retarget its members to the new master.
   Object.keys(state.policyMerges).forEach(function(f) {
@@ -3371,9 +3294,9 @@ function mergePolicy(slaveFam, masterFam) {
   if (masterOwner && (isValidOwnerEmail(masterOwner.email) || getOwnerDisplayName(masterOwner) !== '\u2014')) {
     state.domainOwners[slaveFam] = Object.assign({}, masterOwner);
   }
-  addAuditEntry('program', null, 'Merged ' + slaveFam + ' into ' + masterFam);
+  if (!opts.silent) addAuditEntry('program', null, 'Merged ' + slaveFam + ' into ' + masterFam);
   try { window.markDirty && window.markDirty(); } catch (e) {}
-  setTimeout(function() { renderActiveCisoSetupStep(); }, 0);
+  if (!opts.silent) setTimeout(function() { renderActiveCisoSetupStep(); }, 0);
 }
 
 function unmergePolicy(fam) {

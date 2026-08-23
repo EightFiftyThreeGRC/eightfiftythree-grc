@@ -3848,6 +3848,184 @@
       padding: 10px 12px;
     }
 
+    /* Policy grouping board (Path A Consolidate + Path B Policy set).
+       Drag-and-drop family chips / document merge. Do not restructure older csf-merge-* rules. */
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+    .pgb-panel { margin: 8px 0 16px; }
+    .pgb-panel-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+    .pgb-panel-title { font-size: 15px; font-weight: 700; color: var(--navy); }
+    .pgb-panel-sub { font-size: 13px; color: var(--text-muted); line-height: 1.5; max-width: 720px; margin-top: 4px; }
+    .pgb-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .pgb-isp {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      background: var(--purple-light);
+      border: 1px solid var(--hairline);
+      border-radius: 10px;
+      padding: 12px 14px;
+      margin-bottom: 14px;
+      font-size: 13px;
+      color: var(--ink-7);
+      line-height: 1.45;
+    }
+    .pgb-board {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 12px;
+    }
+    .pmap-doc-list.pgb-board {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .pgb-card {
+      background: var(--white);
+      border: 1px solid var(--hairline);
+      border-radius: 12px;
+      padding: 14px 16px;
+      transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+    }
+    .pgb-card.is-drop-target,
+    .pgb-well.is-drop-target {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+      box-shadow: 0 0 0 3px var(--accent-ring);
+    }
+    .pgb-card-isp { margin-bottom: 0; }
+    .pgb-card-empty { border-style: dashed; background: var(--ink-0); }
+    .pgb-card-mapped { border-color: rgba(13, 148, 136, 0.35); }
+    .pgb-card-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 10px;
+      margin-bottom: 8px;
+      cursor: grab;
+    }
+    .pgb-card-head.is-dragging { opacity: 0.55; cursor: grabbing; }
+    .pgb-card-empty .pgb-card-head { cursor: default; }
+    .pgb-card-title { font-size: 15px; font-weight: 700; color: var(--navy); }
+    .pgb-card-head-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: flex-end; }
+    .pgb-fn-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+    .pgb-fn {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: var(--ink-1);
+      color: var(--ink-7);
+    }
+    .pgb-rename-wrap { display: block; margin: 0 0 8px; }
+    .pgb-rename {
+      width: 100%;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 4px 8px;
+      border: 1px solid var(--hairline);
+      border-radius: 6px;
+      color: var(--navy);
+    }
+    .pgb-chips { display: flex; flex-wrap: wrap; gap: 6px; min-height: 32px; }
+    .pgb-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: var(--ink-0);
+      border: 1px solid var(--hairline);
+      border-radius: 8px;
+      padding: 3px 6px 3px 8px;
+      cursor: grab;
+    }
+    .pgb-chip.is-dragging { opacity: 0.45; cursor: grabbing; }
+    .pgb-chip-code { font-size: 12px; font-weight: 700; color: var(--navy); letter-spacing: 0.02em; }
+    .pgb-menu-btn {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 6px;
+      border: 1px solid var(--hairline);
+      background: var(--white);
+      color: var(--ink-7);
+      cursor: pointer;
+    }
+    .pgb-menu-btn:hover, .pgb-menu-btn:focus { border-color: var(--accent); color: var(--accent); }
+    .pgb-empty { font-size: 12px; color: var(--text-muted); }
+    .pgb-well {
+      margin-top: 14px;
+      border: 1px dashed var(--hairline);
+      border-radius: 12px;
+      padding: 12px 14px;
+      min-height: 72px;
+    }
+    .pgb-well-label { font-size: 12px; font-weight: 700; color: var(--navy); margin-bottom: 4px; }
+    .pgb-well-hint { font-size: 12px; color: var(--text-muted); margin: 0 0 8px; }
+    .pgb-menu {
+      position: fixed;
+      z-index: 10050;
+      min-width: 200px;
+      background: var(--white);
+      border: 1px solid var(--hairline);
+      border-radius: 10px;
+      box-shadow: var(--shadow-md);
+      padding: 6px;
+    }
+    .pgb-menu-item {
+      display: block;
+      width: 100%;
+      text-align: left;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 8px 10px;
+      border: 0;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--navy);
+      cursor: pointer;
+    }
+    .pgb-menu-item:hover, .pgb-menu-item:focus { background: var(--accent-soft); outline: none; }
+    .pmap-help {
+      font-size: 14px;
+      color: var(--text-muted);
+      margin: 0 0 16px;
+      line-height: 1.45;
+    }
+    .pmap-cov-section { margin: 0; }
+    .pmap-cov-heading {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--ink-6);
+      margin: 0 0 12px;
+    }
+    .pmap-cov-intro { margin: 0 0 12px; }
+    .pmap-cov-divider {
+      border: 0;
+      border-top: 1px solid var(--hairline);
+      margin: 28px 0;
+    }
+    .pmap-lead-q {
+      margin: 4px 0 8px;
+    }
+
 
 
 

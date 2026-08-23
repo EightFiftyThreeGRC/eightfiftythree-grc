@@ -3,7 +3,7 @@
 // Path A (build-from-scratch) stays in js/program.js unchanged.
 
 var POLICY_MAP_STEPS = 7;
-var POLICY_MAP_STEP_LABELS = ['Organization', 'Profile', 'Program', 'Catalog', 'Map', 'Further policies', 'Assign owners'];
+var POLICY_MAP_STEP_LABELS = ['Organization', 'Profile', 'Program', 'Catalog', 'Map', 'Policy set', 'Assign owners'];
 var POLICY_MAP_DOC_TYPES = [
   { id: 'policy', label: 'Policy', hint: 'Intent \u2014 what must be true' },
   { id: 'standard', label: 'Standard', hint: 'Measurable requirement' },
@@ -641,6 +641,7 @@ function restorePathAStepNav() {
     }
     if (conn) conn.style.display = '';
   }
+  restorePathAFooters();
 }
 
 function policyMapUpdateProgress(step) {
@@ -655,19 +656,126 @@ function policyMapUpdateProgress(step) {
   policyMapSyncStepNav();
 }
 
+/**
+ * Path B steps that reuse a Path A wizard panel, addressed by the Path A step's name
+ * rather than a bare integer. Path B steps between `program` and `assignOwners` render
+ * in #pmap-root and deliberately have no Path A panel.
+ */
+var POLICY_MAP_PATH_A_PANELS = [
+  { key: 'organization', pathBStep: 1, pathAStep: 1, pathALabel: 'Organization' },
+  { key: 'profile', pathBStep: 2, pathAStep: 2, pathALabel: 'Profile' },
+  { key: 'program', pathBStep: 3, pathAStep: 3, pathALabel: 'Program' },
+  { key: 'assignOwners', pathBStep: POLICY_MAP_STEPS, pathAStep: 8, pathALabel: 'Assign Owners' }
+];
+/** First Path B step with its own renderer — where Path-A-only steps land. */
+var POLICY_MAP_FIRST_OWN_STEP = 4;
+
+/**
+ * Resolve one mapping against the live CISO_STEP_LABELS. If Path A was re-numbered the
+ * label no longer matches the recorded index, so relocate by name and warn instead of
+ * silently painting whatever step now sits at the stale index.
+ */
+function policyMapResolvePathAStep(entry) {
+  var labels = (typeof CISO_STEP_LABELS !== 'undefined' && CISO_STEP_LABELS) ? CISO_STEP_LABELS : [];
+  if (!labels.length) return entry.pathAStep;
+  if (labels[entry.pathAStep - 1] === entry.pathALabel) return entry.pathAStep;
+  var moved = labels.indexOf(entry.pathALabel);
+  console.warn('policy-map: Path A step ' + entry.pathAStep + ' is "' + labels[entry.pathAStep - 1]
+    + '", expected "' + entry.pathALabel + '". Update POLICY_MAP_PATH_A_PANELS.');
+  return moved === -1 ? entry.pathAStep : moved + 1;
+}
+
+/** Path A panel step for a Path B step, or 0 when Path B owns the renderer. */
+function policyMapPathAStep(pathBStep) {
+  for (var i = 0; i < POLICY_MAP_PATH_A_PANELS.length; i++) {
+    if (POLICY_MAP_PATH_A_PANELS[i].pathBStep === pathBStep) {
+      return policyMapResolvePathAStep(POLICY_MAP_PATH_A_PANELS[i]);
+    }
+  }
+  return 0;
+}
+
+/** Path B step that owns a Path A step — Path-A-only steps land on the first Path B step. */
+function policyMapStepForPathAStep(pathAStep) {
+  for (var i = 0; i < POLICY_MAP_PATH_A_PANELS.length; i++) {
+    if (policyMapResolvePathAStep(POLICY_MAP_PATH_A_PANELS[i]) === pathAStep) {
+      return POLICY_MAP_PATH_A_PANELS[i].pathBStep;
+    }
+  }
+  return POLICY_MAP_FIRST_OWN_STEP;
+}
+
+/** Activate one Path A wizard panel and deactivate the rest. */
+function policyMapActivatePathAPanel(pathAStep) {
+  var max = (typeof CISO_WIZARD_STEPS === 'number') ? CISO_WIZARD_STEPS : 8;
+  for (var i = 1; i <= max; i++) {
+    var panel = document.getElementById('ciso-step-' + i);
+    if (panel) panel.classList.toggle('active', i === pathAStep);
+  }
+}
+
+/**
+ * Show a Path A wizard panel from Path B. Routes through the unwrapped goToStep so the
+ * panel is activated, the nav syncs, and the body renders — rendering the body alone
+ * leaves whichever panel was last active on screen showing the wrong step.
+ */
+function policyMapShowPathAStep(pathAStep, pathBStep) {
+  policyMapSetChrome('pathA');
+  if (typeof currentStep !== 'undefined') currentStep.ciso = pathAStep;
+  if (typeof window._policyMapOrigGoToStep === 'function') {
+    window._policyMapInsideGoToStep = true;
+    try { window._policyMapOrigGoToStep('ciso', pathAStep); }
+    finally { window._policyMapInsideGoToStep = false; }
+  } else if (typeof renderCISOStep === 'function') {
+    renderCISOStep(pathAStep);
+  }
+  policyMapActivatePathAPanel(pathAStep);
+  if (typeof updateCISOFinishBtn === 'function') updateCISOFinishBtn();
+  policyMapPatchPathAFooters(pathBStep);
+  policyMapUpdateProgress(pathBStep);
+}
+
+/** Path A footers that Path B rewrites, with their app.html defaults for restoration. */
+var POLICY_MAP_PATH_A_FOOTERS = [
+  { panel: 3, sel: '.btn-primary', text: 'Next: Reg mapping \u2192', onclick: 'cisoNext(3)' },
+  { panel: 8, sel: '.btn-secondary', text: '\u2190 Back', onclick: "goToStep('ciso',7)" }
+];
+
+function policyMapFooterButton(panel, sel) {
+  return document.querySelector('#ciso-step-' + panel + ' .wizard-step-footer ' + sel);
+}
+
+/**
+ * Point the reused Path A footers at Path B. The final Path B step keeps Path A's
+ * finalize button (#ciso-finalise-btn) as its primary action, so no "Next" is shown.
+ */
 function policyMapPatchPathAFooters(step) {
-  var btn3 = document.querySelector('#ciso-step-3 .wizard-step-footer .btn-primary');
+  if (!shouldRenderPolicyMapSetup()) {
+    restorePathAFooters();
+    return;
+  }
+  var btn3 = policyMapFooterButton(3, '.btn-primary');
   if (btn3) {
     btn3.textContent = 'Next: Catalog documents \u2192';
     btn3.setAttribute('onclick', 'policyMapNext(3)');
   }
-  if (step === 7) {
-    var back = document.querySelector('#ciso-step-8 .wizard-step-footer .btn-secondary');
+  if (step === POLICY_MAP_STEPS) {
+    var back = policyMapFooterButton(8, '.btn-secondary');
     if (back) {
-      back.setAttribute('onclick', 'policyMapGoTo(6)');
-      back.textContent = '\u2190 Back to further policies';
+      back.setAttribute('onclick', 'policyMapGoTo(' + (POLICY_MAP_STEPS - 1) + ')');
+      back.textContent = '\u2190 Back to ' + (POLICY_MAP_STEP_LABELS[POLICY_MAP_STEPS - 2] || 'previous step').toLowerCase();
     }
   }
+}
+
+/** Put the footers Path B rewrites back to their Path A defaults. */
+function restorePathAFooters() {
+  POLICY_MAP_PATH_A_FOOTERS.forEach(function(f) {
+    var btn = policyMapFooterButton(f.panel, f.sel);
+    if (!btn) return;
+    btn.textContent = f.text;
+    btn.setAttribute('onclick', f.onclick);
+  });
 }
 
 function renderPolicyMapCisoTab() {
@@ -680,28 +788,9 @@ function renderPolicyMapCisoTab() {
   var step = parseInt(state.policyMapStep, 10) || 1;
   policyMapUpdateProgress(step);
 
-  if (step <= 3) {
-    policyMapSetChrome('pathA');
-    if (typeof currentStep !== 'undefined') currentStep.ciso = step;
-    if (typeof window._policyMapOrigGoToStep === 'function') {
-      window._policyMapInsideGoToStep = true;
-      try { window._policyMapOrigGoToStep('ciso', step); }
-      finally { window._policyMapInsideGoToStep = false; }
-    } else if (typeof renderCISOStep === 'function') {
-      renderCISOStep(step);
-    }
-    policyMapPatchPathAFooters(step);
-    policyMapUpdateProgress(step);
-    return;
-  }
-
-  if (step === 7) {
-    policyMapSetChrome('pathA');
-    if (typeof currentStep !== 'undefined') currentStep.ciso = 8;
-    if (typeof renderCISOStep === 'function') renderCISOStep(8);
-    if (typeof updateCISOFinishBtn === 'function') updateCISOFinishBtn();
-    policyMapPatchPathAFooters(7);
-    policyMapUpdateProgress(7);
+  var pathAStep = policyMapPathAStep(step);
+  if (pathAStep) {
+    policyMapShowPathAStep(pathAStep, step);
     return;
   }
 
@@ -718,7 +807,7 @@ function renderPolicyMapWizardBody(step) {
   else inner = renderPolicyMapCoverageHtml();
 
   var backStep = step - 1;
-  var nextLabel = step === 4 ? 'Next: Map to NIST \u2192' : step === 5 ? 'Next: Further policies \u2192' : 'Next: Assign owners \u2192';
+  var nextLabel = step === 4 ? 'Next: Map to NIST \u2192' : step === 5 ? 'Next: Policy set \u2192' : 'Next: Assign owners \u2192';
   var nextFn = step === 6 ? 'policyMapConfirmCoverage()' : 'policyMapNext(' + step + ')';
 
   root.innerHTML = ''
@@ -1006,6 +1095,19 @@ function renderPolicyMapAlignHtml() {
 }
 
 function policyMapFunctionDocuments() {
+  if (typeof getPolicyBoardDocuments === 'function') {
+    return getPolicyBoardDocuments().docs.filter(function(d) {
+      return d && !d.empty && !d.standalone && d.master;
+    }).map(function(d) {
+      return {
+        master: d.master,
+        fnIds: (d.fnIds && d.fnIds.length) ? d.fnIds.slice() : (d.fn ? [d.fn] : []),
+        families: (d.families || []).slice(),
+        title: d.title,
+        combined: !!d.combined
+      };
+    });
+  }
   if (typeof ensureCsfFunctionGrouping === 'function') ensureCsfFunctionGrouping();
   var groups = (typeof getCsfResolvedPolicyGroups === 'function') ? getCsfResolvedPolicyGroups() : [];
   var byRoot = {};
@@ -1081,59 +1183,33 @@ function policyMapCombineFunctions(keepFn, absorbFn) {
   keepFn = String(keepFn || '').toUpperCase();
   absorbFn = String(absorbFn || '').toUpperCase();
   if (!keepFn || !absorbFn || keepFn === absorbFn || keepFn === 'GV' || absorbFn === 'GV') return;
-  if (typeof ensureCsfFunctionGrouping === 'function') ensureCsfFunctionGrouping();
-  var docs = policyMapFunctionDocuments();
+  var model = (typeof getPolicyBoardDocuments === 'function') ? getPolicyBoardDocuments() : { docs: [] };
   var keep = null;
   var absorb = null;
-  docs.forEach(function(d) {
-    if (d.fnIds.indexOf(keepFn) !== -1) keep = d;
-    if (d.fnIds.indexOf(absorbFn) !== -1) absorb = d;
+  model.docs.forEach(function(d) {
+    if (d.fnIds && d.fnIds.indexOf(keepFn) !== -1) keep = d;
+    if (d.fnIds && d.fnIds.indexOf(absorbFn) !== -1) absorb = d;
   });
   if (!keep || !absorb || keep.master === absorb.master) return;
-  if (!state.policyMerges) state.policyMerges = {};
-  if (!state.domainCustomNames) state.domainCustomNames = {};
-  var keepMaster = keep.master;
-  var absorbMaster = absorb.master;
-  Object.keys(state.policyMerges).forEach(function(f) {
-    if (state.policyMerges[f] === absorbMaster) state.policyMerges[f] = keepMaster;
-  });
-  state.policyMerges[absorbMaster] = keepMaster;
-  absorb.families.forEach(function(f) {
-    if (f !== keepMaster) state.policyMerges[f] = keepMaster;
-  });
-  var titles = [];
-  keep.fnIds.concat(absorb.fnIds).forEach(function(fn) {
-    var name = policyMapCsfFunctionName(fn);
-    if (titles.indexOf(name) === -1) titles.push(name);
-  });
-  state.domainCustomNames[keepMaster] = titles.join(' & ');
-  markDirty();
-  try {
-    addAuditEntry('program', null, 'Combined Function policies: ' + titles.join(' + '));
-  } catch (e) { /* ignore */ }
-  policyMapRerender();
+  if (typeof policyBoardMergeDocs === 'function') {
+    policyBoardMergeDocs(absorb.master, keep.master);
+    if (typeof policyBoardRerender === 'function') policyBoardRerender();
+    return;
+  }
 }
 
 function policyMapUncombineFunction(fn) {
   fn = String(fn || '').toUpperCase();
   if (!fn || fn === 'GV') return;
-  var groups = (typeof getCsfResolvedPolicyGroups === 'function') ? getCsfResolvedPolicyGroups() : [];
-  var group = null;
-  groups.forEach(function(g) { if (g.fn === fn) group = g; });
-  if (!group || !group.master) return;
-  if (!state.policyMerges) state.policyMerges = {};
-  if (!state.domainCustomNames) state.domainCustomNames = {};
-  (group.families || []).forEach(function(f) {
-    if (f === group.master) delete state.policyMerges[f];
-    else state.policyMerges[f] = group.master;
+  var model = (typeof getPolicyBoardDocuments === 'function') ? getPolicyBoardDocuments() : { docs: [] };
+  var host = null;
+  model.docs.forEach(function(d) {
+    if (d.fnIds && d.fnIds.indexOf(fn) !== -1) host = d;
   });
-  state.domainCustomNames[group.master] = group.title;
-  policyMapFunctionDocuments().forEach(function(d) {
-    if (d.fnIds.length === 1) state.domainCustomNames[d.master] = policyMapCsfFunctionName(d.fnIds[0]);
-    else state.domainCustomNames[d.master] = d.fnIds.map(policyMapCsfFunctionName).join(' & ');
-  });
-  markDirty();
-  policyMapRerender();
+  if (host && typeof policyBoardSplitFn === 'function') {
+    policyBoardSplitFn(host.master, fn);
+    if (typeof policyBoardRerender === 'function') policyBoardRerender();
+  }
 }
 
 function policyMapLeftoverFamilies(fnDocs) {
@@ -1161,7 +1237,7 @@ function policyMapConfirmCoverage() {
     if (d.combined) state.domainCustomNames[d.master] = d.title;
   });
   try {
-    addAuditEntry('program', null, 'Further policies confirmed (' + (state.policyCatalog || []).length + ' catalog documents)');
+    addAuditEntry('program', null, 'Policy set confirmed (' + (state.policyCatalog || []).length + ' catalog documents)');
   } catch (e) { /* ignore */ }
   showToast('Policy set saved. Mapped documents count as coverage; remaining Function policies can be drafted after owners are assigned.');
   policyMapGoTo(7);
@@ -1191,95 +1267,95 @@ function policyMapAddAnother() {
 }
 
 function renderPolicyMapCoverageHtml() {
+  if (typeof policyBoardEnsureDelegates === 'function') policyBoardEnsureDelegates();
   if (typeof ensureCsfFunctionGrouping === 'function') ensureCsfFunctionGrouping();
   var cov = getPolicyMapCoverage();
-  var fnDocs = policyMapFunctionDocuments();
-  var leftovers = policyMapLeftoverFamilies(fnDocs);
+  var model = (typeof getPolicyBoardDocuments === 'function')
+    ? getPolicyBoardDocuments()
+    : { docs: [], emptyFns: [] };
   var ispChip = cov.ispMapped
     ? '<span class="pmap-status mapped">Mapped</span>'
     : '<span class="pmap-status gap">Needs a catalog map</span>';
   var ispDocs = cov.ispDocs.map(function(d) { return escapeHTML(d.title); }).join(', ') || 'None';
-  var familyGap = (cov.rows || []).filter(function(r) {
-    if (r.fam === 'PM' || r.status !== 'gap') return false;
-    var assigned = fnDocs.some(function(d) {
-      return !policyMapDocIsOmitted(d) && d.families.indexOf(r.fam) !== -1;
-    });
-    return !assigned;
-  }).length;
+  var ispMeta = cov.ispMapped
+    ? 'PM lives in the ISP. Mapped from: ' + ispDocs
+    : 'PM lives in the ISP. Map a catalog document to Govern, or mark one as the ISP.';
 
-  var docCards = fnDocs.map(function(d) {
-    var omitted = policyMapDocIsOmitted(d);
+  function isMappedDoc(d) {
+    if (!d || d.empty || d.standalone) return false;
+    if (typeof policyMapDocIsOmitted === 'function' && policyMapDocIsOmitted(d)) return false;
     var st = policyMapFunctionDocStatus(d, cov);
-    var fnBits = d.fnIds.map(function(fn) {
-      return '<span class="pmap-chip pmap-chip-quiet pmap-chip-fn csf-fn-' + fn.toLowerCase() + '"><span class="pmap-chip-code">'
-        + escapeHTML(fn) + '</span>' + escapeHTML(policyMapCsfFunctionName(fn)) + '</span>';
-    }).join('');
-    var famBits = d.families.map(function(f) {
-      return '<span class="pmap-chip pmap-chip-quiet">' + escapeHTML(f) + '</span>';
-    }).join('');
-    var statusHtml = omitted
-      ? '<span class="pmap-status gap">Not in the policy set</span>'
-      : (st.mapped
-        ? '<span class="pmap-status mapped">Already mapped</span>'
-        : '<span class="pmap-status partial">Draft after setup</span>');
-    var detail = omitted
-      ? 'This Function will not be a separate policy document. Its families stay unassigned until you place them or map a catalog document.'
-      : (st.mapped
-        ? ('Covered by mapped catalog document' + (st.titles.length === 1 ? '' : 's') + ': ' + st.titles.map(escapeHTML).join(', ') + '. No draft needed unless you choose to write a new one.')
-        : 'No catalog document covers this Function yet. After you assign owners, draft this as one Function policy \u2014 not one policy per 800-53 family.');
-    var others = fnDocs.filter(function(o) { return o.master !== d.master; });
-    var combine = omitted ? '' : '<label class="pmap-field"><span>Combine with another Function</span>'
-      + '<select class="form-select" onchange="if(this.value)policyMapCombineFunctions(\'' + d.fnIds[0] + '\',this.value)">'
-      + '<option value="">Keep separate\u2026</option>'
-      + others.map(function(o) {
-        return '<option value="' + o.fnIds[0] + '">' + escapeHTML(o.title) + '</option>';
-      }).join('')
-      + '</select></label>';
-    var split = (d.combined && !omitted)
-      ? d.fnIds.map(function(fn) {
-        return '<button type="button" class="btn btn-secondary btn-sm" onclick="policyMapUncombineFunction(\'' + fn + '\')">Split ' + escapeHTML(policyMapCsfFunctionName(fn)) + '</button>';
-      }).join(' ')
-      : '';
-    var draftBtn = (!omitted && !st.mapped)
-      ? '<button type="button" class="btn btn-secondary btn-sm" onclick="policyMapDraftMissing(\'' + d.master + '\')">Draft this Function policy</button>'
-      : '';
-    return '<div class="pmap-card pmap-doc-card' + (omitted ? ' pmap-doc-omitted' : '') + '">'
-      + '<label class="pmap-check pmap-doc-keep"><input type="checkbox"' + (omitted ? '' : ' checked')
-      + ' onchange="policyMapToggleMaintain(\'' + d.fnIds.join(',') + '\', this.checked)">'
-      + '<span><strong>' + escapeHTML(d.title) + '</strong> policy document</span></label>'
-      + '<div class="pmap-chip-row">' + fnBits + famBits + '</div>'
-      + statusHtml
-      + '<p class="pmap-muted" style="margin-top:8px;">' + detail + '</p>'
-      + '<div class="pmap-card-actions" style="margin-top:10px;">' + combine + split + ' ' + draftBtn + '</div>'
-      + '</div>';
+    return !!st.mapped;
+  }
+
+  var mappedDocs = model.docs.filter(isMappedDoc);
+  var neededDocs = model.docs.filter(function(d) { return !isMappedDoc(d) && !d.standalone; });
+  var standalones = model.docs.filter(function(d) { return d.standalone; });
+  var cardOpts = { canMoveChip: true };
+
+  function extrasFor(d, inNeeded) {
+    if (!d || d.empty) return '';
+    var omitted = typeof policyMapDocIsOmitted === 'function' && policyMapDocIsOmitted(d);
+    var st = policyMapFunctionDocStatus(d, cov);
+    var bits = '';
+    if (inNeeded && !d.standalone) {
+      var fnCsv = (d.fnIds && d.fnIds.length) ? d.fnIds.join(',') : d.fn;
+      if (fnCsv) {
+        bits += '<label class="pmap-check pmap-doc-keep"><input type="checkbox"' + (omitted ? '' : ' checked')
+          + ' onchange="policyMapToggleMaintain(\'' + fnCsv + '\', this.checked)">'
+          + '<span>Include in the program</span></label>';
+      }
+    }
+    if (inNeeded && omitted) {
+      bits += '<span class="pmap-status gap">Not in the policy set</span>';
+    } else if (inNeeded && !d.standalone && !st.mapped) {
+      bits += '<span class="pmap-status partial">Draft after setup</span>';
+      bits += '<div class="pmap-card-actions" style="margin-top:8px;">'
+        + '<button type="button" class="btn btn-secondary btn-sm" onclick="policyMapDraftMissing(\'' + d.master + '\')">Draft this Function policy</button></div>';
+    } else if (!inNeeded && st.mapped) {
+      bits += '<p class="pmap-muted">Mapped from: ' + st.titles.map(escapeHTML).join(', ') + '</p>';
+    }
+    return bits;
+  }
+
+  var mappedCards = mappedDocs.map(function(d) {
+    return renderPolicyBoardCardHtml(d, Object.assign({}, cardOpts, {
+      mapped: true,
+      statusHtml: '<span class="pmap-status mapped">Mapped</span>',
+      cardExtra: function(doc) { return extrasFor(doc, false); }
+    }));
   }).join('');
 
-  var leftoverHtml = leftovers.length
-    ? '<div class="pmap-card"><div class="pmap-card-title">Leftover standalone families</div>'
-      + '<p class="pmap-muted">These were unmerged from a Function group. Draft only as a standalone if you meant to keep a separate family policy.</p>'
-      + leftovers.map(function(f) {
-        return '<div class="pmap-card-actions" style="margin-top:8px;"><span class="control-id">' + escapeHTML(f) + '</span> '
-          + escapeHTML((FAMILIES && FAMILIES[f]) || f)
-          + ' <button type="button" class="btn btn-secondary btn-sm" onclick="policyMapDraftMissing(\'' + f + '\')">Draft this standalone policy</button></div>';
-      }).join('')
-      + '</div>'
-    : '';
+  var neededCards = neededDocs.concat(model.emptyFns || []).map(function(d) {
+    return renderPolicyBoardCardHtml(d, Object.assign({}, cardOpts, {
+      cardExtra: function(doc) { return extrasFor(doc, true); }
+    }));
+  }).join('');
 
   return ''
-    + '<div class="section-title">Further policies</div>'
-    + '<div class="section-subtitle">Decide the remaining policy set. Document structure first \u2014 ISP (Govern) plus Function documents. Family-level drafts come after this mapping exists, and only for a Function policy (or a family you explicitly unmerged).</div>'
-    + '<div class="pmap-lead-q">Besides the ISP, which policy documents will this program maintain?</div>'
-    + '<div class="pmap-card pmap-isp-card"><div class="pmap-card-head"><div><div class="pmap-card-title">Govern \u2014 organization ISP</div>'
-    + '<div class="pmap-card-meta">Already in the policy set. Program Management (PM) lives here \u2014 not as a separate domain card. Mapped from: ' + ispDocs + '</div></div>'
-    + ispChip + '</div>'
+    + '<div class="section-title">Policy set</div>'
+    + '<div class="pmap-lead-q">Besides the ISP, which documents will you maintain?</div>'
+    + '<p class="pmap-help">Mapped documents already count. Drag a family onto another document to move it, or use Move and Merge.</p>'
+    + '<div class="pgb-actions" style="margin-bottom:16px;"><button type="button" class="btn btn-secondary btn-sm" data-pgb-reset>Reset to CSF defaults</button></div>'
+    + '<div class="pmap-cov-section">'
+    + '<div class="pmap-cov-heading">Already mapped</div>'
+    + '<div class="pgb-board pmap-doc-list">'
+    + '<div class="pgb-card pgb-card-isp pmap-isp-card"><div class="pgb-card-head"><div><div class="pgb-card-title">Govern \u2014 organization ISP</div>'
+    + '<div class="pmap-card-meta">' + ispMeta + '</div></div>' + ispChip + '</div>'
     + (cov.ispMapped ? '' : '<div class="pmap-card-actions" style="margin-top:10px;"><button type="button" class="btn btn-secondary btn-sm" onclick="state.policyMapStep=5;policyMapRerender()">Claim Govern or mark a document as the ISP</button></div>')
     + '</div>'
-    + '<div class="pmap-doc-list">' + docCards + '</div>'
-    + leftoverHtml
-    + (familyGap
-      ? '<p class="pmap-note">' + familyGap + ' famil' + (familyGap === 1 ? 'y is' : 'ies are') + ' unassigned \u2014 not placed in a Function document you will maintain. Combine or check a Function above, or <button type="button" class="btn btn-secondary btn-sm" onclick="state.policyMapStep=5;policyMapRerender()">map another catalog document</button>. Do not draft each 800-53 family as its own policy.</p>'
-      : '<p class="pmap-note">Every in-scope family sits in the ISP or in a Function policy you will maintain. Catalog maps count as already covered; the rest draft as Function documents after owners are assigned.</p>')
-    + '<p class="pmap-note">Confirm writes mapped records for catalog coverage and keeps the Function grouping so owners are assigned to policy documents, not every 800-53 family.</p>';
+    + mappedCards
+    + '</div></div>'
+    + '<hr class="pmap-cov-divider">'
+    + '<div class="pmap-cov-section">'
+    + '<div class="pmap-cov-heading">Still needed</div>'
+    + '<p class="pmap-muted pmap-cov-intro">No catalog document covers these Functions yet. After you assign owners, draft each as one Function policy.</p>'
+    + '<div class="pgb-board pmap-doc-list">' + (neededCards || '<p class="pmap-muted">Every Function is covered by a mapped catalog document.</p>') + '</div>'
+    + '<div class="pgb-well" data-pgb-slot="standalone">'
+    + '<div class="pgb-well-label">Standalone documents</div>'
+    + '<p class="pgb-well-hint">Drop a family here to give it its own document.</p>'
+    + standalones.map(function(d) { return renderPolicyBoardCardHtml(d, cardOpts); }).join('')
+    + '</div></div>';
 }
 
 function installPolicyMapHooks() {
@@ -1290,27 +1366,9 @@ function installPolicyMapHooks() {
     window._policyMapOrigGoToStep = goToStep;
     goToStep = function(tabId, step) {
       if (tabId === 'ciso' && shouldRenderPolicyMapSetup()) {
-        if (step <= 3) {
-        state.policyMapStep = step;
-        window._policyMapInsideGoToStep = true;
-        try {
-          var ret = window._policyMapOrigGoToStep('ciso', step);
-          policyMapSetChrome('pathA');
-          policyMapPatchPathAFooters(step);
-          policyMapUpdateProgress(step);
-          return ret;
-        } finally { window._policyMapInsideGoToStep = false; }
-        }
-        if (step >= 4 && step <= 7) {
-          state.policyMapStep = 4;
-          renderPolicyMapCisoTab();
-          return;
-        }
-        if (step === 8) {
-          state.policyMapStep = 7;
-          renderPolicyMapCisoTab();
-          return;
-        }
+        state.policyMapStep = policyMapStepForPathAStep(step);
+        renderPolicyMapCisoTab();
+        return;
       }
       return window._policyMapOrigGoToStep.apply(this, arguments);
     };
