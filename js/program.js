@@ -1687,17 +1687,34 @@ function renderCISOStep2() {
       if (!state.pmControls[id]) state.pmControls[id] = true;
     });
   }
+  var mappedPm = (typeof getCsfPmIdsForSelectedSubs === 'function') ? getCsfPmIdsForSelectedSubs() : {};
+  var showMappedOnly = !!state._pmShowCsfMappedOnly;
   const renderRow = (c) => {
     const isRequired = PM_BASE.includes(c.id);
     const isPrivacyDefault = getPrivacyPMDefaults().includes(c.id);
+    const implementsSelected = !!mappedPm[c.id];
+    const selectedSubs = (typeof getCsfSelectedSubsForPm === 'function') ? getCsfSelectedSubsForPm(c.id) : [];
+    const explicitSubs = (typeof getCsfExplicitMappingsForControl === 'function')
+      ? getCsfExplicitMappingsForControl(c.id).filter(function(m) { return m.sub; })
+      : [];
+    const coreHeld = isRequired && !!state.pmControls[c.id] && explicitSubs.length > 0 && selectedSubs.length === 0;
+    if (showMappedOnly && !state.pmControls[c.id] && !implementsSelected && !isRequired) return '';
+    const rowClass = implementsSelected ? ' class="csf-pm-mapped"' : (coreHeld ? ' class="csf-pm-core-held"' : '');
     const rowBg = isRequired ? 'background:rgba(13,148,136,0.04);' : isPrivacyDefault ? 'background:rgba(99,102,241,0.04);' : '';
     const csfTags = (typeof renderCsfExplicitTagsHtml === 'function') ? renderCsfExplicitTagsHtml(c.id) : '';
+    const implNote = implementsSelected && selectedSubs.length
+      ? '<div class="csf-pm-impl">Implements ' + selectedSubs.map(function(s) { return escapeHTML(s); }).join(', ') + '</div>'
+      : '';
+    const heldNote = coreHeld
+      ? '<div class="csf-pm-held-note">CORE \u2014 stays selected as program foundation</div>'
+      : '';
+    const cidEsc = String(c.id).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
     return `
-    <tr style="${rowBg}">
+    <tr${rowClass} style="${rowBg}">
       <td style="vertical-align:top; padding-top:12px;">
         <label class="cb-label">
           <input type="checkbox" ${state.pmControls[c.id]?'checked':''}
-            onchange="state.pmControls['${c.id}']=this.checked"
+            onchange="setPmControlSelected('${cidEsc}', this.checked)"
             style="accent-color:var(--teal);">
           <span class="control-id">${c.id}</span>
           ${isRequired ? '<span style="font-size:10px;background:var(--teal);color:white;padding:1px 5px;border-radius:8px;margin-left:4px;font-weight:700;">CORE</span>' : ''}
@@ -1707,6 +1724,7 @@ function renderCISOStep2() {
       <td>
         <div style="font-weight:600;font-size:13px;">${c.n}${csfTags ? ' ' + csfTags : ''}</div>
         <div style="font-size:12px;color:var(--text-muted);margin-top:2px;line-height:1.4;">${PM_STATEMENTS[c.id]||''}</div>
+        ${implNote}${heldNote}
       </td>
     </tr>`;
   };
@@ -1716,22 +1734,28 @@ function renderCISOStep2() {
   body.innerHTML = `
     ${cisoStepProgressHtml(5, 'PM Controls')}
     <div class="section-title">Govern \u2014 CSF outcomes, then PM controls</div>
-    <div class="section-subtitle">The Information Security Policy is the Govern (GV) policy. Review the official CSF 2.0 GV categories and subcategories, then select the 800-53 Program Management controls that implement them. This is orientation, not a second baseline picker.</div>
+    <div class="section-subtitle">CSF subcategories are the primary choice. The Information Security Policy is the Govern (GV) policy. Select or deselect official GV outcomes, then review the 800-53 Program Management controls that implement them.</div>
     ${governHtml}
 
     <div class="section-title" style="font-size:16px;margin-top:8px;">Select Program Management (PM) Controls</div>
-    <div class="section-subtitle">PM controls are organization-wide and apply regardless of impact level. Review and select which controls your program will adopt.</div>
+    <div class="section-subtitle">PM controls are the 800-53 implementations of the Govern outcomes above. Rows that implement a currently selected subcategory are highlighted. CORE PM-1, PM-2, and PM-9 stay on as the program foundation even if their mapped outcome is cleared.</div>
 
     <div class="info-alert">
       <div class="ia-icon">ℹ️</div>
-      <div class="ia-text"><strong>PM-1, PM-2, and PM-9 are pre-selected</strong> as they form the foundation of any security program. All other PM controls are optional — select those applicable to your organization. PM controls are organization-wide and apply regardless of impact level.${state.privacyOverlay ? ` <strong style="color:#6366f1;">Privacy overlay is active:</strong> PM-18 through PM-${state.baseline==='H'?'28':state.baseline==='M'?'25':'20(1)'} are also pre-selected — these support the privacy program plan, leadership, disclosures, and PII governance requirements appropriate for the ${state.baseline==='H'?'High':state.baseline==='M'?'Moderate':'Low'} common-control floor. Policy requirements for these controls are automatically added to your Tier 1 policy in Step 6.` : ''}</div>
+      <div class="ia-text"><strong>PM-1, PM-2, and PM-9 are pre-selected</strong> as they form the foundation of any security program. Clearing a mapped CSF outcome will not uncheck these CORE controls. All other PM controls follow the CSF selection when they have an official map entry \u2014 you can still check extras. PM controls are organization-wide and apply regardless of impact level.${state.privacyOverlay ? ` <strong style="color:#6366f1;">Privacy overlay is active:</strong> PM-18 through PM-${state.baseline==='H'?'28':state.baseline==='M'?'25':'20(1)'} are also pre-selected — these support the privacy program plan, leadership, disclosures, and PII governance requirements appropriate for the ${state.baseline==='H'?'High':state.baseline==='M'?'Moderate':'Low'} common-control floor. Policy requirements for these controls are automatically added to your Tier 1 policy in Step 6.` : ''}</div>
     </div>
 
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; gap:12px; flex-wrap:wrap;">
       <strong style="font-size:14px;">Core PM Controls (All Baselines)</strong>
-      <div>
+      <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+        <label class="cb-label" style="font-size:12px;font-weight:500;">
+          <input type="checkbox" ${showMappedOnly ? 'checked' : ''}
+            onchange="state._pmShowCsfMappedOnly=this.checked; setTimeout(function(){ renderCISOStep2(); }, 0)"
+            style="accent-color:var(--teal);">
+          Mapped to selected CSF
+        </label>
         <button class="btn btn-secondary btn-sm" onclick="selectAllPM(true)">Select All</button>
-        <button class="btn btn-secondary btn-sm" onclick="selectAllPM(false)" style="margin-left:6px;">Deselect All</button>
+        <button class="btn btn-secondary btn-sm" onclick="selectAllPM(false)">Deselect All</button>
       </div>
     </div>
     <div class="table-scroll" style="margin-bottom:20px;">
@@ -1758,8 +1782,21 @@ function renderCISOStep2() {
 }
 
 function selectAllPM(val) {
-  CONTROLS.filter(c=>c.f==='PM').forEach(c => state.pmControls[c.id]=val);
-  renderCISOStep2();
+  CONTROLS.filter(c=>c.f==='PM').forEach(c => {
+    state.pmControls[c.id]=val;
+    if (state.csfAutoPmControls) state.csfAutoPmControls[c.id] = false;
+  });
+  if (typeof markDirty === 'function') markDirty();
+  setTimeout(function() { renderCISOStep2(); }, 0);
+}
+
+function setPmControlSelected(id, checked) {
+  if (!state.pmControls) state.pmControls = {};
+  if (!state.csfAutoPmControls) state.csfAutoPmControls = {};
+  state.pmControls[id] = !!checked;
+  state.csfAutoPmControls[id] = false;
+  if (typeof markDirty === 'function') markDirty();
+  setTimeout(function() { renderCISOStep2(); }, 0);
 }
 
 // ============================================================

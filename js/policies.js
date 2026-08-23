@@ -2276,7 +2276,7 @@ function renderPolicyStep2() {
     <div style="margin-bottom:12px;">
       <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:4px;">${allBadgesHtml2}</div>
       <div style="font-size:16px; font-weight:700; color:var(--navy);">${escapeHTML(mergedTitle)} — Controls</div>
-      <div style="font-size:13px; color:var(--text-muted);">${baselineControls.length} in the ${state.baseline==='L'?'Low':state.baseline==='M'?'Moderate':'High'} common-control floor${state.privacyOverlay?' + Privacy':''}. ${allFamControls.length - baselineControls.length > 0 ? (allFamControls.length - baselineControls.length) + ' additional controls available.' : ''} Low / Moderate / High for a system is chosen under FIPS 199 in Assets &amp; SSP. CSF tags are official map entries only \u2014 unmapped means this program has no 800-53 \u2192 subcategory token.</div>
+      <div style="font-size:13px; color:var(--text-muted);">${baselineControls.length} in the ${state.baseline==='L'?'Low':state.baseline==='M'?'Moderate':'High'} common-control floor${state.privacyOverlay?' + Privacy':''}. ${allFamControls.length - baselineControls.length > 0 ? (allFamControls.length - baselineControls.length) + ' additional controls available.' : ''} Low / Moderate / High for a system is chosen under FIPS 199 in Assets &amp; SSP. Select CSF outcomes in the list below; CSF tags on controls are official map entries only \u2014 unmapped means this program has no 800-53 \u2192 subcategory token.</div>
     </div>
     ${policyFnHtml}
     <div class="filter-bar" style="margin-bottom:12px;">

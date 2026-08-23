@@ -1130,6 +1130,8 @@ const state = {
   cisoIsISSM: false,        // step 1 "this person also owns domain policies" (legacy key name)
   domainOwnerDefaultApplied: false, // the cisoIsISSM default has been written to domainOwners once
   pmControls: {},           // { 'PM-1': true, ... }
+  csfSelectedSubcats: {},   // { 'GV.OC-01': true, ... } CSF 2.0 subcategory selection (primary)
+  csfAutoPmControls: {},    // { 'PM-5': true } PM turned on by CSF cascade (safe to auto-clear)
   domainOwners: {},         // { 'AC': { name, email, role }, ... }
   policyDeadlines: {},      // { 'AC': '2026-06-01', ... }
   policyStatus: {},         // { 'AC': { status, version, notes, lastUpdated } }
@@ -1192,6 +1194,7 @@ const state = {
   policyPriorities: {},          // { 'AC': 'now'|'soon'|'later' }
   domainDeadlines: {},           // { 'AC': 'YYYY-MM-DD' } per-domain deadline overrides
   domainCustomNames: {},         // { 'AC': 'Custom Policy Name' } user-defined policy titles
+  _pmShowCsfMappedOnly: false,   // Step 5 PM table: hide PMs not mapped to selected CSF (and not selected)
   _policyDomain: null,           // currently active domain in Policy tab
   _policyWizardMode: false,      // true = wizard open, false = domain list
   _policyDocView: false,         // true = show read-only policy document viewer

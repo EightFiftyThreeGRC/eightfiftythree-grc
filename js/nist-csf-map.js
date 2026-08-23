@@ -393,6 +393,161 @@ function getCsfExplicitPmControlsForCategory(catId) {
   return out;
 }
 
+var CSF_CORE_PM_IDS = ['PM-1', 'PM-2', 'PM-9'];
+
+function isCsfCorePm(id) {
+  return CSF_CORE_PM_IDS.indexOf(id) !== -1;
+}
+
+function getCsfSubcategoryIdsForFunction(fnId) {
+  var out = [];
+  getCsfCategoriesForFunction(fnId).forEach(function(cat) {
+    getCsfSubcategoryIdsForCategory(cat.id).forEach(function(id) { out.push(id); });
+  });
+  return out;
+}
+
+function getCsfExplicitPmControlsForSubcategory(subId) {
+  var sid = String(subId || '');
+  if (!sid) return [];
+  var out = [];
+  var seen = {};
+  Object.keys(NIST_CSF_MAP).forEach(function(id) {
+    if (id.indexOf('PM-') !== 0) return;
+    getCsfExplicitMappingsForControl(id).forEach(function(m) {
+      if (m.sub === sid && !seen[id]) {
+        seen[id] = true;
+        out.push(id);
+      }
+    });
+  });
+  out.sort();
+  return out;
+}
+
+function isCsfStateMap(v) {
+  return !!v && typeof v === 'object' && !Array.isArray(v);
+}
+
+function ensureCsfSelectedSubcatsState() {
+  if (typeof state === 'undefined' || !state) return false;
+  if (!isCsfStateMap(state.csfSelectedSubcats)) state.csfSelectedSubcats = {};
+  if (!isCsfStateMap(state.csfAutoPmControls)) state.csfAutoPmControls = {};
+  if (!isCsfStateMap(state.pmControls)) state.pmControls = {};
+  return true;
+}
+
+function isCsfSubcatSelected(subId) {
+  if (!ensureCsfSelectedSubcatsState()) return false;
+  return !!state.csfSelectedSubcats[subId];
+}
+
+function ensureCsfSubcatsSeeded(fnId) {
+  if (!ensureCsfSelectedSubcatsState()) return false;
+  var ids = getCsfSubcategoryIdsForFunction(fnId);
+  if (!ids.length) return false;
+  var anySet = ids.some(function(id) { return state.csfSelectedSubcats[id] !== undefined; });
+  if (anySet) return false;
+  ids.forEach(function(id) { state.csfSelectedSubcats[id] = true; });
+  ids.forEach(function(id) { applyCsfPmCascadeFromSub(id, true); });
+  if (typeof markDirty === 'function') markDirty();
+  return true;
+}
+
+function getCsfSelectedSubIds() {
+  if (!ensureCsfSelectedSubcatsState()) return [];
+  return Object.keys(CSF_SUBCATEGORIES).filter(function(id) {
+    return !!state.csfSelectedSubcats[id];
+  });
+}
+
+function getCsfPmIdsForSelectedSubs() {
+  var set = {};
+  getCsfSelectedSubIds().forEach(function(sub) {
+    getCsfExplicitPmControlsForSubcategory(sub).forEach(function(pm) { set[pm] = true; });
+  });
+  return set;
+}
+
+function getCsfSelectedSubsForPm(pmId) {
+  if (!ensureCsfSelectedSubcatsState()) return [];
+  return getCsfExplicitMappingsForControl(pmId).filter(function(m) {
+    return m.sub && !!state.csfSelectedSubcats[m.sub];
+  }).map(function(m) { return m.sub; });
+}
+
+function applyCsfPmCascadeFromSub(subId, nowSelected) {
+  if (!ensureCsfSelectedSubcatsState()) return;
+  var pms = getCsfExplicitPmControlsForSubcategory(subId);
+  if (!pms.length) return;
+  if (nowSelected) {
+    pms.forEach(function(id) {
+      if (!state.pmControls[id]) {
+        state.pmControls[id] = true;
+        state.csfAutoPmControls[id] = true;
+      }
+    });
+    return;
+  }
+  pms.forEach(function(id) {
+    if (isCsfCorePm(id)) return;
+    if (!state.csfAutoPmControls[id]) return;
+    var stillNeeded = getCsfExplicitMappingsForControl(id).some(function(m) {
+      return m.sub && !!state.csfSelectedSubcats[m.sub];
+    });
+    if (stillNeeded) return;
+    state.pmControls[id] = false;
+    state.csfAutoPmControls[id] = false;
+  });
+}
+
+function toggleCsfSubcat(subId, checked) {
+  if (!ensureCsfSelectedSubcatsState()) return;
+  var sid = String(subId || '');
+  if (!CSF_SUBCATEGORIES[sid]) return;
+  state.csfSelectedSubcats[sid] = !!checked;
+  applyCsfPmCascadeFromSub(sid, !!checked);
+  if (typeof markDirty === 'function') markDirty();
+  setTimeout(function() { refreshCsfSelectionUi(); }, 0);
+}
+
+function setCsfCategorySubcats(catId, selected) {
+  if (!ensureCsfSelectedSubcatsState()) return;
+  selected = !!selected;
+  var ids = getCsfSubcategoryIdsForCategory(catId);
+  ids.forEach(function(id) {
+    var was = !!state.csfSelectedSubcats[id];
+    if (was === selected) return;
+    state.csfSelectedSubcats[id] = selected;
+    applyCsfPmCascadeFromSub(id, selected);
+  });
+  if (typeof markDirty === 'function') markDirty();
+  setTimeout(function() { refreshCsfSelectionUi(); }, 0);
+}
+
+function refreshCsfSelectionUi() {
+  var cisoTab = document.getElementById('tab-ciso');
+  var policyTab = document.getElementById('tab-policy');
+  var cisoOn = cisoTab && cisoTab.classList.contains('active');
+  var policyOn = policyTab && policyTab.classList.contains('active');
+  var step = (typeof currentStep !== 'undefined') ? currentStep : {};
+  if (cisoOn && step.ciso === 5 && typeof renderCISOStep2 === 'function') {
+    renderCISOStep2();
+    return;
+  }
+  if (cisoOn && step.ciso === 6 && typeof renderCISOStep3 === 'function') {
+    renderCISOStep3();
+    return;
+  }
+  if (policyOn && state && state._ispRevisionView && typeof renderCISOStep3 === 'function') {
+    renderCISOStep3();
+    return;
+  }
+  if (policyOn && typeof renderPolicyStep === 'function') {
+    renderPolicyStep(step.policy || 1);
+  }
+}
+
 function renderCsfExplicitTagsHtml(ctrlId) {
   if (typeof escapeHTML !== 'function') return '';
   var maps = getCsfExplicitMappingsForControl(ctrlId);
@@ -413,52 +568,79 @@ function renderCsfFunctionOrientationHtml(fnId, opts) {
   var fn = String(fnId || '').toUpperCase();
   var meta = CSF_FUNCTIONS[fn];
   if (!meta) return '';
+  ensureCsfSubcatsSeeded(fn);
   var compact = !!opts.compact;
+  var showMappedPm = fn === 'GV' && opts.showMappedPm !== false;
   var cats = getCsfCategoriesForFunction(fn);
+  var allIds = getCsfSubcategoryIdsForFunction(fn);
+  var selectedCount = allIds.filter(function(id) { return isCsfSubcatSelected(id); }).length;
   var leads = {
-    GV: 'Official GV categories and subcategories. The Information Security Policy is the Govern policy; PM controls implement these outcomes.',
-    ID: 'Official Identify categories and subcategories. 800-53 controls in this Function policy implement these outcomes.',
-    PR: 'Official Protect categories and subcategories. 800-53 controls in this Function policy implement these outcomes.',
-    DE: 'Official Detect categories and subcategories. 800-53 controls in this Function policy implement these outcomes.',
-    RS: 'Official Respond categories and subcategories. 800-53 controls in this Function policy implement these outcomes.',
-    RC: 'Official Recover categories and subcategories. 800-53 controls in this Function policy implement these outcomes.'
+    GV: 'Select the Govern outcomes this program will implement. All GV subcategories start selected (Govern is the ISP floor). PM controls below are the 800-53 implementations \u2014 checking an outcome selects mapped PMs.',
+    ID: 'Select the Identify outcomes this Function policy will implement. Subcategories start selected; deselect any that are out of scope. 800-53 controls in this policy implement the checked outcomes.',
+    PR: 'Select the Protect outcomes this Function policy will implement. Subcategories start selected; deselect any that are out of scope. 800-53 controls in this policy implement the checked outcomes.',
+    DE: 'Select the Detect outcomes this Function policy will implement. Subcategories start selected; deselect any that are out of scope. 800-53 controls in this policy implement the checked outcomes.',
+    RS: 'Select the Respond outcomes this Function policy will implement. Subcategories start selected; deselect any that are out of scope. 800-53 controls in this policy implement the checked outcomes.',
+    RC: 'Select the Recover outcomes this Function policy will implement. Subcategories start selected; deselect any that are out of scope. 800-53 controls in this policy implement the checked outcomes.'
   };
-  var lead = opts.lead || leads[fn] || ('Official ' + meta.name + ' categories and subcategories.');
-  var cards = cats.map(function(cat) {
+  var lead = opts.lead || leads[fn] || ('Select ' + meta.name + ' outcomes. Subcategories start selected.');
+  function escAttr(id) {
+    return String(id || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  }
+  var colCount = showMappedPm ? 4 : 3;
+  var rows = cats.map(function(cat) {
     var hid = 'csf-fn-' + String(cat.id || '').replace(/\./g, '-');
     var subs = getCsfSubcategoryIdsForCategory(cat.id);
-    var subHtml = compact
-      ? '<div class="csf-gv-subids">' + subs.map(function(sid) {
-          return '<span class="csf-gv-sub-id">' + escapeHTML(sid) + '</span>';
-        }).join('') + '</div>'
-      : '<ul class="csf-gv-subs">' + subs.map(function(sid) {
-          return '<li class="csf-gv-sub"><span class="csf-gv-sub-id">' + escapeHTML(sid) + '</span>'
-            + '<span class="csf-gv-sub-name">' + escapeHTML(CSF_SUBCATEGORIES[sid] || '') + '</span></li>';
-        }).join('') + '</ul>';
-    var relatedHtml = '';
-    if (fn === 'GV' && opts.showMappedPm !== false) {
-      var related = getCsfExplicitPmControlsForCategory(cat.id);
-      if (related.length) {
-        relatedHtml = '<div class="csf-gv-related">Mapped PM '
-          + related.map(function(id) {
-            return '<span class="csf-tag csf-fn-gv">' + escapeHTML(id) + '</span>';
-          }).join('')
-          + '</div>';
-      }
-    }
-    return '<section class="csf-gv-cat" aria-labelledby="' + hid + '">'
+    var catEsc = escAttr(cat.id);
+    var head = '<tr class="csf-sub-catrow">'
+      + '<td colspan="' + colCount + '">'
+      + '<div class="csf-sub-cathead">'
       + '<h3 class="csf-gv-cat-head" id="' + hid + '">'
-      + '<span class="csf-fn-code">' + escapeHTML(cat.id) + '</span>'
+      + '<span class="csf-fn-code">' + escapeHTML(cat.id) + '</span> '
       + '<span class="csf-gv-cat-name">' + escapeHTML(cat.name) + '</span></h3>'
-      + subHtml
-      + relatedHtml
-      + '</section>';
+      + '<span class="csf-sub-catactions">'
+      + '<button type="button" class="btn btn-secondary btn-sm" onclick="setCsfCategorySubcats(\'' + catEsc + '\', true)">All</button>'
+      + '<button type="button" class="btn btn-secondary btn-sm" onclick="setCsfCategorySubcats(\'' + catEsc + '\', false)">None</button>'
+      + '</span></div></td></tr>';
+    var body = subs.map(function(sid) {
+      var checked = isCsfSubcatSelected(sid) ? ' checked' : '';
+      var sidEsc = escAttr(sid);
+      var mappedHtml = '';
+      if (showMappedPm) {
+        var pms = getCsfExplicitPmControlsForSubcategory(sid);
+        mappedHtml = '<td class="csf-sub-maps">'
+          + (pms.length
+            ? pms.map(function(id) {
+                return '<span class="csf-tag csf-fn-gv">' + escapeHTML(id) + '</span>';
+              }).join('')
+            : '<span class="csf-sub-maps-empty">\u2014</span>')
+          + '</td>';
+      }
+      return '<tr class="csf-sub-row' + (checked ? ' is-selected' : '') + '">'
+        + '<td><label class="cb-label"><input type="checkbox"' + checked
+        + ' onchange="toggleCsfSubcat(\'' + sidEsc + '\', this.checked)"'
+        + ' style="accent-color:var(--teal);" aria-label="' + escapeHTML(sid) + '"></label></td>'
+        + '<td><span class="csf-gv-sub-id">' + escapeHTML(sid) + '</span></td>'
+        + '<td class="csf-sub-name">' + escapeHTML(CSF_SUBCATEGORIES[sid] || '') + '</td>'
+        + mappedHtml
+        + '</tr>';
+    }).join('');
+    return head + body;
   }).join('');
   var cls = 'csf-fn-orient csf-fn-' + fn.toLowerCase() + (fn === 'GV' ? ' csf-gv-orient' : '') + (compact ? ' csf-fn-orient--compact' : '');
-  return '<div class="' + cls + '" role="region" aria-label="NIST CSF 2.0 ' + escapeHTML(meta.name) + ' categories">'
+  return '<div class="' + cls + '" role="region" aria-label="NIST CSF 2.0 ' + escapeHTML(meta.name) + ' outcomes">'
     + '<div class="csf-gv-orient-kicker">NIST CSF 2.0 \u00b7 ' + escapeHTML(meta.name) + ' (' + fn + ')</div>'
     + '<p class="csf-gv-orient-lead">' + escapeHTML(lead) + '</p>'
-    + '<div class="csf-gv-grid">' + cards + '</div>'
+    + '<div class="csf-sub-toolbar"><span class="csf-sub-count">' + selectedCount + ' of ' + allIds.length + ' selected</span></div>'
+    + '<div class="table-scroll">'
+    + '<table class="control-table csf-sub-table">'
+    + '<thead><tr>'
+    + '<th style="width:44px;"></th>'
+    + '<th style="width:110px;">ID</th>'
+    + '<th>Outcome</th>'
+    + (showMappedPm ? '<th style="width:96px;">Maps to</th>' : '')
+    + '</tr></thead>'
+    + '<tbody>' + rows + '</tbody>'
+    + '</table></div>'
     + '</div>';
 }
 

@@ -3862,14 +3862,6 @@
       border-color: var(--hairline);
       font-weight: 600;
     }
-    .csf-gv-subids {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 4px 6px;
-    }
-    .csf-fn-orient--compact { padding: 12px 14px 10px; margin-bottom: 16px; }
-    .csf-fn-orient--compact .csf-gv-orient-lead { margin-bottom: 8px; }
-    .csf-fn-orient--compact .csf-gv-cat { padding: 8px 10px; }
     .csf-ctrl-map {
       background: var(--ink-0);
       border: 1px solid var(--hairline);
@@ -3929,16 +3921,55 @@
       max-width: 720px;
       margin: 0 0 12px;
     }
-    .csf-gv-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px 14px;
+    .csf-sub-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      margin: 0 0 8px;
     }
-    .csf-gv-cat {
-      border: 1px solid var(--hairline);
-      border-radius: var(--radius-md);
-      padding: 10px 12px;
-      background: var(--ink-0);
+    .csf-sub-count {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+    .csf-sub-table { margin-top: 0; }
+    .csf-sub-table .csf-sub-catrow td {
+      background: var(--ink-1);
+      padding: 8px 14px;
+      border-bottom: 1px solid var(--hairline);
+    }
+    .csf-sub-cathead {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .csf-sub-table .csf-gv-cat-head {
+      margin: 0;
+      font-size: 13px;
+    }
+    .csf-sub-catactions { display: flex; gap: 6px; }
+    .csf-sub-catactions .btn-sm { padding: 2px 8px; font-size: 11px; }
+    .csf-sub-row td { vertical-align: top; }
+    .csf-sub-name { font-size: 12px; line-height: 1.4; color: var(--ink-7); }
+    .csf-sub-maps { white-space: nowrap; }
+    .csf-sub-maps-empty { color: var(--text-muted); }
+    .csf-fn-orient--compact { padding: 12px 14px 10px; margin-bottom: 16px; }
+    .csf-fn-orient--compact .csf-gv-orient-lead { margin-bottom: 8px; }
+    .csf-fn-orient--compact .csf-sub-table td { padding: 6px 10px; }
+    .csf-fn-orient--compact .csf-sub-name { font-size: 11px; }
+    tr.csf-pm-mapped td { box-shadow: inset 3px 0 0 #5b4b8a; }
+    .csf-pm-impl {
+      font-size: 11px;
+      color: #5b4b8a;
+      font-weight: 600;
+      margin-top: 4px;
+    }
+    .csf-pm-held-note {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 4px;
     }
     .csf-gv-cat-head {
       display: flex;
@@ -3950,37 +3981,11 @@
       color: var(--navy);
     }
     .csf-gv-cat-name { font-weight: 600; }
-    .csf-gv-subs {
-      list-style: none;
-      margin: 0;
-      padding: 0;
-    }
-    .csf-gv-sub {
-      display: grid;
-      grid-template-columns: 78px minmax(0, 1fr);
-      gap: 8px;
-      font-size: 11px;
-      line-height: 1.4;
-      color: var(--ink-7);
-      margin: 0 0 3px;
-    }
     .csf-gv-sub-id {
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
       font-weight: 700;
       color: #5b4b8a;
       font-size: 10px;
-    }
-    .csf-gv-related {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      flex-wrap: wrap;
-      margin-top: 6px;
-      font-size: 11px;
-      color: var(--text-muted);
-    }
-    @media (max-width: 800px) {
-      .csf-gv-grid { grid-template-columns: 1fr; }
     }
 
     @keyframes step-in {
