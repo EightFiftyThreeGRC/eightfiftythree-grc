@@ -609,6 +609,12 @@ function renderPolicyBoardCardHtml(d, opts) {
   var fnBits = (d.fnIds || []).map(function(fn) {
     return '<span class="pgb-fn csf-fn-' + String(fn).toLowerCase() + '">' + esc(fn) + ' ' + esc(policyBoardFnName(fn)) + '</span>';
   }).join('');
+  var catBits = (d.fnIds || []).map(function(fn) {
+    var cats = (typeof getCsfCategoriesForFunction === 'function') ? getCsfCategoriesForFunction(fn) : [];
+    return cats.map(function(cat) {
+      return '<span class="csf-tag csf-fn-' + String(fn).toLowerCase() + '" title="' + esc(cat.name) + '">' + esc(cat.id) + '</span>';
+    }).join('');
+  }).join('');
   var canMoveChip = !!(opts.canMoveChip);
   var chips = (d.families || []).map(function(f) { return renderPolicyBoardChipHtml(f, canMoveChip); }).join('');
   if (!chips && d.empty) {
@@ -635,7 +641,9 @@ function renderPolicyBoardCardHtml(d, opts) {
     + (opts.mapped ? ' pgb-card-mapped' : '') + '" data-pgb-slot="' + esc(d.slot) + '" data-pgb-master="' + esc(d.master || '') + '">'
     + '<div class="pgb-card-head"' + handleAttrs + '>'
     + '<div class="pgb-card-head-main"><div class="pgb-card-title">' + esc(d.title) + '</div>'
-    + '<div class="pgb-fn-row">' + fnBits + '</div></div>'
+    + '<div class="pgb-fn-row">' + fnBits + '</div>'
+    + (catBits ? '<div class="pgb-cat-row">' + catBits + '</div>' : '')
+    + '</div>'
     + '<div class="pgb-card-head-actions">' + mergeBtn + splitBtns + (opts.statusHtml || '') + '</div>'
     + '</div>'
     + rename

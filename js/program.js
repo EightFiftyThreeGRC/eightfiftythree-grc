@@ -1691,6 +1691,7 @@ function renderCISOStep2() {
     const isRequired = PM_BASE.includes(c.id);
     const isPrivacyDefault = getPrivacyPMDefaults().includes(c.id);
     const rowBg = isRequired ? 'background:rgba(13,148,136,0.04);' : isPrivacyDefault ? 'background:rgba(99,102,241,0.04);' : '';
+    const csfTags = (typeof renderCsfExplicitTagsHtml === 'function') ? renderCsfExplicitTagsHtml(c.id) : '';
     return `
     <tr style="${rowBg}">
       <td style="vertical-align:top; padding-top:12px;">
@@ -1704,14 +1705,21 @@ function renderCISOStep2() {
         </label>
       </td>
       <td>
-        <div style="font-weight:600;font-size:13px;">${c.n}</div>
+        <div style="font-weight:600;font-size:13px;">${c.n}${csfTags ? ' ' + csfTags : ''}</div>
         <div style="font-size:12px;color:var(--text-muted);margin-top:2px;line-height:1.4;">${PM_STATEMENTS[c.id]||''}</div>
       </td>
     </tr>`;
   };
 
+  var governHtml = (typeof renderCsfGovernOrientationHtml === 'function') ? renderCsfGovernOrientationHtml() : '';
+
   body.innerHTML = `
-    <div class="section-title">Select Program Management (PM) Controls</div>
+    ${cisoStepProgressHtml(5, 'PM Controls')}
+    <div class="section-title">Govern \u2014 CSF outcomes, then PM controls</div>
+    <div class="section-subtitle">The Information Security Policy is the Govern (GV) policy. Review the official CSF 2.0 GV categories and subcategories, then select the 800-53 Program Management controls that implement them. This is orientation, not a second baseline picker.</div>
+    ${governHtml}
+
+    <div class="section-title" style="font-size:16px;margin-top:8px;">Select Program Management (PM) Controls</div>
     <div class="section-subtitle">PM controls are organization-wide and apply regardless of impact level. Review and select which controls your program will adopt.</div>
 
     <div class="info-alert">
@@ -2037,9 +2045,13 @@ function renderISPEditorBody(body, opts) {
     return `<div class="isp-section" data-section-idx="${si}" ${dragAttr} style="margin-bottom:28px;padding:4px;border-radius:6px;transition:background 0.15s;">${hdr}${content}</div>`;
   }).join('');
 
+  var ispGovernHtml = (typeof renderCsfGovernOrientationHtml === 'function')
+    ? renderCsfGovernOrientationHtml({ showMappedPm: true })
+    : '';
   body.innerHTML = (isRevision ? buildISPRevisionBannerHtml() : '')
     + (isRevision ? '' : ('<div class="section-title">' + escapeHTML((isp.title || '').trim() || getDefaultISPTitle()) + '</div>'
-      + '<div class="section-subtitle">Review and edit your organization\'s overall security policy here. The domain policies your teams write later should line up with this document.</div>'))
+      + '<div class="section-subtitle">This is the Govern (GV) policy. Review and edit it here. Domain Function policies later implement Identify, Protect, Detect, Respond, and Recover.</div>'))
+    + ispGovernHtml
     + `
     <div style="border:1px solid var(--border);border-radius:12px;padding:16px 20px;margin-bottom:20px;background:white;">
       <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Policy title</div>

@@ -173,7 +173,9 @@ function renderControlLibraryView() {
       var deselBaseline = cs.deselectDecision === 'Approved' && inActiveBaseline(c);
       return '<tr class="' + (deselBaseline ? 'tr-deselected-baseline ' : '') + 'control-lib-row" style="cursor:pointer;" onclick="openControlFromLibrary(\'' + c.id.replace(/'/g,"\\'") + '\')">'
         + '<td><span class="control-id">' + c.id + '</span></td>'
-        + '<td style="font-size:12px;color:var(--navy);">' + escapeHTML(c.n) + '</td>'
+        + '<td style="font-size:12px;color:var(--navy);">' + escapeHTML(c.n)
+        + (typeof renderCsfTagsHtml === 'function' ? ' ' + renderCsfTagsHtml(c.id, { compact: true }) : '')
+        + '</td>'
         + '<td style="font-size:12px;color:var(--text-muted);">' + escapeHTML(owner.name || 'Unassigned') + '</td>'
         + '<td>' + chipHTML(cs.status || 'Not Started') + '</td>'
         + '<td style="font-size:11px;color:var(--text-muted);">' + (cov.length ? escapeHTML(cov.slice(0, 2).join(' · ')) + (cov.length > 2 ? ' +' + (cov.length - 2) : '') : 'Not scoped') + '</td>'
@@ -232,7 +234,9 @@ function renderPublishedControlLibrary(bodyEl) {
             var escId = c.id.replace(/'/g, "\\'");
             return '<tr class="control-lib-row" style="cursor:pointer;" onclick="openControlLibraryReadOnly(\'' + escId + '\')">'
               + '<td><span class="control-id">' + escapeHTML(c.id) + '</span></td>'
-              + '<td style="font-size:12px;color:var(--navy);">' + escapeHTML(c.n) + '</td>'
+              + '<td style="font-size:12px;color:var(--navy);">' + escapeHTML(c.n)
+              + (typeof renderCsfTagsHtml === 'function' ? ' ' + renderCsfTagsHtml(c.id, { compact: true }) : '')
+              + '</td>'
               + '<td style="font-size:12px;color:var(--text-muted);">' + escapeHTML(owner.name || 'Unassigned') + '</td>'
               + '<td>' + chipHTML(cs.status || 'Not Started') + '</td>'
               + '<td style="font-size:11px;color:var(--text-muted);">' + (cov.length ? escapeHTML(cov.slice(0, 2).join(' · ')) + (cov.length > 2 ? ' +' + (cov.length - 2) : '') : 'Not scoped') + '</td>'
@@ -605,7 +609,7 @@ function renderControlStep1() {
             const deselBaseline = cs.deselectDecision === 'Approved' && c.bl && (c.bl.includes(state.baseline) || (state.privacyOverlay && c.bl.includes('P')));
             return `<tr data-id="${c.id}" data-name="${nameAttr}" data-family="${c.f}" data-status="${st}" data-owner="${escapeHTML(ownerKey)}" data-designed="${designed ? '1' : '0'}" data-deselected="${deselBaseline?'1':'0'}" class="${deselBaseline?'tr-deselected-baseline':''}" style="cursor:pointer;" onmouseover="this.style.background='rgba(13,148,136,0.04)'" onmouseout="this.style.background=''" onclick="goToControlDetail('${cid}')">
               <td><span class="control-id">${c.id}</span></td>
-              <td style="font-size:13px;">${c.n}</td>
+              <td style="font-size:13px;">${c.n}${typeof renderCsfTagsHtml === 'function' ? ' ' + renderCsfTagsHtml(c.id, { compact: true }) : ''}</td>
               <td><span class="family-badge">${c.f}</span></td>
               <td style="font-size:12px;color:${typeof hasRealControlOwner === 'function' && hasRealControlOwner(co) ? 'var(--navy)' : 'var(--text-muted)'};font-style:${typeof hasRealControlOwner === 'function' && hasRealControlOwner(co) ? 'normal' : 'italic'};">${escapeHTML(typeof getControlOwnerDisplayName === 'function' ? getControlOwnerDisplayName(co) : ownerName)}</td>
               <td style="font-size:12px;font-weight:700;color:${designed ? '#166534' : 'var(--text-muted)'};">${designed ? 'Yes' : 'No'}</td>
@@ -2626,6 +2630,8 @@ function renderControlDetailForm(ctrl) {
         </div>
       </div>
     </div>
+
+    ${typeof renderCsfControlMapHtml === 'function' ? renderCsfControlMapHtml(ctrl.id) : ''}
 
     <!-- ② Design Requirements Context -->
     <div style="background:#fafbff;border:2px solid var(--navy);border-radius:10px;padding:18px 20px;margin-bottom:20px;">

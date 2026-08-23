@@ -1061,6 +1061,17 @@ function renderPolicyList(bodyEl) {
           + '</div>'
           : '')
         + '<div style="font-weight:700; font-size:14px; color:var(--navy); margin-bottom:2px;">' + escapeHTML(mergedTitle) + '</div>'
+        + (function() {
+            var pfn = (typeof getCsfPolicyFunctionForFamily === 'function') ? getCsfPolicyFunctionForFamily(masterFam) : '';
+            if (!pfn || typeof getCsfCategoriesForFunction !== 'function') return '';
+            var cats = getCsfCategoriesForFunction(pfn);
+            if (!cats.length) return '';
+            return '<div class="pgb-cat-row" style="margin:0 0 8px;">'
+              + cats.map(function(cat) {
+                  return '<span class="csf-tag csf-fn-' + pfn.toLowerCase() + '">' + escapeHTML(cat.id) + '</span>';
+                }).join('')
+              + '</div>';
+          })()
         + '<div style="font-size:11px; color:var(--text-muted); margin-bottom:10px;">' + ctrlCount + ' controls in common-control floor'
         + (custodian ? ' \u00B7 Custodian: ' + escapeHTML(custodian) : '') + '</div>'
         + actionBtn
@@ -2258,12 +2269,16 @@ function renderPolicyStep2() {
   const allBadgesHtml2 = allFams.map(function(f){
     return '<span class="family-badge" style="font-size:11px;padding:2px 6px;">' + f + '</span>';
   }).join(' ');
+  var policyFnHtml = (typeof renderCsfPolicyOrientationHtml === 'function')
+    ? renderCsfPolicyOrientationHtml(fam)
+    : '';
   if (body) body.innerHTML = `
     <div style="margin-bottom:12px;">
       <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:4px;">${allBadgesHtml2}</div>
       <div style="font-size:16px; font-weight:700; color:var(--navy);">${escapeHTML(mergedTitle)} — Controls</div>
-      <div style="font-size:13px; color:var(--text-muted);">${baselineControls.length} in the ${state.baseline==='L'?'Low':state.baseline==='M'?'Moderate':'High'} common-control floor${state.privacyOverlay?' + Privacy':''}. ${allFamControls.length - baselineControls.length > 0 ? (allFamControls.length - baselineControls.length) + ' additional controls available.' : ''} Low / Moderate / High for a system is chosen under FIPS 199 in Assets &amp; SSP.</div>
+      <div style="font-size:13px; color:var(--text-muted);">${baselineControls.length} in the ${state.baseline==='L'?'Low':state.baseline==='M'?'Moderate':'High'} common-control floor${state.privacyOverlay?' + Privacy':''}. ${allFamControls.length - baselineControls.length > 0 ? (allFamControls.length - baselineControls.length) + ' additional controls available.' : ''} Low / Moderate / High for a system is chosen under FIPS 199 in Assets &amp; SSP. CSF tags are official map entries only \u2014 unmapped means this program has no 800-53 \u2192 subcategory token.</div>
     </div>
+    ${policyFnHtml}
     <div class="filter-bar" style="margin-bottom:12px;">
       <input type="text" id="ctrlFilter1" placeholder="Search controls\u2026" style="flex:1;" oninput="filterDomainControls()">
       <select id="ctrlBaselineFilter" onchange="filterDomainControls()">
@@ -3735,6 +3750,7 @@ function renderPolicyStep3() {
 
     // ── RIGHT: POLICY DOCUMENT ──────────────────────────────────
     '<div style="flex:1;overflow-y:auto;padding:24px 28px;">' +
+      ((typeof renderCsfPolicyOrientationHtml === 'function') ? renderCsfPolicyOrientationHtml(fam, { compact: true }) : '') +
 
       // Title bar
       '<div style="margin-bottom:20px;">' +
