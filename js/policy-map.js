@@ -12,14 +12,45 @@ var POLICY_MAP_DOC_TYPES = [
 var POLICY_MAP_CSF_FUNCTIONS = ['GV', 'ID', 'PR', 'DE', 'RS', 'RC'];
 
 function getResolvedProgramPath() {
+  if (typeof migrateUnifiedSetupPath === 'function') migrateUnifiedSetupPath();
   var p = state && state.programPath;
-  if (p === 'build' || p === 'map') return p;
+  if (p === 'map') return 'build';
+  if (p === 'build' || p === 'unified') return 'build';
   if (state && state.cisoComplete) return 'build';
   var started = !!(String((state && state.orgName) || '').trim()
     || String((state && state.programOwner) || '').trim()
     || (state && state.baseline));
   if (started) return 'build';
   return '';
+}
+
+/**
+ * Mid-wizard Path B programs join the one setup sequence. Catalog, merges,
+ * Function homes, and confirmation flags stay on state; only the fork is retired.
+ */
+function migrateUnifiedSetupPath() {
+  if (!state || state.programPath !== 'map') return;
+  var s = parseInt(state.policyMapStep, 10) || 1;
+  var dest = 1;
+  if (s <= 1) dest = 1;
+  else if (s === 2) dest = 2;
+  else if (s === 3) dest = 3;
+  else if (s === 4 || s === 5) dest = 6;
+  else if (s === 6) dest = 7;
+  else dest = 8;
+  state.cisoSetupStep = dest;
+  if (typeof currentStep !== 'undefined') currentStep.ciso = dest;
+  if ((state.policyCatalog || []).length) state.setupHasExistingPolicies = 'yes';
+  if (s >= 5 && typeof applyPolicyCatalogToProgram === 'function') {
+    try { applyPolicyCatalogToProgram(); } catch (e) { /* keep going */ }
+  }
+  state.programPath = 'build';
+  state.policyMapWizardRev = Math.max(parseInt(state.policyMapWizardRev, 10) || 0, 3);
+  if (typeof markDirty === 'function') markDirty();
+}
+
+function shouldRenderPolicyMapSetup() {
+  return false;
 }
 
 function getPolicyMapProgressSummary() {
@@ -48,10 +79,6 @@ function migratePolicyMapWizardRev() {
   }
   state.policyMapWizardRev = 2;
   if (typeof markDirty === 'function') markDirty();
-}
-
-function shouldRenderPolicyMapSetup() {
-  return getResolvedProgramPath() === 'map' && !state.cisoComplete;
 }
 
 function ensurePolicyCatalog() {
@@ -454,31 +481,21 @@ function applyPolicyCatalogToProgram() {
 }
 
 function chooseProgramPath(path) {
-  if (path !== 'build' && path !== 'map') return;
-  var prev = state.programPath;
-  if (prev && prev !== path) {
-    if (!window.confirm('Switch program path?\n\nMapping work is kept. Drafted ISP and domain policies are kept. Command Center and setup will follow the path you pick now.')) {
-      return;
-    }
-  }
-  state.programPath = path;
-  if (path === 'map') {
-    if (!state.policyMapStep) state.policyMapStep = 1;
-    policyMapEnsurePmDefaults();
-  }
+  // Legacy alias: both former paths now enter the one wizard.
+  if (path === 'map') state.setupHasExistingPolicies = 'yes';
+  else if (path === 'build' && !state.setupHasExistingPolicies) state.setupHasExistingPolicies = 'no';
+  state.programPath = 'build';
+  if (!state.cisoSetupStep) state.cisoSetupStep = 1;
   try {
-    addAuditEntry('program', null, path === 'map'
-      ? 'Program path chosen: Map what you have (catalog existing policies to NIST 800-53)'
-      : 'Program path chosen: Build from scratch (draft ISP and domain policies)');
+    addAuditEntry('program', null, 'Program setup started');
   } catch (e) { /* ignore */ }
   markDirty();
-  if (path === 'map') continuePolicyMapSetup();
-  else startProgramSetup();
+  if (typeof startProgramSetup === 'function') startProgramSetup();
+  else if (typeof showTab === 'function') showTab('ciso');
 }
 
 function promptSwitchProgramPath() {
-  var next = getResolvedProgramPath() === 'map' ? 'build' : 'map';
-  chooseProgramPath(next);
+  if (typeof startProgramSetup === 'function') startProgramSetup();
 }
 
 function continuePolicyMapSetup() {
@@ -627,7 +644,7 @@ function policyMapSyncStepNav() {
 
 function restorePathAStepNav() {
   var labels = (typeof CISO_STEP_LABELS !== 'undefined') ? CISO_STEP_LABELS
-    : ['Organization', 'Profile', 'Program', 'Reg mapping', 'PM Controls', 'InfoSec Policy', 'Consolidate', 'Assign Owners'];
+    : ['Organization', 'Profile', 'Program', 'Reg mapping', 'PM Controls', 'InfoSec Policy', 'Policy set', 'Assign Owners'];
   for (var i = 1; i <= 8; i++) {
     var item = document.getElementById('ciso-step-item-' + i);
     var conn = document.getElementById('ciso-conn-' + i);
@@ -1400,7 +1417,9 @@ function installPolicyMapHooks() {
   if (typeof cisoFinish === 'function') {
     var _cisoFinish = cisoFinish;
     cisoFinish = function() {
-      if (getResolvedProgramPath() === 'map') applyPolicyCatalogToProgram();
+      if ((state.policyCatalog || []).length && typeof applyPolicyCatalogToProgram === 'function') {
+        applyPolicyCatalogToProgram();
+      }
       return _cisoFinish.apply(this, arguments);
     };
   }

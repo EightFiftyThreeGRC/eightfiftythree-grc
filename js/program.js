@@ -210,7 +210,21 @@ function updateCISOFinishBtn() {
 // updateCISOFinishBtn, goToStep, etc.
 // ============================================================
 var CISO_WIZARD_STEPS = 8;
-var CISO_STEP_LABELS = ['Organization', 'Profile', 'Program', 'Reg mapping', 'PM Controls', 'InfoSec Policy', 'Consolidate', 'Assign Owners'];
+var CISO_STEP_LABELS = ['Organization', 'Profile', 'Program', 'Reg mapping', 'PM Controls', 'InfoSec Policy', 'Policy set', 'Assign Owners'];
+
+/** Label-first lookup so a re-number warns instead of painting the wrong step. */
+function cisoStepIndexByLabel(label, fallback) {
+  var labels = CISO_STEP_LABELS || [];
+  var i = labels.indexOf(label);
+  if (i === -1) {
+    try { console.warn('ciso: expected step "' + label + '" is missing from CISO_STEP_LABELS'); } catch (e) {}
+    return fallback;
+  }
+  if (fallback && (i + 1) !== fallback) {
+    try { console.warn('ciso: step "' + label + '" is now ' + (i + 1) + ', not ' + fallback + '. Update hardcoded step numbers.'); } catch (e) {}
+  }
+  return i + 1;
+}
 
 function updateCisoSetupProgress(step) {
   if (typeof getResolvedProgramPath === 'function' && getResolvedProgramPath() === 'map' && !state.cisoComplete
@@ -234,20 +248,7 @@ function getCisoSetupStepDisplay(step, label) {
   var displayStep = step;
   var total = CISO_WIZARD_STEPS;
   var displayLabel = label || (CISO_STEP_LABELS[step - 1] || '');
-  if (typeof getResolvedProgramPath === 'function' && getResolvedProgramPath() === 'map' && !state.cisoComplete) {
-    total = (typeof POLICY_MAP_STEPS === 'number') ? POLICY_MAP_STEPS : 7;
-    // Path B reuses a few Path A panels; renumber those to their Path B position.
-    if (typeof policyMapPathAStep === 'function') {
-      for (var pb = 1; pb <= total; pb++) {
-        if (policyMapPathAStep(pb) === step) { displayStep = pb; break; }
-      }
-    } else if (step === CISO_WIZARD_STEPS) {
-      displayStep = total;
-    }
-    if (typeof POLICY_MAP_STEP_LABELS !== 'undefined' && POLICY_MAP_STEP_LABELS[displayStep - 1]) {
-      displayLabel = POLICY_MAP_STEP_LABELS[displayStep - 1];
-    }
-  }
+  if (label) cisoStepIndexByLabel(label, step);
   return { step: displayStep, total: total, label: displayLabel };
 }
 
@@ -266,6 +267,10 @@ function renderCISOStep(step) {
   // rather than in the renderer, so per-row edits and clears are not overwritten.
   if (step === CISO_WIZARD_STEPS && typeof seedDomainOwnersFromProgramOwner === 'function') {
     seedDomainOwnersFromProgramOwner();
+  }
+  if (state.cisoSetupStep !== step) {
+    state.cisoSetupStep = step;
+    if (typeof markDirty === 'function') markDirty();
   }
   if (step===1) renderCISOStep1();
   if (step===2) renderCISOStep1Profile();
@@ -1876,6 +1881,62 @@ function draftUnmappedPMRequirements(rerender) {
   return unmapped.length;
 }
 
+function applyImportedIspText(text, meta) {
+  meta = meta || {};
+  if (!state.infoSecPolicy) {
+    var scratch = document.createElement('div');
+    renderISPEditorBody(scratch, { context: 'setup' });
+  }
+  if (!state.infoSecPolicy) return;
+  var parsed = parseImportedPolicyMarkdown(text);
+  var filename = meta.filename ? String(meta.filename) : '';
+  if (parsed.title) state.infoSecPolicy.title = parsed.title;
+  else if (filename) state.infoSecPolicy.title = filename.replace(/\.(txt|md)$/i, '');
+  if (!state.infoSecPolicy.sections) state.infoSecPolicy.sections = [];
+  parsed.sections.forEach(function(sec) {
+    var hint = typeof importedSectionTypeHint === 'function' ? importedSectionTypeHint(sec.title) : 'custom';
+    if (hint === 'custom') return;
+    for (var i = 0; i < state.infoSecPolicy.sections.length; i++) {
+      var row = state.infoSecPolicy.sections[i];
+      if (row && row.type === hint) {
+        row.content = sec.content;
+        break;
+      }
+    }
+  });
+  var unmatched = parsed.sections.filter(function(sec) {
+    var hint = typeof importedSectionTypeHint === 'function' ? importedSectionTypeHint(sec.title) : 'custom';
+    return hint === 'custom' && sec.content;
+  });
+  unmatched.forEach(function(sec) {
+    state.infoSecPolicy.sections.push({ type: 'custom', title: sec.title || 'Imported section', content: sec.content });
+  });
+  if (!parsed.sections.length && parsed.full.trim()) {
+    for (var j = 0; j < state.infoSecPolicy.sections.length; j++) {
+      if (state.infoSecPolicy.sections[j].type === 'purpose') {
+        state.infoSecPolicy.sections[j].content = parsed.full.trim();
+        break;
+      }
+    }
+  }
+  if (typeof upsertImportedCustomSection === 'function') {
+    state.infoSecPolicy.sections = upsertImportedCustomSection(state.infoSecPolicy.sections, parsed.full);
+  }
+  state.infoSecPolicy.source = 'imported';
+  state.infoSecPolicy.importedFrom = filename;
+  state.infoSecPolicy.importedAt = new Date().toISOString().slice(0, 10);
+  if (typeof markDirty === 'function') markDirty();
+  try { addAuditEntry('policy', 'ISP', 'Existing Information Security Policy text loaded' + (filename ? ' from ' + filename : '')); } catch (e) {}
+  if (typeof showToast === 'function') showToast('Loaded into the Information Security Policy. Review the text below.');
+  setTimeout(function() {
+    if (typeof renderCISOStep3 === 'function') renderCISOStep3();
+    else if (typeof renderISPEditorBody === 'function') {
+      var body = document.getElementById('ciso-step-6-body');
+      if (body) renderISPEditorBody(body, { context: 'setup' });
+    }
+  }, 0);
+}
+
 function renderCISOStep3() {
   if (state._ispRevisionView && typeof renderISPRevisionPanel === 'function') {
     renderISPRevisionPanel();
@@ -2061,7 +2122,15 @@ function renderISPEditorBody(body, opts) {
   }).join('');
 
   body.innerHTML = (isRevision ? buildISPRevisionBannerHtml() : '')
-    + (isRevision ? '' : '<div class="section-title">' + escapeHTML((isp.title || '').trim() || getDefaultISPTitle()) + '</div>'
+    + (isRevision ? '' : (typeof renderPolicyImportPanelHtml === 'function'
+      ? renderPolicyImportPanelHtml('isp', {
+          heading: 'Do you already have an Information Security Policy?',
+          lead: state.setupHasExistingPolicies === 'yes'
+            ? 'You said some policies already exist. Load the ISP as .txt or .md, or paste it. You assert what it is \u2014 nothing is inferred.'
+            : 'Load the ISP you already have as .txt or .md, or paste it. Or skip this and write it in the editor below.'
+        })
+      : '')
+      + '<div class="section-title">' + escapeHTML((isp.title || '').trim() || getDefaultISPTitle()) + '</div>'
       + '<div class="section-subtitle">Review and edit your organization\'s overall security policy here. The domain policies your teams write later should line up with this document.</div>')
     + `
     <div style="border:1px solid var(--border);border-radius:12px;padding:16px 20px;margin-bottom:20px;background:white;">
@@ -2795,6 +2864,46 @@ function renderCsfFunctionGroupingHtml(families, merges) {
 // ============================================================
 
 // --- Step 4: Consolidate & Prioritize ---
+function renderUnifiedPolicySetCoverageHtml() {
+  var ispHave = !!(state.infoSecPolicy && String(state.infoSecPolicy.title || '').trim());
+  var ispLabel = ispHave
+    ? (String(state.infoSecPolicy.title).trim() + (state.infoSecPolicy.source === 'imported' ? ' (loaded)' : ''))
+    : 'Not started';
+  var masters = typeof getMasterPolicyFamilies === 'function' ? getMasterPolicyFamilies() : [];
+  var have = [];
+  var needed = [];
+  masters.forEach(function(fam) {
+    var st = ((state.policyStatus || {})[fam] || {}).status || '';
+    var dp = (state.domainPolicies || {})[fam];
+    var title = (dp && dp.title) || (typeof getPolicyMergedTitle === 'function' ? getPolicyMergedTitle(fam) : fam);
+    if (dp || st === 'Mapped' || st === 'Approved' || st === 'Under Review' || st === 'Draft' || st === 'Returned') {
+      have.push({ fam: fam, title: title, status: st || (dp && dp.source === 'imported' ? 'Loaded' : 'Draft') });
+    } else {
+      needed.push({ fam: fam, title: title });
+    }
+  });
+  function chip(item, cls) {
+    return '<span class="policy-set-chip ' + cls + '"><span class="family-badge">' + escapeHTML(item.fam) + '</span> '
+      + escapeHTML(item.title) + (item.status ? ' \u00b7 ' + escapeHTML(item.status) : '') + '</span>';
+  }
+  return ''
+    + '<div class="policy-set-coverage">'
+    + '<div class="policy-set-cov-col">'
+    + '<div class="policy-set-cov-h">Have</div>'
+    + '<div class="policy-set-chip-row">'
+    + '<span class="policy-set-chip ' + (ispHave ? 'is-have' : 'is-need') + '">ISP \u00b7 ' + escapeHTML(ispLabel) + '</span>'
+    + have.map(function(h) { return chip(h, 'is-have'); }).join('')
+    + (!have.length && ispHave ? '' : '')
+    + '</div></div>'
+    + '<div class="policy-set-cov-col">'
+    + '<div class="policy-set-cov-h">Still needed</div>'
+    + '<div class="policy-set-chip-row">'
+    + (needed.length ? needed.map(function(n) { return chip(n, 'is-need'); }).join('') : '<span class="policy-set-empty">Every Function policy has a document started.</span>')
+    + '</div>'
+    + '<p class="policy-set-cov-note">Draft or load each remaining Function policy in Domain Policies after setup. Grouping below is the document set you will maintain.</p>'
+    + '</div></div>';
+}
+
 function renderCISOStep4a() {
   const body = document.getElementById('ciso-step-7-body');
   if (!body) return;
@@ -2812,13 +2921,16 @@ function renderCISOStep4a() {
   const priorityCounts = { now: 0, soon: 0, later: 0 };
   masters.forEach(f => priorityCounts[getPriority(f)]++);
 
+  var setMeta = getCisoSetupStepDisplay(7, 'Policy set');
   body.innerHTML = `
     <div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:16px;">
-      <span style="opacity:0.55;margin-right:8px;">Step 7 of 8</span> Consolidate &amp; Prioritize
+      <span style="opacity:0.55;margin-right:8px;">Step ${setMeta.step} of ${setMeta.total}</span> ${escapeHTML(setMeta.label)}
     </div>
 
-    <div class="section-title">Consolidate &amp; Prioritize Policies</div>
-    <div class="section-subtitle">Document structure first: the ISP (Govern) plus Function policy documents. Drag families between documents, or use Move and Merge. Then set urgency \u2014 that drives draft deadlines in the next step.</div>
+    <div class="section-title">Policy set</div>
+    <div class="section-subtitle">Everyone sees the same picture: what you already have versus what still needs a Function policy. Document structure first \u2014 the ISP (Govern) plus Function policy documents. Drag families between documents, or use Move and Merge. Then set urgency.</div>
+
+    ${renderUnifiedPolicySetCoverageHtml()}
 
     ${renderCsfFunctionGroupingHtml(families, merges)}
 

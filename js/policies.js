@@ -6,6 +6,180 @@ function updateOwnerRowStatus(input) {
   if (row && input.value.trim()) row.style.background = 'rgba(13,148,136,0.03)';
 }
 
+// ============================================================
+// POLICY TEXT INGEST (ISP + domain). Paste or .txt/.md FileReader only.
+// Mapping is user-asserted. Content lands on infoSecPolicy / domainPolicies.
+// ============================================================
+var POLICY_IMPORT_MAX_CHARS = 180000;
+
+function safeUrl(u) {
+  var s = String(u || '').trim();
+  if (/^https?:\/\//i.test(s)) return s;
+  return '';
+}
+
+function capImportedPolicyText(text) {
+  var raw = String(text == null ? '' : text);
+  if (raw.length <= POLICY_IMPORT_MAX_CHARS) return { text: raw, truncated: false };
+  return { text: raw.slice(0, POLICY_IMPORT_MAX_CHARS), truncated: true };
+}
+
+function parseImportedPolicyMarkdown(text) {
+  var lines = String(text || '').replace(/\r\n/g, '\n').split('\n');
+  var title = '';
+  var sections = [];
+  var curTitle = '';
+  var curBody = [];
+  function flush() {
+    var body = curBody.join('\n').replace(/^\n+|\n+$/g, '');
+    if (curTitle || body) sections.push({ title: curTitle, content: body });
+    curTitle = '';
+    curBody = [];
+  }
+  lines.forEach(function(line) {
+    var h1 = line.match(/^#\s+(.+)/);
+    var h2 = line.match(/^##\s+(.+)/);
+    if (h1 && !title) { title = h1[1].replace(/\s+$/g, ''); return; }
+    if (h2) {
+      flush();
+      curTitle = h2[1].replace(/\s+$/g, '');
+      return;
+    }
+    curBody.push(line);
+  });
+  flush();
+  return { title: title, sections: sections, full: String(text || '') };
+}
+
+function importedSectionTypeHint(title) {
+  var t = String(title || '').toLowerCase();
+  if (/^purpose\b/.test(t)) return 'purpose';
+  if (/^scope\b/.test(t)) return 'scope';
+  if (/enforcement|violation/.test(t)) return 'enforcement';
+  if (/exception|waiver/.test(t)) return 'exceptions';
+  return 'custom';
+}
+
+function onPolicyImportFile(ev, targetKey) {
+  var input = ev && ev.target;
+  var file = input && input.files && input.files[0];
+  if (!file) return;
+  var name = String(file.name || '');
+  if (!/\.(txt|md)$/i.test(name)) {
+    if (typeof showToast === 'function') showToast('Use a .txt or .md file. Word (.docx) files are not parsed.', true);
+    if (input) input.value = '';
+    return;
+  }
+  if (file.size > POLICY_IMPORT_MAX_CHARS * 4) {
+    if (typeof showToast === 'function') showToast('That file is too large for this browser store (keep each document well under 1 MB).', true);
+    if (input) input.value = '';
+    return;
+  }
+  var reader = new FileReader();
+  reader.onload = function() {
+    applyPolicyImport(targetKey, String(reader.result || ''), { filename: name });
+    if (input) input.value = '';
+  };
+  reader.onerror = function() {
+    if (typeof showToast === 'function') showToast('Could not read that file.', true);
+    if (input) input.value = '';
+  };
+  reader.readAsText(file);
+}
+
+function applyPolicyImportFromPaste(targetKey) {
+  var id = targetKey === 'isp' ? 'policy-import-paste-isp' : ('policy-import-paste-' + String(targetKey || '').replace(/[^A-Za-z0-9_-]/g, ''));
+  var el = document.getElementById(id);
+  var text = el ? String(el.value || '') : '';
+  applyPolicyImport(targetKey, text, { filename: '' });
+}
+
+function applyPolicyImport(targetKey, text, meta) {
+  var capped = capImportedPolicyText(text);
+  if (!String(capped.text || '').trim()) {
+    if (typeof showToast === 'function') showToast('Paste or choose a .txt / .md file first.', true);
+    return;
+  }
+  if (capped.truncated && typeof showToast === 'function') {
+    showToast('Imported text was trimmed to ' + POLICY_IMPORT_MAX_CHARS + ' characters so it fits in this browser.', true);
+  }
+  if (targetKey === 'isp') {
+    if (typeof applyImportedIspText === 'function') applyImportedIspText(capped.text, meta || {});
+    return;
+  }
+  applyImportedDomainPolicyText(targetKey, capped.text, meta || {});
+}
+
+function renderPolicyImportPanelHtml(targetKey, opts) {
+  opts = opts || {};
+  var safeTarget = String(targetKey || '').replace(/[^A-Za-z0-9_-]/g, '');
+  var pasteId = 'policy-import-paste-' + (safeTarget || 'doc');
+  var fileId = 'policy-import-file-' + (safeTarget || 'doc');
+  var heading = opts.heading || 'Do you already have this?';
+  var lead = opts.lead || 'Load a .txt or .md file, or paste the text. You tell us what it covers \u2014 nothing is inferred.';
+  return ''
+    + '<div class="policy-import">'
+    + '<div class="policy-import-kicker">' + escapeHTML(heading) + '</div>'
+    + '<p class="policy-import-lead">' + escapeHTML(lead) + '</p>'
+    + '<div class="policy-import-row">'
+    + '<label class="btn btn-secondary btn-sm policy-import-file-btn" for="' + escapeHTML(fileId) + '">Choose .txt or .md</label>'
+    + '<input id="' + escapeHTML(fileId) + '" class="policy-import-file" type="file" accept=".txt,.md,text/plain,text/markdown" onchange="onPolicyImportFile(event,\'' + escapeHTML(safeTarget) + '\')">'
+    + '<button type="button" class="btn btn-primary btn-sm" onclick="applyPolicyImportFromPaste(\'' + escapeHTML(safeTarget) + '\')">Load pasted text</button>'
+    + '</div>'
+    + '<textarea id="' + escapeHTML(pasteId) + '" class="form-input policy-import-paste" rows="6" placeholder="Paste policy text here\u2026"></textarea>'
+    + '</div>';
+}
+
+function upsertImportedCustomSection(sections, fullText) {
+  var list = Array.isArray(sections) ? sections : [];
+  var idx = -1;
+  for (var i = 0; i < list.length; i++) {
+    if (list[i] && list[i].type === 'custom' && /imported policy/i.test(list[i].title || '')) { idx = i; break; }
+  }
+  var row = { type: 'custom', title: 'Imported policy', content: fullText };
+  if (idx === -1) list.push(row);
+  else list[idx] = row;
+  return list;
+}
+
+function applyImportedDomainPolicyText(fam, text, meta) {
+  fam = String(fam || '').replace(/[^A-Z0-9]/g, '');
+  if (!fam) return;
+  if (typeof initDomainPolicy === 'function') initDomainPolicy(fam);
+  if (!state.domainPolicies) state.domainPolicies = {};
+  var dp = state.domainPolicies[fam];
+  if (!dp) return;
+  var parsed = parseImportedPolicyMarkdown(text);
+  var filename = meta && meta.filename ? String(meta.filename) : '';
+  if (parsed.title) dp.title = parsed.title;
+  else if (filename) dp.title = filename.replace(/\.(txt|md)$/i, '');
+  var leftovers = [];
+  parsed.sections.forEach(function(sec) {
+    var hint = importedSectionTypeHint(sec.title);
+    if (hint === 'purpose' && sec.content) dp.purpose = sec.content;
+    else if (hint === 'scope' && sec.content) dp.scope = sec.content;
+    else if (hint === 'enforcement' && sec.content) dp.enforcement = sec.content;
+    else if (hint === 'exceptions' && sec.content) dp.exceptions = sec.content;
+    else if (sec.content) leftovers.push(sec);
+  });
+  if (!parsed.sections.length || (!dp.purpose && parsed.full.trim())) dp.purpose = parsed.full.trim();
+  if (!dp.sections) dp.sections = [];
+  leftovers.forEach(function(sec) {
+    dp.sections.push({ type: 'custom', title: sec.title || 'Imported section', content: sec.content });
+  });
+  dp.sections = upsertImportedCustomSection(dp.sections, parsed.full);
+  dp.source = 'imported';
+  dp.importedFrom = filename;
+  dp.importedAt = new Date().toISOString().slice(0, 10);
+  dp.lastUpdated = new Date().toLocaleDateString();
+  if (typeof markDirty === 'function') markDirty();
+  try { addAuditEntry('policy', fam, 'Existing domain policy text loaded' + (filename ? ' from ' + filename : '')); } catch (e) {}
+  if (typeof showToast === 'function') showToast('Loaded into this domain policy. Review the text, then keep editing.');
+  setTimeout(function() {
+    if (typeof renderPolicyStep3 === 'function') renderPolicyStep3();
+  }, 0);
+}
+
 
 
 
@@ -776,9 +950,11 @@ function renderPolicyLibraryCatalog() {
 
   var ispStatus = getISPStatus();
   var ispStyle = statusStyle(ispStatus);
+  var ispLibTitle = ((state.infoSecPolicy && state.infoSecPolicy.title) ? String(state.infoSecPolicy.title).trim() : '')
+    || (typeof getDefaultISPTitle === 'function' ? getDefaultISPTitle() : 'Information Security Policy');
   var rows = '<tr onclick="goToCISOPolicyEditor()" style="cursor:pointer;" onmouseover="this.style.background=\'rgba(13,148,136,0.03)\'" onmouseout="this.style.background=\'\'">'
     + '<td><span style="font-family:monospace;font-size:11px;font-weight:700;background:#e0f2fe;color:#0369a1;padding:2px 7px;border-radius:4px;">ISP</span></td>'
-    + '<td style="font-weight:600;font-size:13px;color:var(--navy);">Information Security Policy</td>'
+    + '<td style="font-weight:600;font-size:13px;color:var(--navy);">' + _esc(ispLibTitle) + '</td>'
     + '<td style="font-size:12px;color:var(--text-muted);">' + _esc(state.programOwner || '—') + '</td>'
     + '<td style="font-size:12px;color:var(--text-muted);">' + _esc((state.infoSecPolicy && state.infoSecPolicy.custodian && state.infoSecPolicy.custodian.name) || '—') + '</td>'
     + '<td style="font-size:12px;color:var(--text-muted);">' + _esc(getApprover('ISP')) + '</td>'
@@ -2965,12 +3141,13 @@ function renderISPPolicyViewerPanel() {
       : ispViewStatus === 'Draft' || ispViewStatus === 'In Progress'
       ? 'Tier 1 organizational policy — draft in progress; not yet approved.'
       : 'Tier 1 organizational policy — owned by the CISO.';
+    var isp = state.infoSecPolicy;
+    var ispTitle = ((isp && isp.title) ? String(isp.title).trim() : '') || (typeof getDefaultISPTitle === 'function' ? getDefaultISPTitle() : 'Information Security Policy');
     if (hdr) hdr.innerHTML = '<div class="role-badge">📋 Policy</div>'
-      + '<h1>Information Security Policy</h1>'
+      + '<h1>' + escapeHTML(ispTitle) + '</h1>'
       + '<p>' + ispHdrSub + '</p>';
     var body = document.getElementById('policy-list-body');
     if (!body) return;
-    var isp = state.infoSecPolicy;
     if (!isp || !isp.title) {
       var editBtn = !state.currentUserId ? '<button class="btn btn-primary btn-sm" style="margin-top:16px;" onclick="showTab(\'ciso\');goToStep(\'ciso\',3);">✏️ Edit in Setup Wizard</button>' : '';
       body.innerHTML = '<div class="empty-state"><div class="es-icon">📋</div><div class="es-title">Not Yet Published</div><p>The Information Security Policy has not been finalized yet.</p>' + editBtn + '</div>';
@@ -2980,7 +3157,7 @@ function renderISPPolicyViewerPanel() {
     // Clickable card header
     ispHTML += '<div id="isp-doc-card" onclick="document.getElementById(\'isp-doc-body\').style.display=document.getElementById(\'isp-doc-body\').style.display===\'none\'?\'\':\'none\';document.getElementById(\'isp-doc-chevron\').textContent=document.getElementById(\'isp-doc-body\').style.display===\'none\'?\'▼ View policy\':\'▲ Hide policy\';" style="display:flex;align-items:center;gap:10px;margin-bottom:0;padding:14px 18px;background:rgba(13,148,136,0.04);border:1px solid rgba(13,148,136,0.2);border-radius:10px 10px 0 0;cursor:pointer;transition:background 0.15s;" onmouseover="this.style.background=\'rgba(13,148,136,0.09)\'" onmouseout="this.style.background=\'rgba(13,148,136,0.04)\'">'
       + '<span style="font-size:22px;">📋</span>'
-      + '<div style="flex:1;"><div style="font-size:15px;font-weight:700;color:var(--navy);">Information Security Policy</div>'
+      + '<div style="flex:1;"><div style="font-size:15px;font-weight:700;color:var(--navy);">' + _esc(ispTitle) + '</div>'
       + '<div style="font-size:12px;color:var(--text-muted);">Tier 1 · Owned by ' + _esc(state.programOwner||'CISO') + '</div></div>'
       + '<span style="margin-right:10px;">' + chipHTML(ispViewStatus) + '</span>'
       + '<span id="isp-doc-chevron" style="font-size:12px;color:var(--primary);font-weight:600;">▼ View policy</span>'
@@ -3739,6 +3916,13 @@ function renderPolicyStep3() {
           '<span style="font-size:12px;color:var(--text-muted);">v'+escapeHTML(dp.version)+' · Effective '+dp.effectiveDate+' · '+dp.reviewCycle+' review</span>' +
         '</div>' +
       '</div>' +
+
+      (typeof renderPolicyImportPanelHtml === 'function'
+        ? renderPolicyImportPanelHtml(fam, {
+            heading: 'Do you already have this Function policy?',
+            lead: 'Load a .txt or .md file or paste the text. It becomes this family\'s policy content \u2014 you assert the mapping.'
+          })
+        : '') +
 
       // Toolbar
       '<div style="display:flex;gap:10px;margin-bottom:20px;justify-content:space-between;align-items:center;">' +

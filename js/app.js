@@ -787,16 +787,11 @@ function goToProgramSetupOrDashboard() {
     showTab('home');
     return;
   }
-  var path = typeof getResolvedProgramPath === 'function' ? getResolvedProgramPath() : (state.programPath || '');
-  if (path === 'map' && typeof continuePolicyMapSetup === 'function') {
-    continuePolicyMapSetup();
+  if (typeof startProgramSetup === 'function') {
+    startProgramSetup();
     return;
   }
-  if (path === 'build') {
-    showTab('ciso');
-    return;
-  }
-  showTab('home');
+  showTab('ciso');
 }
 
 /** From dashboard: open domain-owner step in CISO wizard (admin), or explain when PO no longer has that workspace. */

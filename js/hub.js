@@ -1,20 +1,36 @@
 // js/hub.js — Command Center (post-setup home dashboard)
 
 function getSetupProgressSummary() {
-  if (typeof getResolvedProgramPath === 'function' && getResolvedProgramPath() === 'map'
-      && typeof getPolicyMapProgressSummary === 'function') {
-    return getPolicyMapProgressSummary();
-  }
-  var step = (typeof currentStep !== 'undefined' && currentStep.ciso) ? currentStep.ciso : 1;
+  var persisted = parseInt(state.cisoSetupStep, 10) || 0;
+  var live = (typeof currentStep !== 'undefined' && currentStep.ciso) ? currentStep.ciso : 0;
+  var step = persisted || live || 1;
   var total = (typeof CISO_WIZARD_STEPS === 'number') ? CISO_WIZARD_STEPS : 8;
-  var labels = (typeof CISO_STEP_LABELS !== 'undefined') ? CISO_STEP_LABELS : ['Organization', 'Profile', 'Program', 'Reg mapping', 'PM Controls', 'InfoSec Policy', 'Consolidate', 'Assign Owners'];
+  var labels = (typeof CISO_STEP_LABELS !== 'undefined') ? CISO_STEP_LABELS : ['Organization', 'Profile', 'Program', 'Reg mapping', 'PM Controls', 'InfoSec Policy', 'Policy set', 'Assign Owners'];
   var pct = Math.round((step / total) * 100);
   return { step: step, pct: pct, label: labels[step - 1] || 'Organization', total: total };
 }
 
 function startProgramSetup() {
+  if (!state.programPath) state.programPath = 'build';
+  var step = parseInt(state.cisoSetupStep, 10) || 1;
+  if (step < 1) step = 1;
   showTab('ciso');
-  goToStep('ciso', 1);
+  goToStep('ciso', step);
+}
+
+function setSetupHasExistingPolicies(val) {
+  state.setupHasExistingPolicies = (val === 'yes' || val === 'no') ? val : '';
+  if (typeof markDirty === 'function') markDirty();
+  setTimeout(function() {
+    if (typeof renderHomeTab === 'function') renderHomeTab();
+  }, 0);
+}
+
+function startUnifiedProgramSetup() {
+  state.programPath = 'build';
+  if (!state.cisoSetupStep) state.cisoSetupStep = 1;
+  if (typeof markDirty === 'function') markDirty();
+  startProgramSetup();
 }
 
 /** Escape a value for embedding in an HTML onclick single-quoted JS string literal. */
@@ -108,57 +124,44 @@ function renderOnboardingHome() {
   var chosen = typeof getResolvedProgramPath === 'function' ? getResolvedProgramPath() : (state.programPath || '');
   var progress = getSetupProgressSummary();
   var hasStarted = !!(String(state.orgName || '').trim() || String(state.programOwner || '').trim() || state.baseline);
-  var total = progress.total || (chosen === 'map' ? 7 : 8);
+  var total = progress.total || 8;
 
-  // Nothing chosen yet: two equal-weight path cards. Do not auto-select.
+  // One start. "Do you already have policies?" only sets a default for later
+  // load-or-author prompts; it does not fork the wizard.
   if (!chosen) {
+    var has = state.setupHasExistingPolicies === 'yes' ? 'yes' : (state.setupHasExistingPolicies === 'no' ? 'no' : '');
     body.innerHTML = ''
       + '<div class="onboard onboard--cover onboard--paths">'
       + '<div class="onboard-cover-copy">'
       + '<p class="onboard-eyebrow">Program setup</p>'
-      + '<h1 class="onboard-title">How do you want to start?</h1>'
-      + '<p class="onboard-lead">Stand up policy from a blank page, or map documents you already have to NIST 800-53.</p>'
+      + '<h1 class="onboard-title">Stand up your program</h1>'
+      + '<p class="onboard-lead">Identity first, then a short profile, then the Information Security Policy \u2014 load the one you have or write it here. Function policies come next in Domain Policies.</p>'
+      + '<button type="button" class="btn onboard-cta" onclick="startUnifiedProgramSetup()">Start setup</button>'
+      + '<p class="onboard-path-foot">Optional \u2014 how much already exists? This only pre-fills the later prompts.</p>'
+      + '<div class="onboard-exist-row" role="group" aria-label="How much policy already exists">'
+      + '<button type="button" class="onboard-exist-btn' + (has === 'no' ? ' is-on' : '') + '" onclick="setSetupHasExistingPolicies(\'no\')">We will write them here</button>'
+      + '<button type="button" class="onboard-exist-btn' + (has === 'yes' ? ' is-on' : '') + '" onclick="setSetupHasExistingPolicies(\'yes\')">We have some to load</button>'
       + '</div>'
-      + '<div class="onboard-path-grid" role="group" aria-label="Program setup path">'
-      + '<button type="button" class="onboard-path-card" onclick="chooseProgramPath(\'build\')">'
-      + '<p class="onboard-path-kicker">Path A</p>'
-      + '<h2 class="onboard-path-title">Build from scratch</h2>'
-      + '<p class="onboard-path-desc">ISP, domain policies, and control assignments. Identity first, then a short profile.</p>'
-      + '<span class="onboard-path-cta">Start Path A</span>'
-      + '</button>'
-      + '<button type="button" class="onboard-path-card" onclick="chooseProgramPath(\'map\')">'
-      + '<p class="onboard-path-kicker">Path B</p>'
-      + '<h2 class="onboard-path-title">Map what you have</h2>'
-      + '<p class="onboard-path-desc">Catalog existing policies and align them to NIST 800-53. See coverage gaps.</p>'
-      + '<span class="onboard-path-cta">Start Path B</span>'
-      + '</button>'
       + '</div>'
-      + '<p class="onboard-path-foot">You can switch later. Mapping work and drafted policies are kept.</p>'
       + '</div>';
     return;
   }
 
-  var isMap = chosen === 'map';
-  var continueFn = isMap ? 'continuePolicyMapSetup()' : 'startProgramSetup()';
-  var pathLabel = isMap ? 'Map what you have' : 'Build from scratch';
   var title = hasStarted
     ? escapeHTML(progress.label || 'Continue')
-    : (isMap ? 'Map your existing policies' : 'Stand up your program');
+    : 'Stand up your program';
   var lead = hasStarted
     ? 'Everything you\u2019ve entered is saved. This is the next screen.'
-    : (isMap
-      ? 'Catalog the documents you already have, map them to NIST 800-53, then close the gaps.'
-      : 'Start with who owns the program. Then a short profile so we can suggest overlays and flag systems that may need a higher categorization.');
-  var cta = hasStarted ? 'Continue' : (isMap ? 'Start mapping' : 'Start setup');
+    : 'Start with who owns the program. Then a short profile so we can suggest overlays and flag systems that may need a higher categorization.';
+  var cta = hasStarted ? 'Continue' : 'Start setup';
 
   body.innerHTML = ''
     + '<div class="onboard onboard--cover onboard--resume">'
     + '<div class="onboard-cover-copy">'
-    + '<p class="onboard-eyebrow">Program setup \u00b7 ' + escapeHTML(pathLabel) + '</p>'
+    + '<p class="onboard-eyebrow">Program setup</p>'
     + '<h1 class="onboard-title">' + title + '</h1>'
     + '<p class="onboard-lead">' + lead + '</p>'
-    + '<button type="button" class="btn onboard-cta" onclick="' + continueFn + '">' + cta + '</button>'
-    + '<p class="onboard-path-switch"><button type="button" class="onboard-path-switch-btn" onclick="promptSwitchProgramPath()">Choose a different path</button></p>'
+    + '<button type="button" class="btn onboard-cta" onclick="startProgramSetup()">' + cta + '</button>'
     + '</div>'
     + '<div class="onboard-cover-progress">'
     + renderOnboardingRingHtml(progress.step || 1, total, progress.label)
@@ -179,14 +182,13 @@ function getNextActions(limit) {
   if (!state.cisoComplete) {
     var p = getSetupProgressSummary();
     var total = p.total || ((typeof CISO_WIZARD_STEPS === 'number') ? CISO_WIZARD_STEPS : 8);
-    var isMap = typeof getResolvedProgramPath === 'function' && getResolvedProgramPath() === 'map';
     actions.push({
       priority: 1,
       icon: '🏛️',
       label: 'Continue program setup',
       desc: 'Step ' + p.step + ' of ' + total + ' \u2014 ' + p.label + '.',
       stage: 'setup',
-      action: isMap ? 'continuePolicyMapSetup();' : 'startProgramSetup();'
+      action: 'startProgramSetup();'
     });
     return actions;
   }
@@ -1264,4 +1266,7 @@ try {
   window.focusJourneyStage = focusJourneyStage;
   window.deferJourneyStage = deferJourneyStage;
   window.renderCommandCenterDashboard = renderCommandCenterDashboard;
+  window.startProgramSetup = startProgramSetup;
+  window.startUnifiedProgramSetup = startUnifiedProgramSetup;
+  window.setSetupHasExistingPolicies = setSetupHasExistingPolicies;
 } catch (e) {}

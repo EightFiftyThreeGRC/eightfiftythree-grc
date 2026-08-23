@@ -1170,14 +1170,16 @@ const state = {
   // stage the operator jumped back to; `deferred` holds stage ids they chose to
   // come back to later. Stage completion itself is always computed from state.
   homeJourney: { mode: 'guided', focus: '', deferred: {} },
-  // First-run program path. Empty until the operator chooses on Command Center.
-  // 'build' = draft ISP + domain policies (8-step wizard).
-  // 'map'   = catalog existing documents and align them to 800-53 (Path B).
+  // First-run program path. Empty until setup starts. 'build' is the one wizard.
+  // Legacy 'map' (Path B) is migrated into 'build' by migrateUnifiedSetupPath().
   programPath: '',
-  policyCatalog: [],         // Path B: [{ id, title, type, ownerName, ownerEmail, ownerRole, sourceNote, familyCodes[], controlIds[], csfFunctions[], coverageNote, isProgramPolicy }]
-  policyMapConfirmed: false, // Path B: coverage review confirmed \u2014 domainPolicies / policyStatus written
-  policyMapStep: 1,          // Path B wizard step 1\u20137 (org, profile, baseline, catalog, map, coverage, owners)
-  policyMapWizardRev: 0,     // 2+ = Profile step already inserted into Path B numbering
+  cisoSetupStep: 1,          // persisted CISO wizard step so resume / Path B migration land correctly
+  setupHasExistingPolicies: '', // '' | 'yes' | 'no' \u2014 optional default only; never forks the wizard
+  policyCatalog: [],         // Existing documents catalogued during setup or Domain Policies [{ id, title, type, ownerName, ownerEmail, ownerRole, sourceNote, familyCodes[], controlIds[], csfFunctions[], coverageNote, isProgramPolicy }]
+  policyMapConfirmed: false, // coverage review confirmed \u2014 domainPolicies / policyStatus written
+  policyMapStep: 1,          // legacy Path B step 1\u20137; kept so mid-wizard programs can be migrated
+  policyMapWizardRev: 0,     // 2+ = Profile step already inserted into Path B numbering; 3 = unified wizard
+
   policyMapOmitFns: {},      // Path B: { ID: true } = do not maintain that Function policy document
   _policyMapEditId: '',      // Path B catalog editor selection (transient)
   _policyMapExpandedDocId: '', // Path B map-step accordion (transient)
@@ -1347,6 +1349,7 @@ function normalizeStateShape() {
   migratePoamItemsToIssues();
   stripLegacyDemoPlaceholderFlags();
   ensurePmControlsAssignedToCiso();
+  if (typeof migrateUnifiedSetupPath === 'function') migrateUnifiedSetupPath();
 }
 
 /**
@@ -1658,6 +1661,12 @@ function applyLoadedState(saved) {
   seedXmplAtoDemoDataIfMissing();
   if (state.cisoComplete && state.baseline && typeof seedAllControlScopeDefaults === 'function') {
     seedAllControlScopeDefaults();
+  }
+  if (typeof currentStep !== 'undefined') {
+    var cs = parseInt(state.cisoSetupStep, 10) || 1;
+    if (cs < 1) cs = 1;
+    if (typeof CISO_WIZARD_STEPS === 'number' && cs > CISO_WIZARD_STEPS) cs = CISO_WIZARD_STEPS;
+    currentStep.ciso = cs;
   }
   return true;
 }
