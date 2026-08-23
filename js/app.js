@@ -667,7 +667,7 @@ function confirmReset() {
     '<div style="background:white;border-radius:16px;padding:32px;width:420px;max-width:90vw;box-shadow:0 20px 60px rgba(0,0,0,0.25);">'
     + '<div style="font-size:22px;margin-bottom:8px;">↺</div>'
     + '<div style="font-size:18px;font-weight:800;color:var(--navy);margin-bottom:8px;">Reset Program?</div>'
-    + '<div style="font-size:13px;color:var(--text-muted);margin-bottom:24px;line-height:1.6;">This will clear all data — baseline selection, domain owners, policies, control assignments, and test results. The app will return to its initial state.</div>'
+    + '<div style="font-size:13px;color:var(--text-muted);margin-bottom:24px;line-height:1.6;">This will clear all data \u2014 owners, policies, control assignments, assets, and decisions. You will pick a setup path again.</div>'
     + '<div style="display:flex;gap:12px;justify-content:flex-end;">'
     + '<button class="btn btn-secondary" onclick="document.getElementById(\'resetModalOverlay\').remove()">Cancel</button>'
     + '<button class="btn" style="background:var(--red);color:white;border:none;" onclick="resetApp()">Reset Everything</button>'
@@ -691,8 +691,7 @@ function resetApp() {
   Object.keys(currentStep).forEach(function(k){ currentStep[k] = 1; });
   reapplySessionRoleView();
   renderSidebarBadges();
-  showTab('ciso');
-  goToStep('ciso', 1);
+  showTab('home');
   try { localStorage.removeItem(STORAGE_KEY); localStorage.removeItem(STORAGE_KEY + '-ts'); } catch(e) {}
   showToast('\u21BA Program reset. Starting fresh.');
 }
@@ -784,8 +783,20 @@ function getPersonVisibleTabIds(user) {
 }
 
 function goToProgramSetupOrDashboard() {
-  if (state.cisoComplete) showTab('home');
-  else showTab('ciso');
+  if (state.cisoComplete) {
+    showTab('home');
+    return;
+  }
+  var path = typeof getResolvedProgramPath === 'function' ? getResolvedProgramPath() : (state.programPath || '');
+  if (path === 'map' && typeof continuePolicyMapSetup === 'function') {
+    continuePolicyMapSetup();
+    return;
+  }
+  if (path === 'build') {
+    showTab('ciso');
+    return;
+  }
+  showTab('home');
 }
 
 /** From dashboard: open domain-owner step in CISO wizard (admin), or explain when PO no longer has that workspace. */
@@ -796,7 +807,7 @@ function goToDomainOwnersFromDashboard() {
     return;
   }
   if (state.cisoComplete) {
-    showToast('Domain owners are edited in Program Setup. Sign out and open Admin (🔑), or ask your administrator.', true);
+    showToast('Domain owners are edited in Program Setup. Switch to Admin mode, or ask your administrator.', true);
     return;
   }
   showTab('ciso');

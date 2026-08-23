@@ -218,10 +218,55 @@ function submitAtoDecision() {
  * ATO status and a "Record decision" action for AOs/CISOs. Returns '' when
  * there are no boundaries at all so the dashboard stays uncluttered for
  * programs that aren't running an authorization process. */
+/** One authorization boundary per registered system so Reports can show FIPS 199 / system baseline. */
+function ensureAuthBoundaryForAsset(asset) {
+  atoEnsureState();
+  if (!asset || !asset.id) return null;
+  var aid = String(asset.id);
+  var existing = (state.authBoundaries || []).find(function(b) {
+    return b && ((b.assetIds || []).indexOf(aid) !== -1);
+  });
+  if (existing) return existing;
+  var b = {
+    id: 'bnd-' + aid,
+    name: (asset.name || 'System') + ' authorization boundary',
+    description: 'Authorization boundary for this system. FIPS 199 sets the 800-53 baseline here \u2014 not for the organization.',
+    assetTypes: asset.type ? [asset.type] : [],
+    assetIds: [aid],
+    processIds: [],
+    aoUserId: '',
+    assessorUserIds: [],
+    atoStatus: 'pending',
+    atoGrantedDate: '',
+    atoExpiresDate: '',
+    conditions: []
+  };
+  state.authBoundaries.push(b);
+  if (typeof addAuditEntry === 'function') {
+    addAuditEntry('ato', b.id, 'Authorization boundary created for system ' + (asset.name || aid));
+  }
+  if (typeof markDirty === 'function') markDirty();
+  return b;
+}
+
+function ensureAuthBoundariesForAssets() {
+  (state.assets || []).forEach(function(a) {
+    if (a && a.id) ensureAuthBoundaryForAsset(a);
+  });
+}
+
 function renderAuthorizationStatusPanelHtml() {
   atoEnsureState();
+  ensureAuthBoundariesForAssets();
   var boundaries = state.authBoundaries || [];
-  if (!boundaries.length) return '';
+  if (!boundaries.length) {
+    return ''
+      + '<div style="background:white;border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:18px;max-width:920px;">'
+      + '<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:6px;">\uD83D\uDEE1\uFE0F Authorization status</div>'
+      + '<div style="font-size:12px;color:var(--text-muted);line-height:1.55;margin-bottom:10px;">No systems yet. Each information system gets its own authorization boundary. FIPS 199 categorization there sets that system\u2019s 800-53 baseline \u2014 not an organizational Low / Moderate / High pick.</div>'
+      + '<button type="button" class="btn btn-primary btn-sm" onclick="showTab(\'asset\');if(typeof openAddItemModal===\'function\')openAddItemModal(\'asset\');">Register a system</button>'
+      + '</div>';
+  }
   var rows = boundaries.map(function(b) {
     var status = b.atoStatus || 'pending';
     var label = status === 'ato-granted' ? 'ATO granted'

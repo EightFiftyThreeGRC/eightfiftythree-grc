@@ -295,8 +295,8 @@ function selectUserProfile(userId) {
   }
   applyRoleView(userId);
   if (userId === 'admin') {
-    showTab(state.cisoComplete ? 'home' : 'ciso');
-    showToast('🔑 Admin mode');
+    showTab('home');
+    showToast('\uD83D\uDD11 Admin mode');
   } else {
     const u = (state.users || []).find(function(x){ return x.id === userId; });
     if (u) {

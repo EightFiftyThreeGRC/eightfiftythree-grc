@@ -476,6 +476,63 @@ function policyMapSetChrome(mode) {
   }
 }
 
+function policyMapSyncStepNav() {
+  var step = parseInt(state.policyMapStep, 10) || 1;
+  for (var i = 1; i <= 8; i++) {
+    var item = document.getElementById('ciso-step-item-' + i);
+    var conn = document.getElementById('ciso-conn-' + i);
+    if (i === 8) {
+      if (item) item.style.display = 'none';
+      if (conn) conn.style.display = 'none';
+      var conn7 = document.getElementById('ciso-conn-7');
+      if (conn7) conn7.style.display = 'none';
+      continue;
+    }
+    if (item) {
+      item.style.display = '';
+      item.setAttribute('onclick', 'policyMapGoTo(' + i + ')');
+      var nameEl = item.querySelector('.step-name');
+      var numEl = item.querySelector('.step-num');
+      if (nameEl) nameEl.textContent = POLICY_MAP_STEP_LABELS[i - 1] || '';
+      if (numEl) numEl.textContent = 'Step ' + i;
+    }
+    if (conn) conn.style.display = (i < 7) ? '' : 'none';
+  }
+  for (var c = 1; c <= 7; c++) {
+    var circle = document.getElementById('ciso-circle-' + c);
+    var navItem = document.getElementById('ciso-step-item-' + c);
+    if (!circle || !navItem) continue;
+    if (c === step) {
+      circle.className = 'step-circle active';
+      navItem.classList.add('active');
+    } else if (c < step) {
+      circle.className = 'step-circle completed';
+      navItem.classList.remove('active');
+    } else {
+      circle.className = 'step-circle pending';
+      navItem.classList.remove('active');
+    }
+  }
+}
+
+function restorePathAStepNav() {
+  var labels = (typeof CISO_STEP_LABELS !== 'undefined') ? CISO_STEP_LABELS
+    : ['Organization', 'Profile', 'Program', 'Reg mapping', 'PM Controls', 'InfoSec Policy', 'Consolidate', 'Assign Owners'];
+  for (var i = 1; i <= 8; i++) {
+    var item = document.getElementById('ciso-step-item-' + i);
+    var conn = document.getElementById('ciso-conn-' + i);
+    if (item) {
+      item.style.display = '';
+      item.setAttribute('onclick', "goToStep('ciso'," + i + ")");
+      var nameEl = item.querySelector('.step-name');
+      var numEl = item.querySelector('.step-num');
+      if (nameEl) nameEl.textContent = labels[i - 1] || '';
+      if (numEl) numEl.textContent = 'Step ' + i;
+    }
+    if (conn) conn.style.display = '';
+  }
+}
+
 function policyMapUpdateProgress(step) {
   var fill = document.getElementById('ciso-setup-progress-fill');
   var label = document.getElementById('ciso-setup-progress-label');
@@ -485,6 +542,7 @@ function policyMapUpdateProgress(step) {
   var name = POLICY_MAP_STEP_LABELS[s - 1] || '';
   if (label) label.textContent = 'Step ' + s + ' of ' + POLICY_MAP_STEPS + ' \u00b7 ' + name;
   if (desc) desc.textContent = 'Map existing policies \u2014 step ' + s + ' of ' + POLICY_MAP_STEPS + ' \u2014 ' + name + '.';
+  policyMapSyncStepNav();
 }
 
 function policyMapPatchPathAFooters(step) {

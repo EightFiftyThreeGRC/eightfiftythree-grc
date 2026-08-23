@@ -168,7 +168,7 @@ function updateCISOFinishBtn() {
     btn.innerHTML = '⚠️ Replace demo placeholder owners';
     btn.style.opacity = '0.5';
     if (!document.getElementById('fake-review-panel')) {
-      btn.insertAdjacentHTML('beforebegin', '<div id="fake-review-panel" style="padding:16px;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;margin-bottom:16px;"><h4 style="color:#92400e;margin:0 0 8px 0;">Demo placeholder owners</h4><p style="font-size:12px;color:#78350f;margin:0 0 8px 0;">The following names are flagged as portfolio demo data and cannot be used for real attestations: <strong>' + escapeHTML(demoNames.join(', ')) + '</strong>. Replace demo emails in Step 8 to clear the DEMO badge, then finalize.</p></div>');
+      btn.insertAdjacentHTML('beforebegin', '<div id="fake-review-panel" style="padding:16px;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;margin-bottom:16px;"><h4 style="color:#92400e;margin:0 0 8px 0;">Demo placeholder owners</h4><p style="font-size:12px;color:#78350f;margin:0 0 8px 0;">The following names are flagged as portfolio demo data and cannot be used for real attestations: <strong>' + escapeHTML(demoNames.join(', ')) + '</strong>. Replace them with real names and emails on Assign owners to clear the DEMO badge, then finalize.</p></div>');
     }
     return;
   }
@@ -227,19 +227,41 @@ var CISO_WIZARD_STEPS = 8;
 var CISO_STEP_LABELS = ['Organization', 'Profile', 'Program', 'Reg mapping', 'PM Controls', 'InfoSec Policy', 'Consolidate', 'Assign Owners'];
 
 function updateCisoSetupProgress(step) {
+  if (typeof getResolvedProgramPath === 'function' && getResolvedProgramPath() === 'map' && !state.cisoComplete
+      && typeof policyMapUpdateProgress === 'function') {
+    policyMapUpdateProgress(typeof state.policyMapStep !== 'undefined' ? state.policyMapStep : step);
+    if (typeof policyMapSyncStepNav === 'function') policyMapSyncStepNav();
+    return;
+  }
+  if (typeof restorePathAStepNav === 'function') restorePathAStepNav();
   var s = step || (typeof currentStep !== 'undefined' ? currentStep.ciso : 1) || 1;
   var fill = document.getElementById('ciso-setup-progress-fill');
   var label = document.getElementById('ciso-setup-progress-label');
   var desc = document.getElementById('ciso-setup-header-desc');
   if (fill) fill.style.width = Math.round((s / CISO_WIZARD_STEPS) * 100) + '%';
   var name = CISO_STEP_LABELS[s - 1] || '';
-  if (label) label.textContent = 'Step ' + s + ' of ' + CISO_WIZARD_STEPS + ' · ' + name;
+  if (label) label.textContent = 'Step ' + s + ' of ' + CISO_WIZARD_STEPS + ' \u00b7 ' + name;
   if (desc) desc.textContent = 'Step ' + s + ' of ' + CISO_WIZARD_STEPS + ' \u2014 ' + name + '.';
 }
 
+function getCisoSetupStepDisplay(step, label) {
+  var displayStep = step;
+  var total = CISO_WIZARD_STEPS;
+  var displayLabel = label || (CISO_STEP_LABELS[step - 1] || '');
+  if (typeof getResolvedProgramPath === 'function' && getResolvedProgramPath() === 'map' && !state.cisoComplete) {
+    total = (typeof POLICY_MAP_STEPS === 'number') ? POLICY_MAP_STEPS : 7;
+    if (step === 8) displayStep = 7;
+    if (typeof POLICY_MAP_STEP_LABELS !== 'undefined' && POLICY_MAP_STEP_LABELS[displayStep - 1]) {
+      displayLabel = POLICY_MAP_STEP_LABELS[displayStep - 1];
+    }
+  }
+  return { step: displayStep, total: total, label: displayLabel };
+}
+
 function cisoStepProgressHtml(step, label) {
+  var meta = getCisoSetupStepDisplay(step, label);
   return '<div class="ciso-step-progress" style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:16px;">Step '
-    + step + ' of ' + CISO_WIZARD_STEPS + ' · ' + escapeHTML(label) + '</div>';
+    + meta.step + ' of ' + meta.total + ' \u00b7 ' + escapeHTML(meta.label) + '</div>';
 }
 
 function refreshCurrentCisoStep() {
@@ -1045,7 +1067,7 @@ function renderCISOStep1Profile() {
   body.innerHTML = `
     ${cisoStepProgressHtml(2, 'Profile')}
     <div class="section-title">A few questions</div>
-    <div class="section-subtitle">These answers recommend a starting baseline and which frameworks to turn on. Nothing here is asked again.</div>
+    <div class="section-subtitle">These answers suggest overlays and flag systems that may need a higher FIPS 199 categorization. Nothing here is asked again.</div>
     <div class="ciso-profile-stack">
       ${typeof renderOrgClassificationFieldsHtml === 'function' ? renderOrgClassificationFieldsHtml() : ''}
       ${typeof renderOrgProfileFieldsHtml === 'function' ? renderOrgProfileFieldsHtml() : ''}

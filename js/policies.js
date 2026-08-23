@@ -918,7 +918,7 @@ function renderPolicyList(bodyEl) {
   const body = bodyEl || document.getElementById('policy-list-body');
   if (!body) return;
   if (!state.baseline) {
-    body.innerHTML = '<div class="empty-state"><div class="es-icon">\uD83C\uDFDB\uFE0F</div><div class="es-title">CISO Setup Required</div><p>The CISO must complete program setup before policy owners can begin. Ask your CISO to finish baseline selection, PM controls, security policy, and role assignments.</p></div>';
+    body.innerHTML = '<div class="empty-state"><div class="es-icon">\uD83C\uDFDB\uFE0F</div><div class="es-title">CISO Setup Required</div><p>The CISO must complete program setup before policy owners can begin. Ask your CISO to finish organization identity, CSF structure, the ISP, and owner assignments.</p></div>';
     return;
   }
 
@@ -1145,7 +1145,7 @@ function renderPolicyList(bodyEl) {
   const cloudOwnerBuildHTML = isCloudOwner
     ? '<div style="margin-bottom:16px;">'
       + '<div style="font-size:16px;font-weight:800;color:var(--navy);margin-bottom:4px;">Build / Edit Policies</div>'
-      + '<div style="font-size:13px;color:var(--text-muted);">You\'re signed in as program owner — open any domain below to start or continue drafting.</div>'
+      + '<div style="font-size:13px;color:var(--text-muted);">Working as program owner \u2014 open any domain below to start or continue drafting.</div>'
       + '</div>'
     : '';
 
@@ -1549,7 +1549,7 @@ function renderPolicyDocViewer(fam, opts) {
       + '<div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.06em;color:#4338ca;">Under review</div>'
       + '<div style="font-size:14px;color:var(--navy);margin-top:5px;line-height:1.5;">This policy is waiting on <strong style="color:#3730a3;">' + escapeHTML(whoBr) + '</strong>'
       + (pSt.submittedAt ? '<span style="color:var(--text-muted);font-weight:500;"> — submitted ' + escapeHTML(pSt.submittedAt) + '</span>' : '')
-      + '. Sign in as that reviewer and open <strong>Reports</strong> (awaiting approval) or use <strong>Review →</strong> from the dashboard to act on it.</div>'
+      + '. Switch to that reviewer in the sidebar and open <strong>Reports</strong> (awaiting approval) or use <strong>Review \u2192</strong> from the dashboard to act on it.</div>'
       + '</div>';
   } else if (status === 'Returned') {
     html += '<div role="status" style="position:sticky;top:0;z-index:5;margin:0 0 2px 0;padding:14px 32px;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.45);border-radius:0 0 12px 12px;">'
@@ -1963,7 +1963,7 @@ function renderPolicyStep1() {
   const helpEl = document.getElementById('policy-step-1-help');
   const body = document.getElementById('policy-step-1-body');
   if (!fam || !state.baseline) {
-    if (body) body.innerHTML = '<div class="empty-state"><div class="es-icon">\uD83C\uDFDB\uFE0F</div><div class="es-title">CISO Setup Required</div><p>The CISO must complete program setup before policy owners can begin. Ask your CISO to finish baseline selection, PM controls, security policy, and role assignments.</p></div>';
+    if (body) body.innerHTML = '<div class="empty-state"><div class="es-icon">\uD83C\uDFDB\uFE0F</div><div class="es-title">CISO Setup Required</div><p>The CISO must complete program setup before policy owners can begin. Ask your CISO to finish organization identity, CSF structure, the ISP, and owner assignments.</p></div>';
     return;
   }
   const owner = state.domainOwners[fam] || {};
@@ -2000,7 +2000,7 @@ function renderPolicyStep1() {
     <div style="background:rgba(13,148,136,0.05); border:1px solid rgba(13,148,136,0.2); border-radius:8px; padding:12px; margin-bottom:16px;">
       <div style="font-size:13px; font-weight:700; color:var(--navy); margin-bottom:4px;">${escapeHTML(mergedTitle)}</div>
       <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px;">${allBadgesHtml}</div>
-      <div style="font-size:12px; color:var(--text-muted);">${ctrls} controls &middot; ${state.baseline==='L'?'Low':state.baseline==='M'?'Moderate':'High'} baseline</div>
+      <div style="font-size:12px; color:var(--text-muted);">${ctrls} controls \u00b7 ${state.baseline==='L'?'Low':state.baseline==='M'?'Moderate':'High'} common-control floor</div>
       <div style="margin-top:8px;">${chipHTML(status)}</div>
     </div>
     <div style="font-size:11px; color:var(--text-muted); line-height:1.6;">The Policy Custodian is responsible for ongoing maintenance and annual review of this policy document.</div>
@@ -2193,7 +2193,7 @@ function renderPolicyStep2() {
   const helpEl = document.getElementById('policy-step-2-help');
   const body = document.getElementById('policy-step-2-body');
   if (!state.baseline) {
-    if (body) body.innerHTML = '<div class="empty-state"><div class="es-icon">\uD83C\uDFDB\uFE0F</div><div class="es-title">CISO Setup Required</div><p>The CISO must complete program setup first, including baseline selection and control assignment.</p></div>';
+    if (body) body.innerHTML = '<div class="empty-state"><div class="es-icon">\uD83C\uDFDB\uFE0F</div><div class="es-title">CISO Setup Required</div><p>The CISO must complete program setup first, including CSF structure and owner assignments.</p></div>';
     return;
   }
   const families = getActiveFamilies().filter(function(f){ return f !== 'PM'; });
@@ -3193,7 +3193,7 @@ function renderISPPolicyViewerPanel() {
           + '<div style="font-size:12px;color:var(--text-muted);line-height:1.5;">'
           + 'Awaiting approval from <strong>' + _esc(pendingApprover || 'the designated approver') + '</strong>'
           + (pendingEmail ? ' (' + _esc(pendingEmail) + ')' : '')
-          + '. Sign in with that account to approve or return this policy.</div></div>';
+          + '. Switch to that profile in the sidebar to approve or return this policy.</div></div>';
       }
     }
     // Annual review working draft (kickoff — promoted from approved suggestions)
@@ -3975,7 +3975,7 @@ function renderPolicyStep4() {
   if (!body) return;
   const fam = state._policyDomain || getActiveFamilies().filter(f=>f!=='PM')[0];
   if (!state.baseline) {
-    body.innerHTML = `<div class="empty-state"><div class="es-icon">⚠️</div><div class="es-title">Setup Required</div><p>The CISO must complete all program setup steps first, including baseline selection, PM controls, and policy creation.</p></div>`;
+    body.innerHTML = `<div class="empty-state"><div class="es-icon">⚠️</div><div class="es-title">Setup Required</div><p>The CISO must complete program setup first, including CSF structure, the ISP, and owner assignments.</p></div>`;
     return;
   }
   const selected = (state.policySelectedControls||{})[fam]||[];

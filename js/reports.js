@@ -1792,7 +1792,7 @@ function approveISP() {
   if (typeof canSessionApproveISP === 'function' && !canSessionApproveISP()) {
     var approverEmail = typeof getISPDesignatedApproverEmail === 'function' ? getISPDesignatedApproverEmail() : '';
     var msg = approverEmail
-      ? 'Only the designated ISP approver (' + approverEmail + ') can approve this policy. Sign in with that account.'
+      ? 'Only the designated ISP approver (' + approverEmail + ') can approve this policy. Switch to that profile in the sidebar.'
       : 'Only the designated ISP approver can approve this policy.';
     showToast(msg, true);
     return;
@@ -1839,7 +1839,7 @@ function returnISPToEditor() {
   if (typeof canSessionApproveISP === 'function' && !canSessionApproveISP()) {
     var approverEmail = typeof getISPDesignatedApproverEmail === 'function' ? getISPDesignatedApproverEmail() : '';
     var msg = approverEmail
-      ? 'Only the designated ISP approver (' + approverEmail + ') can return this policy. Sign in with that account.'
+      ? 'Only the designated ISP approver (' + approverEmail + ') can return this policy. Switch to that profile in the sidebar.'
       : 'Only the designated ISP approver can return this policy.';
     showToast(msg, true);
     return;
@@ -2205,7 +2205,7 @@ function renderApproverDashboard(user) {
         html += '<div style="font-size:12px;color:var(--text-muted);line-height:1.5;">'
           + 'Awaiting approval from <strong>' + escapeHTML(getISPDesignatedApproverName() || 'the designated approver') + '</strong>'
           + (approverEmail ? ' (' + escapeHTML(approverEmail) + ')' : '')
-          + '. Sign in with that account to approve or return this policy.</div>';
+          + '. Switch to that profile in the sidebar to approve or return this policy.</div>';
       }
       html += '</div>';
     } else if (ispSt === 'Approved') {

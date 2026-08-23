@@ -108,7 +108,7 @@ function renderOnboardingHome() {
   var chosen = typeof getResolvedProgramPath === 'function' ? getResolvedProgramPath() : (state.programPath || '');
   var progress = getSetupProgressSummary();
   var hasStarted = !!(String(state.orgName || '').trim() || String(state.programOwner || '').trim() || state.baseline);
-  var total = progress.total || (chosen === 'map' ? 6 : 7);
+  var total = progress.total || (chosen === 'map' ? 7 : 8);
 
   // Nothing chosen yet: two equal-weight path cards. Do not auto-select.
   if (!chosen) {
@@ -148,7 +148,7 @@ function renderOnboardingHome() {
     ? 'Everything you\u2019ve entered is saved. This is the next screen.'
     : (isMap
       ? 'Catalog the documents you already have, map them to NIST 800-53, then close the gaps.'
-      : 'Start with who owns the program. Then a few questions so we can recommend a baseline.');
+      : 'Start with who owns the program. Then a short profile so we can suggest overlays and flag systems that may need a higher categorization.');
   var cta = hasStarted ? 'Continue' : (isMap ? 'Start mapping' : 'Start setup');
 
   body.innerHTML = ''
@@ -262,6 +262,15 @@ function getNextActions() {
         desc: 'Tier 1 Information Security Policy is awaiting your sign-off.',
         action: "showTab('reports');goToCISOPolicyEditor();"
       });
+    } else {
+      var approverNm = typeof getISPDesignatedApproverName === 'function' ? getISPDesignatedApproverName() : '';
+      actions.push({
+        priority: 1,
+        icon: '📋',
+        label: 'ISP awaiting ' + (approverNm || 'approver'),
+        desc: 'Switch profile to that person to approve or return the ISP.',
+        action: "typeof showRolePicker === 'function' ? showRolePicker() : showTab('reports');"
+      });
     }
   }
 
@@ -339,6 +348,56 @@ function getNextActions() {
       actions.push({ priority: 4, icon: '🖥️', label: 'SSP submitted: ' + a.name, desc: 'Review asset package on Reports.', action: "showTab('reports');" });
     }
   });
+
+  var hubTabs = typeof getHubVisibleTabIds === 'function' ? getHubVisibleTabIds() : [];
+  if (hubTabs.indexOf('policy') !== -1) {
+    var masters = typeof getMasterPolicyFamilies === 'function' ? getMasterPolicyFamilies() : [];
+    var draftFam = null;
+    var draftSt = '';
+    for (var mi = 0; mi < masters.length; mi++) {
+      draftSt = ((state.policyStatus || {})[masters[mi]] || {}).status || 'Not Started';
+      if (draftSt === 'Not Started' || draftSt === 'In Progress' || draftSt === 'Draft') {
+        draftFam = masters[mi];
+        break;
+      }
+    }
+    if (draftFam) {
+      var draftTitle = typeof getPolicyMergedTitle === 'function' ? getPolicyMergedTitle(draftFam) : draftFam;
+      var draftEsc = String(draftFam).replace(/'/g, "\\'");
+      actions.push({
+        priority: 2,
+        icon: '📋',
+        label: (draftSt === 'In Progress' || draftSt === 'Draft' ? 'Continue ' : 'Draft ') + draftTitle + ' policy',
+        desc: 'Function policy is not submitted yet.',
+        action: "showTab('policy');if(typeof enterPolicyWizard==='function')enterPolicyWizard('" + draftEsc + "');"
+      });
+    }
+  }
+  if (hubTabs.indexOf('asset') !== -1 && !(state.assets || []).length) {
+    actions.push({
+      priority: 3,
+      icon: '🖥️',
+      label: 'Register a system',
+      desc: 'Categorize it under FIPS 199. That sets this system\u2019s 800-53 baseline \u2014 not the organization.',
+      action: "showTab('asset');if(typeof openAddItemModal==='function')openAddItemModal('asset');"
+    });
+  }
+  if (hubTabs.indexOf('control') !== -1 && typeof getActiveControls === 'function') {
+    var needsDesign = getActiveControls().some(function(c) {
+      var st = (state.controlStatus || {})[c.id];
+      var status = st ? st.status : 'Not Started';
+      return status !== 'Implemented' && status !== 'Inherited' && status !== 'N/A';
+    });
+    if (needsDesign) {
+      actions.push({
+        priority: 4,
+        icon: '🔧',
+        label: 'Design control implementations',
+        desc: 'Document how in-scope 800-53 controls are implemented.',
+        action: "typeof goToControlWorkspace === 'function' ? goToControlWorkspace() : showTab('control');"
+      });
+    }
+  }
 
   actions.sort(function(a, b) { return a.priority - b.priority; });
   return actions.slice(0, 8);
@@ -575,8 +634,8 @@ function updateCommandCenterPageHeader() {
   var subtitle = document.getElementById('home-page-subtitle');
   if (!subtitle || !state.cisoComplete) return;
   var org = (state.orgName || '').trim() || 'Your organization';
-  var baseline = state.baseline ? (state.baseline === 'L' ? 'Low' : state.baseline === 'M' ? 'Moderate' : 'High') : '—';
-  subtitle.textContent = org + ' · ' + baseline + ' baseline · posture and next actions';
+  var floor = state.baseline ? (state.baseline === 'L' ? 'Low' : state.baseline === 'M' ? 'Moderate' : 'High') : '\u2014';
+  subtitle.textContent = org + ' \u00b7 ' + floor + ' common-control floor \u00b7 posture and next actions';
 }
 
 function renderHomeTab() {

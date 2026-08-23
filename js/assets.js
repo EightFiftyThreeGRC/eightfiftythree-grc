@@ -1259,6 +1259,7 @@ function createAssetFromLibrary() {
     }
   }
 
+  if (typeof ensureAuthBoundaryForAsset === 'function') ensureAuthBoundaryForAsset(newAsset);
   addAuditEntry('asset', newAsset.id, 'Asset created from Asset Library: ' + newAsset.name + (ownerName ? ' (owner: ' + ownerName + ')' : ''));
   markDirty();
   showToast('Asset created: ' + newAsset.name);
@@ -3913,6 +3914,7 @@ function confirmAddAsset() {
   if (!state.assets) state.assets = [];
   var newAsset = { id: 'asset-' + Date.now(), name: name, type: type, owner: owner, description: '' };
   state.assets.push(newAsset);
+  if (typeof ensureAuthBoundaryForAsset === 'function') ensureAuthBoundaryForAsset(newAsset);
   document.getElementById('addItemOverlay')?.remove();
   markDirty();
   renderSidebarAssets();

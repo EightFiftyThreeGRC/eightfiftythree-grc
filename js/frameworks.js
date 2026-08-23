@@ -432,7 +432,7 @@ function renderOrgProfileFieldsHtml() {
     + renderOrgProfileSelectHtml('Workforce size', 'orgSizeBand', ORG_SIZE_OPTIONS,
         'Informs overlay suggestions and which systems may need elevation \u2014 not an organizational 800-53 baseline.')
     + renderOrgProfileSelectHtml('Worst realistic consequence', 'orgImpactProfile', ORG_IMPACT_OPTIONS,
-        'Compromise or outage \u2014 used to recommend a baseline.')
+        'Compromise or outage \u2014 flags systems that may need a higher FIPS 199 categorization.')
     + '</div>'
     + '<div class="form-group" style="margin-bottom:0;">'
     + '<label class="form-label">Regulated or sensitive data <span class="required">*</span></label>'
