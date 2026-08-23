@@ -898,7 +898,7 @@ function renderPublishedISPDocInReports(bodyEl) {
     else content = sec.content || '';
     if (!content) return;
     html += '<div style="background:white;border:1px solid var(--border);border-top:none;padding:20px 28px;">'
-      + '<div style="font-size:12px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;">' + _esc(sec.title || sec.type) + '</div>'
+      + '<div style="font-size:12px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;">' + _esc(typeof policySectionHeadingTitle === 'function' ? policySectionHeadingTitle(sec) : (sec.title || sec.type)) + '</div>'
       + '<div style="font-size:14px;line-height:1.7;color:#374151;white-space:pre-wrap;">' + _esc(content) + '</div></div>';
   });
   html += '</div>';
@@ -1384,7 +1384,7 @@ function _buildISPExportPayload() {
   var sections = [];
   (isp.sections || []).forEach(function(sec) {
     var txt = (sec && sec.content) ? String(sec.content).trim() : '';
-    if (txt) sections.push({ heading: sec.title || sec.type || 'Section', content: txt });
+    if (txt) sections.push({ heading: (typeof policySectionHeadingTitle === 'function' ? policySectionHeadingTitle(sec) : (sec.title || sec.type || 'Section')), content: txt });
   });
   if ((isp.roles || []).length) {
     var rolesText = (isp.roles || []).map(function(r) {
@@ -2621,6 +2621,7 @@ function _migrateDomainPolicy(fam) {
     dp.sections.push({ type:'revision-history', title:'Revision History' });
   }
   if (!dp.revisionHistory) dp.revisionHistory = [];
+  if (typeof rewriteRetiredImportChromeTitles === 'function') rewriteRetiredImportChromeTitles(dp.sections);
   // Tier 2 domain R&R: remove legacy "Program Owner" row (org/CISO approval is outside this list).
   if (dp.roles && dp.roles.length) {
     dp.roles = dp.roles.filter(function(r) {
@@ -3002,7 +3003,7 @@ function renderISPPolicyViewerPanel() {
       if (!content) return;
       hasSections = true;
       ispHTML += '<div style="margin-bottom:20px;">'
-        + '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:6px;">' + _esc(sec.title||sec.type) + '</div>'
+        + '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:6px;">' + _esc(typeof policySectionHeadingTitle === 'function' ? policySectionHeadingTitle(sec) : (sec.title||sec.type)) + '</div>'
         + '<div style="font-size:13px;color:var(--navy);line-height:1.7;white-space:pre-wrap;">' + _esc(content) + '</div>'
         + '</div>';
     });
@@ -3661,7 +3662,7 @@ function renderPolicyStep3() {
     const hdr = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;border-bottom:2px solid var(--border);padding-bottom:6px;">' +
       '<div style="display:flex;align-items:center;gap:8px;">' +
         '<span style="cursor:grab;color:var(--text-muted);font-size:16px;" title="Drag to reorder">⠿</span>' +
-        '<div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--navy);">'+(si+1)+'. '+escapeHTML(sec.title)+'</div>' +
+        '<div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--navy);">'+(si+1)+'. '+escapeHTML(typeof policySectionHeadingTitle === 'function' ? policySectionHeadingTitle(sec) : (sec.title || ''))+'</div>' +
       '</div>' +
       '<div style="display:flex;gap:4px;align-items:center;">'+upBtn+downBtn+delBtn+'</div>' +
     '</div>';
@@ -3687,7 +3688,7 @@ function renderPolicyStep3() {
     } else if (sec.type === 'revision-history') {
       content = _renderDomainRevisionHistory(fam, dp);
     } else if (sec.type === 'custom') {
-      content = '<div style="margin-bottom:8px;"><input class="form-input" style="font-size:14px;font-weight:600;border:none;border-bottom:1px solid var(--border);border-radius:0;padding:4px 0;background:transparent;" value="'+escapeHTML(sec.title)+'" oninput="state.domainPolicies[\''+esc_fam+'\'].sections['+si+'].title=this.value;renderPolicyStep3();; window.markDirty();" placeholder="Section title"></div>' +
+      content = '<div style="margin-bottom:8px;"><input class="form-input" style="font-size:14px;font-weight:600;border:none;border-bottom:1px solid var(--border);border-radius:0;padding:4px 0;background:transparent;" value="'+escapeHTML(typeof policySectionHeadingTitle === 'function' ? policySectionHeadingTitle(sec) : (sec.title || ''))+'" oninput="state.domainPolicies[\''+esc_fam+'\'].sections['+si+'].title=this.value;renderPolicyStep3();; window.markDirty();" placeholder="Section title"></div>' +
         '<textarea class="form-input" rows="5" style="font-size:13px;line-height:1.7;resize:vertical;" oninput="state.domainPolicies[\''+esc_fam+'\'].sections['+si+'].content=this.value; window.markDirty();" placeholder="Enter section content…">'+(sec.content||'')+'</textarea>';
     }
     return '<div class="isp-section" data-section-idx="'+si+'" '+dragAttr+' style="margin-bottom:28px;padding:4px 4px 4px 4px;border-radius:6px;transition:background 0.15s;">'+hdr+content+'</div>';

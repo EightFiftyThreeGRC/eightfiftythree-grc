@@ -1801,6 +1801,7 @@ function ensureISPSectionMigrations() {
     if (sec.type === 'enforcement' && !sec.content) sec.content = getDefaultISPEnforcementContent(orgNameVal);
     if (sec.type === 'exceptions' && !sec.content) sec.content = getDefaultISPExceptionsContent(orgNameVal);
   });
+  if (typeof rewriteRetiredImportChromeTitles === 'function') rewriteRetiredImportChromeTitles(isp.sections);
 }
 
 function ensureISPPrivacyRoles() {
@@ -1991,7 +1992,7 @@ function renderISPEditorBody(body, opts) {
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;border-bottom:2px solid var(--border);padding-bottom:6px;">
         <div style="display:flex;align-items:center;gap:8px;">
           <span style="cursor:grab;color:var(--text-muted);font-size:16px;" title="Drag to reorder">⠿</span>
-          <div style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--navy);">${si+1}. ${escapeHTML(sec.title)}</div>
+          <div style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--navy);">${si+1}. ${escapeHTML(typeof policySectionHeadingTitle === 'function' ? policySectionHeadingTitle(sec) : (sec.title || ''))}</div>
         </div>
         <div style="display:flex;gap:6px;align-items:center;">
           ${renderSectionActions(sec, si)}
@@ -2028,7 +2029,7 @@ function renderISPEditorBody(body, opts) {
     } else if (sec.type === 'custom') {
       content = `
         <div style="margin-bottom:8px;">
-          <input class="form-input" style="font-size:14px;font-weight:600;border:none;border-bottom:1px solid var(--border);border-radius:0;padding:4px 0;background:transparent;" value="${escapeHTML(sec.title)}" oninput="setISPSectionTitle(${si}, this.value, true);" placeholder="Section title">
+          <input class="form-input" style="font-size:14px;font-weight:600;border:none;border-bottom:1px solid var(--border);border-radius:0;padding:4px 0;background:transparent;" value="${escapeHTML(typeof policySectionHeadingTitle === 'function' ? policySectionHeadingTitle(sec) : (sec.title || ''))}" oninput="setISPSectionTitle(${si}, this.value, true);" placeholder="Section title">
         </div>
         <textarea class="form-input" rows="6" style="font-size:13px;line-height:1.8;padding:16px 18px;border-radius:8px;background:white;border:1px solid var(--border);resize:vertical;min-height:100px;" oninput="setISPSectionContent(${si}, this.value);" placeholder="Enter section content…">${escapeHTML(sec.content||'')}</textarea>`;
     }

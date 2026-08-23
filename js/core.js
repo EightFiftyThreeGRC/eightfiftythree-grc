@@ -1369,9 +1369,32 @@ function stripLegacyDemoPlaceholderFlags() {
   if (Array.isArray(state.users)) state.users.forEach(strip);
 }
 
+/** Exact BYO ingest chrome titles. Bodies stay; only the origin heading is rewritten. */
+var RETIRED_IMPORT_CHROME_TITLE = /^imported\s+(section|policy)$/i;
+
+function isRetiredImportChromeTitle(title) {
+  return RETIRED_IMPORT_CHROME_TITLE.test(String(title || '').trim());
+}
+
+function policySectionHeadingTitle(sec) {
+  var t = String((sec && sec.title) || '').trim();
+  if (isRetiredImportChromeTitle(t)) return 'Additional section';
+  return t || String((sec && sec.type) || '').trim() || 'Section';
+}
+
+function rewriteRetiredImportChromeTitles(sections) {
+  if (!Array.isArray(sections)) return;
+  sections.forEach(function(sec) {
+    if (!sec || typeof sec !== 'object') return;
+    if (isRetiredImportChromeTitle(sec.title)) sec.title = 'Additional section';
+  });
+}
+
 /**
  * Drop retired BYO/file-ingest flags. Authored ISP and domain policy bodies stay.
  * Catalog rows keep title/type/owner/mapping; raw paste blobs and import meta go.
+ * Section titles that were only ingest chrome ("Imported section" / "Imported policy")
+ * are renamed so renderers never show import origin.
  */
 function stripRetiredPolicyIngestState() {
   if (!state) return;
@@ -1382,12 +1405,20 @@ function stripRetiredPolicyIngestState() {
     if ('importedFrom' in obj) delete obj.importedFrom;
     if ('importedAt' in obj) delete obj.importedAt;
     if (obj.source === 'imported') delete obj.source;
+    rewriteRetiredImportChromeTitles(obj.sections);
   }
 
   stripImportMeta(state.infoSecPolicy);
+  if (state.infoSecPolicy && isRetiredImportChromeTitle(state.infoSecPolicy.title) && typeof getDefaultISPTitle === 'function') {
+    state.infoSecPolicy.title = getDefaultISPTitle();
+  }
   if (isPlainObject(state.domainPolicies)) {
     Object.keys(state.domainPolicies).forEach(function(k) {
-      stripImportMeta(state.domainPolicies[k]);
+      var dp = state.domainPolicies[k];
+      stripImportMeta(dp);
+      if (dp && isRetiredImportChromeTitle(dp.title)) {
+        dp.title = (typeof getPolicyMergedTitle === 'function' ? getPolicyMergedTitle(k) : '') || 'Additional section';
+      }
     });
   }
 

@@ -935,7 +935,7 @@ function viewISPModal() {
       if (!content) return;
       hasSections = true;
       sectionsHTML += '<div style="margin-bottom:20px;">'
-        + '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:6px;">' + escapeHTML(sec.title||sec.type) + '</div>'
+        + '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:6px;">' + escapeHTML(typeof policySectionHeadingTitle === 'function' ? policySectionHeadingTitle(sec) : (sec.title||sec.type)) + '</div>'
         + '<div style="font-size:13px;color:var(--navy);line-height:1.7;white-space:pre-wrap;">' + escapeHTML(content) + '</div>'
         + '</div>';
     });
