@@ -1438,12 +1438,12 @@ function renderCISOStep2Baseline() {
   body.innerHTML = `
     ${cisoStepProgressHtml(3, 'Program')}
     <div class="section-title">This program is structured around NIST CSF 2.0</div>
-    <p class="program-structure-lead">Baselines (Low / Moderate / High) are selected for an information system, from that system\u2019s FIPS 199 categorization, inside its authorization boundary. You do not choose \u201cthe organization is Moderate.\u201d</p>
+    <p class="program-structure-lead">This step sets program structure and the inherited common-control floor. You do not choose \u201cthe organization is Moderate.\u201d Low / Moderate / High is chosen later for each information system in Assets &amp; SSP.</p>
     ${renderCsfProgramStructureHtml()}
     <p class="program-structure-note">Govern is the ISP. Identify, Protect, Detect, Respond, and Recover are the domain policy packages. 800-53 controls implement those outcomes. RMF Prepare (SP 800-37 P-4) is organizationally-tailored control baselines and common controls \u2014 a tailoring and inheritance job, not an estate-wide Low / Moderate / High pick.</p>
     <div class="common-floor-note">
       <div class="common-floor-kicker">Inherited catalog</div>
-      <div class="common-floor-line">Common-control floor (${escapeHTML(floorLabel)}). Systems are categorized separately under FIPS 199.</div>
+      <div class="common-floor-line">Common-control floor (${escapeHTML(floorLabel)}). Each system categorizes later in Assets &amp; SSP.</div>
       <div class="common-floor-sub">${floorCount} controls in the inherited common-control set (NIST 800-53B). A Moderate or High system pulls additional controls through baseline elevation in Assets &amp; SSP without flipping this floor.</div>
     </div>
     <p class="program-structure-flag">${escapeHTML(getProfileElevationFlagSentence())}</p>
@@ -1457,7 +1457,7 @@ function renderCISOStep2Baseline() {
     </div>
     <details class="common-floor-advanced"${advancedOpen}>
       <summary>Advanced: change the inherited common-control floor</summary>
-      <p>Only if the catalog itself must start above Low. This is not a FIPS 199 decision for the organization.</p>
+      <p>Only if the catalog itself must start above Low. This does not categorize any information system.</p>
       <select class="form-select" style="max-width:240px;" onchange="selectBaseline(this.value)">${floorOptions}</select>
     </details>
   `;
