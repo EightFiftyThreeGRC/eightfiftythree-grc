@@ -268,16 +268,6 @@ function renderRolePickerProfiles() {
 }
 
 function selectUserProfile(userId) {
-  // Block impersonation of demo placeholder users — any attestation made while
-  // acting as one of them would have no real signatory, which is a
-  // non-repudiation violation in a real program.
-  if (userId && userId !== 'admin') {
-    var pickedUser = (state.users || []).find(function(x){ return x.id === userId; });
-    if (pickedUser && pickedUser.isDemoPlaceholder) {
-      showToast('Cannot act as a demo placeholder user. Replace ' + (pickedUser.name || 'this user') + ' under Users & roles, or stay in Admin mode for demos.', true);
-      return;
-    }
-  }
   if (typeof window !== 'undefined') {
     window.selectedControl = null;
     window.selectedDomain = null;

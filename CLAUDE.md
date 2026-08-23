@@ -41,10 +41,9 @@ js/nist-control-text.js     — verbatim NIST 800-53 control requirement text lo
 js/core.js                  — STATE shape, STATE_DEFAULTS, ROLE_TABS, persistence
                               (saveToStorage / loadFromStorage / markDirty /
                               importProgramFromFile / validateProgramShape /
-                              applyLoadedState / addAuditEntry / logFieldChange /
-                              getDemoPlaceholderNames / blockActionIfDemoPlaceholders)
+                              applyLoadedState / addAuditEntry / logFieldChange)
 js/program.js               — CISO setup wizard (8 steps, CISO_STEP_LABELS);
-                              prefillDemoOwners; prefillDemoControlOwners; sidebar badges
+                              seedDomainOwnersFromProgramOwner; sidebar badges
 js/policies.js              — Domain Policies wizard (4 steps) + policy library
 js/controls.js              — Control Implementation wizard (4 steps) + control library
 js/assets.js                — Assets & SSP wizard (4 steps) + asset/asset-type libraries;
@@ -110,7 +109,7 @@ Program/CISO identity
 - `pmControls`, `cisoComplete`, `infoSecPolicy`
 
 Policies
-- `domainOwners` — `{ 'AC': { name, email, role, isDemoPlaceholder? }, ... }`
+- `domainOwners` — `{ 'AC': { name, email, role }, ... }`
 - `policyDeadlines`, `policyStatus`, `policyPriorities`, `domainDeadlines`
 - `policyMerges` — `{ 'IA': 'AC' }` means IA is merged under AC's owner card
 - `domainCustomNames` — display names for merged domains
@@ -147,10 +146,10 @@ Risks & Issues (Phase 2 — `js/risk.js`, tab id `risk`)
 - PM-4 selected in CISO wizard → issues sub-view labeled **Issues (POA&M)** + CSV export
 
 Users / acting identity
-- `users` — `[{ id, name, email, role, families[], controls[], note, isDemoPlaceholder? }]`, built by `syncUsersFromState()` from the wizard's owner assignments
+- `users` — `[{ id, name, email, role, families[], controls[], note }]`, built by `syncUsersFromState()` from the wizard's owner assignments
 - `currentUserId` — `null` = Admin mode (full program-owner oversight); string id = impersonating that roster record
 - `_currentPersonIds` — every roster row belonging to the impersonated person (one human can hold several roles); `null` in Admin mode
-- Switch identity with `selectUserProfile(id | 'admin')` from the sidebar role picker. Impersonating a user with `isDemoPlaceholder` is blocked so attestations always have a real signatory.
+- Switch identity with `selectUserProfile(id | 'admin')` from the sidebar role picker. Any rostered person can be impersonated.
 - Role → tabs mapping: `ROLE_TABS` in `js/core.js` (~line 1075). Roles: `ciso`, `issm`, `control-owner`, `asset-owner`, `custodian`, `assessor`, `ao`, `approver`. Every role's list includes `home` (Command Center). The `risk` tab is on most implementation/review roles (`ciso`, `issm`, `control-owner`, `asset-owner`, `assessor`, `ao`). As of 2026-04-27 the dedicated Control Assessment (`tester`) and Authorization (`ato`) tabs were removed. `ao` now sees `home` + `asset` + `risk` + `reports` + `users`; `assessor` sees `home` + `risk` + `reports`. Admins can also define custom role slugs via `state.customProgramRoles[]` (resolved by `getRoleTabs()` in `js/app.js` using `tabsTemplate: 'assessor' | 'reports-only'`). AO decisions are recorded via `openAtoDecisionModal()` which is launched from the Authorization status panel on the Reports dashboard. Tab visibility is enforced in `showTab()` (redirects out-of-role tab ids), not just hidden nav.
 
 Accountability
@@ -219,7 +218,7 @@ Top-left of sidebar has the profile button (`showRolePicker()` → role picker o
 7. **Consolidate** — review and prioritize domain policies, suggest merges (e.g., PS+AT, CP+IR, MP+PE, SR+SA)
 8. **Assign Owners** — assign the 20 NIST control families to domain policy owners, set priorities and deadlines
 
-**Phantom-owner safety net:** `prefillDemoOwners()` and `prefillDemoControlOwners(fam)` (in `js/program.js`) inject synthetic identities ("Alex Rivera", "Jordan Patel", etc.) for demos. Each entry point is now confirmation-gated, every demo record is tagged with `isDemoPlaceholder: true`, and `blockActionIfDemoPlaceholders()` (called from `cisoFinish`, `submitSSP`, `submitProcessSSP`, `submitControlDesign`, `confirmSubmitDomainPolicy`, `openAtoDecisionModal`, `submitAtoDecisionFromModal`) refuses to advance until placeholders are replaced. The legacy `prefillFakeOwners` / `prefillFakeControlOwners` names remain as `@deprecated` thin wrappers — do not call them in new code.
+**Owner assignment gating:** the only finalize guard is in `cisoFinish` — every unmerged domain must carry a valid owner email (`isValidOwnerEmail`) or the wizard refuses to complete. The former "phantom-owner safety net" (the `prefillDemoOwners` / `prefillDemoControlOwners` demo-data injectors, the `isDemoPlaceholder` tag, and the `blockActionIfDemoPlaceholders()` submit gate) was removed 2026-08-23. It only ever recognised its own prefilled records and never validated hand-typed identities, so it was not a general control against fictitious signatories. `stripLegacyDemoPlaceholderFlags()` in `js/core.js` clears the retired tag from loaded state; it can be deleted after a release cycle.
 
 ### Role-Based Workspaces
 
@@ -281,7 +280,7 @@ When `privacyOverlay` is true, the ISP auto-injects tiered privacy requirements 
 4. "Snapshots" modal → load each XMPL snapshot, then Reset and confirm no ghost state
 5. Sidebar badges and counts update correctly after state changes
 6. Role-picker: impersonate each role, confirm only the intended tabs are visible (assessor sees `reports` only; AO sees `asset` + `reports` + `users`; the AO sees an "Authorization status" panel on the dashboard with a Record decision button per boundary), then switch back to Admin mode
-7. Demo placeholder gating: prefill demo owners, then attempt to finalize → must be blocked with a toast naming the demo identities
+7. Owner gating: clear a domain owner's email, then attempt to finalize → must be blocked with a toast naming the unassigned domain count
 
 ## Work Style
 

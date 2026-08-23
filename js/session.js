@@ -68,10 +68,9 @@ function getCloudSessionName() {
   return email ? email.split('@')[0] : '';
 }
 
-/** The roster record for the acting identity, ignoring demo placeholders. */
+/** The roster record for the acting identity. */
 function getMatchedCloudProgramUser() {
-  var u = getActingUser();
-  return (u && !u.isDemoPlaceholder) ? u : null;
+  return getActingUser() || null;
 }
 
 /** Human-friendly name for the acting identity. */

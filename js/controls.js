@@ -2911,7 +2911,6 @@ function setCtrlOwnerField(ctrlId, field, value) {
   if (!state.controlOwners[ctrlId]) state.controlOwners[ctrlId] = {};
   var prev = state.controlOwners[ctrlId][field];
   state.controlOwners[ctrlId][field] = value;
-  if (field === 'name' || field === 'email') delete state.controlOwners[ctrlId].isDemoPlaceholder;
   logFieldChange('controlOwners.' + ctrlId + '.' + field, prev, value);
   markDirty();
 }
@@ -4395,7 +4394,7 @@ function getControlDesignReviewerCandidates(fam) {
     role: state.programOwnerTitle || 'Program Owner'
   });
   (state.users || []).forEach(function(u) {
-    if (!u || u.isDemoPlaceholder) return;
+    if (!u) return;
     addCandidate(u.id, u);
   });
   return list;
@@ -4723,7 +4722,6 @@ function renderControlStep4() {
 }
 
 function submitControlDesign() {
-  if (blockActionIfDemoPlaceholders()) return;
   clearScopedUndoStack('control design submit');
   const currentUser = state.currentUserId ? (state.users||[]).find(u=>u.id===state.currentUserId) : null;
   const name = typeof getSessionActorName === 'function'

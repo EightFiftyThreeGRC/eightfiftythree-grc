@@ -1164,6 +1164,12 @@ const state = {
   assetCategoryLabelOverrides: {},     // { canonicalCategoryName: displayLabel }
   processCategoryLabelOverrides: {},   // { categoryId: displayLabel }
   cisoComplete: false,
+  // Post-setup landing decision for the `home` tab (js/hub.js owns the render).
+  // mode 'guided' = staged journey, one thing at a time; 'open' = the full
+  // Command Center dashboard. A fresh program starts guided. `focus` pins a
+  // stage the operator jumped back to; `deferred` holds stage ids they chose to
+  // come back to later. Stage completion itself is always computed from state.
+  homeJourney: { mode: 'guided', focus: '', deferred: {} },
   // First-run program path. Empty until the operator chooses on Command Center.
   // 'build' = draft ISP + domain policies (8-step wizard).
   // 'map'   = catalog existing documents and align them to 800-53 (Path B).
@@ -1756,7 +1762,7 @@ function hasRealControlOwner(co) {
 
 /** True when a control owner can be invited to sign up (name + valid work email). */
 function isControlOwnerInviteReady(co) {
-  if (!co || co.isDemoPlaceholder) return false;
+  if (!co) return false;
   if (!(co.name || '').trim()) return false;
   return isValidOwnerEmail(co.email);
 }
@@ -1767,7 +1773,7 @@ function isKnownProgramUserEmail(email) {
   if (!key) return false;
   if (normalizeOwnerEmail(state.programOwnerEmail) === key) return true;
   if ((state.users || []).some(function(u) {
-    return !u.isDemoPlaceholder && normalizeOwnerEmail(u.email) === key;
+    return normalizeOwnerEmail(u.email) === key;
   })) return true;
   var owners = state.domainOwners || {};
   return Object.keys(owners).some(function(fam) {
@@ -1802,7 +1808,7 @@ function getControlOwnerDisplayName(co) {
 }
 
 function userNeedsProfileSetup(user) {
-  if (!user || user.isDemoPlaceholder) return false;
+  if (!user) return false;
   if (user.profileComplete === true) return false;
   if (user.profileComplete === false) return true;
   var email = normalizeOwnerEmail(user.email);
@@ -1834,41 +1840,6 @@ function countUniquePolicyOwnerEmails() {
     if (isValidOwnerEmail(em)) seen[em] = true;
   });
   return Object.keys(seen).length;
-}
-
-function getDemoPlaceholderNames() {
-  var names = [];
-  var seen = {};
-  function add(n) {
-    n = (n || '').trim();
-    if (!n || seen[n]) return;
-    seen[n] = true;
-    names.push(n);
-  }
-  Object.keys(state.domainOwners || {}).forEach(function(fam) {
-    var o = state.domainOwners[fam];
-    if (o && o.isDemoPlaceholder) add(o.name);
-  });
-  Object.keys(state.controlOwners || {}).forEach(function(cid) {
-    var o = state.controlOwners[cid];
-    if (o && o.isDemoPlaceholder) add(o.name);
-  });
-  // Demo placeholder users (tagged when the prefill helpers seed state.users).
-  (state.users || []).forEach(function(u) {
-    if (u && u.isDemoPlaceholder) add(u.name);
-  });
-  return names;
-}
-
-function hasDemoPlaceholderOwners() {
-  return getDemoPlaceholderNames().length > 0;
-}
-
-function blockActionIfDemoPlaceholders() {
-  var names = getDemoPlaceholderNames();
-  if (!names.length) return false;
-  showToast('Demo placeholder owners detected. Replace ' + names.join(', ') + ' with real people before submitting.', true);
-  return true;
 }
 
 function clearScopedUndoStack(reason) {
@@ -2046,40 +2017,20 @@ function loadFromStorage() {
 }
 
 function exportProgramJson() {
-  function doExport() {
-    try {
-      var blob = new Blob([JSON.stringify(buildPersistedPayload(), null, 2)], { type: 'application/json' });
-      var a = document.createElement('a');
-      var base = ((state.orgName || '') + '').replace(/[^\w\-.]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48) || 'grc-program';
-      a.href = URL.createObjectURL(blob);
-      a.download = base + '-export.json';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(a.href);
-      showToast('JSON export downloaded — keep it as a backup outside the browser.');
-    } catch (e) {
-      showToast('Export failed.', true);
-    }
+  try {
+    var blob = new Blob([JSON.stringify(buildPersistedPayload(), null, 2)], { type: 'application/json' });
+    var a = document.createElement('a');
+    var base = ((state.orgName || '') + '').replace(/[^\w\-.]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48) || 'grc-program';
+    a.href = URL.createObjectURL(blob);
+    a.download = base + '-export.json';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(a.href);
+    showToast('JSON export downloaded \u2014 keep it as a backup outside the browser.');
+  } catch (e) {
+    showToast('Export failed.', true);
   }
-  if (!hasDemoPlaceholderOwners()) {
-    doExport();
-    return;
-  }
-  var overlay = document.createElement('div');
-  overlay.id = 'exportDemoWarnOverlay';
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:10050;display:flex;align-items:center;justify-content:center;padding:16px;';
-  overlay.innerHTML = '<div style="background:white;border-radius:14px;max-width:480px;width:100%;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,0.25);">'
-    + '<div style="font-size:17px;font-weight:800;color:var(--navy);margin-bottom:8px;">Demo placeholder owners</div>'
-    + '<p style="font-size:13px;color:var(--text-muted);line-height:1.55;margin:0 0 16px 0;">This program contains demo placeholder owners. Export anyway for testing, or cancel to replace them first.</p>'
-    + '<div style="display:flex;gap:10px;justify-content:flex-end;">'
-    + '<button class="btn btn-secondary" type="button" id="exportDemoCancel">Cancel</button>'
-    + '<button class="btn btn-primary" type="button" id="exportDemoAnyway">Export anyway</button>'
-    + '</div></div>';
-  document.body.appendChild(overlay);
-  document.getElementById('exportDemoCancel').onclick = function() { overlay.remove(); };
-  document.getElementById('exportDemoAnyway').onclick = function() { overlay.remove(); doExport(); };
-  overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
 }
 
 function importProgramFromFile(ev) {

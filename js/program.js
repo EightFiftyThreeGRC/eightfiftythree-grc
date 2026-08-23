@@ -161,20 +161,6 @@ function allOwnersAssigned() {
 }
 
 function updateCISOFinishBtn() {
-  var demoNames = getDemoPlaceholderNames();
-  if (demoNames.length && document.getElementById('ciso-finalise-btn')) {
-    const btn = document.getElementById('ciso-finalise-btn');
-    btn.disabled = true;
-    btn.innerHTML = '⚠️ Replace demo placeholder owners';
-    btn.style.opacity = '0.5';
-    if (!document.getElementById('fake-review-panel')) {
-      btn.insertAdjacentHTML('beforebegin', '<div id="fake-review-panel" style="padding:16px;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;margin-bottom:16px;"><h4 style="color:#92400e;margin:0 0 8px 0;">Demo placeholder owners</h4><p style="font-size:12px;color:#78350f;margin:0 0 8px 0;">The following names are flagged as portfolio demo data and cannot be used for real attestations: <strong>' + escapeHTML(demoNames.join(', ')) + '</strong>. Replace them with real names and emails on Assign owners to clear the DEMO badge, then finalize.</p></div>');
-    }
-    return;
-  }
-  var fr = document.getElementById('fake-review-panel');
-  if (fr) fr.remove();
-
   const btn = document.getElementById('ciso-finalise-btn');
   if (!btn) return;
 
@@ -221,7 +207,7 @@ function updateCISOFinishBtn() {
 // ============================================================
 // CISO WIZARD — STEP DISPATCH & SHARED HELPERS
 // renderCISOStep router, cisoNext, allOwnersAssigned,
-// updateCISOFinishBtn, goToStep, prefillFakeOwners, etc.
+// updateCISOFinishBtn, goToStep, etc.
 // ============================================================
 var CISO_WIZARD_STEPS = 8;
 var CISO_STEP_LABELS = ['Organization', 'Profile', 'Program', 'Reg mapping', 'PM Controls', 'InfoSec Policy', 'Consolidate', 'Assign Owners'];
@@ -533,8 +519,6 @@ function showToast(msg, isError=false) {
 }
 
 function cisoFinish() {
-  if (blockActionIfDemoPlaceholders()) return;
-  // Check if any domain owners are unassigned — do not auto-inject demo identities
   const families = getActiveFamilies().filter(f => f !== 'PM');
   const merges = state.policyMerges || {};
   const masters = families.filter(f => !merges[f]);
@@ -2987,7 +2971,6 @@ function applyOwnerEmailToFamilies(famList, email, meta) {
       name: (meta.name || '').trim(),
       role: (meta.role || '').trim() || DOMAIN_SUGGESTED_ROLES[fam] || 'Security Manager'
     };
-    delete state.domainOwners[fam].isDemoPlaceholder;
     families.filter(function(f) { return merges[f] === fam; }).forEach(function(mf) {
       state.domainOwners[mf] = Object.assign({}, state.domainOwners[fam]);
     });
@@ -3036,10 +3019,9 @@ function setProgramOwnerOwnsDomainPolicies(on) {
 
 /**
  * Default unassigned domains to the program owner when step 1 said they own domain
- * policies. These are real assignments — never tagged isDemoPlaceholder, so finalize is
- * not blocked by blockActionIfDemoPlaceholders(). Only empty rows are written, so a
- * domain handed to someone else keeps its owner. Applied once per answer
- * (domainOwnerDefaultApplied) so an explicit clear is not undone on the next visit.
+ * policies. Only empty rows are written, so a domain handed to someone else keeps its
+ * owner. Applied once per answer (domainOwnerDefaultApplied) so an explicit clear is
+ * not undone on the next visit.
  */
 function seedDomainOwnersFromProgramOwner() {
   if (state.domainOwnerDefaultApplied) return 0;
@@ -3304,7 +3286,6 @@ function assignOwnerToReturnedDomainPolicy(fam, meta) {
 
   relatedFams.forEach(function(targetFam) {
     state.domainOwners[targetFam] = { name: name, email: email, role: role };
-    delete state.domainOwners[targetFam].isDemoPlaceholder;
     if (!state.policyStatus[targetFam]) state.policyStatus[targetFam] = {};
     if (keepReturned) {
       state.policyStatus[targetFam].status = 'Returned';
@@ -3515,9 +3496,6 @@ function setDomainOwner(fam, field, value) {
   var path = 'domainOwners.' + fam + '.' + field;
   var prev = state.domainOwners[fam][field];
   state.domainOwners[fam][field] = value;
-  if (field === 'name' || field === 'email') {
-    delete state.domainOwners[fam].isDemoPlaceholder;
-  }
   logFieldChange(path, prev, value);
   if (field === 'email') applyProgramOwnerMetaIfMatchingEmail(fam);
   if (field === 'name' || field === 'email') {
@@ -3562,91 +3540,8 @@ function autoPopulateControlOwnersFromDomain(fam) {
         email: owner.email || '',
         dueDate: state.policyDeadlines[fam] || ''
       };
-      if (owner.isDemoPlaceholder) state.controlOwners[cid].isDemoPlaceholder = true;
-      else delete state.controlOwners[cid].isDemoPlaceholder;
     }
     if (typeof markControlPlannedIfAssigned === 'function') markControlPlannedIfAssigned(cid);
   });
 }
 
-function prefillDemoOwners() {
-  if (state.cisoComplete) {
-    showToast('Cannot inject demo owners after program setup is finalized.', true);
-    return;
-  }
-  if (!confirm('This will populate domain owners with synthetic identities ("Alex Rivera", etc.) for demonstration only. Any record marked as a demo placeholder will be blocked from finalize/submit until you replace it with a real person. Continue?')) return;
-  setTimeout(updateCISOFinishBtn, 100);
-
-  // Fake people mapped to each consolidated bucket
-  const FAKE_PEOPLE = {
-    'IAM/Access Lead':          { name:'Alex Rivera',      role:'IAM/Access Lead',          email:'alex.rivera@example.com' },
-    'GRC/Risk Lead':            { name:'Jordan Patel',     role:'GRC/Risk Lead',            email:'jordan.patel@example.com' },
-    'Security Engineering Lead':{ name:'Sam Chen',         role:'Security Engineering Lead', email:'sam.chen@example.com' },
-    'Ops/Continuity Lead':      { name:'Morgan Williams',  role:'Ops/Continuity Lead',       email:'morgan.williams@example.com' },
-    'People Lead':              { name:'Taylor Brooks',    role:'People Lead',               email:'taylor.brooks@example.com' },
-    'Supply Chain/Vendor Lead': { name:'Casey Thompson',   role:'Supply Chain/Vendor Lead',  email:'casey.thompson@example.com' },
-    'CISO':                     { name: state.programOwner || 'Chris Morgan', role:'CISO',  email: state.programOwnerEmail || 'ciso@example.com' },
-  };
-  const families = getActiveFamilies().filter(f => f !== 'PM');
-  const merges = state.policyMerges || {};
-  const masters = families.filter(f => !merges[f]);
-  masters.forEach(fam => {
-    const bucket = DOMAIN_SUGGESTED_ROLES[fam] || 'GRC/Risk Lead';
-    const person = FAKE_PEOPLE[bucket] || FAKE_PEOPLE['GRC/Risk Lead'];
-    state.domainOwners[fam] = Object.assign({}, person, { isDemoPlaceholder: true });
-    // propagate to merged-in families
-    families.filter(f => merges[f] === fam).forEach(mf => { state.domainOwners[mf] = Object.assign({}, person, { isDemoPlaceholder: true }); });
-    // Auto-populate control owners from domain owner
-    autoPopulateControlOwnersFromDomain(fam);
-  });
-  showToast('🧪 Demo data prefilled — replace names with real owners before finalizing.');
-  renderActiveCisoSetupStep();
-}
-
-/** @deprecated */ function prefillFakeOwners() { return prefillDemoOwners(); }
-
-function prefillDemoControlOwners(fam) {
-  const title = getPolicyMergedTitle(fam);
-  if (!confirm('This will populate ' + title + ' control owners with synthetic identities for demo only. Demo placeholder records will be blocked from policy submit until you replace them with real people. Continue?')) return;
-  const selected = (state.policySelectedControls || {})[fam] || [];
-  if (!state.controlOwners) state.controlOwners = {};
-  if (!state.users) state.users = [];
-
-  // Distinct control owner roster — different names from policy owners
-  const FAKE_CO_ROSTER = [
-    { name: 'Priya Nair',      role: 'control-owner', note: 'Systems Security Engineer',  email: 'priya.nair@example.com' },
-    { name: 'Daniel Osei',     role: 'control-owner', note: 'IT Security Analyst',        email: 'daniel.osei@example.com' },
-    { name: 'Rachel Kim',      role: 'control-owner', note: 'Compliance Engineer',        email: 'rachel.kim@example.com' },
-    { name: 'Marcus Torres',   role: 'control-owner', note: 'Infrastructure Lead',        email: 'marcus.torres@example.com' },
-  ];
-
-  // Ensure each person exists in state.users so they can log in. Tag demo
-  // identities so the role picker can refuse to impersonate them — non-repudiation
-  // shortcut: real attestations must come from real people.
-  FAKE_CO_ROSTER.forEach(function(p) {
-    const existing = state.users.find(function(u) { return u.name === p.name; });
-    if (!existing) {
-      state.users.push({
-        id: 'u_co_' + p.name.replace(/\s+/g,'_').toLowerCase(),
-        name: p.name, role: p.role, note: p.note, email: p.email,
-        families: [], controls: [], isDemoPlaceholder: true
-      });
-    } else if (!existing.isDemoPlaceholder) {
-      // Pre-existing user with the same name — leave them alone.
-    }
-  });
-
-  // Distribute controls round-robin across the roster
-  selected.forEach(function(cid, idx) {
-    const p = FAKE_CO_ROSTER[idx % FAKE_CO_ROSTER.length];
-    state.controlOwners[cid] = { name: p.name, role: p.note, email: p.email, isDemoPlaceholder: true };
-    // Also track in the user's controls list
-    const u = state.users.find(function(u) { return u.name === p.name; });
-    if (u && !u.controls.includes(cid)) u.controls.push(cid);
-  });
-
-  showToast('🧪 Demo data prefilled — control owners assigned for ' + title + '. Replace with real owners before policy submit.');
-  renderPolicyStep4();
-}
-
-/** @deprecated */ function prefillFakeControlOwners(fam) { return prefillDemoControlOwners(fam); }

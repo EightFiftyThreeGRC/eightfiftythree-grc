@@ -3761,7 +3761,6 @@ function applySSPFieldBulkToSelected() {
 }
 
 function submitSSP() {
-  if (blockActionIfDemoPlaceholders()) return;
   clearScopedUndoStack('SSP submit');
   var asset = (state.assets||[]).find(function(a){ return String(a.id) === String(state._selectedAssetId); });
   if (!asset) return;
@@ -4169,7 +4168,6 @@ function renderProcessSSPStep5_SignOff() {
 }
 
 function submitProcessSSP() {
-  if (blockActionIfDemoPlaceholders()) return;
   clearScopedUndoStack('Process SSP submit');
   var proc = (state.processes||[]).find(function(p){ return String(p.id)===String(state._selectedProcessId); });
   if (!proc) return;

@@ -99,7 +99,6 @@ function atoDecisionDefaultExpiry(decision) {
 /** Open a modal for the AO to record a decision on `boundaryId`. */
 function openAtoDecisionModal(boundaryId) {
   atoEnsureState();
-  if (typeof blockActionIfDemoPlaceholders === 'function' && blockActionIfDemoPlaceholders()) return;
   var boundary = (state.authBoundaries || []).find(function(b) { return b.id === boundaryId; });
   if (!boundary) { showToast('Boundary not found.', true); return; }
   var canDecide = atoCanDecide(boundary);
@@ -159,7 +158,6 @@ function closeAtoDecisionModal() {
 /** Pulls the form values out of the modal and persists the decision. */
 function submitAtoDecisionFromModal(boundaryId) {
   atoEnsureState();
-  if (typeof blockActionIfDemoPlaceholders === 'function' && blockActionIfDemoPlaceholders()) return;
   var boundary = (state.authBoundaries || []).find(function(b) { return b.id === boundaryId; });
   if (!boundary) { showToast('Boundary not found.', true); return; }
   if (!atoCanDecide(boundary)) {

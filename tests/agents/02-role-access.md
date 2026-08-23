@@ -8,8 +8,7 @@ Goal: every role sees exactly its tabs; separation-of-duties rules hold.
    - Spot expectations as of 2026-07: assessor → risk + reports; ao → asset + risk + reports + users, with an "Authorization status" panel + Record decision button on the Reports dashboard; no dedicated tester/ato tabs exist.
 3. AO decision: `openAtoDecisionModal` only actionable when `atoCanDecide(boundary)` is true; non-AO roles never see Record decision.
 4. SoD: issue verification must be blocked when verifier == assignee; risk acceptance only available to program owner / AO.
-5. Demo-placeholder gating fires on every entry point: cisoFinish, policy submit, submitControlDesign, submitSSP, submitAtoDecision.
-6. Admin mode (`currentUserId = null`) sees everything; a user with no assignments gets the scoped empty-state on Reports, not a blank page.
+5. Admin mode (`currentUserId = null`) sees everything; a user with no assignments gets the scoped empty-state on Reports, not a blank page.
 
 ## Output
 Matrix: Role | Expected tabs | Observed tabs | Match? — plus a findings table for SoD/gating checks. End with PASS/FAIL.

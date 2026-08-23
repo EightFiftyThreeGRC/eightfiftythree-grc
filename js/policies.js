@@ -4038,10 +4038,6 @@ function renderPolicyStep4() {
           <button type="button" class="btn btn-secondary btn-sm" style="width:100%;" onclick="openBulkAssignControlModal('${fam}')">Bulk assign (picker)…</button>
         </div>
 
-        ${!state.currentUserId ? `<div style="border-top:1px solid var(--border); padding-top:12px;">
-          <button onclick="prefillDemoControlOwners('${fam}')" style="width:100%;font-size:11px;font-weight:700;color:#a5b4fc;background:rgba(165,180,252,0.1);border:1px solid rgba(165,180,252,0.3);border-radius:6px;padding:6px 10px;cursor:pointer;">🧪 Prefill demo data</button>
-        </div>` : ''}
-
         <div style="margin-top:auto; border-top:1px solid var(--border); padding-top:12px;">
           <div style="font-size:11px; color:var(--text-muted); line-height:1.5;">Each control owner needs a <strong>work email</strong> so they can sign up, claim their controls, and begin implementation in the Control Owner workspace.</div>
         </div>
@@ -4099,7 +4095,6 @@ function renderPolicyStep4() {
                   : '')
                 + '<input class="form-input co-name" data-cid="' + cid + '" style="font-size:12px;width:100%;box-sizing:border-box;margin-bottom:4px;" placeholder="Full name" value="' + escapeHTML(ownerName !== '—' ? (co.name || '') : '') + '" oninput="setCtrlOwner(\'' + cid + '\',\'name\',this.value);step4RosterSync(\'' + cid + '\');_coCardUpdate(\'' + cid + '\');">'
                 + '<input class="form-input co-email" data-cid="' + cid + '" type="email" autocomplete="email" style="font-size:12px;width:100%;box-sizing:border-box;" placeholder="work email@org.com (required)" value="' + escapeHTML(co.email || '') + '" oninput="setCtrlOwner(\'' + cid + '\',\'email\',this.value);_coCardUpdate(\'' + cid + '\');">'
-                + (co.isDemoPlaceholder ? '<div class="demo-placeholder-badge" style="margin-top:6px;">Demo placeholder — replace before submit</div>' : '')
                 + statusHtml
                 + '</td>'
                 + '</tr>';
@@ -4236,9 +4231,6 @@ function setCtrlOwner(ctrlId, field, value) {
   var path = 'controlOwners.' + ctrlId + '.' + field;
   var prev = state.controlOwners[ctrlId][field];
   state.controlOwners[ctrlId][field] = value;
-  if (field === 'name' || field === 'email') {
-    delete state.controlOwners[ctrlId].isDemoPlaceholder;
-  }
   logFieldChange(path, prev, value);
   if (field === 'name' || field === 'email') {
     _coCardUpdate(ctrlId);
@@ -4425,7 +4417,6 @@ function showSubmitModal() {
 }
 
 function confirmSubmitDomainPolicy() {
-  if (blockActionIfDemoPlaceholders()) return;
   clearScopedUndoStack('policy submit');
   const fam = state._policyDomain || getActiveFamilies().filter(f=>f!=='PM')[0];
   if (!state.policyStatus) state.policyStatus = {};

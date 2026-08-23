@@ -120,7 +120,6 @@ function step7ProbeFn() {
     finalizeText: btn ? btn.innerText : '',
     finalizeDisabled: btn ? !!btn.disabled : null,
     rows: rows,
-    demoNames: (typeof getDemoPlaceholderNames === 'function') ? getDemoPlaceholderNames() : [],
     defaultApplied: !!state.domainOwnerDefaultApplied
   };
 }
