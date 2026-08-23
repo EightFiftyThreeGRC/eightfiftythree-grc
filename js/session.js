@@ -150,7 +150,7 @@ function canReassignProgramWork() {
 function getISPDesignatedApproverEmail() {
   var ps = (state.policyStatus || {}).ISP || {};
   var rc = (state.policyReviewCycle || {}).ISP || {};
-  return _sessionNormalizeEmail(ps.submittedToEmail || rc.approverEmail || '');
+  return _sessionNormalizeEmail(ps.submittedToEmail || rc.approverEmail || state.programOwnerEmail || '');
 }
 
 function getISPDesignatedApproverName() {
@@ -261,33 +261,9 @@ function getSessionReturnedDomainPoliciesNeedingOwner() {
 }
 
 function validateISPApproverAssignment(rc, silent) {
-  rc = rc || (state.policyReviewCycle || {}).ISP || {};
-  if (!rc._customApprover) {
-    if (!silent && typeof showToast === 'function') {
-      showToast('The ISP must be approved by someone other than the program owner. Turn on "Different approver" and assign a separate reviewer.', true);
-    }
-    return false;
-  }
-  var email = (rc.approverEmail || '').trim();
-  var name = (rc.approvedBy || '').trim();
-  if (typeof isValidOwnerEmail === 'function' && !isValidOwnerEmail(email)) {
-    if (!silent && typeof showToast === 'function') {
-      showToast('Enter a valid approver email so the roster shows who signs off on the ISP.', true);
-    }
-    return false;
-  }
-  if (!name) {
-    if (!silent && typeof showToast === 'function') {
-      showToast('Enter the approver name in the Policy Review card.', true);
-    }
-    return false;
-  }
-  if (ispApproverViolatesSeparationOfDuties(email, name)) {
-    if (!silent && typeof showToast === 'function') {
-      showToast('The ISP approver must be a different person than the program owner (separation of duties).', true);
-    }
-    return false;
-  }
+  // Setup no longer collects a distinct ISP approver email, and Next must
+  // not block on a missing or invalid address. Downstream Reports approval
+  // falls back to the program owner via getISPDesignatedApproverEmail.
   return true;
 }
 

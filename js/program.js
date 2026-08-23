@@ -339,21 +339,9 @@ function cisoNext(fromStep) {
     if (typeof ensureCommonControlFloor === 'function') ensureCommonControlFloor();
   }
   if (fromStep===6) {
-    var ispRc = (state.policyReviewCycle || {}).ISP || {};
-    if (typeof validateISPApproverAssignment === 'function') {
-      if (!validateISPApproverAssignment(ispRc, false)) return;
-    } else if (ispRc._customApprover) {
-      var approverEm = String(ispRc.approverEmail || '').trim();
-      if (!isValidOwnerEmail(approverEm)) {
-        showToast('Enter a valid approver email — they will receive a sign-up link to review the ISP.', true);
-        return;
-      }
-    } else {
-      showToast('Assign a different ISP approver (not the program owner) for separation of duties.', true);
-      return;
-    }
-    // Finalize the ISP and submit to the selected approver for review.
-    try { submitISPForApproval(false, { forceEmail: true }); } catch (e) { console.warn('submitISPForApproval failed:', e); }
+    // Finalize the ISP. Setup no longer collects an approver email, so do not
+    // block Next on a missing or invalid address.
+    try { submitISPForApproval(true); } catch (e) { console.warn('submitISPForApproval failed:', e); }
   }
   goToStep('ciso', fromStep+1);
 }
@@ -397,9 +385,11 @@ function resubmitISPForApproval() {
   showTab('home');
 }
 
-// Auto-submits the ISP to the assigned approver when the CISO advances past the InfoSec Policy step.
-// options.forceEmail — re-send approver invite when leaving ISP step (even if already Under Review).
-// options.forceResubmit — program owner resubmitting after approver returned the ISP.
+// Finalizes the ISP when the CISO advances past the InfoSec Policy step (or resubmits).
+// Setup does not collect an approver email; fall back to the program owner so
+// Reports approval still has someone to match. options.forceEmail is kept for
+// callers that re-route after a status change. options.forceResubmit - program
+// owner resubmitting after an approver returned the ISP.
 function submitISPForApproval(silent, options) {
   options = options || {};
   var forceEmail = !!options.forceEmail;
@@ -409,38 +399,15 @@ function submitISPForApproval(silent, options) {
   if (!state.policyReviewCycle) state.policyReviewCycle = {};
   var rc = state.policyReviewCycle.ISP || (state.policyReviewCycle.ISP = {});
 
-  if (typeof validateISPApproverAssignment === 'function') {
-    if (!validateISPApproverAssignment(rc, silent)) return;
-  }
-
-  // Determine approver — ISP requires a different person than the program owner.
   var isCustom = !!rc._customApprover;
-  if (!isCustom) {
-    if (!silent && typeof showToast === 'function') {
-      showToast('The ISP must be approved by someone other than the program owner. Turn on "Different approver" and assign a separate reviewer.', true);
-    }
-    return;
-  }
-  var approverName = (rc.approvedBy || '').trim();
-  var approverRole  = (rc.approverRole  || '').trim();
-  var approverEmail = (rc.approverEmail || '').trim();
-  if (typeof ispApproverViolatesSeparationOfDuties === 'function'
-      && ispApproverViolatesSeparationOfDuties(approverEmail, approverName)) {
-    if (!silent && typeof showToast === 'function') {
-      showToast('The ISP approver must be a different person than the program owner (separation of duties).', true);
-    }
-    return;
-  }
+  var approverName = (rc.approvedBy || '').trim() || (state.programOwner || '').trim();
+  var approverRole  = (rc.approverRole  || '').trim() || (state.programOwnerTitle || '').trim();
+  var approverEmail = (rc.approverEmail || '').trim() || (state.programOwnerEmail || '').trim();
 
-  if (!approverName) {
-    if (!silent) showToast('Tip: assign an ISP approver in the Policy Review card to route it for sign-off.', true);
-    return;
-  }
-
-  // Persist the approver on the review cycle so Peter's view can render the correct "Approver" label.
-  rc.approvedBy    = approverName;
-  rc.approverRole  = approverRole;
-  rc.approverEmail = approverEmail;
+  // Persist whoever we resolved so later Reports / role-picker views have a label.
+  if (approverName) rc.approvedBy = approverName;
+  if (approverRole) rc.approverRole = approverRole;
+  if (approverEmail) rc.approverEmail = approverEmail;
 
   // Mark the ISP as finalized by setting a title. Other views (sidebar badge, approver queue,
   // policy status fallbacks) use `state.infoSecPolicy.title` as the "ISP exists / is done" flag.
