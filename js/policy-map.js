@@ -3,12 +3,13 @@
 // Path A (build-from-scratch) stays in js/program.js unchanged.
 
 var POLICY_MAP_STEPS = 7;
-var POLICY_MAP_STEP_LABELS = ['Organization', 'Profile', 'Program', 'Catalog', 'Map', 'Coverage', 'Assign owners'];
+var POLICY_MAP_STEP_LABELS = ['Organization', 'Profile', 'Program', 'Catalog', 'Map', 'Further policies', 'Assign owners'];
 var POLICY_MAP_DOC_TYPES = [
   { id: 'policy', label: 'Policy', hint: 'Intent \u2014 what must be true' },
   { id: 'standard', label: 'Standard', hint: 'Measurable requirement' },
   { id: 'procedure', label: 'Procedure', hint: 'How the work is done' }
 ];
+var POLICY_MAP_CSF_FUNCTIONS = ['GV', 'ID', 'PR', 'DE', 'RS', 'RC'];
 
 function getResolvedProgramPath() {
   var p = state && state.programPath;
@@ -55,6 +56,65 @@ function shouldRenderPolicyMapSetup() {
 
 function ensurePolicyCatalog() {
   if (!Array.isArray(state.policyCatalog)) state.policyCatalog = [];
+  state.policyCatalog.forEach(function(d) {
+    if (!d || typeof d !== 'object') return;
+    if (!Array.isArray(d.csfFunctions)) d.csfFunctions = [];
+    if (!Array.isArray(d.familyCodes)) d.familyCodes = [];
+    if (!Array.isArray(d.controlIds)) d.controlIds = [];
+  });
+}
+
+function policyMapCsfFunctionIds() {
+  if (typeof CSF_FUNCTIONS !== 'undefined' && CSF_FUNCTIONS) {
+    return POLICY_MAP_CSF_FUNCTIONS.filter(function(fn) { return !!CSF_FUNCTIONS[fn]; });
+  }
+  return POLICY_MAP_CSF_FUNCTIONS.slice();
+}
+
+function policyMapNormalizeCsfFunctions(raw) {
+  var allowed = {};
+  policyMapCsfFunctionIds().forEach(function(fn) { allowed[fn] = true; });
+  var seen = {};
+  var out = [];
+  (Array.isArray(raw) ? raw : []).forEach(function(fn) {
+    var id = String(fn || '').toUpperCase();
+    if (!allowed[id] || seen[id]) return;
+    seen[id] = true;
+    out.push(id);
+  });
+  return out;
+}
+
+function policyMapCsfFunctionName(fn) {
+  if (typeof CSF_FUNCTIONS !== 'undefined' && CSF_FUNCTIONS[fn]) return CSF_FUNCTIONS[fn].name;
+  var fallback = { GV: 'Govern', ID: 'Identify', PR: 'Protect', DE: 'Detect', RS: 'Respond', RC: 'Recover' };
+  return fallback[fn] || fn;
+}
+
+/** Govern / ISP is covered by a Function claim, the ISP checkbox, or a PM family map. */
+function policyMapDocCoversGovern(d) {
+  if (!d) return false;
+  if (d.isProgramPolicy) return true;
+  if ((d.csfFunctions || []).indexOf('GV') !== -1) return true;
+  if ((d.familyCodes || []).indexOf('PM') !== -1) return true;
+  return false;
+}
+
+function policyMapFamilyCsfFunction(fam) {
+  if (fam === 'PM') return 'GV';
+  if (typeof getCsfFamilyPolicyFunction === 'function') return getCsfFamilyPolicyFunction(fam) || '';
+  return '';
+}
+
+function policyMapMergeRoot(fam) {
+  var merges = (state && state.policyMerges) || {};
+  var seen = {};
+  var cur = fam;
+  while (cur && merges[cur] && !seen[cur]) {
+    seen[cur] = true;
+    cur = merges[cur];
+  }
+  return cur;
 }
 
 function policyMapNewId() {
@@ -92,19 +152,41 @@ function policyMapNormalizeDoc(raw) {
     sourceNote: String(d.sourceNote || '').trim(),
     familyCodes: Array.isArray(d.familyCodes) ? d.familyCodes.filter(Boolean) : [],
     controlIds: Array.isArray(d.controlIds) ? d.controlIds.filter(Boolean) : [],
+    csfFunctions: policyMapNormalizeCsfFunctions(d.csfFunctions),
     coverageNote: String(d.coverageNote || '').trim(),
     isProgramPolicy: !!d.isProgramPolicy
   };
 }
 
+/**
+ * Every in-scope 800-53 family, including PM (always) and PT when the privacy overlay is on.
+ * Do not hide PM because the ISP / Govern layer also covers program management.
+ */
 function policyMapInScopeFamilies() {
   var fams = typeof getActiveFamilies === 'function' ? getActiveFamilies() : Object.keys(FAMILIES || {});
-  return fams.filter(function(f) { return f !== 'PM'; });
+  if (!Array.isArray(fams)) fams = [];
+  var seen = {};
+  var out = [];
+  function add(f) {
+    if (!f || seen[f] || !(FAMILIES && FAMILIES[f])) return;
+    seen[f] = true;
+    out.push(f);
+  }
+  fams.forEach(add);
+  add('PM');
+  if (state && state.privacyOverlay) add('PT');
+  return out.sort();
 }
 
 function policyMapInScopeControlsForFamily(fam) {
   var all = typeof getActiveControls === 'function' ? getActiveControls() : [];
-  return all.filter(function(c) { return c && c.f === fam; });
+  var inFam = all.filter(function(c) { return c && c.f === fam; });
+  if (fam === 'PM') {
+    policyMapEnsurePmDefaults();
+    var selected = inFam.filter(function(c) { return state.pmControls && state.pmControls[c.id]; });
+    if (selected.length) return selected;
+  }
+  return inFam;
 }
 
 function policyMapControlFamily(cid) {
@@ -121,7 +203,7 @@ function policyMapDocFamilies(doc) {
   var seen = {};
   var out = [];
   function add(f) {
-    if (!f || seen[f] || f === 'PM') return;
+    if (!f || seen[f]) return;
     seen[f] = true;
     out.push(f);
   }
@@ -157,19 +239,44 @@ function getPolicyMapCoverage() {
   ensurePolicyCatalog();
   var docs = state.policyCatalog.map(policyMapNormalizeDoc);
   var families = policyMapInScopeFamilies();
-  var ispMapped = docs.some(function(d) { return d.isProgramPolicy || (d.familyCodes || []).indexOf('PM') !== -1; });
+  var ispMapped = docs.some(policyMapDocCoversGovern);
+  var claimedFns = {};
+  docs.forEach(function(d) {
+    policyMapNormalizeCsfFunctions(d.csfFunctions).forEach(function(fn) { claimedFns[fn] = true; });
+    if (d.isProgramPolicy) claimedFns.GV = true;
+  });
+  var csfRows = policyMapCsfFunctionIds().map(function(fn) {
+    var hits = docs.filter(function(d) {
+      if (fn === 'GV') return policyMapDocCoversGovern(d);
+      return (d.csfFunctions || []).indexOf(fn) !== -1;
+    });
+    return {
+      fn: fn,
+      name: policyMapCsfFunctionName(fn),
+      mapped: hits.length > 0,
+      docs: hits
+    };
+  });
   var rows = families.map(function(fam) {
     var ctrls = policyMapInScopeControlsForFamily(fam);
     var inScopeIds = ctrls.map(function(c) { return c.id; });
-    var hits = docs.filter(function(d) { return policyMapDocFamilies(d).indexOf(fam) !== -1; });
+    var famFn = policyMapFamilyCsfFunction(fam);
+    var fnClaimed = !!(famFn && claimedFns[famFn]) || (fam === 'PM' && ispMapped);
+    var hits = docs.filter(function(d) {
+      if (policyMapDocFamilies(d).indexOf(fam) !== -1) return true;
+      if (fam === 'PM' && policyMapDocCoversGovern(d)) return true;
+      return !!(famFn && ((d.csfFunctions || []).indexOf(famFn) !== -1 || (famFn === 'GV' && policyMapDocCoversGovern(d))));
+    });
     var status = policyMapFamilyCoverageStatus(fam, hits, inScopeIds);
     var coveredIds = [];
-    var familyLevel = hits.some(function(d) {
+    var familyLevel = fnClaimed || hits.some(function(d) {
       return (d.familyCodes || []).indexOf(fam) !== -1
         && !(d.controlIds || []).some(function(cid) { return policyMapControlFamily(cid) === fam; });
     });
+    if (fnClaimed && status === 'gap') status = 'mapped';
     if (familyLevel) {
       coveredIds = inScopeIds.slice();
+      if (status === 'gap') status = 'mapped';
     } else {
       var named = {};
       hits.forEach(function(d) {
@@ -194,7 +301,9 @@ function getPolicyMapCoverage() {
   var gap = rows.filter(function(r) { return r.status === 'gap'; }).length;
   return {
     ispMapped: ispMapped,
-    ispDocs: docs.filter(function(d) { return d.isProgramPolicy || (d.familyCodes || []).indexOf('PM') !== -1; }),
+    ispDocs: docs.filter(policyMapDocCoversGovern),
+    csfRows: csfRows,
+    csfMapped: csfRows.filter(function(r) { return r.mapped; }).length,
     rows: rows,
     mapped: mapped,
     partial: partial,
@@ -441,10 +550,11 @@ function policyMapValidateUpTo(fromStep) {
   }
   if (fromStep >= 5) {
     var anyMapped = state.policyCatalog.some(function(d) {
-      return d && ((d.familyCodes && d.familyCodes.length) || (d.controlIds && d.controlIds.length) || d.isProgramPolicy);
+      return d && ((d.familyCodes && d.familyCodes.length) || (d.controlIds && d.controlIds.length)
+        || (d.csfFunctions && d.csfFunctions.length) || d.isProgramPolicy);
     });
     if (!anyMapped) {
-      showToast('Map at least one document to a control family (or mark it as the organization ISP) before reviewing coverage.', true);
+      showToast('Map at least one document to a CSF Function or 800-53 family (or mark it as the organization ISP) before reviewing coverage.', true);
       return false;
     }
   }
@@ -555,7 +665,7 @@ function policyMapPatchPathAFooters(step) {
     var back = document.querySelector('#ciso-step-8 .wizard-step-footer .btn-secondary');
     if (back) {
       back.setAttribute('onclick', 'policyMapGoTo(6)');
-      back.textContent = '\u2190 Back to coverage';
+      back.textContent = '\u2190 Back to further policies';
     }
   }
 }
@@ -608,7 +718,7 @@ function renderPolicyMapWizardBody(step) {
   else inner = renderPolicyMapCoverageHtml();
 
   var backStep = step - 1;
-  var nextLabel = step === 4 ? 'Next: Map to NIST \u2192' : step === 5 ? 'Next: Coverage review \u2192' : 'Confirm mapping \u2192';
+  var nextLabel = step === 4 ? 'Next: Map to NIST \u2192' : step === 5 ? 'Next: Further policies \u2192' : 'Next: Assign owners \u2192';
   var nextFn = step === 6 ? 'policyMapConfirmCoverage()' : 'policyMapNext(' + step + ')';
 
   root.innerHTML = ''
@@ -692,9 +802,19 @@ function renderPolicyMapCatalogHtml() {
     var d = policyMapNormalizeDoc(raw);
     var editing = state._policyMapEditId === d.id;
     var fams = policyMapDocFamilies(d);
-    var famBits = fams.length
-      ? fams.map(function(f) { return '<span class="pmap-chip pmap-chip-quiet">' + escapeHTML(f) + '</span>'; }).join('')
-      : (d.isProgramPolicy ? '<span class="pmap-chip pmap-chip-quiet">ISP</span>' : '<span class="pmap-muted">Not mapped yet</span>');
+    var fns = policyMapNormalizeCsfFunctions(d.csfFunctions);
+    if (d.isProgramPolicy && fns.indexOf('GV') === -1) fns = ['GV'].concat(fns);
+    var famBits = '';
+    if (fns.length) {
+      famBits += fns.map(function(fn) {
+        return '<span class="pmap-chip pmap-chip-quiet pmap-chip-fn csf-fn-' + fn.toLowerCase() + '"><span class="pmap-chip-code">' + escapeHTML(fn) + '</span>' + escapeHTML(policyMapCsfFunctionName(fn)) + '</span>';
+      }).join('');
+    }
+    if (fams.length) {
+      famBits += fams.map(function(f) { return '<span class="pmap-chip pmap-chip-quiet">' + escapeHTML(f) + '</span>'; }).join('');
+    }
+    if (d.isProgramPolicy) famBits += '<span class="pmap-chip pmap-chip-quiet">ISP</span>';
+    if (!famBits) famBits = '<span class="pmap-muted">Not mapped yet</span>';
     if (editing) {
       cards += ''
         + '<div class="pmap-card pmap-card-edit">'
@@ -735,7 +855,7 @@ function renderPolicyMapCatalogHtml() {
 
   return ''
     + '<div class="section-title">Catalog existing documents</div>'
-    + '<div class="section-subtitle">Policies, standards, and procedures you already have. This is a structured catalog \u2014 not a file upload. Mapping to NIST families happens on the next step.</div>'
+    + '<div class="section-subtitle">Policies, standards, and procedures you already have. This is a structured catalog \u2014 not a file upload. Mapping to CSF Functions and 800-53 families happens on the next step.</div>'
     + '<div class="pmap-toolbar"><button type="button" class="btn btn-primary" onclick="policyMapAddDocument()">Add document</button>'
     + '<span class="pmap-muted">' + rows.length + ' in catalog</span></div>'
     + '<div class="pmap-list">' + cards + '</div>';
@@ -761,6 +881,26 @@ function policyMapToggleProgramPolicy(id, on) {
   var doc = getPolicyCatalogDoc(id);
   if (!doc) return;
   doc.isProgramPolicy = !!on;
+  if (!Array.isArray(doc.csfFunctions)) doc.csfFunctions = [];
+  var gi = doc.csfFunctions.indexOf('GV');
+  if (on && gi === -1) doc.csfFunctions.push('GV');
+  if (!on && gi !== -1) doc.csfFunctions.splice(gi, 1);
+  markDirty();
+  policyMapRerender();
+}
+
+function policyMapToggleCsfFunction(id, fn) {
+  var doc = getPolicyCatalogDoc(id);
+  if (!doc) return;
+  fn = String(fn || '').toUpperCase();
+  if (policyMapCsfFunctionIds().indexOf(fn) === -1) return;
+  if (!Array.isArray(doc.csfFunctions)) doc.csfFunctions = [];
+  var i = doc.csfFunctions.indexOf(fn);
+  if (i === -1) doc.csfFunctions.push(fn);
+  else {
+    doc.csfFunctions.splice(i, 1);
+    if (fn === 'GV') doc.isProgramPolicy = false;
+  }
   markDirty();
   policyMapRerender();
 }
@@ -800,16 +940,24 @@ function renderPolicyMapAlignHtml() {
   ensurePolicyCatalog();
   var named = state.policyCatalog.filter(function(d) { return d && String(d.title || '').trim(); });
   if (!named.length) {
-    return '<div class="section-title">Map documents to NIST 800-53</div>'
+    return '<div class="section-title">Map documents to CSF 2.0 and NIST 800-53</div>'
       + '<div class="pmap-empty">Add titled documents on the catalog step first, then map them here.</div>';
   }
   var fams = policyMapInScopeFamilies();
+  var fnIds = policyMapCsfFunctionIds();
   var cards = named.map(function(raw) {
     var d = policyMapNormalizeDoc(raw);
     var expanded = state._policyMapExpandedDocId === d.id;
+    var fnChips = fnIds.map(function(fn) {
+      var on = (d.csfFunctions || []).indexOf(fn) !== -1 || (fn === 'GV' && d.isProgramPolicy);
+      return '<button type="button" class="pmap-chip pmap-chip-fn csf-fn-' + fn.toLowerCase() + (on ? ' on' : '')
+        + '" onclick="policyMapToggleCsfFunction(\'' + policyMapEscId(d.id) + '\',\'' + fn + '\')">'
+        + '<span class="pmap-chip-code">' + escapeHTML(fn) + '</span>' + escapeHTML(policyMapCsfFunctionName(fn)) + '</button>';
+    }).join('');
     var famChips = fams.map(function(f) {
       var on = (d.familyCodes || []).indexOf(f) !== -1;
-      return '<button type="button" class="pmap-chip' + (on ? ' on' : '') + '" onclick="policyMapToggleFamily(\'' + policyMapEscId(d.id) + '\',\'' + f + '\')">' + escapeHTML(f) + '</button>';
+      return '<button type="button" class="pmap-chip' + (on ? ' on' : '') + '" title="' + escapeHTML((FAMILIES && FAMILIES[f]) || f)
+        + '" onclick="policyMapToggleFamily(\'' + policyMapEscId(d.id) + '\',\'' + f + '\')">' + escapeHTML(f) + '</button>';
     }).join('');
     var refine = '';
     if (expanded) {
@@ -837,8 +985,10 @@ function renderPolicyMapAlignHtml() {
       + '<div class="pmap-card-meta">' + escapeHTML(policyMapDocTypeLabel(d.type)) + (d.ownerName ? ' \u00b7 ' + escapeHTML(d.ownerName) : '') + '</div></div></div>'
       + '<label class="pmap-check"><input type="checkbox"' + (d.isProgramPolicy ? ' checked' : '')
       + ' onchange="policyMapToggleProgramPolicy(\'' + policyMapEscId(d.id) + '\', this.checked)">'
-      + ' This is the organization information security policy (Tier 1 / ISP)</label>'
-      + '<div class="pmap-label">Quick map by family</div>'
+      + ' This is the organization information security policy (Tier 1 / ISP) \u2014 same Govern outcome as claiming <span class="control-id">GV</span></label>'
+      + '<div class="pmap-label">CSF 2.0 Functions <span class="pmap-muted pmap-layer-hint">outcome layer \u2014 your claim, not extracted from a file</span></div>'
+      + '<div class="pmap-chip-row">' + fnChips + '</div>'
+      + '<div class="pmap-label">800-53 families <span class="pmap-muted pmap-layer-hint">catalog layer \u2014 including Program Management (PM)</span></div>'
       + '<div class="pmap-chip-row">' + famChips + '</div>'
       + '<button type="button" class="btn btn-secondary btn-sm" onclick="policyMapToggleExpand(\'' + policyMapEscId(d.id) + '\')">'
       + (expanded ? 'Hide control refinement' : 'Refine controls (optional)') + '</button>'
@@ -850,28 +1000,188 @@ function renderPolicyMapAlignHtml() {
   }).join('');
 
   return ''
-    + '<div class="section-title">Map documents to NIST 800-53</div>'
-    + '<div class="section-subtitle">A document implements or directs one or more controls \u2014 mapping is many-to-many. Quick-map by family, then optionally name individual controls. Family-only means every in-scope control in that family is covered.</div>'
+    + '<div class="section-title">Map documents to CSF 2.0 and NIST 800-53</div>'
+    + '<div class="section-subtitle">Claim CSF Functions (Govern, Identify, Protect, Detect, Respond, Recover) as the outcome layer, then map 800-53 families and optionally individual controls as the catalog layer. Many-to-many. This is your assertion \u2014 nothing is extracted from a file. Family-only mapping covers every in-scope control in that family. PM is a mappable family; claiming Govern or marking the ISP checkbox both cover Govern / ISP readiness.</div>'
     + '<div class="pmap-list">' + cards + '</div>';
 }
 
-function policyMapConfirmCoverage() {
-  if (!policyMapValidateUpTo(4)) return;
-  applyPolicyCatalogToProgram();
+function policyMapFunctionDocuments() {
+  if (typeof ensureCsfFunctionGrouping === 'function') ensureCsfFunctionGrouping();
+  var groups = (typeof getCsfResolvedPolicyGroups === 'function') ? getCsfResolvedPolicyGroups() : [];
+  var byRoot = {};
+  var order = [];
+  groups.forEach(function(g) {
+    if (!g || !g.master || g.fn === 'GV') return;
+    var root = policyMapMergeRoot(g.master);
+    if (!byRoot[root]) {
+      byRoot[root] = { master: root, fnIds: [], titles: [], families: [] };
+      order.push(root);
+    }
+    var bucket = byRoot[root];
+    if (bucket.fnIds.indexOf(g.fn) === -1) {
+      bucket.fnIds.push(g.fn);
+      bucket.titles.push(g.title);
+    }
+    (g.families || []).forEach(function(f) {
+      if (bucket.families.indexOf(f) === -1) bucket.families.push(f);
+    });
+  });
+  return order.map(function(root) {
+    var b = byRoot[root];
+    var custom = (state.domainCustomNames && state.domainCustomNames[root]) || '';
+    var title = custom || (b.titles.length > 1 ? b.titles.join(' & ') : (b.titles[0] || root));
+    return {
+      master: root,
+      fnIds: b.fnIds,
+      families: b.families,
+      title: title,
+      combined: b.fnIds.length > 1
+    };
+  });
+}
+
+function policyMapFunctionDocStatus(doc, cov) {
+  var titles = [];
+  var seen = {};
+  function addTitle(t) {
+    var name = String(t || '').trim();
+    if (!name || seen[name]) return;
+    seen[name] = true;
+    titles.push(name);
+  }
+  (cov.csfRows || []).forEach(function(r) {
+    if (doc.fnIds.indexOf(r.fn) === -1 || !r.mapped) return;
+    (r.docs || []).forEach(function(d) { addTitle(d.title); });
+  });
+  (cov.rows || []).forEach(function(r) {
+    if (doc.families.indexOf(r.fam) === -1 || r.status === 'gap') return;
+    (r.docs || []).forEach(function(d) { addTitle(d.title); });
+  });
+  return { mapped: titles.length > 0, titles: titles };
+}
+
+function policyMapDocIsOmitted(doc) {
+  if (!state.policyMapOmitFns) return false;
+  return doc.fnIds.every(function(fn) { return !!state.policyMapOmitFns[fn]; });
+}
+
+function policyMapToggleMaintain(fnListCsv, on) {
+  if (!state.policyMapOmitFns || typeof state.policyMapOmitFns !== 'object') state.policyMapOmitFns = {};
+  String(fnListCsv || '').split(',').forEach(function(fn) {
+    fn = String(fn || '').trim().toUpperCase();
+    if (!fn) return;
+    if (on) delete state.policyMapOmitFns[fn];
+    else state.policyMapOmitFns[fn] = true;
+  });
+  markDirty();
+  policyMapRerender();
+}
+
+function policyMapCombineFunctions(keepFn, absorbFn) {
+  keepFn = String(keepFn || '').toUpperCase();
+  absorbFn = String(absorbFn || '').toUpperCase();
+  if (!keepFn || !absorbFn || keepFn === absorbFn || keepFn === 'GV' || absorbFn === 'GV') return;
+  if (typeof ensureCsfFunctionGrouping === 'function') ensureCsfFunctionGrouping();
+  var docs = policyMapFunctionDocuments();
+  var keep = null;
+  var absorb = null;
+  docs.forEach(function(d) {
+    if (d.fnIds.indexOf(keepFn) !== -1) keep = d;
+    if (d.fnIds.indexOf(absorbFn) !== -1) absorb = d;
+  });
+  if (!keep || !absorb || keep.master === absorb.master) return;
+  if (!state.policyMerges) state.policyMerges = {};
+  if (!state.domainCustomNames) state.domainCustomNames = {};
+  var keepMaster = keep.master;
+  var absorbMaster = absorb.master;
+  Object.keys(state.policyMerges).forEach(function(f) {
+    if (state.policyMerges[f] === absorbMaster) state.policyMerges[f] = keepMaster;
+  });
+  state.policyMerges[absorbMaster] = keepMaster;
+  absorb.families.forEach(function(f) {
+    if (f !== keepMaster) state.policyMerges[f] = keepMaster;
+  });
+  var titles = [];
+  keep.fnIds.concat(absorb.fnIds).forEach(function(fn) {
+    var name = policyMapCsfFunctionName(fn);
+    if (titles.indexOf(name) === -1) titles.push(name);
+  });
+  state.domainCustomNames[keepMaster] = titles.join(' & ');
+  markDirty();
   try {
-    addAuditEntry('program', null, 'Existing-policy mapping confirmed (' + (state.policyCatalog || []).length + ' documents)');
+    addAuditEntry('program', null, 'Combined Function policies: ' + titles.join(' + '));
   } catch (e) { /* ignore */ }
-  showToast('Mapped documents now count as policy coverage for those families.');
+  policyMapRerender();
+}
+
+function policyMapUncombineFunction(fn) {
+  fn = String(fn || '').toUpperCase();
+  if (!fn || fn === 'GV') return;
+  var groups = (typeof getCsfResolvedPolicyGroups === 'function') ? getCsfResolvedPolicyGroups() : [];
+  var group = null;
+  groups.forEach(function(g) { if (g.fn === fn) group = g; });
+  if (!group || !group.master) return;
+  if (!state.policyMerges) state.policyMerges = {};
+  if (!state.domainCustomNames) state.domainCustomNames = {};
+  (group.families || []).forEach(function(f) {
+    if (f === group.master) delete state.policyMerges[f];
+    else state.policyMerges[f] = group.master;
+  });
+  state.domainCustomNames[group.master] = group.title;
+  policyMapFunctionDocuments().forEach(function(d) {
+    if (d.fnIds.length === 1) state.domainCustomNames[d.master] = policyMapCsfFunctionName(d.fnIds[0]);
+    else state.domainCustomNames[d.master] = d.fnIds.map(policyMapCsfFunctionName).join(' & ');
+  });
+  markDirty();
+  policyMapRerender();
+}
+
+function policyMapLeftoverFamilies(fnDocs) {
+  var fams = (typeof getActiveFamilies === 'function' ? getActiveFamilies() : []).filter(function(f) { return f !== 'PM'; });
+  var inDoc = {};
+  (fnDocs || []).forEach(function(d) {
+    (d.families || []).forEach(function(f) { inDoc[f] = true; });
+  });
+  var merges = state.policyMerges || {};
+  return fams.filter(function(f) { return !inDoc[f] && !merges[f]; });
+}
+
+function policyMapConfirmCoverage() {
+  if (!policyMapValidateUpTo(5)) return;
+  if (typeof ensureCsfFunctionGrouping === 'function') ensureCsfFunctionGrouping();
+  applyPolicyCatalogToProgram();
+  if (!state.policyPriorities) state.policyPriorities = {};
+  if (!state.domainCustomNames) state.domainCustomNames = {};
+  var cov = getPolicyMapCoverage();
+  policyMapFunctionDocuments().forEach(function(d) {
+    var omitted = policyMapDocIsOmitted(d);
+    var st = policyMapFunctionDocStatus(d, cov);
+    if (omitted) state.policyPriorities[d.master] = 'later';
+    else if (!st.mapped) state.policyPriorities[d.master] = 'now';
+    if (d.combined) state.domainCustomNames[d.master] = d.title;
+  });
+  try {
+    addAuditEntry('program', null, 'Further policies confirmed (' + (state.policyCatalog || []).length + ' catalog documents)');
+  } catch (e) { /* ignore */ }
+  showToast('Policy set saved. Mapped documents count as coverage; remaining Function policies can be drafted after owners are assigned.');
   policyMapGoTo(7);
 }
 
 function policyMapDraftMissing(fam) {
+  var docs = policyMapFunctionDocuments();
+  var allowed = {};
+  docs.forEach(function(d) { allowed[d.master] = true; });
+  policyMapLeftoverFamilies(docs).forEach(function(f) { allowed[f] = true; });
+  if (!allowed[fam]) {
+    showToast('Choose the Function policy document first. Family drafts come after the policy set is decided.', true);
+    return;
+  }
   applyPolicyCatalogToProgram();
   if (typeof enterPolicyWizard === 'function') {
     showTab('policy');
     setTimeout(function() { enterPolicyWizard(fam); }, 0);
   } else {
-    showToast('Open Domain Policies after setup to draft ' + fam + '.', true);
+    showToast('Open Domain Policies after setup to draft that Function policy.', true);
   }
 }
 
@@ -883,60 +1193,93 @@ function policyMapAddAnother() {
 function renderPolicyMapCoverageHtml() {
   if (typeof ensureCsfFunctionGrouping === 'function') ensureCsfFunctionGrouping();
   var cov = getPolicyMapCoverage();
+  var fnDocs = policyMapFunctionDocuments();
+  var leftovers = policyMapLeftoverFamilies(fnDocs);
   var ispChip = cov.ispMapped
     ? '<span class="pmap-status mapped">Mapped</span>'
-    : '<span class="pmap-status gap">Gap</span>';
+    : '<span class="pmap-status gap">Needs a catalog map</span>';
   var ispDocs = cov.ispDocs.map(function(d) { return escapeHTML(d.title); }).join(', ') || 'None';
+  var familyGap = (cov.rows || []).filter(function(r) {
+    if (r.fam === 'PM' || r.status !== 'gap') return false;
+    var assigned = fnDocs.some(function(d) {
+      return !policyMapDocIsOmitted(d) && d.families.indexOf(r.fam) !== -1;
+    });
+    return !assigned;
+  }).length;
 
-  var rows = cov.rows.map(function(r) {
-    var stClass = r.status === 'mapped' ? 'mapped' : r.status === 'partial' ? 'partial' : 'gap';
-    var stLabel = r.status === 'mapped' ? 'Mapped' : r.status === 'partial' ? 'Partial' : 'Gap';
-    var docs = r.docs.map(function(d) { return escapeHTML(d.title || 'Untitled'); }).join(', ') || '\u2014';
-    var actions = '';
-    if (r.status === 'gap') {
-      actions = '<button type="button" class="btn btn-secondary btn-sm" onclick="policyMapAddAnother()">Map another doc</button>'
-        + ' <button type="button" class="btn btn-secondary btn-sm" onclick="policyMapDraftMissing(\'' + r.fam + '\')">Draft missing policy</button>';
-    } else if (r.status === 'partial') {
-      actions = '<button type="button" class="btn btn-secondary btn-sm" onclick="state.policyMapStep=5;policyMapRerender()">Refine mapping</button>'
-        + ' <button type="button" class="btn btn-secondary btn-sm" onclick="policyMapAddAnother()">Map another doc</button>';
-    } else {
-      actions = '<span class="pmap-muted">Existing documents cover this family</span>';
-    }
-    return '<tr>'
-      + '<td><span class="control-id">' + escapeHTML(r.fam) + '</span><div class="pmap-fam-name">' + escapeHTML(r.name) + '</div></td>'
-      + '<td><span class="pmap-status ' + stClass + '">' + stLabel + '</span></td>'
-      + '<td>' + r.covered + ' / ' + r.inScope + '</td>'
-      + '<td>' + docs + '</td>'
-      + '<td>' + actions + '</td>'
-      + '</tr>';
+  var docCards = fnDocs.map(function(d) {
+    var omitted = policyMapDocIsOmitted(d);
+    var st = policyMapFunctionDocStatus(d, cov);
+    var fnBits = d.fnIds.map(function(fn) {
+      return '<span class="pmap-chip pmap-chip-quiet pmap-chip-fn csf-fn-' + fn.toLowerCase() + '"><span class="pmap-chip-code">'
+        + escapeHTML(fn) + '</span>' + escapeHTML(policyMapCsfFunctionName(fn)) + '</span>';
+    }).join('');
+    var famBits = d.families.map(function(f) {
+      return '<span class="pmap-chip pmap-chip-quiet">' + escapeHTML(f) + '</span>';
+    }).join('');
+    var statusHtml = omitted
+      ? '<span class="pmap-status gap">Not in the policy set</span>'
+      : (st.mapped
+        ? '<span class="pmap-status mapped">Already mapped</span>'
+        : '<span class="pmap-status partial">Draft after setup</span>');
+    var detail = omitted
+      ? 'This Function will not be a separate policy document. Its families stay unassigned until you place them or map a catalog document.'
+      : (st.mapped
+        ? ('Covered by mapped catalog document' + (st.titles.length === 1 ? '' : 's') + ': ' + st.titles.map(escapeHTML).join(', ') + '. No draft needed unless you choose to write a new one.')
+        : 'No catalog document covers this Function yet. After you assign owners, draft this as one Function policy \u2014 not one policy per 800-53 family.');
+    var others = fnDocs.filter(function(o) { return o.master !== d.master; });
+    var combine = omitted ? '' : '<label class="pmap-field"><span>Combine with another Function</span>'
+      + '<select class="form-select" onchange="if(this.value)policyMapCombineFunctions(\'' + d.fnIds[0] + '\',this.value)">'
+      + '<option value="">Keep separate\u2026</option>'
+      + others.map(function(o) {
+        return '<option value="' + o.fnIds[0] + '">' + escapeHTML(o.title) + '</option>';
+      }).join('')
+      + '</select></label>';
+    var split = (d.combined && !omitted)
+      ? d.fnIds.map(function(fn) {
+        return '<button type="button" class="btn btn-secondary btn-sm" onclick="policyMapUncombineFunction(\'' + fn + '\')">Split ' + escapeHTML(policyMapCsfFunctionName(fn)) + '</button>';
+      }).join(' ')
+      : '';
+    var draftBtn = (!omitted && !st.mapped)
+      ? '<button type="button" class="btn btn-secondary btn-sm" onclick="policyMapDraftMissing(\'' + d.master + '\')">Draft this Function policy</button>'
+      : '';
+    return '<div class="pmap-card pmap-doc-card' + (omitted ? ' pmap-doc-omitted' : '') + '">'
+      + '<label class="pmap-check pmap-doc-keep"><input type="checkbox"' + (omitted ? '' : ' checked')
+      + ' onchange="policyMapToggleMaintain(\'' + d.fnIds.join(',') + '\', this.checked)">'
+      + '<span><strong>' + escapeHTML(d.title) + '</strong> policy document</span></label>'
+      + '<div class="pmap-chip-row">' + fnBits + famBits + '</div>'
+      + statusHtml
+      + '<p class="pmap-muted" style="margin-top:8px;">' + detail + '</p>'
+      + '<div class="pmap-card-actions" style="margin-top:10px;">' + combine + split + ' ' + draftBtn + '</div>'
+      + '</div>';
   }).join('');
 
+  var leftoverHtml = leftovers.length
+    ? '<div class="pmap-card"><div class="pmap-card-title">Leftover standalone families</div>'
+      + '<p class="pmap-muted">These were unmerged from a Function group. Draft only as a standalone if you meant to keep a separate family policy.</p>'
+      + leftovers.map(function(f) {
+        return '<div class="pmap-card-actions" style="margin-top:8px;"><span class="control-id">' + escapeHTML(f) + '</span> '
+          + escapeHTML((FAMILIES && FAMILIES[f]) || f)
+          + ' <button type="button" class="btn btn-secondary btn-sm" onclick="policyMapDraftMissing(\'' + f + '\')">Draft this standalone policy</button></div>';
+      }).join('')
+      + '</div>'
+    : '';
+
   return ''
-    + '<div class="section-title">Coverage review</div>'
-    + '<div class="section-subtitle">Families with mapped documents will count as policy coverage for control implementation. Gaps stay available to map another existing document or draft in-app. Mapped 800-53 controls are also shown as CSF 2.0 outcomes below \u2014 aligned to CSF 2.0, not a CSF Profile.</div>'
-    + (typeof renderCsfCoverageStripHtml === 'function' ? renderCsfCoverageStripHtml('embed') : '')
-    + '<div class="pmap-kpi">'
-    + '<div class="pmap-kpi-card"><div class="pmap-kpi-val">' + cov.mapped + '</div><div class="pmap-kpi-label">Mapped families</div></div>'
-    + '<div class="pmap-kpi-card"><div class="pmap-kpi-val">' + cov.partial + '</div><div class="pmap-kpi-label">Partial</div></div>'
-    + '<div class="pmap-kpi-card"><div class="pmap-kpi-val">' + cov.gap + '</div><div class="pmap-kpi-label">Gaps</div></div>'
-    + '</div>'
-    + '<div class="pmap-card"><div class="pmap-card-head"><div><div class="pmap-card-title">Organization ISP (Tier 1)</div>'
-    + '<div class="pmap-card-meta">Govern (GV) is this ISP \u2014 XX-1 policy-and-procedures controls and selected PM controls. Mapped from: ' + ispDocs + '</div></div>'
+    + '<div class="section-title">Further policies</div>'
+    + '<div class="section-subtitle">Decide the remaining policy set. Document structure first \u2014 ISP (Govern) plus Function documents. Family-level drafts come after this mapping exists, and only for a Function policy (or a family you explicitly unmerged).</div>'
+    + '<div class="pmap-lead-q">Besides the ISP, which policy documents will this program maintain?</div>'
+    + '<div class="pmap-card pmap-isp-card"><div class="pmap-card-head"><div><div class="pmap-card-title">Govern \u2014 organization ISP</div>'
+    + '<div class="pmap-card-meta">Already in the policy set. Program Management (PM) lives here \u2014 not as a separate domain card. Mapped from: ' + ispDocs + '</div></div>'
     + ispChip + '</div>'
-    + (cov.ispMapped ? '' : '<div class="pmap-card-actions" style="margin-top:10px;"><button type="button" class="btn btn-secondary btn-sm" onclick="state.policyMapStep=5;policyMapRerender()">Mark a document as the ISP</button></div>')
+    + (cov.ispMapped ? '' : '<div class="pmap-card-actions" style="margin-top:10px;"><button type="button" class="btn btn-secondary btn-sm" onclick="state.policyMapStep=5;policyMapRerender()">Claim Govern or mark a document as the ISP</button></div>')
     + '</div>'
-    + (typeof renderCsfFunctionGroupingHtml === 'function'
-      ? '<div class="csf-merge-pathb-note">Domain policies default-group by CSF Function (Identify / Protect / Detect / Respond / Recover). Family coverage in the table still stands; a mapped Function policy covers every family in that group.</div>'
-        + renderCsfFunctionGroupingHtml(
-          (typeof getActiveFamilies === 'function' ? getActiveFamilies() : []).filter(function(f){ return f !== 'PM'; }),
-          (typeof state !== 'undefined' && state.policyMerges) ? state.policyMerges : {}
-        )
-      : '')
-    + '<div class="table-scroll"><table class="control-table pmap-table"><thead><tr>'
-    + '<th>Family</th><th>Coverage</th><th>Controls</th><th>Documents</th><th>Action</th>'
-    + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
-    + (cov.gap ? '<p class="pmap-note">You can confirm with gaps. Unmapped families stay Not Started until you map another document or draft them in Domain Policies.</p>' : '')
-    + '<p class="pmap-note">Confirm writes <span class="control-id">Mapped (existing)</span> policy records so control owners are not blocked on families you have covered.</p>';
+    + '<div class="pmap-doc-list">' + docCards + '</div>'
+    + leftoverHtml
+    + (familyGap
+      ? '<p class="pmap-note">' + familyGap + ' famil' + (familyGap === 1 ? 'y is' : 'ies are') + ' unassigned \u2014 not placed in a Function document you will maintain. Combine or check a Function above, or <button type="button" class="btn btn-secondary btn-sm" onclick="state.policyMapStep=5;policyMapRerender()">map another catalog document</button>. Do not draft each 800-53 family as its own policy.</p>'
+      : '<p class="pmap-note">Every in-scope family sits in the ISP or in a Function policy you will maintain. Catalog maps count as already covered; the rest draft as Function documents after owners are assigned.</p>')
+    + '<p class="pmap-note">Confirm writes mapped records for catalog coverage and keeps the Function grouping so owners are assigned to policy documents, not every 800-53 family.</p>';
 }
 
 function installPolicyMapHooks() {

@@ -2886,7 +2886,7 @@ function renderCISOStep4a() {
     </div>
 
     <div class="section-title">Consolidate &amp; Prioritize Policies</div>
-    <div class="section-subtitle">Lean teams start with the ISP plus five CSF Function policies. Unmerge a family, move it to another Function, or add a custom merge. Then set urgency \u2014 that drives draft deadlines in the next step.</div>
+    <div class="section-subtitle">Document structure first: the ISP (Govern) plus five CSF Function policy documents. Do not draft AC, AT, AU\u2026 as separate policies while Function grouping is the default. Unmerge a family only if it should be its own document. Then set urgency \u2014 that drives draft deadlines in the next step.</div>
 
     ${renderCsfFunctionGroupingHtml(families, merges)}
 
@@ -2912,7 +2912,7 @@ function renderCISOStep4a() {
         </colgroup>
         <thead>
           <tr>
-            <th>Policy Domain</th>
+            <th>Policy document</th>
             <th>Priority</th>
             <th>Custom extra merge</th>
           </tr>
@@ -2925,14 +2925,18 @@ function renderCISOStep4a() {
             const tier = getPriority(fam);
             const m = PRIORITY_META[tier];
             const isDefault = !!(PRIORITY_DEFAULTS[fam]);
+            const fnDocTitle = (typeof getCsfFunctionPolicyTitleForMaster === 'function' && getCsfFunctionPolicyTitleForMaster(fam))
+              || (state.domainCustomNames && state.domainCustomNames[fam])
+              || '';
             return `
             <tr>
               <td>
+                <div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:4px;">${escapeHTML(fnDocTitle || getPolicyMergedTitle(fam))}</div>
                 <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:3px;">
                   <span class="family-badge">${fam}</span>
                   ${merged.map(mf => `<span class="family-badge" style="font-size:11px;background:#e0f2f1;color:var(--teal);border-color:rgba(13,148,136,0.3);">+${mf} <span role="button" tabindex="0" style="cursor:pointer;" data-ciso-unmerge="${mf}">✕</span></span>`).join('')}
                 </div>
-                <input class="form-input" style="font-size:12px;font-weight:600;margin-bottom:3px;${state.domainCustomNames[fam]?'border-color:#6366f1;background:rgba(99,102,241,0.04);':''}" placeholder="${escapeHTML(getPolicyMergedTitle(fam))}" value="${escapeHTML(state.domainCustomNames[fam]||'')}" oninput="setDomainCustomName('${fam}',this.value);this.style.borderColor=this.value?'#6366f1':'';this.style.background=this.value?'rgba(99,102,241,0.04)':'';">
+                <input class="form-input" style="font-size:12px;font-weight:600;margin-bottom:3px;${state.domainCustomNames[fam]?'border-color:#6366f1;background:rgba(99,102,241,0.04);':''}" placeholder="${escapeHTML(fnDocTitle || getPolicyMergedTitle(fam))}" value="${escapeHTML(state.domainCustomNames[fam]||'')}" oninput="setDomainCustomName('${fam}',this.value);this.style.borderColor=this.value?'#6366f1':'';this.style.background=this.value?'rgba(99,102,241,0.04)':'';">
                 <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">${ctrl.length + merged.reduce((s,mf)=>s+controls.filter(c=>c.f===mf).length,0)} controls${state.domainCustomNames[fam] ? ' · <span style="color:#6366f1;">✏ custom name</span>' : ''}</div>
                 ${FAMILY_DESC[fam] ? `<div style="font-size:11px;color:#64748b;line-height:1.4;">${[fam, ...merged].map(f => '<strong style="color:#475569;">' + f + ':</strong> ' + (FAMILY_DESC[f]||'')).filter(d => !d.endsWith(' ')).join(' ')}</div>` : ''}
               </td>
@@ -2963,7 +2967,7 @@ function renderCISOStep4a() {
 
     <div class="info-alert" style="margin-top:16px;">
       <div class="ia-icon">💡</div>
-      <div class="ia-text">A lean program is the ISP plus five Function policies. <strong>Now</strong> = audit-critical (Respond, Protect access, Recover). <strong>Soon</strong> = important but not blocking. <strong>Later</strong> = real but low-urgency. These drive default deadlines in the next step \u2014 you can still override per domain.</div>
+      <div class="ia-text">A lean program is the ISP plus five Function policies \u2014 not one draft per 800-53 family. <strong>Now</strong> = audit-critical (Respond, Protect access, Recover). <strong>Soon</strong> = important but not blocking. <strong>Later</strong> = real but low-urgency. These drive default deadlines in the next step \u2014 you can still override per document.</div>
     </div>
 
   `;

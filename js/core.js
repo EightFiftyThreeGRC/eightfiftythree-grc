@@ -1167,10 +1167,11 @@ const state = {
   // 'build' = draft ISP + domain policies (8-step wizard).
   // 'map'   = catalog existing documents and align them to 800-53 (Path B).
   programPath: '',
-  policyCatalog: [],         // Path B: [{ id, title, type, ownerName, ownerEmail, ownerRole, sourceNote, familyCodes[], controlIds[], coverageNote, isProgramPolicy }]
+  policyCatalog: [],         // Path B: [{ id, title, type, ownerName, ownerEmail, ownerRole, sourceNote, familyCodes[], controlIds[], csfFunctions[], coverageNote, isProgramPolicy }]
   policyMapConfirmed: false, // Path B: coverage review confirmed \u2014 domainPolicies / policyStatus written
   policyMapStep: 1,          // Path B wizard step 1\u20137 (org, profile, baseline, catalog, map, coverage, owners)
   policyMapWizardRev: 0,     // 2+ = Profile step already inserted into Path B numbering
+  policyMapOmitFns: {},      // Path B: { ID: true } = do not maintain that Function policy document
   _policyMapEditId: '',      // Path B catalog editor selection (transient)
   _policyMapExpandedDocId: '', // Path B map-step accordion (transient)
   infoSecPolicy: null,
