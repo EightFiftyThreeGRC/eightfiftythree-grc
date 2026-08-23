@@ -429,7 +429,6 @@
     body.setup-focus-mode #sidebar-program-section .sidebar-section-label { display: none; }
     body.setup-focus-mode .profile-btn-wrap { opacity: 1; }
     body.setup-focus-mode .persist-advanced { display: none !important; }
-    body.setup-focus-mode #resetBtn { display: none !important; }
     body.setup-focus-mode #ciso-step-nav-panel { display: none; }
     body.setup-focus-mode .ciso-setup-progress { display: block; }
     body:not(.setup-focus-mode) .ciso-setup-progress { display: none; }
@@ -484,6 +483,14 @@
       border: none;
       box-shadow: none;
       color: var(--cover-muted);
+    }
+    body:has(#tab-home.active .onboard--cover) #resetBtn {
+      color: var(--cover-muted);
+    }
+    body:has(#tab-home.active .onboard--cover) #resetBtn:hover,
+    body:has(#tab-home.active .onboard--cover) #resetBtn:focus-visible {
+      background: rgba(250, 249, 246, 0.14);
+      color: var(--cover-ink);
     }
 
     .onboard--cover {
