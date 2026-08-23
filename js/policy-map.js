@@ -40,7 +40,6 @@ function migrateUnifiedSetupPath() {
   else dest = 8;
   state.cisoSetupStep = dest;
   if (typeof currentStep !== 'undefined') currentStep.ciso = dest;
-  if ((state.policyCatalog || []).length) state.setupHasExistingPolicies = 'yes';
   if (s >= 5 && typeof applyPolicyCatalogToProgram === 'function') {
     try { applyPolicyCatalogToProgram(); } catch (e) { /* keep going */ }
   }
@@ -482,8 +481,6 @@ function applyPolicyCatalogToProgram() {
 
 function chooseProgramPath(path) {
   // Legacy alias: both former paths now enter the one wizard.
-  if (path === 'map') state.setupHasExistingPolicies = 'yes';
-  else if (path === 'build' && !state.setupHasExistingPolicies) state.setupHasExistingPolicies = 'no';
   state.programPath = 'build';
   if (!state.cisoSetupStep) state.cisoSetupStep = 1;
   try {

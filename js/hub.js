@@ -18,14 +18,6 @@ function startProgramSetup() {
   goToStep('ciso', step);
 }
 
-function setSetupHasExistingPolicies(val) {
-  state.setupHasExistingPolicies = (val === 'yes' || val === 'no') ? val : '';
-  if (typeof markDirty === 'function') markDirty();
-  setTimeout(function() {
-    if (typeof renderHomeTab === 'function') renderHomeTab();
-  }, 0);
-}
-
 function startUnifiedProgramSetup() {
   state.programPath = 'build';
   if (!state.cisoSetupStep) state.cisoSetupStep = 1;
@@ -126,22 +118,15 @@ function renderOnboardingHome() {
   var hasStarted = !!(String(state.orgName || '').trim() || String(state.programOwner || '').trim() || state.baseline);
   var total = progress.total || 8;
 
-  // One start. "Do you already have policies?" only sets a default for later
-  // load-or-author prompts; it does not fork the wizard.
+  // One start. Write the ISP in setup; Function policies later in Domain Policies.
   if (!chosen) {
-    var has = state.setupHasExistingPolicies === 'yes' ? 'yes' : (state.setupHasExistingPolicies === 'no' ? 'no' : '');
     body.innerHTML = ''
       + '<div class="onboard onboard--cover onboard--paths">'
       + '<div class="onboard-cover-copy">'
       + '<p class="onboard-eyebrow">Program setup</p>'
       + '<h1 class="onboard-title">Stand up your program</h1>'
-      + '<p class="onboard-lead">Identity first, then a short profile, then the Information Security Policy \u2014 load the one you have or write it here. Function policies come next in Domain Policies.</p>'
+      + '<p class="onboard-lead">Identity first, then a short profile, then write the Information Security Policy in the wizard. Function policies are written later in Domain Policies.</p>'
       + '<button type="button" class="btn onboard-cta" onclick="startUnifiedProgramSetup()">Start setup</button>'
-      + '<p class="onboard-path-foot">Optional \u2014 how much already exists? This only pre-fills the later prompts.</p>'
-      + '<div class="onboard-exist-row" role="group" aria-label="How much policy already exists">'
-      + '<button type="button" class="onboard-exist-btn' + (has === 'no' ? ' is-on' : '') + '" onclick="setSetupHasExistingPolicies(\'no\')">We will write them here</button>'
-      + '<button type="button" class="onboard-exist-btn' + (has === 'yes' ? ' is-on' : '') + '" onclick="setSetupHasExistingPolicies(\'yes\')">We have some to load</button>'
-      + '</div>'
       + '</div>'
       + '</div>';
     return;
@@ -1268,5 +1253,4 @@ try {
   window.renderCommandCenterDashboard = renderCommandCenterDashboard;
   window.startProgramSetup = startProgramSetup;
   window.startUnifiedProgramSetup = startUnifiedProgramSetup;
-  window.setSetupHasExistingPolicies = setSetupHasExistingPolicies;
 } catch (e) {}

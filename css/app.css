@@ -3535,73 +3535,10 @@
       color: var(--cover-muted);
       margin: 0;
     }
-    .onboard-exist-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin-top: 10px;
-    }
-    .onboard-exist-btn {
-      font: inherit;
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--cover-muted);
-      background: transparent;
-      border: 1px solid rgba(250, 249, 246, 0.22);
-      border-radius: 999px;
-      padding: 8px 14px;
-      cursor: pointer;
-    }
-    .onboard-exist-btn.is-on,
-    .onboard-exist-btn:hover {
-      color: var(--cover-ink);
-      border-color: rgba(250, 249, 246, 0.55);
-      background: rgba(250, 249, 246, 0.1);
-    }
     @media (max-width: 600px) {
       .onboard-path-grid { grid-template-columns: 1fr; }
     }
 
-    .policy-import {
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 16px 20px;
-      margin-bottom: 20px;
-      background: #fff;
-    }
-    .policy-import-kicker {
-      font-size: 13px;
-      font-weight: 700;
-      color: var(--navy);
-      margin-bottom: 4px;
-    }
-    .policy-import-lead {
-      font-size: 13px;
-      color: var(--text-muted);
-      line-height: 1.5;
-      margin: 0 0 12px;
-    }
-    .policy-import-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      align-items: center;
-      margin-bottom: 10px;
-    }
-    .policy-import-file {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      overflow: hidden;
-      clip: rect(0, 0, 0, 0);
-    }
-    .policy-import-paste {
-      width: 100%;
-      min-height: 110px;
-      font-size: 13px;
-      line-height: 1.55;
-      resize: vertical;
-    }
     .policy-set-coverage {
       display: grid;
       grid-template-columns: 1fr 1fr;

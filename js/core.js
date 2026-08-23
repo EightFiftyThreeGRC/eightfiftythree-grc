@@ -1174,8 +1174,7 @@ const state = {
   // Legacy 'map' (Path B) is migrated into 'build' by migrateUnifiedSetupPath().
   programPath: '',
   cisoSetupStep: 1,          // persisted CISO wizard step so resume / Path B migration land correctly
-  setupHasExistingPolicies: '', // '' | 'yes' | 'no' \u2014 optional default only; never forks the wizard
-  policyCatalog: [],         // Existing documents catalogued during setup or Domain Policies [{ id, title, type, ownerName, ownerEmail, ownerRole, sourceNote, familyCodes[], controlIds[], csfFunctions[], coverageNote, isProgramPolicy }]
+  policyCatalog: [],         // Policy set grouping [{ id, title, type, ownerName, ownerEmail, ownerRole, sourceNote, familyCodes[], controlIds[], csfFunctions[], coverageNote, isProgramPolicy }]
   policyMapConfirmed: false, // coverage review confirmed \u2014 domainPolicies / policyStatus written
   policyMapStep: 1,          // legacy Path B step 1\u20137; kept so mid-wizard programs can be migrated
   policyMapWizardRev: 0,     // 2+ = Profile step already inserted into Path B numbering; 3 = unified wizard
@@ -1348,6 +1347,7 @@ function normalizeStateShape() {
   migrateISPWorkflowStatus();
   migratePoamItemsToIssues();
   stripLegacyDemoPlaceholderFlags();
+  stripRetiredPolicyIngestState();
   ensurePmControlsAssignedToCiso();
   if (typeof migrateUnifiedSetupPath === 'function') migrateUnifiedSetupPath();
 }
@@ -1367,6 +1367,38 @@ function stripLegacyDemoPlaceholderFlags() {
     Object.keys(map).forEach(function(k) { strip(map[k]); });
   });
   if (Array.isArray(state.users)) state.users.forEach(strip);
+}
+
+/**
+ * Drop retired BYO/file-ingest flags. Authored ISP and domain policy bodies stay.
+ * Catalog rows keep title/type/owner/mapping; raw paste blobs and import meta go.
+ */
+function stripRetiredPolicyIngestState() {
+  if (!state) return;
+  if ('setupHasExistingPolicies' in state) delete state.setupHasExistingPolicies;
+
+  function stripImportMeta(obj) {
+    if (!obj || typeof obj !== 'object') return;
+    if ('importedFrom' in obj) delete obj.importedFrom;
+    if ('importedAt' in obj) delete obj.importedAt;
+    if (obj.source === 'imported') delete obj.source;
+  }
+
+  stripImportMeta(state.infoSecPolicy);
+  if (isPlainObject(state.domainPolicies)) {
+    Object.keys(state.domainPolicies).forEach(function(k) {
+      stripImportMeta(state.domainPolicies[k]);
+    });
+  }
+
+  var blobKeys = ['rawText', 'pasteText', 'importedText', 'fileContent', 'fileBody', 'bodyText', 'paste'];
+  if (Array.isArray(state.policyCatalog)) {
+    state.policyCatalog.forEach(function(d) {
+      if (!d || typeof d !== 'object') return;
+      blobKeys.forEach(function(k) { if (k in d) delete d[k]; });
+      stripImportMeta(d);
+    });
+  }
 }
 
 /** One-time migration: legacy Phase-1 poamItems → Phase-2 issues records. */

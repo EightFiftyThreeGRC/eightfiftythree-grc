@@ -1885,62 +1885,6 @@ function draftUnmappedPMRequirements(rerender) {
   return unmapped.length;
 }
 
-function applyImportedIspText(text, meta) {
-  meta = meta || {};
-  if (!state.infoSecPolicy) {
-    var scratch = document.createElement('div');
-    renderISPEditorBody(scratch, { context: 'setup' });
-  }
-  if (!state.infoSecPolicy) return;
-  var parsed = parseImportedPolicyMarkdown(text);
-  var filename = meta.filename ? String(meta.filename) : '';
-  if (parsed.title) state.infoSecPolicy.title = parsed.title;
-  else if (filename) state.infoSecPolicy.title = filename.replace(/\.(txt|md)$/i, '');
-  if (!state.infoSecPolicy.sections) state.infoSecPolicy.sections = [];
-  parsed.sections.forEach(function(sec) {
-    var hint = typeof importedSectionTypeHint === 'function' ? importedSectionTypeHint(sec.title) : 'custom';
-    if (hint === 'custom') return;
-    for (var i = 0; i < state.infoSecPolicy.sections.length; i++) {
-      var row = state.infoSecPolicy.sections[i];
-      if (row && row.type === hint) {
-        row.content = sec.content;
-        break;
-      }
-    }
-  });
-  var unmatched = parsed.sections.filter(function(sec) {
-    var hint = typeof importedSectionTypeHint === 'function' ? importedSectionTypeHint(sec.title) : 'custom';
-    return hint === 'custom' && sec.content;
-  });
-  unmatched.forEach(function(sec) {
-    state.infoSecPolicy.sections.push({ type: 'custom', title: sec.title || 'Imported section', content: sec.content });
-  });
-  if (!parsed.sections.length && parsed.full.trim()) {
-    for (var j = 0; j < state.infoSecPolicy.sections.length; j++) {
-      if (state.infoSecPolicy.sections[j].type === 'purpose') {
-        state.infoSecPolicy.sections[j].content = parsed.full.trim();
-        break;
-      }
-    }
-  }
-  if (typeof upsertImportedCustomSection === 'function') {
-    state.infoSecPolicy.sections = upsertImportedCustomSection(state.infoSecPolicy.sections, parsed.full);
-  }
-  state.infoSecPolicy.source = 'imported';
-  state.infoSecPolicy.importedFrom = filename;
-  state.infoSecPolicy.importedAt = new Date().toISOString().slice(0, 10);
-  if (typeof markDirty === 'function') markDirty();
-  try { addAuditEntry('policy', 'ISP', 'Existing Information Security Policy text loaded' + (filename ? ' from ' + filename : '')); } catch (e) {}
-  if (typeof showToast === 'function') showToast('Loaded into the Information Security Policy. Review the text below.');
-  setTimeout(function() {
-    if (typeof renderCISOStep3 === 'function') renderCISOStep3();
-    else if (typeof renderISPEditorBody === 'function') {
-      var body = document.getElementById('ciso-step-6-body');
-      if (body) renderISPEditorBody(body, { context: 'setup' });
-    }
-  }, 0);
-}
-
 function renderCISOStep3() {
   if (state._ispRevisionView && typeof renderISPRevisionPanel === 'function') {
     renderISPRevisionPanel();
@@ -2126,16 +2070,8 @@ function renderISPEditorBody(body, opts) {
   }).join('');
 
   body.innerHTML = (isRevision ? buildISPRevisionBannerHtml() : '')
-    + (isRevision ? '' : (typeof renderPolicyImportPanelHtml === 'function'
-      ? renderPolicyImportPanelHtml('isp', {
-          heading: 'Do you already have an Information Security Policy?',
-          lead: state.setupHasExistingPolicies === 'yes'
-            ? 'You said some policies already exist. Load the ISP as .txt or .md, or paste it. You assert what it is \u2014 nothing is inferred.'
-            : 'Load the ISP you already have as .txt or .md, or paste it. Or skip this and write it in the editor below.'
-        })
-      : '')
-      + '<div class="section-title">' + escapeHTML((isp.title || '').trim() || getDefaultISPTitle()) + '</div>'
-      + '<div class="section-subtitle">Review and edit your organization\'s overall security policy here. The domain policies your teams write later should line up with this document.</div>')
+    + (isRevision ? '' : ('<div class="section-title">' + escapeHTML((isp.title || '').trim() || getDefaultISPTitle()) + '</div>'
+      + '<div class="section-subtitle">Review and edit your organization\'s overall security policy here. The domain policies your teams write later should line up with this document.</div>'))
     + `
     <div style="border:1px solid var(--border);border-radius:12px;padding:16px 20px;margin-bottom:20px;background:white;">
       <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Policy title</div>
@@ -2871,7 +2807,7 @@ function renderCsfFunctionGroupingHtml(families, merges) {
 function renderUnifiedPolicySetCoverageHtml() {
   var ispHave = !!(state.infoSecPolicy && String(state.infoSecPolicy.title || '').trim());
   var ispLabel = ispHave
-    ? (String(state.infoSecPolicy.title).trim() + (state.infoSecPolicy.source === 'imported' ? ' (loaded)' : ''))
+    ? String(state.infoSecPolicy.title).trim()
     : 'Not started';
   var masters = typeof getMasterPolicyFamilies === 'function' ? getMasterPolicyFamilies() : [];
   var have = [];
@@ -2881,7 +2817,7 @@ function renderUnifiedPolicySetCoverageHtml() {
     var dp = (state.domainPolicies || {})[fam];
     var title = (dp && dp.title) || (typeof getPolicyMergedTitle === 'function' ? getPolicyMergedTitle(fam) : fam);
     if (dp || st === 'Mapped' || st === 'Approved' || st === 'Under Review' || st === 'Draft' || st === 'Returned') {
-      have.push({ fam: fam, title: title, status: st || (dp && dp.source === 'imported' ? 'Loaded' : 'Draft') });
+      have.push({ fam: fam, title: title, status: st || 'Draft' });
     } else {
       needed.push({ fam: fam, title: title });
     }
@@ -2904,7 +2840,7 @@ function renderUnifiedPolicySetCoverageHtml() {
     + '<div class="policy-set-chip-row">'
     + (needed.length ? needed.map(function(n) { return chip(n, 'is-need'); }).join('') : '<span class="policy-set-empty">Every Function policy has a document started.</span>')
     + '</div>'
-    + '<p class="policy-set-cov-note">Draft or load each remaining Function policy in Domain Policies after setup. Grouping below is the document set you will maintain.</p>'
+    + '<p class="policy-set-cov-note">Draft each remaining Function policy in Domain Policies after setup. Grouping below is the document set you will maintain.</p>'
     + '</div></div>';
 }
 
