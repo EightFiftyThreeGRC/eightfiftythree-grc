@@ -1896,6 +1896,33 @@ function exceedsMaxDepth(v, maxDepth) {
   return false;
 }
 
+// STATE_DEFAULTS holds `null` for 20 keys, so for those keys the generic type
+// check in validateProgramShape has no type to compare against \u2014 valType(null)
+// is 'null', and every populated program was rejected with
+// 'Field "baseline" must be null, got string'. That failed the app's own
+// Export JSON output, which is the only backup-and-restore path there is.
+//
+// A `null` default therefore means "any type permitted", not "skip checking".
+// The keys below carry real persisted program data and are only ever assigned
+// a plain object (or a baseline letter / user id / id array) anywhere in the
+// codebase, so they declare their permitted types here and stay validated.
+// `null` remains valid for all of them \u2014 normalizeStateShape() treats null as
+// "reset to the default". The 12 keys deliberately absent from this map are the
+// transient `_`-prefixed UI selections and `_policyDomain`-style scratch flags,
+// which are re-derived on load and cannot corrupt a program.
+const STATE_NULLABLE_TYPES = {
+  baseline: ['string'],
+  baselineOverride: ['string'],
+  infoSecPolicy: ['object'],
+  policySelectedControls: ['object'],
+  domainPolicies: ['object'],
+  controlOwners: ['object'],
+  controlDesignSubmission: ['object'],
+  infoSecPolicyReviewDraft: ['object'],
+  currentUserId: ['string'],
+  _currentPersonIds: ['array']
+};
+
 function validateProgramShape(parsed) {
   var errors = [];
   var warnings = [];
@@ -1919,8 +1946,16 @@ function validateProgramShape(parsed) {
   }
   STATE_ALLOWED_KEYS.forEach(function(k) {
     if (!(k in parsed)) return;
-    var exp = valType(STATE_DEFAULTS[k]);
     var got = valType(parsed[k]);
+    if (STATE_DEFAULTS[k] === null) {
+      if (got === 'null') return;
+      var allowed = STATE_NULLABLE_TYPES[k];
+      if (allowed && allowed.indexOf(got) === -1) {
+        errors.push('Field "' + k + '" must be ' + allowed.join(' or ') + ' or null, got ' + got);
+      }
+      return;
+    }
+    var exp = valType(STATE_DEFAULTS[k]);
     if (exp !== got) {
       errors.push('Field "' + k + '" must be ' + exp + ', got ' + got);
     }
