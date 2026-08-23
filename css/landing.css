@@ -99,12 +99,22 @@ body {
 
 .landing-hero h1 {
   font-family: var(--font-display);
-  font-size: clamp(52px, 8vw, 88px);
+  font-size: clamp(40px, 6.4vw, 72px);
   font-weight: 500;
   letter-spacing: -0.045em;
-  line-height: 0.92;
-  max-width: 12ch;
-  margin-bottom: 24px;
+  line-height: 1.02;
+  max-width: 14em;
+  margin-bottom: 10px;
+}
+
+.landing-hero-hook {
+  font-family: var(--font-display);
+  font-size: clamp(28px, 4.2vw, 40px);
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  margin: 0 0 24px;
+  color: var(--cover-ink);
 }
 
 .landing-hero-lead {

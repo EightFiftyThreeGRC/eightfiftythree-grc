@@ -5,7 +5,8 @@ test.describe('EightFiftyThree GRC smoke', function() {
 
   test('landing page loads and links to app', async function({ page }) {
     await page.goto('/');
-    await expect(page.locator('h1')).toContainText('NIST 800-53');
+    await expect(page.locator('h1')).toContainText('NIST RMF, CSF, 800-53');
+    await expect(page.locator('.landing-hero-hook')).toContainText('Without the spreadsheet');
     await expect(page.getByRole('link', { name: /Launch app/i }).first()).toBeVisible();
   });
 
