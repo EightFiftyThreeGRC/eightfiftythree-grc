@@ -1469,10 +1469,14 @@ function renderCISOStep3Integrations() {
   const body = document.getElementById('ciso-step-4-body');
   if (!body) return;
 
+  if (typeof applyRegMappingRecommendations === 'function') applyRegMappingRecommendations(false);
+
   body.innerHTML = `
     ${cisoStepProgressHtml(4, 'Reg mapping')}
     <div class="section-title">Overlays on the CSF program</div>
     <div class="section-subtitle">CSF 2.0 is already the program structure. Turn on ISO 27001, SOC 2, HIPAA, SOX, or other lenses the profile suggested \u2014 they do not change any system\u2019s 800-53 baseline.</div>
+
+    ${typeof renderRegMappingRecommendationHtml === 'function' ? renderRegMappingRecommendationHtml() : ''}
 
     ${typeof renderFrameworkSetupSectionHtml === 'function' ? renderFrameworkSetupSectionHtml() : ''}
 
