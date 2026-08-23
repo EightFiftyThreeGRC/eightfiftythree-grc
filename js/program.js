@@ -1107,15 +1107,15 @@ function baselineLabel(letter) {
 
 /** Caveat shared by every baseline rationale. Wording matters \u2014 see the block comment above. */
 function getOrgBaselineScopeCaveat(level) {
-  var base = 'This is your organization-wide starting baseline and common control set \u2014 the floor every system inherits. '
+  var base = 'This is the inherited common-control floor \u2014 the catalog every system starts from. '
     + 'It is not a statement that every system is categorized at this level. Individual systems are categorized separately '
-    + 'under FIPS 199 within their own authorization boundary and may land higher or lower than this organizational default.';
+    + 'under FIPS 199 within their own authorization boundary.';
   if (level === 'L') {
-    base += ' Choosing a Low organizational floor does not claim that no system needs more \u2014 a higher-impact system is raised '
+    base += ' A Low common-control floor does not claim that no system needs more \u2014 a higher-impact system is raised '
       + 'on its own merits through the baseline-elevation review in Assets & SSP, which creates an elevated system class '
-      + 'without moving the organizational floor.';
+      + 'without flipping this floor.';
   } else {
-    base += ' Systems above this floor are handled by the baseline-elevation review in Assets & SSP rather than by raising the organizational default again.';
+    base += ' Systems above this floor are handled by the baseline-elevation review in Assets & SSP rather than by raising the inherited catalog again.';
   }
   return base;
 }
@@ -1261,21 +1261,21 @@ function recommendBaseline() {
   var summary;
   if (level === 'H') {
     var topH = drivers.filter(function(d) { return d.level === 'H'; })[0] || drivers[0];
-    summary = 'High is the organizational starting floor because the mission is catastrophic, safety-of-life, or national security. '
+    summary = 'High is the recommended common-control floor because the mission is catastrophic, safety-of-life, or national security. '
       + (topH ? topH.detail : '')
-      + ' That is the common-control floor, not a claim that every system is High.';
+      + ' That is the inherited catalog floor, not a claim that every system is High.';
   } else if (level === 'M') {
     var topM = drivers.filter(function(d) { return d.level === 'M'; })[0] || drivers[0];
-    summary = 'Moderate is the organizational starting floor because of a hard program trigger'
+    summary = 'Moderate is the recommended common-control floor because of a hard program trigger'
       + (topM ? ' \u2014 ' + topM.detail : '.')
       + ' Moderate is a multi-year common-control lift, not a size-based default.';
   } else {
     summary = isSmallWorkforce
-      ? 'Workforce and sector point to a Low organizational floor \u2014 the maintainable common-control set for a program of this size.'
-      : 'Low is the organizational starting floor. Nothing in the profile is a hard Moderate trigger.';
+      ? 'Workforce and sector point to a Low common-control floor \u2014 the maintainable inherited catalog for a program of this size.'
+      : 'Low is the recommended common-control floor. Nothing in the profile is a hard Moderate trigger.';
     if (soft.length) {
       summary += ' Named risks raise impact for specific systems \u2014 use baseline elevation / per-boundary FIPS 199. '
-        + 'The organizational common-control set should stay Low so the program is maintainable.';
+        + 'The inherited common-control set should stay Low so the program is maintainable.';
     }
   }
 
@@ -1322,13 +1322,13 @@ function recordBaselineDecision(selected, previous) {
   if (previous !== selected && typeof addAuditEntry === 'function') {
     var msg;
     if (!rec.available) {
-      msg = 'Organizational baseline set to ' + baselineLabel(selected) + ' (' + selected + '). '
+      msg = 'Common-control floor set to ' + baselineLabel(selected) + ' (' + selected + '). '
         + 'Organization profile incomplete \u2014 no derived recommendation to compare against.';
     } else if (deviation) {
-      msg = 'Organizational baseline set to ' + baselineLabel(selected) + ' (' + selected + ') \u2014 DEVIATION from the recommended '
+      msg = 'Common-control floor set to ' + baselineLabel(selected) + ' (' + selected + ') \u2014 DEVIATION from the recommended '
         + rec.label + ' (' + rec.level + '). Recommendation basis: ' + rec.summary;
     } else {
-      msg = 'Organizational baseline set to ' + baselineLabel(selected) + ' (' + selected + '), matching the recommendation derived '
+      msg = 'Common-control floor set to ' + baselineLabel(selected) + ' (' + selected + '), matching the recommendation derived '
         + 'from the organization profile. Basis: ' + rec.summary;
     }
     addAuditEntry('program', 'baseline', msg);
@@ -1383,7 +1383,7 @@ function ensureCommonControlFloor() {
 }
 
 function getProfileElevationFlagSentence() {
-  return 'Profile answers flag systems that will need a higher categorization; they do not set an organizational baseline.';
+  return 'Profile answers flag systems that will need a higher categorization; they do not choose Low / Moderate / High for the organization.';
 }
 
 function renderCsfProgramStructureHtml() {
@@ -1743,7 +1743,7 @@ function renderCISOStep2() {
 
     <div class="info-alert">
       <div class="ia-icon">ℹ️</div>
-      <div class="ia-text"><strong>PM-1, PM-2, and PM-9 are pre-selected</strong> as they form the foundation of any security program. All other PM controls are optional — select those applicable to your organization. PM controls are organization-wide and apply regardless of impact level.${state.privacyOverlay ? ` <strong style="color:#6366f1;">Privacy overlay is active:</strong> PM-18 through PM-${state.baseline==='H'?'28':state.baseline==='M'?'25':'20(1)'} are also pre-selected — these support the privacy program plan, leadership, disclosures, and PII governance requirements appropriate for your ${state.baseline==='H'?'High':state.baseline==='M'?'Moderate':'Low'} baseline. Policy requirements for these controls are automatically added to your Tier 1 policy in Step 6.` : ''}</div>
+      <div class="ia-text"><strong>PM-1, PM-2, and PM-9 are pre-selected</strong> as they form the foundation of any security program. All other PM controls are optional — select those applicable to your organization. PM controls are organization-wide and apply regardless of impact level.${state.privacyOverlay ? ` <strong style="color:#6366f1;">Privacy overlay is active:</strong> PM-18 through PM-${state.baseline==='H'?'28':state.baseline==='M'?'25':'20(1)'} are also pre-selected — these support the privacy program plan, leadership, disclosures, and PII governance requirements appropriate for the ${state.baseline==='H'?'High':state.baseline==='M'?'Moderate':'Low'} common-control floor. Policy requirements for these controls are automatically added to your Tier 1 policy in Step 6.` : ''}</div>
     </div>
 
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
@@ -2339,7 +2339,7 @@ function renderRequirementsSection(unmappedPM) {
     const stale = req.controls.length > 0 && !req.controls.some(cid => activeControlIds.has(cid));
     const borderColor = stale ? '#fca5a5' : (unmappedPM.length > 0 && oi === isp.requirements.length - 1 ? '#fca5a5' : 'var(--border)');
     const staleBanner = stale
-      ? '<div style="font-size:11px;color:#b45309;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:8px 10px;margin-bottom:10px;">None of the mapped controls are currently active in your baseline or PM selection. Remove this row or update control mappings.</div>'
+      ? '<div style="font-size:11px;color:#b45309;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:8px 10px;margin-bottom:10px;">None of the mapped controls are currently active in the common-control floor or PM selection. Remove this row or update control mappings.</div>'
       : '';
     const upBtn = oi > 0 ? `<button class="btn btn-secondary btn-sm" style="padding:2px 6px;font-size:11px;" onclick="moveReq(${oi},-1)">▲</button>` : '';
     const downBtn = oi < isp.requirements.length - 1 ? `<button class="btn btn-secondary btn-sm" style="padding:2px 6px;font-size:11px;" onclick="moveReq(${oi},1)">▼</button>` : '';

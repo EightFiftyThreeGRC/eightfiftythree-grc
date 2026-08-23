@@ -122,7 +122,7 @@ function renderControlLibraryView() {
   });
   var selectedTypeCount = rows.filter(function(c) { return getCtrlCoveredAssetTypes(c.id).length > 0; }).length;
   var designedCount = rows.filter(function(c) { return isControlDesigned(c.id); }).length;
-  body.innerHTML = (deselectBaselineCount ? '<div class="callout-deselected-baseline" style="border:1px solid #f59e0b;background:#fffbeb;border-radius:10px;padding:12px 16px;margin-bottom:14px;font-size:12px;color:#92400e;"><strong>Baseline de-selections:</strong> ' + deselectBaselineCount + ' control(s) are formally de-selected from the active baseline but remain visible here for traceability. Use the status filter <em>De-selected (baseline)</em> to list them.</div>' : '')
+  body.innerHTML = (deselectBaselineCount ? '<div class="callout-deselected-baseline" style="border:1px solid #f59e0b;background:#fffbeb;border-radius:10px;padding:12px 16px;margin-bottom:14px;font-size:12px;color:#92400e;"><strong>Common-control floor note:</strong> ' + deselectBaselineCount + ' control(s) are formally de-selected from the inherited catalog but remain visible here for traceability. Use the status filter <em>De-selected (baseline)</em> to list them.</div>' : '')
     + '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;">'
     + '<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:12px 14px;"><div style="font-size:10px;font-weight:700;color:#1d4ed8;text-transform:uppercase;">Controls</div><div style="font-size:24px;font-weight:800;color:#1d4ed8;">' + rows.length + '</div></div>'
     + '<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:12px 14px;"><div style="font-size:10px;font-weight:700;color:#166534;text-transform:uppercase;">Designed</div><div style="font-size:24px;font-weight:800;color:#166534;">' + designedCount + '</div></div>'
@@ -2668,7 +2668,7 @@ function renderControlDetailForm(ctrl) {
       <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--navy);margin-bottom:4px;">Asset &amp; Process Scope</div>
       <div style="font-size:11px;color:var(--text-muted);margin-bottom:14px;line-height:1.6;">
         Identify which asset types and processes this control applies to. Your design must address how it works for <strong>each type you check</strong>. Assessors will validate coverage by asset type.
-        <span style="display:block;margin-top:6px;color:#475569;">Suggested defaults are pre-selected for your baseline — adjust, add, or clear any checkbox.</span>
+        <span style="display:block;margin-top:6px;color:#475569;">Suggested defaults are pre-selected for the common-control floor — adjust, add, or clear any checkbox.</span>
       </div>
 
       ${((state.assets||[]).length > 0 || (state.processes||[]).length > 0) ? `
@@ -3676,7 +3676,7 @@ function buildAssetCoverageHTML(ctrlId) {
       + '<div style="font-weight:800;margin-bottom:4px;color:#6b21a8;">AI asset types in scope for this control</div>'
       + 'Defaults follow NIST <a href="https://csrc.nist.gov/projects/cosais" target="_blank" rel="noopener noreferrer" style="color:#6d28d9;font-weight:700;">COSAiS</a> (Control Overlays for Securing AI Systems) draft overlays — Generative AI/LLM, RAG, predictive ML, agents, and AI developer toolchain use cases. Adjust checkboxes to match your environment.'
       + (suggested.length ? '<div style="margin-top:8px;padding-top:8px;border-top:1px dashed rgba(107,33,168,0.25);">'
-        + '<span style="font-weight:700;color:#6b21a8;">Related COSAiS controls in your baseline:</span> '
+        + '<span style="font-weight:700;color:#6b21a8;">Related COSAiS controls in the common-control floor:</span> '
         + suggested.map(function(id) {
           return '<span style="font-family:monospace;font-weight:700;background:rgba(255,255,255,0.9);padding:1px 6px;border-radius:4px;margin-right:4px;">' + escapeHTML(id) + '</span>';
         }).join('')

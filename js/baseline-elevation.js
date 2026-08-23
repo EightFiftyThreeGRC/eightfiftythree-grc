@@ -162,7 +162,7 @@ function processBaselineElevationOnSystemProfile(asset, assetImpactLetter) {
       + '<div style="font-weight:800;margin-bottom:4px;">Baseline elevation declined</div>'
       + 'The CISO previously declined elevation of this asset type to <strong>' + beTargetLabelLetter(rej.targetBaseline) + '</strong> on ' + escapeHTML(rej.decisionDate || '—') + '. '
       + (rej.decisionRationale ? '<em>Rationale:</em> ' + escapeHTML(rej.decisionRationale) + ' ' : '')
-      + 'This asset remains on the program baseline.</div>';
+      + 'This asset remains on the common-control floor.</div>';
   }
   var pendL = aLev.find(function(r) { return r.status === 'Pending'; });
   if (pendL) {
@@ -466,7 +466,7 @@ function renderBaselineElevationCisoCardsHtml() {
   var canAct = userMayActOnBaselineElevation() || !state.currentUserId;
   return '<div id="be-ciso-elevation" style="background:linear-gradient(135deg,#fff7ed,#fffbeb);border:1px solid #fbbf24;border-radius:12px;padding:18px;margin-bottom:20px;max-width:1020px;">'
     + '<div style="font-size:15px;font-weight:800;color:var(--navy);margin-bottom:8px;">CISO: Baseline Elevation Recommendations</div>'
-    + '<p style="font-size:12px;color:var(--text-muted);margin:0 0 12px;">NIST-consistent tailoring with additions: CISO/ AO decision at system-class; tool does not change program baseline. Delta lists include <strong>all</strong> applicable control enhancements by family; control owners later mark inapplicable during implementation. Full rationale required for approve or reject.</p>'
+    + '<p style="font-size:12px;color:var(--text-muted);margin:0 0 12px;">NIST-consistent tailoring with additions: CISO/ AO decision at system-class; tool does not change the common-control floor. Delta lists include <strong>all</strong> applicable control enhancements by family; control owners later mark inapplicable during implementation. Full rationale required for approve or reject.</p>'
     + pending.map(function(rec) {
       var fams = {};
       rec.deltaControlIds.forEach(function(cid) {
@@ -482,7 +482,7 @@ function renderBaselineElevationCisoCardsHtml() {
         + '<div style="font-size:16px;font-weight:800;color:var(--navy);margin:6px 0;">Elevate ' + escapeHTML(rec.baseAssetTypeName) + ' to ' + beTargetLabelLetter(rec.targetBaseline) + ' baseline</div>'
         + '<div style="font-size:12px;color:var(--text);">'
         + 'Triggering asset: <a href="#" onclick="event.preventDefault();showTab(\'asset\');if(typeof enterAssetSSP===\'function\'){enterAssetSSP(' + JSON.stringify(String(rec.triggerAssetId)) + ');}" style="color:var(--teal);font-weight:600;">' + escapeHTML(aName) + '</a>'
-        + ' · Program baseline: ' + escapeHTML(String(rec.programBaselineAtTimeOfRec)) + ' · Proposed: <strong>' + escapeHTML(rec.elevatedSubtypeName) + '</strong>'
+        + ' · Common-control floor: ' + escapeHTML(String(rec.programBaselineAtTimeOfRec)) + ' · Proposed: <strong>' + escapeHTML(rec.elevatedSubtypeName) + '</strong>'
         + '</div>'
         + '<details style="margin:10px 0;font-size:12px;"><summary style="cursor:pointer;font-weight:600;">Delta controls (' + rec.deltaControlIds.length + ')</summary>'
         + Object.keys(fams).sort().map(function(f) {

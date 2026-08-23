@@ -289,7 +289,7 @@ function applyPolicyCatalogToProgram() {
         status: 'Mapped',
         source: 'mapped',
         purpose: 'This family is satisfied by existing organizational documents catalogued during program setup (Path B \u2014 map what you have). Mapped documents: ' + noteParts.join('; ') + '.',
-        scope: 'Controls in the ' + ((FAMILIES && FAMILIES[fam]) || fam) + ' family that are in the program baseline and listed on the mapped documents.',
+        scope: 'Controls in the ' + ((FAMILIES && FAMILIES[fam]) || fam) + ' family that are in the common-control floor and listed on the mapped documents.',
         sections: [
           { type: 'purpose', title: 'Purpose' },
           { type: 'scope', title: 'Scope' },

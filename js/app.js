@@ -163,10 +163,10 @@ function pillsHTML(bl) {
 // bl=[] = catalog control, not assigned to any baseline.
 function minBaselinePill(bl) {
   if (!bl || bl.length === 0) return '<span class="baseline-pill" style="background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;" title="NIST 800-53 catalog — not assigned to any baseline">CATALOG</span>';
-  if (bl.includes('L')) return '<span class="baseline-pill pill-l" title="Required in Low, Moderate, and High baselines">LOW+</span>';
-  if (bl.includes('M')) return '<span class="baseline-pill pill-m" title="Required in Moderate and High baselines">MOD+</span>';
-  if (bl.includes('H')) return '<span class="baseline-pill pill-h" title="Required in High baseline only">HIGH</span>';
-  if (bl.includes('P')) return '<span class="baseline-pill pill-p" title="Privacy baseline">PRIVACY</span>';
+  if (bl.includes('L')) return '<span class="baseline-pill pill-l" title="In the 800-53B Low catalog (and Moderate / High)">LOW+</span>';
+  if (bl.includes('M')) return '<span class="baseline-pill pill-m" title="In the 800-53B Moderate catalog (and High)">MOD+</span>';
+  if (bl.includes('H')) return '<span class="baseline-pill pill-h" title="In the 800-53B High catalog only">HIGH</span>';
+  if (bl.includes('P')) return '<span class="baseline-pill pill-p" title="Privacy overlay catalog">PRIVACY</span>';
   return '<span class="baseline-pill" style="background:#f1f5f9;color:#64748b;">CATALOG</span>';
 }
 

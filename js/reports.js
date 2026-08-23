@@ -1487,7 +1487,7 @@ function renderProgramDashboard(controls, families) {
   }).length;
 
   return `
-    ${deselectBaselineDash ? '<div class="callout-deselected-baseline" style="border:1px solid #f59e0b;background:#fffbeb;border-radius:10px;padding:12px 18px;margin-bottom:16px;font-size:12px;color:#92400e;line-height:1.5;"><strong>Baseline scope note:</strong> ' + deselectBaselineDash + ' control(s) are formally <em>de-selected</em> from the active baseline. They remain in the catalog for audit traceability — open the Control Library and filter <strong>De-selected (baseline)</strong> to review them.</div>' : ''}
+    ${deselectBaselineDash ? '<div class="callout-deselected-baseline" style="border:1px solid #f59e0b;background:#fffbeb;border-radius:10px;padding:12px 18px;margin-bottom:16px;font-size:12px;color:#92400e;line-height:1.5;"><strong>Common-control floor note:</strong> ' + deselectBaselineDash + ' control(s) are formally <em>de-selected</em> from the inherited catalog. They remain in the catalog for audit traceability — open the Control Library and filter <strong>De-selected (baseline)</strong> to review them.</div>' : ''}
 
     ${typeof renderBaselineElevationReportsSummaryHtml === 'function' ? renderBaselineElevationReportsSummaryHtml() : ''}
     ${typeof renderBaselineElevationCisoCardsHtml === 'function' ? renderBaselineElevationCisoCardsHtml() : ''}

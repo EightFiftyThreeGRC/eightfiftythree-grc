@@ -1918,7 +1918,7 @@ function buildSspReadOnlyStep1ProfileHtml(item, isProc) {
     + ' · Integrity <strong>' + _esc(fipsL[cat.integrity] || cat.integrity || 'Low') + '</strong>'
     + ' · Availability <strong>' + _esc(fipsL[cat.availability] || cat.availability || 'Low') + '</strong>'
     + '<br><span style="font-size:12px;color:var(--text-muted);">Overall system impact: <strong style="color:var(--navy);">' + _esc(fipsL[impact] || impact) + '</strong>'
-    + ' · Program baseline: <strong>' + _esc(fipsL[programBl] || programBl) + '</strong></span>'
+    + ' · Common-control floor: <strong>' + _esc(fipsL[programBl] || programBl) + '</strong></span>'
     + '</dd>'
     + infoLines
     + '<dt style="' + dtStyle + '">Categorization rationale</dt><dd style="' + ddStyle + ';white-space:pre-wrap;">' + (rationale ? _esc(rationale) : '<span style="color:var(--text-muted);font-style:italic;">Not provided.</span>') + '</dd>'
@@ -2694,7 +2694,7 @@ function renderAssetSSPStep2_SystemProfile(asset) {
     mismatchBanner = '<div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:10px;padding:12px 14px;margin-top:14px;margin-bottom:8px;font-size:12px;color:#92400e;line-height:1.55;max-width:920px;">'
       + '<div style="font-weight:800;margin-bottom:4px;">This system is above the common-control floor</div>'
       + 'This system\'s FIPS 199 high-water mark (<strong>' + fipsLabels[assetImpact] + '</strong>) is above the inherited common-control floor (<strong>' + fipsLabels[programBl] + '</strong>). '
-      + 'The organizational floor is <em>not</em> auto-changed. Elevation adds Moderate/High controls for this system class only. Details below.</div>';
+      + 'The inherited common-control floor is <em>not</em> auto-changed. Elevation adds Moderate/High controls for this system class only. Details below.</div>';
   }
 
   return fipsBlock + mismatchBanner + elevationHtml;

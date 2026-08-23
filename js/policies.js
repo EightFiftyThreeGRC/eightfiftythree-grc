@@ -645,7 +645,7 @@ function renderISSMWorkspace(user) {
       + (returnNotes
         ? '<div style="margin:6px 0 8px 0;padding:8px 10px;background:#fff7ed;border:1px solid #fdba74;border-radius:6px;font-size:11px;line-height:1.45;color:#9a3412;"><strong>Return notes:</strong> ' + _esc(returnNotes) + '</div>'
         : '')
-      + '<div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">' + selected.length + ' controls selected · ' + ctrlCount + ' in baseline</div>'
+      + '<div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">' + selected.length + ' controls selected · ' + ctrlCount + ' in common-control floor</div>'
       + '<div style="font-size:11px;display:flex;align-items:center;">' + reviewStatusDot(fam) + '<span style="color:' + getReviewStatus(fam).color + ';">' + getReviewStatus(fam).label + '</span></div>'
       + ownerBar
       + (primary.handler
@@ -1058,7 +1058,7 @@ function renderPolicyList(bodyEl) {
           + '</div>'
           : '')
         + '<div style="font-weight:700; font-size:14px; color:var(--navy); margin-bottom:2px;">' + escapeHTML(mergedTitle) + '</div>'
-        + '<div style="font-size:11px; color:var(--text-muted); margin-bottom:10px;">' + ctrlCount + ' controls in baseline'
+        + '<div style="font-size:11px; color:var(--text-muted); margin-bottom:10px;">' + ctrlCount + ' controls in common-control floor'
         + (custodian ? ' \u00B7 Custodian: ' + escapeHTML(custodian) : '') + '</div>'
         + actionBtn
         + '</div>';
@@ -2231,7 +2231,7 @@ function renderPolicyStep2() {
   });
 
   const footerCount = document.getElementById('policy-step-2-count');
-  if (footerCount) footerCount.textContent = selected.length + ' selected (' + baselineControls.length + ' required by baseline)';
+  if (footerCount) footerCount.textContent = selected.length + ' selected (' + baselineControls.length + ' in the common-control floor)';
 
   if (helpEl) helpEl.innerHTML = `
     <div style="margin-bottom:16px;">
@@ -2240,15 +2240,15 @@ function renderPolicyStep2() {
     </div>
     <div style="background:rgba(59,130,246,0.08); border:1px solid rgba(59,130,246,0.25); border-radius:8px; padding:12px; margin-bottom:16px;">
       <div style="font-size:12px; font-weight:700; color:#2563eb; margin-bottom:6px;">\u2139\uFE0F About this step</div>
-      <div style="font-size:12px; color:#1d4ed8; line-height:1.6;">Baseline controls are pre-selected. Deselect any that don't apply. You can also add controls from higher baselines if your risk profile or strategic priorities require them. <strong>Policy and Procedures (XX-1) controls are covered by your organization-wide Information Security Policy and are not listed here.</strong></div>
+      <div style="font-size:12px; color:#1d4ed8; line-height:1.6;">Controls in the inherited common-control floor are pre-selected. Deselect any that don't apply. You can add Moderate or High catalog controls when a system's risk profile needs them \u2014 Low / Moderate / High is chosen per system, not for the organization. <strong>Policy and Procedures (XX-1) controls are covered by your organization-wide Information Security Policy and are not listed here.</strong></div>
     </div>
     <div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted); margin-bottom:8px;">Quick Select</div>
-    <button class="btn btn-secondary btn-sm" style="width:100%; margin-bottom:6px;" onclick="selectAllDomainControls('${fam}','baseline')">\u21A9 Reset to ${state.baseline==='L'?'Low':state.baseline==='M'?'Moderate':'High'} Baseline</button>
+    <button class="btn btn-secondary btn-sm" style="width:100%; margin-bottom:6px;" onclick="selectAllDomainControls('${fam}','baseline')">\u21A9 Reset to common-control floor</button>
     <button class="btn btn-secondary btn-sm" style="width:100%; margin-bottom:6px;" onclick="selectAllDomainControls('${fam}','none')">\u2610 Clear All</button>
     <button class="btn btn-secondary btn-sm" style="width:100%; margin-bottom:6px;" onclick="addControlsFromOtherFamilies('${fam}')">+ Add control(s) from other families</button>
     <div style="border-top:1px solid var(--border); padding-top:12px;">
       <div style="font-size:13px; font-weight:700; color:var(--navy);" id="policy-step-2-count-side">${selected.length} <span style="font-weight:400; font-size:12px; color:var(--text-muted);">selected</span></div>
-      <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">${baselineControls.length} required by ${state.baseline==='L'?'Low':state.baseline==='M'?'Moderate':'High'} baseline</div>
+      <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">${baselineControls.length} in the ${state.baseline==='L'?'Low':state.baseline==='M'?'Moderate':'High'} common-control floor</div>
     </div>
   `;
 
@@ -2259,13 +2259,13 @@ function renderPolicyStep2() {
     <div style="margin-bottom:12px;">
       <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:4px;">${allBadgesHtml2}</div>
       <div style="font-size:16px; font-weight:700; color:var(--navy);">${escapeHTML(mergedTitle)} — Controls</div>
-      <div style="font-size:13px; color:var(--text-muted);">${baselineControls.length} required by your ${state.baseline==='L'?'Low':state.baseline==='M'?'Moderate':'High'} baseline${state.privacyOverlay?' + Privacy':''}. ${allFamControls.length - baselineControls.length > 0 ? (allFamControls.length - baselineControls.length) + ' additional controls available.' : ''}</div>
+      <div style="font-size:13px; color:var(--text-muted);">${baselineControls.length} in the ${state.baseline==='L'?'Low':state.baseline==='M'?'Moderate':'High'} common-control floor${state.privacyOverlay?' + Privacy':''}. ${allFamControls.length - baselineControls.length > 0 ? (allFamControls.length - baselineControls.length) + ' additional controls available.' : ''} Low / Moderate / High for a system is chosen under FIPS 199 in Assets &amp; SSP.</div>
     </div>
     <div class="filter-bar" style="margin-bottom:12px;">
       <input type="text" id="ctrlFilter1" placeholder="Search controls\u2026" style="flex:1;" oninput="filterDomainControls()">
       <select id="ctrlBaselineFilter" onchange="filterDomainControls()">
         <option value="all" selected>All Controls</option>
-        <option value="required">Baseline Required</option>
+        <option value="required">In common-control floor</option>
         <option value="optional">Optional / Enhanced</option>
       </select>
     </div>
@@ -2279,7 +2279,7 @@ function renderPolicyStep2() {
             <th style="width:90px;">Control ID</th>
             <th style="width:120px;">CSF 2.0</th>
             <th>Name</th>
-            <th style="width:110px;">Baseline</th>
+            <th style="width:110px;">800-53B</th>
           </tr>
         </thead>
         <tbody id="tbod-${Math.random().toString(36).slice(2,8)}">
@@ -2345,7 +2345,7 @@ function addControlsFromOtherFamilies(fam) {
     return allFams.indexOf(c.f) === -1;
   });
   if (!candidateControls.length) {
-    showToast('No controls from other families are available in the current baseline scope.', true);
+    showToast('No controls from other families are available in the common-control floor.', true);
     return;
   }
   var preview = candidateControls.slice(0, 40).map(function(c) { return c.id + ' (' + c.f + ')'; }).join(', ');
@@ -2410,7 +2410,7 @@ function toggleDomainControl(fam, ctrlId, checked) {
   }).length;
   const fc  = document.getElementById('policy-step-2-count');
   const fcs = document.getElementById('policy-step-2-count-side');
-  if (fc)  fc.textContent = sel.length + ' selected (' + baselineCount + ' required by baseline)';
+  if (fc)  fc.textContent = sel.length + ' selected (' + baselineCount + ' in the common-control floor)';
   if (fcs) fcs.innerHTML  = sel.length + ' <span style="font-weight:400;font-size:12px;color:var(--text-muted);">selected</span>';
 }
 
@@ -2438,7 +2438,7 @@ function selectAllDomainControls(fam, mode) {
   if (selectAllCb) selectAllCb.checked = mode === 'all';
   const fc = document.getElementById('policy-step-2-count');
   const fcs = document.getElementById('policy-step-2-count-side');
-  if (fc)  fc.textContent = sel.length + ' selected (' + baselineFam.length + ' required by baseline)';
+  if (fc)  fc.textContent = sel.length + ' selected (' + baselineFam.length + ' in the common-control floor)';
   if (fcs) fcs.innerHTML  = sel.length + ' <span style="font-weight:400;font-size:12px;color:var(--text-muted);">selected</span>';
 }
 
