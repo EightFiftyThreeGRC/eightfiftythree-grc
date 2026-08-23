@@ -4,6 +4,9 @@ const { test, expect } = require('@playwright/test');
 function seedSspReviewFixture(reviewerIsSubmitter) {
   return function (isSamePerson) {
     window.state.cisoComplete = true;
+    // These assertions are about the open-world dashboard's action cards, so opt
+    // out of the guided post-setup journey that `home` otherwise defaults to.
+    window.state.homeJourney = { mode: 'open', focus: '', deferred: {} };
     window.state.baseline = 'L';
     window.state.orgName = 'Kraper & Dramer';
     window.state.programOwner = 'David Slang';

@@ -798,6 +798,8 @@
     .journey-step.is-done .journey-step-label { opacity: 0.7; }
     .journey-step.is-current { background: rgba(250, 249, 246, 0.16); }
     .journey-step.is-deferred .journey-step-marker { border-style: dashed; }
+    .journey-step.is-dormant { opacity: 0.6; }
+    .journey-step.is-dormant .journey-step-marker { border-style: dashed; }
     .journey-foot {
       margin: 0;
       font-size: 13px;

@@ -166,7 +166,13 @@ function renderOnboardingHome() {
     + '</div>';
 }
 
-function getNextActions() {
+/**
+ * Real next steps for this acting identity, highest priority first.
+ * Every action carries a `stage` id so the guided journey (renderGuidedJourneyHome)
+ * can adopt the same routing instead of recomputing it. Pass limit 0 for the
+ * unsliced list.
+ */
+function getNextActions(limit) {
   var actions = [];
   var today = new Date().toISOString().slice(0, 10);
 
@@ -179,6 +185,7 @@ function getNextActions() {
       icon: '🏛️',
       label: 'Continue program setup',
       desc: 'Step ' + p.step + ' of ' + total + ' \u2014 ' + p.label + '.',
+      stage: 'setup',
       action: isMap ? 'continuePolicyMapSetup();' : 'startProgramSetup();'
     });
     return actions;
@@ -195,6 +202,7 @@ function getNextActions() {
         icon: '📋',
         label: 'Approve policy: ' + title,
         desc: 'Domain policy awaiting your sign-off.',
+        stage: 'policies',
         action: "openCISOReview('" + fam.replace(/'/g, "\\'") + "');"
       });
     }
@@ -209,6 +217,7 @@ function getNextActions() {
         icon: '📋',
         label: 'Review SSP: ' + (r.assetName || 'Package'),
         desc: 'Submitted by ' + (r.submittedBy || 'owner') + (r.date ? ' on ' + r.date : ''),
+        stage: 'attest',
         kind: 'ssp-review',
         scopeId: String(r.assetId || ''),
         isProcess: isProc,
@@ -223,6 +232,7 @@ function getNextActions() {
         icon: '⏳',
         label: 'SSP awaiting review: ' + (pkg.name || 'Package'),
         desc: 'Submitted — with ' + (pkg.reviewerLabel || 'designated reviewer'),
+        stage: 'attest',
         action: "showTab('reports');"
       });
     });
@@ -236,11 +246,14 @@ function getNextActions() {
     var action = isReturn
       ? "openControlReassignmentModal('" + escId + "');"
       : "state._selectedCtrl='" + escId + "';showTab('control');goToStep('control',2);";
-    actions.push({ priority: 3, icon: isReturn ? '↩' : '🔧', label: (isReturn ? 'Reassign control: ' : 'Review control: ') + r.controlId, desc: (r.status || 'Pending review'), action: action });
+    actions.push({ priority: 3, icon: isReturn ? '↩' : '🔧', label: (isReturn ? 'Reassign control: ' : 'Review control: ') + r.controlId, desc: (r.status || 'Pending review'), stage: 'controls', action: action });
   });
 
   if (typeof getRiskHubNextActions === 'function') {
-    getRiskHubNextActions().forEach(function(a) { actions.push(a); });
+    getRiskHubNextActions().forEach(function(a) {
+      if (a && !a.stage) a.stage = 'risks';
+      actions.push(a);
+    });
   }
 
   if (typeof getISPStatus === 'function' && getISPStatus() === 'Under Review') {
@@ -260,6 +273,7 @@ function getNextActions() {
         icon: '✅',
         label: 'Approve ISP: ' + ispTitle,
         desc: 'Tier 1 Information Security Policy is awaiting your sign-off.',
+        stage: 'govern',
         action: "showTab('reports');goToCISOPolicyEditor();"
       });
     } else {
@@ -269,6 +283,7 @@ function getNextActions() {
         icon: '📋',
         label: 'ISP awaiting ' + (approverNm || 'approver'),
         desc: 'Switch profile to that person to approve or return the ISP.',
+        stage: 'govern',
         action: "typeof showRolePicker === 'function' ? showRolePicker() : showTab('reports');"
       });
     }
@@ -286,6 +301,7 @@ function getNextActions() {
       icon: '\u21A9',
       label: 'Revise ISP: ' + returnedIspTitle,
       desc: returnedDesc,
+      stage: 'govern',
       action: 'openISPForRevision();'
     });
   }
@@ -303,6 +319,7 @@ function getNextActions() {
       icon: '\u21A9',
       label: 'Revise policy: ' + title,
       desc: domainDesc,
+      stage: 'policies',
       action: "typeof openReturnedDomainPolicyRevision === 'function' ? openReturnedDomainPolicyRevision('" + fam.replace(/'/g, "\\'") + "') : showTab('policy');"
     });
   });
@@ -320,6 +337,7 @@ function getNextActions() {
       icon: '\ud83d\udc64',
       label: 'Assign policy owner: ' + title,
       desc: domainDesc,
+      stage: 'policies',
       action: "typeof openAssignDomainPolicyOwnerModal === 'function' ? openAssignDomainPolicyOwnerModal('" + fam.replace(/'/g, "\\'") + "') : showTab('policy');"
     });
   });
@@ -337,6 +355,7 @@ function getNextActions() {
         icon: '\u21A9',
         label: 'Reassign policy: ' + title,
         desc: 'A domain owner returned this policy for reassignment.',
+        stage: 'policies',
         action: "typeof openAssignDomainPolicyOwnerModal === 'function' ? openAssignDomainPolicyOwnerModal('" + fam.replace(/'/g, "\\'") + "') : startProgramSetup();"
       });
     });
@@ -345,7 +364,7 @@ function getNextActions() {
   (state.assets || []).forEach(function(a) {
     var signoff = (state.sspSignoffs || {})[a.id] || {};
     if (signoff.status === 'Submitted') {
-      actions.push({ priority: 4, icon: '🖥️', label: 'SSP submitted: ' + a.name, desc: 'Review asset package on Reports.', action: "showTab('reports');" });
+      actions.push({ priority: 4, icon: '🖥️', label: 'SSP submitted: ' + a.name, desc: 'Review asset package on Reports.', stage: 'attest', action: "showTab('reports');" });
     }
   });
 
@@ -369,6 +388,7 @@ function getNextActions() {
         icon: '📋',
         label: (draftSt === 'In Progress' || draftSt === 'Draft' ? 'Continue ' : 'Draft ') + draftTitle + ' policy',
         desc: 'Function policy is not submitted yet.',
+        stage: 'policies',
         action: "showTab('policy');if(typeof enterPolicyWizard==='function')enterPolicyWizard('" + draftEsc + "');"
       });
     }
@@ -379,6 +399,7 @@ function getNextActions() {
       icon: '🖥️',
       label: 'Register a system',
       desc: 'Categorize it under FIPS 199. That sets this system\u2019s 800-53 baseline \u2014 not the organization.',
+      stage: 'systems',
       action: "showTab('asset');if(typeof openAddItemModal==='function')openAddItemModal('asset');"
     });
   }
@@ -394,13 +415,459 @@ function getNextActions() {
         icon: '🔧',
         label: 'Design control implementations',
         desc: 'Document how in-scope 800-53 controls are implemented.',
+        stage: 'controls',
         action: "typeof goToControlWorkspace === 'function' ? goToControlWorkspace() : showTab('control');"
       });
     }
   }
 
   actions.sort(function(a, b) { return a.priority - b.priority; });
-  return actions.slice(0, 8);
+  return limit === 0 ? actions : actions.slice(0, limit || 8);
+}
+
+// ---------------------------------------------------------------------------
+// GUIDED POST-SETUP JOURNEY
+//
+// Finishing setup used to drop the operator straight into the open-world
+// dashboard, which is the moment they know least about what comes next. The
+// `home` tab now branches on state.homeJourney.mode: 'guided' hands over one
+// stage at a time, 'open' is the full Command Center. Both directions stay
+// reachable and the choice persists. Stage completion is always derived from
+// program state so the progress shown cannot drift from reality.
+// ---------------------------------------------------------------------------
+
+function ensureHomeJourneyState() {
+  var j = state.homeJourney;
+  if (!j || typeof j !== 'object' || Array.isArray(j)) {
+    j = state.homeJourney = { mode: 'guided', focus: '', deferred: {} };
+  }
+  if (j.mode !== 'open' && j.mode !== 'guided') j.mode = 'guided';
+  if (typeof j.focus !== 'string') j.focus = '';
+  if (!j.deferred || typeof j.deferred !== 'object' || Array.isArray(j.deferred)) j.deferred = {};
+  return j;
+}
+
+function getHomeMode() {
+  return ensureHomeJourneyState().mode;
+}
+
+/** Switch the `home` landing between the guided journey and the open dashboard. */
+function setHomeMode(mode) {
+  var j = ensureHomeJourneyState();
+  j.mode = (mode === 'open') ? 'open' : 'guided';
+  if (typeof markDirty === 'function') markDirty();
+  setTimeout(function() {
+    if (typeof renderHomeTab === 'function') renderHomeTab();
+    if (typeof renderProgramPhaseBar === 'function') renderProgramPhaseBar();
+  }, 0);
+}
+
+/** Pin a stage the operator jumped back to, and un-defer it. */
+function focusJourneyStage(stageId) {
+  var j = ensureHomeJourneyState();
+  j.focus = String(stageId || '');
+  if (j.focus) delete j.deferred[j.focus];
+  if (typeof markDirty === 'function') markDirty();
+  setTimeout(function() { renderHomeTab(); }, 0);
+}
+
+/** Park a stage for later. It comes back once nothing else is outstanding. */
+function deferJourneyStage(stageId) {
+  var id = String(stageId || '');
+  if (!id) return;
+  var j = ensureHomeJourneyState();
+  j.deferred[id] = true;
+  if (j.focus === id) j.focus = '';
+  if (typeof markDirty === 'function') markDirty();
+  setTimeout(function() { renderHomeTab(); }, 0);
+}
+
+/**
+ * A system counts as categorized once someone has actually made a FIPS 199
+ * call: a rationale, selected information types, or an impact above Low.
+ * An untouched all-Low row is the default the app wrote, not a decision.
+ */
+function journeyAssetIsCategorized(assetId) {
+  var row = (state.assetCategorization || {})[String(assetId)];
+  if (!row) return false;
+  if (String(row.rationale || '').trim()) return true;
+  if (Array.isArray(row.infoTypes) && row.infoTypes.length) return true;
+  return ['confidentiality', 'integrity', 'availability'].some(function(k) {
+    var v = String(row[k] || '').trim().toUpperCase().charAt(0);
+    return v === 'M' || v === 'H';
+  });
+}
+
+function journeySspSubmitted(scopeId) {
+  var sig = (state.sspSignoffs || {})[String(scopeId)] || {};
+  var st = typeof normalizeSspSignoffStatus === 'function'
+    ? normalizeSspSignoffStatus(sig.status)
+    : String(sig.status || '').trim();
+  return st === 'Submitted' || st === 'Approved';
+}
+
+/**
+ * The post-setup arc, scoped to what this identity can actually reach.
+ * Each stage computes its own completion from real state. `dormant` marks a
+ * stage with nothing to act on yet (no controls in scope, no gaps surfaced):
+ * it is neither done nor focusable, because claiming either would be a lie.
+ * `terminal` marks the open-ended final stage so it never blocks completion.
+ */
+function getJourneyStages() {
+  var tabs = typeof getHubVisibleTabIds === 'function' ? getHubVisibleTabIds() : [];
+  function has(t) { return tabs.indexOf(t) !== -1; }
+  var stages = [];
+
+  var ispStatus = typeof getISPStatus === 'function' ? getISPStatus() : 'Not Started';
+  var ispApproved = ispStatus === 'Approved';
+  var canApproveIsp = typeof canSessionApproveISP === 'function' && canSessionApproveISP();
+  if (has('policy') || canApproveIsp) {
+    stages.push({
+      id: 'govern',
+      label: 'Govern policy',
+      title: ispApproved ? 'Information Security Policy approved'
+        : ispStatus === 'Returned' ? 'Revise the returned Information Security Policy'
+        : ispStatus === 'Under Review' ? 'Get the Information Security Policy approved'
+        : 'Finish the Information Security Policy',
+      why: 'The ISP is your Govern layer. Every Function policy and control underneath inherits its authority, so nothing below it is defensible until it is formally approved.',
+      meta: 'ISP status: ' + ispStatus,
+      cta: 'Open the ISP',
+      action: 'goToCISOPolicyEditor()',
+      complete: ispApproved,
+      pct: ispApproved ? 100 : (ispStatus === 'Under Review' ? 60 : ispStatus === 'Not Started' ? 0 : 30)
+    });
+  }
+
+  if (has('policy')) {
+    var masters = typeof getMasterPolicyFamilies === 'function' ? getMasterPolicyFamilies() : [];
+    var approvedPolicies = masters.filter(function(fam) {
+      return ((state.policyStatus || {})[fam] || {}).status === 'Approved';
+    }).length;
+    stages.push({
+      id: 'policies',
+      label: 'Function policies',
+      title: approvedPolicies ? 'Keep working through your Function policies' : 'Draft your CSF Function policies',
+      why: 'Function policies carry the 800-53 families grouped under Identify, Protect, Detect, Respond and Recover. They turn the ISP\u2019s intent into requirements a named owner can be held to.',
+      meta: masters.length
+        ? approvedPolicies + ' of ' + masters.length + ' Function policies approved'
+        : 'No Function policies in scope',
+      cta: 'Open the policy workspace',
+      action: 'goToPoliciesHome()',
+      complete: masters.length > 0 && approvedPolicies === masters.length,
+      dormant: masters.length === 0,
+      pct: masters.length ? Math.round((approvedPolicies / masters.length) * 100) : 0
+    });
+  }
+
+  if (has('asset')) {
+    var assets = state.assets || [];
+    var categorized = assets.filter(function(a) { return journeyAssetIsCategorized(a.id); }).length;
+    stages.push({
+      id: 'systems',
+      label: 'Systems',
+      title: assets.length ? 'Categorize the systems in your inventory' : 'Register your first system',
+      why: 'FIPS 199 categorization happens per system, never once for the whole organization. A system\u2019s high-water impact is what sets its 800-53 baseline and the scope of its SSP.',
+      meta: assets.length
+        ? categorized + ' of ' + assets.length + ' systems categorized'
+        : 'Nothing in the inventory yet',
+      cta: assets.length ? 'Open Assets & SSP' : 'Register a system',
+      action: assets.length
+        ? 'goToAssetWorkspace()'
+        : "showTab('asset');if(typeof openAddItemModal==='function')openAddItemModal('asset');",
+      complete: assets.length > 0 && categorized === assets.length,
+      pct: assets.length ? Math.round((categorized / assets.length) * 100) : 0
+    });
+  }
+
+  if (has('control')) {
+    var ctrls = (state.currentUserId && typeof getScopedControls === 'function')
+      ? getScopedControls()
+      : (typeof getActiveControls === 'function' ? getActiveControls() : []);
+    var designed = ctrls.filter(function(c) {
+      var st = ((state.controlStatus || {})[c.id] || {}).status || 'Not Started';
+      return st === 'Implemented' || st === 'Inherited' || st === 'N/A';
+    }).length;
+    stages.push({
+      id: 'controls',
+      label: 'Control design',
+      title: 'Design your control implementations',
+      why: 'A control is not implemented until somebody writes down how. That narrative is what an assessor tests against and what every SSP attestation points back to.',
+      meta: ctrls.length
+        ? designed + ' of ' + ctrls.length + ' in-scope controls documented'
+        : 'No controls assigned to you yet',
+      cta: 'Open the control workspace',
+      action: 'goToControlWorkspace()',
+      complete: ctrls.length > 0 && designed === ctrls.length,
+      dormant: ctrls.length === 0,
+      pct: ctrls.length ? Math.round((designed / ctrls.length) * 100) : 0
+    });
+  }
+
+  if (has('asset')) {
+    var scopes = (state.assets || []).concat(state.processes || []);
+    var submitted = scopes.filter(function(s) { return journeySspSubmitted(s.id); }).length;
+    stages.push({
+      id: 'attest',
+      label: 'Attestations',
+      title: 'Attest and submit your SSP packages',
+      why: 'Attestation puts an accountable name against each control for one specific system. It is the evidence a reviewer actually reads, and the input to any authorization decision.',
+      meta: scopes.length
+        ? submitted + ' of ' + scopes.length + ' packages submitted for review'
+        : 'Register a system first',
+      cta: 'Open Assets & SSP',
+      action: 'goToAssetWorkspace()',
+      complete: scopes.length > 0 && submitted === scopes.length,
+      dormant: scopes.length === 0,
+      pct: scopes.length ? Math.round((submitted / scopes.length) * 100) : 0
+    });
+  }
+
+  if (has('risk')) {
+    var triage = typeof getTriagePendingCount === 'function' ? getTriagePendingCount() : 0;
+    var tracked = (state.risks || []).length + (state.issues || []).length;
+    var openRi = typeof getCombinedOpenRiskIssueCount === 'function' ? getCombinedOpenRiskIssueCount() : 0;
+    stages.push({
+      id: 'risks',
+      label: 'Risks & issues',
+      title: triage ? 'Triage the gaps into risks and issues' : 'Record the gaps you found as risks and issues',
+      why: 'The gaps that surfaced while drafting policy and designing controls belong in the register. Unrecorded gaps are the ones that resurface as audit findings.',
+      meta: triage
+        ? triage + ' suggestion' + (triage === 1 ? '' : 's') + ' waiting in the triage queue'
+        : (tracked
+          ? openRi + ' open of ' + tracked + ' tracked'
+          : 'Nothing has surfaced yet \u2014 gaps appear as you work policies and controls'),
+      cta: 'Open the triage queue',
+      action: "state._riskView='triage';showTab('risk');",
+      complete: triage === 0 && tracked > 0,
+      dormant: triage === 0 && tracked === 0,
+      pct: triage === 0 && tracked > 0 ? 100 : 0
+    });
+  }
+
+  if (has('reports')) {
+    var boundaries = state.authBoundaries || [];
+    var decided = boundaries.filter(function(b) {
+      var d = (state.atoDecisions || {})[b && b.id];
+      return !!(d && d.decision);
+    }).length;
+    // Only an AO records the decision. Everyone else is here to read the record,
+    // so do not point them at a button they are not allowed to press.
+    var sessionRoles = getHubPersonRoles(getHubSessionUser());
+    var isAo = !state.currentUserId || sessionRoles.indexOf('ao') !== -1;
+    stages.push({
+      id: 'report',
+      label: isAo ? 'Reports & authorization' : 'Reports',
+      title: (isAo && boundaries.length) ? 'Record the authorization decision' : 'Check the program record',
+      why: isAo
+        ? 'Reports are the record an assessor or auditor is handed. Once a boundary\u2019s package holds up, the authorizing official records the decision against it.'
+        : 'Reports are the running record of where the program stands \u2014 policy status, control posture, and open items in one place. Check it before you report upward.',
+      meta: (isAo && boundaries.length)
+        ? decided + ' of ' + boundaries.length + ' boundaries authorized'
+        : 'Program dashboard, audit trail, and review queues',
+      cta: 'Open Reports',
+      action: "showTab('reports')",
+      complete: isAo && boundaries.length > 0 && decided === boundaries.length,
+      pct: (isAo && boundaries.length) ? Math.round((decided / boundaries.length) * 100) : 0,
+      terminal: true
+    });
+  }
+
+  // Adopt the routing that "Your next actions" already computes rather than
+  // inventing a second one. The unsliced list keeps low-priority stages served.
+  var pending = [];
+  try { pending = getNextActions(0); } catch (e) { pending = []; }
+  stages.forEach(function(s) {
+    if (s.complete) return;
+    for (var i = 0; i < pending.length; i++) {
+      if (pending[i] && pending[i].stage === s.id) { s.next = pending[i]; return; }
+    }
+  });
+
+  return stages;
+}
+
+/**
+ * The one stage the guided view puts in front of the operator: their pinned
+ * stage if it is still actionable, else the first outstanding stage they have
+ * not deferred, else a deferred one (so deferring can never dead-end).
+ */
+function getJourneyFocusStage(stages) {
+  var j = ensureHomeJourneyState();
+  var incomplete = stages.filter(function(s) { return !s.complete; });
+  if (j.focus) {
+    // An explicit pin wins even on a dormant stage: the operator asked for it.
+    for (var i = 0; i < incomplete.length; i++) {
+      if (incomplete[i].id === j.focus) return incomplete[i];
+    }
+  }
+  var actionable = incomplete.filter(function(s) { return !s.dormant; });
+  if (!actionable.length) return null;
+  var live = actionable.filter(function(s) { return !j.deferred[s.id]; });
+  return live.length ? live[0] : actionable[0];
+}
+
+function countJourneyStagesDone(stages) {
+  return stages.filter(function(s) { return s.complete; }).length;
+}
+
+/**
+ * Some roles (a Tier 1 ISP approver, for instance) only ever reach the
+ * open-ended Reports stage. A one-row "journey" there is scaffolding with
+ * nothing to scaffold, so those identities go straight to the dashboard.
+ */
+function journeyHasGuidableStages(stages) {
+  return stages.some(function(s) { return !s.terminal; });
+}
+
+function renderJourneyRailHtml(stages, focusId) {
+  var aria = countJourneyStagesDone(stages) + ' of ' + stages.length + ' journey stages complete';
+  return '<div class="journey-rail" role="img" aria-label="' + escapeHTML(aria) + '">'
+    + stages.map(function(s) {
+      var cls = s.complete ? ' is-done' : (s.id === focusId ? ' is-current' : '');
+      return '<span class="journey-rail-seg' + cls + '"></span>';
+    }).join('')
+    + '</div>';
+}
+
+function renderJourneyStepsHtml(stages, focusId) {
+  var j = ensureHomeJourneyState();
+  return stages.map(function(s, i) {
+    var isFocus = s.id === focusId;
+    var meta = getJourneyStageMeta(s);
+    var cls, marker, status;
+    if (s.complete) {
+      cls = 'is-done'; marker = '\u2713'; status = 'Done';
+    } else if (isFocus) {
+      // The copy column already spells this stage out; repeating it here just
+      // prints the same sentence twice on one screen.
+      cls = 'is-current'; marker = String(i + 1); status = 'Current stage';
+    } else if (s.dormant) {
+      cls = 'is-dormant'; marker = '\u2013'; status = meta;
+    } else if (j.deferred[s.id]) {
+      cls = 'is-deferred'; marker = String(i + 1); status = 'Deferred \u00b7 ' + meta;
+    } else {
+      cls = 'is-later'; marker = String(i + 1); status = meta;
+    }
+    return '<button type="button" class="journey-step ' + cls + '"'
+      + (isFocus ? ' aria-current="step"' : '')
+      + ' onclick="focusJourneyStage(\'' + hubJsStringLiteral(s.id) + '\')">'
+      + '<span class="journey-step-marker" aria-hidden="true">' + marker + '</span>'
+      + '<span class="journey-step-text">'
+      + '<span class="journey-step-label">' + escapeHTML(s.label) + '</span>'
+      + '<span class="journey-step-status">' + escapeHTML(status) + '</span>'
+      + '</span></button>';
+  }).join('');
+}
+
+/* Next-action labels double as status lines ("ISP awaiting Morgan Chen",
+   "Overdue: ..."). Only an imperative one can be borrowed for the primary
+   button; anything else keeps the stage's own verb and becomes context. */
+var JOURNEY_CTA_VERB = /^(Approve|Assign|Categorize|Continue|Design|Draft|Open|Reassign|Record|Register|Review|Revise|Submit|Triage)\b/;
+
+/** The single next action the journey adopts from getNextActions(), or null. */
+function getJourneyAdoptedAction(stage) {
+  if (!stage || !stage.next || !stage.next.label) return null;
+  return JOURNEY_CTA_VERB.test(stage.next.label) ? stage.next : null;
+}
+
+/** One line of honest status, plus whoever the work is currently parked with. */
+function getJourneyStageMeta(stage) {
+  var meta = stage.meta || '';
+  if (stage.next && !getJourneyAdoptedAction(stage)) {
+    meta = meta ? meta + ' \u00b7 ' + stage.next.label : stage.next.label;
+  }
+  return meta;
+}
+
+/** The one primary action button for a stage. */
+function renderJourneyCtaHtml(stage) {
+  var adopted = getJourneyAdoptedAction(stage);
+  var label = adopted ? adopted.label : stage.cta;
+  if (adopted && adopted.kind === 'ssp-review') {
+    ensureHubActionDelegation();
+    return '<button type="button" class="btn onboard-cta" data-hub-action="ssp-review"'
+      + ' data-scope-id="' + escapeHTML(adopted.scopeId || '') + '"'
+      + ' data-is-process="' + (adopted.isProcess ? '1' : '0') + '">' + escapeHTML(label) + '</button>';
+  }
+  var action = (adopted && adopted.action) ? adopted.action : stage.action;
+  return '<button type="button" class="btn onboard-cta" onclick="' + action + '">' + escapeHTML(label) + '</button>';
+}
+
+/** Guided landing. Returns false when no stage applies, so home falls back to the dashboard. */
+function renderGuidedJourneyHome() {
+  var body = document.getElementById('home-body');
+  if (!body) return false;
+  var stages = getJourneyStages();
+  if (!journeyHasGuidableStages(stages)) return false;
+
+  // The stage headline is this screen's only title; the standard page header
+  // would just compete with it. renderCommandCenterDashboard() restores it.
+  var pageHeader = document.querySelector('#tab-home .page-header');
+  if (pageHeader) pageHeader.style.display = 'none';
+
+  var focus = getJourneyFocusStage(stages);
+  var done = countJourneyStagesDone(stages);
+  var org = String(state.orgName || '').trim();
+  var eyebrow = 'Guided journey' + (org ? ' \u00b7 ' + org : '');
+  var steps = renderJourneyStepsHtml(stages, focus ? focus.id : '');
+  var exitFoot = '<p class="journey-foot">Prefer the open dashboard \u2014 KPIs, CSF outcomes, every workspace? '
+    + '<button type="button" class="journey-foot-btn" onclick="setHomeMode(\'open\')">Open the Command Center</button></p>';
+
+  if (!focus) {
+    body.innerHTML = ''
+      + '<div class="onboard onboard--cover onboard--journey">'
+      + '<div class="onboard-cover-copy">'
+      + '<p class="onboard-eyebrow">' + escapeHTML(eyebrow + ' \u00b7 clear') + '</p>'
+      + '<h1 class="onboard-title">Nothing is waiting on you</h1>'
+      + '<p class="onboard-lead">Every stage you can act on right now is clear. The Command Center is the better home from here, and this list stays one click away.</p>'
+      + '<button type="button" class="btn onboard-cta" onclick="setHomeMode(\'open\')">Open the Command Center</button>'
+      + '</div>'
+      + '<div class="journey-side">'
+      + '<p class="journey-side-label">' + done + ' of ' + stages.length + ' stages complete</p>'
+      + '<div class="journey-steps">' + steps + '</div>'
+      + '</div>'
+      + '</div>';
+    return true;
+  }
+
+  body.innerHTML = ''
+    + '<div class="onboard onboard--cover onboard--journey">'
+    + '<div class="onboard-cover-copy">'
+    + '<p class="onboard-eyebrow">' + escapeHTML(eyebrow) + '</p>'
+    + renderJourneyRailHtml(stages, focus.id)
+    + '<h1 class="onboard-title">' + escapeHTML(focus.title) + '</h1>'
+    + '<p class="onboard-lead">' + escapeHTML(focus.why) + '</p>'
+    + '<p class="journey-meta">' + escapeHTML(getJourneyStageMeta(focus)) + '</p>'
+    + renderJourneyCtaHtml(focus)
+    + '<p class="journey-defer"><button type="button" class="onboard-path-switch-btn"'
+    + ' onclick="deferJourneyStage(\'' + hubJsStringLiteral(focus.id) + '\')">Come back to this later</button></p>'
+    + '</div>'
+    + '<div class="journey-side">'
+    + '<p class="journey-side-label">Stage ' + (stages.indexOf(focus) + 1) + ' of ' + stages.length
+    + ' \u00b7 ' + done + ' complete</p>'
+    + '<div class="journey-steps">' + steps + '</div>'
+    + '</div>'
+    + exitFoot
+    + '</div>';
+  return true;
+}
+
+/** Always-present way back into the guided journey from the open dashboard. */
+function renderJourneyResumeBarHtml() {
+  var stages = getJourneyStages();
+  if (!journeyHasGuidableStages(stages)) return '';
+  var focus = getJourneyFocusStage(stages);
+  var done = countJourneyStagesDone(stages);
+  var line = focus
+    ? 'Stage ' + (stages.indexOf(focus) + 1) + ' of ' + stages.length + ' \u2014 ' + focus.title
+    : 'Nothing waiting on you right now';
+  return '<div class="journey-resume">'
+    + '<div class="journey-resume-copy">'
+    + '<span class="journey-resume-kicker">Guided journey \u00b7 ' + done + '/' + stages.length + '</span>'
+    + '<span class="journey-resume-text">' + escapeHTML(line) + '</span>'
+    + '</div>'
+    + '<button type="button" class="journey-resume-btn" onclick="setHomeMode(\'guided\')">Resume guided journey</button>'
+    + '</div>';
 }
 
 function getHubSessionUser() {
@@ -647,6 +1114,15 @@ function renderHomeTab() {
     return;
   }
 
+  if (getHomeMode() === 'guided' && renderGuidedJourneyHome()) return;
+  renderCommandCenterDashboard();
+}
+
+/** The open-world Command Center: KPIs, CSF outcomes, next actions, workspaces. */
+function renderCommandCenterDashboard() {
+  var body = document.getElementById('home-body');
+  if (!body) return;
+
   var pageHeader = document.querySelector('#tab-home .page-header');
   if (pageHeader) pageHeader.style.display = '';
   updateCommandCenterPageHeader();
@@ -684,6 +1160,7 @@ function renderHomeTab() {
 
   body.innerHTML = ''
     + '<div class="hub-dashboard">'
+    + renderJourneyResumeBarHtml()
     + '<div class="hub-kpi-grid">'
     + '<div class="hub-kpi"><div class="hub-kpi-val">' + implPct + '%</div><div class="hub-kpi-label">Controls implemented</div><div class="hub-kpi-sub">' + implemented + ' / ' + ctrlTotal + '</div></div>'
     + '<div class="hub-kpi"><div class="hub-kpi-val">' + ownerCount + '</div><div class="hub-kpi-label">Policy owners</div><div class="hub-kpi-sub">' + domainsAssigned + ' / ' + domainTotal + ' domains rostered</div></div>'
@@ -715,9 +1192,10 @@ function renderProgramPhaseBar() {
   var phase1Complete = !!state.cisoComplete;
   var tab = getActiveTabIdFromDom();
 
-  // First-run and resume-setup Command Center: the cover is the UI. A three-card
-  // phase roadmap on top of it is competing chrome.
-  if (!phase1Complete && tab === 'home') {
+  // First-run setup and the guided post-setup journey both use the cover as the
+  // whole UI. A phase caption on top of it is competing chrome.
+  var homeIsCover = tab === 'home' && !!document.querySelector('#tab-home .onboard--cover');
+  if (tab === 'home' && (!phase1Complete || homeIsCover)) {
     bar.innerHTML = '';
     bar.style.display = 'none';
     return;
@@ -780,4 +1258,10 @@ try {
   window.getHubCurrentUser = getHubCurrentUser;
   window.hubOpenQueuedSsp = hubOpenQueuedSsp;
   window.ensureHubActionDelegation = ensureHubActionDelegation;
+  window.getHomeMode = getHomeMode;
+  window.setHomeMode = setHomeMode;
+  window.getJourneyStages = getJourneyStages;
+  window.focusJourneyStage = focusJourneyStage;
+  window.deferJourneyStage = deferJourneyStage;
+  window.renderCommandCenterDashboard = renderCommandCenterDashboard;
 } catch (e) {}
