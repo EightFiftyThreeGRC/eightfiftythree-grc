@@ -930,9 +930,8 @@ function goToStep(tabId, step) {
       if (toastCisoProfileIncomplete()) return;
     }
   }
-  if (tabId === 'ciso' && step > 3 && !state.baseline) {
-    showToast('Please select a baseline impact level first.', true);
-    return;
+  if (tabId === 'ciso' && step > 3) {
+    if (typeof ensureCommonControlFloor === 'function') ensureCommonControlFloor();
   }
   // Hide all steps
   for (let i = 1; i <= max; i++) {

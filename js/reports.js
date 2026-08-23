@@ -2232,7 +2232,7 @@ function renderReports() {
   const body = document.getElementById('reports-body');
   if (!body) return;
   if (!state.baseline) {
-    body.innerHTML = `<div class="empty-state"><div class="es-icon">\uD83D\uDCCA</div><div class="es-title">Reports Unavailable \u2014 Setup Required</div><p>The CISO must complete program setup (baseline selection, PM controls, security policy, and role assignments) before reports can be generated. Go to the CISO tab to continue.</p></div>`;
+    body.innerHTML = `<div class="empty-state"><div class="es-icon">\uD83D\uDCCA</div><div class="es-title">Reports Unavailable \u2014 Setup Required</div><p>The CISO must complete program setup (CSF program structure, PM controls, security policy, and role assignments) before reports can be generated. Go to the Program setup tab to continue.</p></div>`;
     return;
   }
 
@@ -2322,7 +2322,7 @@ function renderReports() {
       <div class="metric-card">
         <div class="mc-value">${authTotalInReports}</div>
         <div class="mc-label">Total Controls in Scope</div>
-        <div class="mc-sub" style="color:var(--text-muted);">${state.baseline==='L'?'Low':state.baseline==='M'?'Moderate':'High'}${state.privacyOverlay?'+Privacy':''} Baseline</div>
+        <div class="mc-sub" style="color:var(--text-muted);">Common-control floor (${state.baseline==='L'?'Low':state.baseline==='M'?'Moderate':'High'}${state.privacyOverlay?' + Privacy':''})</div>
       </div>
       <div class="metric-card">
         <div class="mc-value" style="color:var(--green);">${coveragePct}%</div>

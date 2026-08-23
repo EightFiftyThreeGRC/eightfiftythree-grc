@@ -3708,6 +3708,90 @@
       .org-profile-grid {
         grid-template-columns: 1fr;
       }
+      .csf-struct-row { grid-template-columns: 1fr 1fr; }
+    }
+
+    /* CISO Step 3 — CSF program structure (not an org L/M/H chooser) */
+    .program-structure-lead {
+      font-size: 15px;
+      line-height: 1.55;
+      color: var(--navy);
+      max-width: 720px;
+      margin: 0 0 14px;
+    }
+    .program-structure-note,
+    .program-structure-flag {
+      font-size: 13px;
+      line-height: 1.5;
+      color: var(--text-muted);
+      max-width: 720px;
+      margin: 10px 0 14px;
+    }
+    .program-structure-flag { color: var(--navy); }
+    .csf-struct-row {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 8px;
+      margin: 0 0 8px;
+    }
+    .csf-struct-chip {
+      border: 1px solid var(--hairline);
+      border-radius: var(--radius-md);
+      padding: 8px 10px;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--navy);
+      background: var(--white);
+    }
+    .csf-struct-chip-head { display: block; }
+    .csf-struct-chip-note {
+      display: block;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+    .common-floor-note {
+      max-width: 720px;
+      padding: 12px 14px;
+      border: 1px solid var(--hairline);
+      border-radius: var(--radius-md);
+      background: var(--ink-0);
+      margin: 4px 0 12px;
+    }
+    .common-floor-kicker {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 4px;
+    }
+    .common-floor-line {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--navy);
+    }
+    .common-floor-sub {
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.45;
+      margin-top: 4px;
+    }
+    .common-floor-advanced {
+      margin-top: 14px;
+      max-width: 720px;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+    .common-floor-advanced summary {
+      cursor: pointer;
+      font-weight: 600;
+      color: var(--navy);
+    }
+    .common-floor-advanced p { margin: 8px 0; }
+    .privacy-toggle-card.compact {
+      padding: 10px 12px;
     }
 
 

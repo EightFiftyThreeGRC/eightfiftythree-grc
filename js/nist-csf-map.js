@@ -353,8 +353,7 @@ function renderCsfDisclaimerHtml() {
 
 function renderCsfPrepareNoteHtml() {
   return '<div class="csf-prepare-note" role="note">'
-    + '<div class="csf-prepare-note-kicker">RMF Prepare \u00b7 CSF 2.0</div>'
-    + '<p>NIST SP 800-37 Rev. 2 Prepare is where the organization establishes its control baseline and is expected to express that baseline as cybersecurity outcomes. CSF 2.0 is NIST\u2019s recommended communication model for those outcomes. Policy control objectives stay written against 800-53; CSF tags on each objective are the outcome label. Domain policies default-group by Function; Govern is the ISP.</p>'
+    + '<p>RMF Prepare (SP 800-37 P-4) is organizationally-tailored control baselines and common controls \u2014 a tailoring and inheritance job, not an estate-wide Low / Moderate / High pick. CSF 2.0 is the program structure.</p>'
     + '</div>';
 }
 

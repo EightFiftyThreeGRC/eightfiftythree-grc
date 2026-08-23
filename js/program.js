@@ -224,7 +224,7 @@ function updateCISOFinishBtn() {
 // updateCISOFinishBtn, goToStep, prefillFakeOwners, etc.
 // ============================================================
 var CISO_WIZARD_STEPS = 8;
-var CISO_STEP_LABELS = ['Organization', 'Profile', 'Baseline', 'Reg mapping', 'PM Controls', 'InfoSec Policy', 'Consolidate', 'Assign Owners'];
+var CISO_STEP_LABELS = ['Organization', 'Profile', 'Program', 'Reg mapping', 'PM Controls', 'InfoSec Policy', 'Consolidate', 'Assign Owners'];
 
 function updateCisoSetupProgress(step) {
   var s = step || (typeof currentStep !== 'undefined' ? currentStep.ciso : 1) || 1;
@@ -308,24 +308,10 @@ function cisoNext(fromStep) {
   }
   if (fromStep===2) {
     if (toastCisoProfileIncomplete()) return;
+    if (typeof ensureCommonControlFloor === 'function') ensureCommonControlFloor();
   }
   if (fromStep===3) {
-    if (state.fismaMode) {
-      if (!Array.isArray(state.programInfoTypes) || state.programInfoTypes.length === 0) {
-        showToast('FISMA / CUI mode is on — pick at least one information type so a baseline can be derived.', true);
-        return;
-      }
-      var _derived = computeBaselineFromInfoTypes(state.programInfoTypes);
-      var _override = state.baselineOverride;
-      var _isTailored = (_override === 'L' || _override === 'M' || _override === 'H') && _override !== _derived;
-      if (_isTailored && !(state.baselineOverrideRationale || '').trim()) {
-        showToast('Tailoring rationale is required when the applied baseline differs from the derived one.', true);
-        return;
-      }
-    } else if (!state.baseline) {
-      showToast('Please select a baseline impact level before continuing.', true);
-      return;
-    }
+    if (typeof ensureCommonControlFloor === 'function') ensureCommonControlFloor();
   }
   if (fromStep===6) {
     var ispRc = (state.policyReviewCycle || {}).ISP || {};
@@ -1113,18 +1099,25 @@ function getOrgBaselineScopeCaveat(level) {
 }
 
 /**
- * Derive a provisional organizational baseline from the Step 2 profile.
+ * Derive a provisional *organizational starting floor* from the Step 2 profile.
+ *
+ * This is the common-control set the estate inherits \u2014 not a FIPS 199
+ * high-water mark for every system. Soft signals (serious financial harm,
+ * a pocket of PHI or PCI at a small org) belong on individual systems via
+ * baseline elevation. Only hard program triggers move the org floor up.
+ *
+ * Hard Moderate: federal / CUI-as-primary-mission, FISMA toggle, healthcare
+ * + PHI at scale (250+ workforce), financial-reporting as a core mission,
+ * critical infrastructure (non-catastrophic).
+ * Hard High: catastrophic / safety-of-life / national security / defense-intel.
  *
  * Returns:
  *   available    \u2014 false when the profile is incomplete (no recommendation is invented)
  *   level        \u2014 'L' | 'M' | 'H'
- *   summary      \u2014 one-or-two-sentence rationale, in adverse-effect terms
- *   factors      \u2014 [{ label, detail }] the actual profile signals, in priority order
+ *   summary      \u2014 short rationale (keep the Step 3 panel to a few lines)
+ *   factors      \u2014 [{ label, detail }] hard drivers first, then soft elevation notes
  *   caveat       \u2014 organizational-vs-system scope caveat
- *   fismaSuggested \u2014 profile indicates a federal / CUI program, so the
- *                    info-types-driven FISMA path is the better fit
- *
- * The rules are intentionally flat and legible so they can be tuned later.
+ *   fismaSuggested \u2014 federal / CUI program, so the info-types path is the better fit
  */
 function recommendBaseline() {
   var profileReady = typeof isOrgProfileComplete === 'function' && isOrgProfileComplete();
@@ -1135,98 +1128,136 @@ function recommendBaseline() {
   var sector = state.orgSector || '';
   var size = state.orgSizeBand || '';
   var impact = state.orgImpactProfile || '';
-  var hasRegulatedData = data.length > 0 && !has('none');
+  var isSmallWorkforce = (size === 'lt50' || size === '50_250');
+  var isAtScale = (size === '250_1000' || size === 'gt1000');
 
   var level = 'L';
   var factors = [];
   var drivers = [];
+  var soft = [];
 
-  // raise() only ever moves the recommendation up, and records why.
   function raise(to, label, detail) {
     if (baselineRank(to) > baselineRank(level)) level = to;
     drivers.push({ level: to, label: label, detail: detail });
     factors.push({ label: label, detail: detail });
   }
+  function noteSoft(label, detail) {
+    soft.push({ label: label, detail: detail });
+  }
 
-  // ── HIGH: severe or catastrophic adverse effect ─────────────────────────
+  // ── HIGH: catastrophic / safety-of-life / national security ─────────────
   if (impact === 'severe') {
-    raise('H', 'Severe or catastrophic worst-case consequence',
-      'Safety-of-life, national-security, or existential loss indicates a High availability and integrity impact rating.');
+    raise('H', 'Severe or catastrophic consequence',
+      'Safety-of-life, national-security, or existential loss warrants a High organizational floor.');
   }
   if (isFederal && (sector === 'defense' || sector === 'intelligence')) {
     raise('H', 'Federal defense or intelligence mission',
       'National-security systems carry a High confidentiality impact as a matter of course.');
   }
 
-  // ── MODERATE: serious adverse effect, regulated data, or public mission ──
-  if (impact === 'serious') {
-    raise('M', 'Serious worst-case consequence',
-      'Significant financial, legal, or operational harm indicates a Moderate impact rating.');
+  // ── HARD MODERATE: program triggers that a small org can actually justify ─
+  if (state.fismaMode) {
+    raise('M', 'FISMA / CUI program',
+      'The FISMA / CUI program toggle is on, so the organizational floor follows the federal common-control baseline.');
   }
-  if (has('phi')) {
-    raise('M', 'Protected health information in scope',
-      'PHI carries a Moderate confidentiality impact and a statutory breach-notification obligation.');
+  if (isFederal && sector !== 'defense' && sector !== 'intelligence') {
+    raise('M', 'Federal program',
+      'A federal mission is a hard Moderate organizational floor (FISMA / CUI common controls).');
   }
   if (has('cui')) {
-    raise('M', 'CUI or federal contract information in scope',
-      'CUI is handled at Moderate confidentiality under the federal CUI program and NIST SP 800-171 flow-down.');
+    raise('M', 'CUI or federal contract information',
+      'CUI-as-primary-mission requires a Moderate organizational common-control floor (NIST SP 800-171 flow-down).');
   }
-  if (has('card')) {
-    raise('M', 'Cardholder data in scope',
-      'Payment card data carries a Moderate confidentiality impact and contractual PCI DSS obligations.');
+  if (sector === 'critical_infra' && impact !== 'severe') {
+    raise('M', 'Critical infrastructure sector',
+      'Critical-infrastructure operators sustain a Moderate organizational floor for service continuity. Safety-of-life would raise this to High.');
   }
-  if (has('finrep')) {
-    raise('M', 'Financial-reporting-relevant data in scope',
-      'Systems feeding the financial statements carry a Moderate integrity impact.');
+  if (sector === 'medicare_integrator') {
+    raise('M', 'Medicare / CMS integrator',
+      'CMS integrator work is a federal-adjacent regulated mission \u2014 Moderate is the organizational floor.');
   }
-  if (sector === 'healthcare' || sector === 'medicare_integrator') {
-    raise('M', 'Healthcare sector', 'Health-sector information is normally categorized at Moderate or above.');
+  if (has('finrep') && sector === 'financial') {
+    raise('M', 'Financial-reporting data as a core mission',
+      'SOX-relevant financial-reporting systems are core to this organization, so the common-control floor is Moderate.');
   }
-  if (sector === 'financial') {
-    raise('M', 'Financial services sector', 'Financial-services data carries a Moderate confidentiality and integrity impact.');
-  }
-  if (sector === 'critical_infra') {
-    raise('M', 'Critical infrastructure sector', 'Service-continuity dependence raises the availability impact to at least Moderate.');
-  }
-  if (sector === 'justice_public_safety' || sector === 'law_enforcement') {
-    raise('M', 'Justice or public-safety mission', 'Law-enforcement information is normally categorized at Moderate.');
-  }
-  if (isGov && baselineRank(level) < 2) {
-    raise('M', 'Government program',
-      'Public-sector systems are rarely categorized Low once citizen or mission data is aggregated.');
-  }
-  // Size is an aggregation signal only \u2014 it never sets a baseline on its own.
-  if (size === 'gt1000' && hasRegulatedData && baselineRank(level) < 2) {
-    raise('M', 'Regulated data aggregated across a large workforce',
-      'Over 1,000 people holding regulated data concentrates enough records that the confidentiality impact of a single breach reaches Moderate.');
+  // Documented "at scale" rule: PHI + healthcare + workforce 250+.
+  // A 50-person clinic cannot sustain 287 organizational controls.
+  if (has('phi') && sector === 'healthcare' && isAtScale) {
+    raise('M', 'Healthcare + PHI at organizational scale',
+      'PHI across a 250+ workforce is enough volume that a Moderate organizational floor is the defensible common-control set.');
   }
 
-  // ── LOW: nothing above a limited adverse effect ─────────────────────────
+  // ── SOFT: system-level elevation only \u2014 never move the org floor ────────
+  if (impact === 'serious') {
+    noteSoft('Serious financial, legal, or operational harm',
+      'That consequence is a FIPS 199 input for specific systems. Elevate those boundaries; do not adopt 287 controls estate-wide.');
+  }
+  if (has('phi') && !(sector === 'healthcare' && isAtScale) && sector !== 'medicare_integrator') {
+    noteSoft('PHI in scope',
+      'PHI raises impact for the systems that hold it. A small clinic or isolated health workload uses baseline elevation, not an organizational Moderate.');
+  }
+  if (has('card')) {
+    noteSoft('Cardholder data in scope',
+      'PCI obligations attach to the cardholder-data environment, not the whole common-control set.');
+  }
+  if (has('finrep') && sector !== 'financial') {
+    noteSoft('Financial-reporting-relevant data',
+      'SOX-relevant systems elevate on their own. A small commercial org should not inherit a Moderate estate for one reporting feed.');
+  }
+  if (sector === 'healthcare' && !has('phi') && !isAtScale) {
+    noteSoft('Healthcare sector',
+      'Sector alone does not force an organizational Moderate.');
+  }
+  if (sector === 'financial' && !has('finrep')) {
+    noteSoft('Financial services sector',
+      'Without financial-reporting as a core mission, keep the organizational floor Low and elevate the systems that need it.');
+  }
+  if ((sector === 'justice_public_safety' || sector === 'law_enforcement') && baselineRank(level) < 2) {
+    noteSoft('Justice or public-safety mission',
+      'Law-enforcement information is categorized per system. The organizational floor stays Low unless a federal or CUI trigger applies.');
+  }
+  if (isGov && !isFederal && baselineRank(level) < 2) {
+    noteSoft('State or local government',
+      'SLG programs start at a Low organizational floor unless a hard Moderate trigger (CUI, CMS, critical infrastructure) applies.');
+  }
+
+  soft.forEach(function(s) { factors.push(s); });
+
   if (!drivers.length) {
-    if (size) factors.push({ label: labelFromOptions(ORG_SIZE_OPTIONS, size), detail: 'Small enough estate to run one common control set.' });
-    if (sector) factors.push({ label: getOrgClassificationSummary(), detail: 'No sector-specific impact escalation applies.' });
-    factors.push({
-      label: has('none') ? 'No regulated or sensitive data in scope' : 'No regulated data triggering escalation',
-      detail: 'Nothing in scope carries a statutory or contractual confidentiality floor above Low.'
-    });
-    if (impact === 'limited') {
-      factors.push({ label: 'Limited worst-case consequence', detail: 'A loss of confidentiality, integrity, or availability would be disruptive but recoverable.' });
+    var sizeLabel = (typeof labelFromOptions === 'function' && typeof ORG_SIZE_OPTIONS !== 'undefined')
+      ? labelFromOptions(ORG_SIZE_OPTIONS, size) : size;
+    if (size) {
+      factors.unshift({
+        label: sizeLabel || 'Workforce size',
+        detail: isSmallWorkforce
+          ? 'A workforce of 250 or fewer cannot sustain a 287-control Moderate common-control set. Low is the organizational starting floor.'
+          : 'No hard Moderate trigger is present, so the organizational starting floor stays Low.'
+      });
     }
   }
 
   var summary;
-  if (level === 'L') {
-    summary = 'A Low organizational baseline is the appropriate starting point. Nothing in your profile indicates more than a limited '
-      + 'adverse effect from a loss of confidentiality, integrity, or availability at the organization level, so a Low common control '
-      + 'set is the right floor to build and inherit from.';
+  if (level === 'H') {
+    var topH = drivers.filter(function(d) { return d.level === 'H'; })[0] || drivers[0];
+    summary = 'High is the organizational starting floor because the mission is catastrophic, safety-of-life, or national security. '
+      + (topH ? topH.detail : '')
+      + ' That is the common-control floor, not a claim that every system is High.';
+  } else if (level === 'M') {
+    var topM = drivers.filter(function(d) { return d.level === 'M'; })[0] || drivers[0];
+    summary = 'Moderate is the organizational starting floor because of a hard program trigger'
+      + (topM ? ' \u2014 ' + topM.detail : '.')
+      + ' Moderate is a multi-year common-control lift, not a size-based default.';
   } else {
-    var top = drivers.filter(function(d) { return d.level === level; })[0] || drivers[0];
-    summary = 'A ' + baselineLabel(level) + ' organizational baseline is the appropriate starting point. '
-      + (top ? top.detail + ' ' : '')
-      + 'That raises the floor for every system that inherits your common controls.';
+    summary = isSmallWorkforce
+      ? 'Workforce and sector point to a Low organizational floor \u2014 the maintainable common-control set for a program of this size.'
+      : 'Low is the organizational starting floor. Nothing in the profile is a hard Moderate trigger.';
+    if (soft.length) {
+      summary += ' Named risks raise impact for specific systems \u2014 use baseline elevation / per-boundary FIPS 199. '
+        + 'The organizational common-control set should stay Low so the program is maintainable.';
+    }
   }
 
-  var fismaSuggested = isGov || has('cui');
+  var fismaSuggested = isFederal || has('cui') || !!state.fismaMode;
 
   return {
     available: profileReady,
@@ -1306,26 +1337,51 @@ function getBaselineRationaleSummaryText() {
   var d = (state.baselineDecision && typeof state.baselineDecision === 'object') ? state.baselineDecision : {};
   var r = (state.baselineRecommendation && typeof state.baselineRecommendation === 'object') ? state.baselineRecommendation : {};
   if (state.fismaMode) {
-    var derived = computeBaselineFromInfoTypes(state.programInfoTypes);
-    var ov = state.baselineOverride;
-    if (ov && ov !== derived) {
-      return 'Tailored from the ' + baselineLabel(derived) + ' baseline derived from your selected information types.'
-        + ((state.baselineOverrideRationale || '').trim() ? ' Rationale: ' + state.baselineOverrideRationale : '');
-    }
-    return 'Derived from the FIPS 199 high-water mark across the information types selected for this program.';
+    return 'Federal / CUI systems use 800-60 information types in Assets & SSP. Common-control floor ('
+      + baselineLabel(state.baseline || 'L') + ') is unchanged.';
   }
-  if (!r.level) return 'Selected manually \u2014 complete the organization profile in Step 2 for a derived recommendation.';
+  if (!r.level) return 'Common-control floor (' + baselineLabel(state.baseline || 'L') + '). Systems are categorized separately under FIPS 199.';
   if (d.deviation) {
-    return 'Recommended ' + baselineLabel(r.level) + ' (' + r.level + '); '
-      + baselineLabel(d.selected) + ' selected instead.'
-      + (String(d.justification || '').trim() ? ' Justification: ' + d.justification : ' Justification outstanding.');
+    return 'Common-control floor set to ' + baselineLabel(d.selected || state.baseline) + ' (advanced override).'
+      + (String(d.justification || '').trim() ? ' ' + d.justification : '');
   }
-  return 'Matches the recommended ' + baselineLabel(r.level) + ' baseline. ' + (r.summary || '');
+  return 'Common-control floor (' + baselineLabel(state.baseline || r.level || 'L') + '). Systems are categorized separately under FIPS 199.';
+}
+
+/** Implicit inherited catalog floor. Not a FIPS 199 decision for the organization. */
+function ensureCommonControlFloor() {
+  if (state.baseline === 'L' || state.baseline === 'M' || state.baseline === 'H') return state.baseline;
+  var previous = state.baseline || '';
+  state.baseline = 'L';
+  if (typeof addAuditEntry === 'function' && previous !== 'L') {
+    addAuditEntry('program', 'baseline', 'Common-control floor set to Low. Systems categorize separately under FIPS 199.');
+  }
+  if (typeof markDirty === 'function') markDirty();
+  return 'L';
+}
+
+function getProfileElevationFlagSentence() {
+  return 'Profile answers flag systems that will need a higher categorization; they do not set an organizational baseline.';
+}
+
+function renderCsfProgramStructureHtml() {
+  var order = ['GV', 'ID', 'PR', 'DE', 'RS', 'RC'];
+  var chips = order.map(function(fn) {
+    var meta = (typeof CSF_FUNCTIONS !== 'undefined' && CSF_FUNCTIONS[fn]) ? CSF_FUNCTIONS[fn] : { name: fn };
+    var note = fn === 'GV' ? 'ISP' : 'domain policy';
+    return '<div class="csf-struct-chip csf-fn-' + fn.toLowerCase() + '">'
+      + '<div class="csf-struct-chip-head"><span class="csf-fn-code">' + fn + '</span> '
+      + escapeHTML(meta.name) + '</div>'
+      + '<div class="csf-struct-chip-note">' + note + '</div></div>';
+  }).join('');
+  return '<div class="csf-struct-row" role="list">' + chips + '</div>';
 }
 
 function renderCISOStep2Baseline() {
   const body = document.getElementById('ciso-step-3-body');
   if (!body) return;
+
+  ensureCommonControlFloor();
 
   if (state.privacyOverlay) {
     var _syncTitle = (state.programOwnerTitle || '').trim();
@@ -1335,207 +1391,53 @@ function renderCISOStep2Baseline() {
     }
   }
 
-  const lCount = baselineCount('L');
-  const mCount = baselineCount('M');
-  const hCount = baselineCount('H');
+  const floor = state.baseline === 'M' ? 'M' : state.baseline === 'H' ? 'H' : 'L';
+  const floorLabel = baselineLabel(floor);
+  const floorCount = typeof baselineCount === 'function' ? baselineCount(floor) : (BASELINE_COUNTS[floor] || 0);
   const privCount = typeof getPrivacyOnlyCatalogControlCount === 'function' ? getPrivacyOnlyCatalogControlCount() : 0;
   const isFisma = !!state.fismaMode;
-  const selectedTypes = Array.isArray(state.programInfoTypes) ? state.programInfoTypes : [];
-  const rec = recommendBaseline();
+  const rec = typeof recommendBaseline === 'function' ? recommendBaseline() : { fismaSuggested: false };
 
   const fismaToggleCard = `
-    <div class="privacy-toggle-card ${isFisma?'selected':''}" onclick="toggleProgramFismaMode()" style="margin-bottom:14px;border-color:${isFisma?'#7c3aed':'var(--border)'};${isFisma?'background:#f5f3ff;':''}">
-      <div class="pt-icon">🏛️</div>
+    <div class="privacy-toggle-card compact ${isFisma?'selected':''}" onclick="toggleProgramFismaMode()" style="margin-bottom:10px;border-color:${isFisma?'#7c3aed':'var(--border)'};${isFisma?'background:#f5f3ff;':''}">
       <div class="pt-info">
-        <div class="pt-name">FISMA / CUI program (info-types-driven baseline)</div>
-        <div class="pt-desc">Turn on if this program must comply with FISMA, FedRAMP, DoD RMF, or handle CUI. Derives baseline from NIST 800-60 information types.</div>
-        ${!isFisma && rec.fismaSuggested ? `<div class="pt-desc" style="margin-top:6px;color:#6d28d9;font-weight:600;">Your organization profile indicates a federal or CUI-handling program \u2014 this path is the better fit for you.</div>` : ''}
+        <div class="pt-name">FISMA / CUI systems</div>
+        <div class="pt-desc">Federal, FedRAMP, DoD RMF, or CUI systems categorize from 800-60 information types in Assets &amp; SSP. This does not stamp the organization Moderate.${!isFisma && rec.fismaSuggested ? ' Profile suggests those systems exist.' : ''}</div>
       </div>
       <div class="toggle-switch ${isFisma?'on':''}"></div>
     </div>`;
 
-  let baselineBlock = '';
-  if (!isFisma) {
-    // The RECOMMENDED badge is derived from the Step 2 profile, never hardcoded.
-    const recBadge = (letter) => rec.available && rec.level === letter
-      ? ' <span style="background:#0d9488;color:white;font-size:10px;padding:2px 6px;border-radius:10px;margin-left:4px;font-weight:700;">RECOMMENDED</span>'
-      : '';
-    const decision = (state.baselineDecision && typeof state.baselineDecision === 'object') ? state.baselineDecision : {};
-    const isDeviation = rec.available && !!state.baseline && state.baseline !== rec.level;
-
-    let recPanel = '';
-    if (!rec.available) {
-      recPanel = renderRecommendationPanelHtml({
-        tone: 'info',
-        heading: 'No recommendation yet',
-        verdict: 'Complete the organization profile in Step 2',
-        summary: 'Once workforce size, worst-case consequence, regulated data, non-US footprint, and SOC 2 demand are answered, this step '
-          + 'recommends a starting baseline and writes down why. Until then, pick the level you believe is right.',
-        caveat: getOrgBaselineScopeCaveat('')
-      });
-    } else {
-      const extra = isDeviation
-        ? `<div class="rec-deviation">
-             <div class="rec-deviation-title">Documented deviation \u2014 ${escapeHTML(baselineLabel(state.baseline))} selected, ${escapeHTML(rec.label)} recommended</div>
-             <div class="rec-deviation-body">Record why the recommended baseline is not the right organizational floor for you. This is stored with the recommendation and written to the audit trail.</div>
-             <textarea class="form-input" rows="2" placeholder="e.g. A single regulated workload drives the estate, so we are standardising the whole common control set at Moderate rather than elevating per system."
-               oninput="setBaselineDecisionJustification(this.value)">${escapeHTML(String(decision.justification || ''))}</textarea>
-           </div>`
-        : '';
-      recPanel = renderRecommendationPanelHtml({
-        tone: isDeviation ? 'warn' : 'ok',
-        heading: 'Why this recommendation',
-        verdict: 'Recommended organizational baseline: ' + rec.label + ' (' + rec.level + ')',
-        summary: rec.summary,
-        factors: rec.factors,
-        caveat: rec.caveat,
-        extraHtml: extra
-      });
-    }
-
-    baselineBlock = `
-      <div style="margin-bottom:8px;">
-        <div class="section-title" style="margin-bottom:2px;">Select Your Organizational NIST 800-53 Baseline</div>
-        <div class="section-subtitle">This is the default control set your systems inherit \u2014 your common controls, PM family, and enterprise policy floor. Individual systems are categorized separately.</div>
-      </div>
-
-      <div class="baseline-grid">
-        <div class="baseline-card bc-low ${state.baseline==='L'?'selected':''}" onclick="selectBaseline('L')">
-          <div class="bc-label">LOW IMPACT${recBadge('L')}</div>
-          <div class="bc-name">Low Baseline</div>
-          <div class="bc-desc">Where compromise would have limited adverse effects on operations, assets, or individuals. A common starting floor for smaller organizations.</div>
-          <div class="bc-count">${lCount} controls incl. enhancements (NIST 800-53B)</div>
-        </div>
-        <div class="baseline-card bc-mod ${state.baseline==='M'?'selected':''}" onclick="selectBaseline('M')">
-          <div class="bc-label">MODERATE IMPACT${recBadge('M')}</div>
-          <div class="bc-name">Moderate Baseline</div>
-          <div class="bc-desc">Where compromise would have serious adverse effects. Substantially more to implement and sustain across an estate.</div>
-          <div class="bc-count">${mCount} controls incl. enhancements (NIST 800-53B)</div>
-        </div>
-        <div class="baseline-card bc-high ${state.baseline==='H'?'selected':''}" onclick="selectBaseline('H')">
-          <div class="bc-label">HIGH IMPACT${recBadge('H')}</div>
-          <div class="bc-name">High Baseline</div>
-          <div class="bc-desc">Where compromise would have severe or catastrophic effects \u2014 safety of life, national security, or critical infrastructure.</div>
-          <div class="bc-count">${hCount} controls incl. enhancements (NIST 800-53B)</div>
-        </div>
-      </div>
-      ${recPanel}`;
-  } else {
-    const derivedBaseline = computeBaselineFromInfoTypes(selectedTypes);
-    const override = (state.baselineOverride === 'L' || state.baselineOverride === 'M' || state.baselineOverride === 'H') ? state.baselineOverride : null;
-    const effectiveBaseline = override || derivedBaseline;
-    const effectiveCount = BASELINE_COUNTS[effectiveBaseline] || 0;
-    const labelOf = (b) => b === 'H' ? 'High' : b === 'M' ? 'Moderate' : 'Low';
-    const isTailored = !!override && override !== derivedBaseline;
-    const tailorDir = isTailored ? (_fipsRank(override) > _fipsRank(derivedBaseline) ? 'up' : 'down') : null;
-    const derivedPill = (b) => derivedBaseline === b
-      ? ' <span style="background:#7c3aed;color:white;font-size:10px;padding:2px 6px;border-radius:10px;margin-left:4px;font-weight:700;">DERIVED</span>'
-      : '';
-    baselineBlock = `
-      <div style="margin-bottom:8px;">
-        <div class="section-title" style="margin-bottom:2px;">Program baseline <span style="font-size:11px;font-weight:600;color:#7c3aed;background:#ede9fe;padding:2px 8px;border-radius:10px;margin-left:6px;letter-spacing:0.4px;">FISMA</span></div>
-        <div class="section-subtitle">FIPS 199 high-water mark across the information types below sets the derived baseline. NIST allows tailoring up (or down with justification) — click a card to tailor.</div>
-      </div>
-      <div class="baseline-grid">
-        <div class="baseline-card bc-low ${effectiveBaseline==='L'?'selected':''}" onclick="setProgramBaselineOverride('L')" style="cursor:pointer;">
-          <div class="bc-label">LOW IMPACT${derivedPill('L')}</div>
-          <div class="bc-name">Low Baseline</div>
-          <div class="bc-desc">${lCount} controls.</div>
-        </div>
-        <div class="baseline-card bc-mod ${effectiveBaseline==='M'?'selected':''}" onclick="setProgramBaselineOverride('M')" style="cursor:pointer;">
-          <div class="bc-label">MODERATE IMPACT${derivedPill('M')}</div>
-          <div class="bc-name">Moderate Baseline</div>
-          <div class="bc-desc">${mCount} controls.</div>
-        </div>
-        <div class="baseline-card bc-high ${effectiveBaseline==='H'?'selected':''}" onclick="setProgramBaselineOverride('H')" style="cursor:pointer;">
-          <div class="bc-label">HIGH IMPACT${derivedPill('H')}</div>
-          <div class="bc-name">High Baseline</div>
-          <div class="bc-desc">${hCount} controls.</div>
-        </div>
-      </div>
-      ${selectedTypes.length === 0
-        ? `<div style="background:#fef3c7;border:1px solid #fbbf24;border-radius:10px;padding:10px 14px;margin:10px 0 8px;font-size:13px;color:#92400e;line-height:1.5;">
-            <strong>No information types selected yet.</strong> Pick at least one type below — until you do, the derived baseline defaults to Low.
-          </div>`
-        : isTailored
-          ? `<div style="background:#fef9c3;border:1px solid #fde047;border-radius:10px;padding:12px 14px;margin:10px 0 8px;font-size:13px;color:#713f12;line-height:1.55;">
-              <div style="font-weight:800;margin-bottom:4px;">⚠️ Baseline tailored ${tailorDir} (${derivedBaseline} → ${override})</div>
-              Derived from your information types: <strong>${labelOf(derivedBaseline)} (${derivedBaseline})</strong>. You've tailored ${tailorDir} to <strong>${labelOf(effectiveBaseline)} (${effectiveBaseline})</strong> — ${effectiveCount} controls.
-              ${tailorDir === 'down'
-                ? ` Tailoring <em>down</em> reduces controls below what FIPS 199 would normally require — your rationale must explain compensating controls or risk acceptance.`
-                : ` Tailoring <em>up</em> is always permitted; capture why for the audit trail.`}
-              <button class="btn btn-secondary btn-sm" type="button" onclick="setProgramBaselineOverride(null)" style="margin-left:8px;font-size:11px;padding:3px 10px;">Revert to derived</button>
-            </div>
-            <div class="form-group" style="margin-top:8px;max-width:720px;">
-              <label class="form-label" style="font-size:12px;">Tailoring rationale <span style="color:var(--red)">*</span></label>
-              <textarea class="form-input" rows="2" placeholder="Why is this baseline appropriate? Reference threats, mission context, regulatory drivers, or compensating controls." oninput="setProgramBaselineOverrideRationale(this.value)">${escapeHTML(state.baselineOverrideRationale || '')}</textarea>
-            </div>`
-          : `<div style="background:#ecfdf5;border:1px solid #6ee7b7;border-radius:10px;padding:10px 14px;margin:10px 0 8px;font-size:13px;color:#065f46;line-height:1.5;">
-              <strong>Effective baseline: ${labelOf(effectiveBaseline)} (${effectiveBaseline}) — ${effectiveCount} controls.</strong> Matches the FIPS 199 high-water mark across your selected information types. Click a different card above to tailor up or down.
-            </div>`
-      }
-      ${renderRecommendationPanelHtml({
-        tone: 'info',
-        heading: 'What this baseline covers',
-        summary: 'FISMA / CUI mode derives your organizational floor from the information types below, so the profile-based recommendation is '
-          + 'superseded by the stronger signal.',
-        caveat: getOrgBaselineScopeCaveat(resolveProgramBaseline() || '')
-      })}
-      <div style="margin:14px 0 8px;">
-        <div class="section-title" style="margin-bottom:2px;">Information types this program will handle</div>
-        <div class="section-subtitle">Select every category your systems will create, store, or process. Each one carries a NIST 800-60 suggested C/I/A — the highest across your selections sets the derived baseline.</div>
-      </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:10px;margin-bottom:14px;">
-        ${(typeof INFO_TYPES_800_60 !== 'undefined' ? INFO_TYPES_800_60 : []).map(function(it) {
-          var on = selectedTypes.indexOf(it.id) >= 0;
-          var border = on ? '2px solid var(--teal)' : '2px solid #e5e7eb';
-          var bg = on ? '#ecfdf5' : '#fff';
-          var seed = 'C' + it.cia.c + ' / I' + it.cia.i + ' / A' + it.cia.a;
-          var seedHigh = _fipsLetterFromRank(Math.max(_fipsRank(it.cia.c), _fipsRank(it.cia.i), _fipsRank(it.cia.a)));
-          var seedColor = seedHigh === 'H' ? '#dc2626' : seedHigh === 'M' ? '#d97706' : '#059669';
-          var idEsc = escapeHTML(it.id).replace(/'/g, "\\'");
-          return `<label style="display:block;border:${border};background:${bg};border-radius:10px;padding:12px 14px;cursor:pointer;transition:border-color .15s, background .15s;">
-            <div style="display:flex;gap:10px;align-items:flex-start;">
-              <input type="checkbox" ${on?'checked':''} onchange="toggleProgramInfoType('${idEsc}')" style="margin-top:3px;flex-shrink:0;">
-              <div style="flex:1;min-width:0;">
-                <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:4px;">
-                  <span style="font-weight:700;font-size:13px;color:var(--navy);">${escapeHTML(it.label)}</span>
-                  <span style="background:${seedColor};color:#fff;font-size:10px;font-weight:800;letter-spacing:0.4px;padding:2px 8px;border-radius:10px;">${seed}</span>
-                </div>
-                <div style="font-size:12px;color:#475569;line-height:1.45;">${escapeHTML(it.desc || '')}</div>
-                ${it.examples ? `<div style="font-size:11px;color:var(--text-muted);margin-top:3px;line-height:1.4;"><em>Examples: ${escapeHTML(it.examples)}</em></div>` : ''}
-              </div>
-            </div>
-          </label>`;
-        }).join('')}
-      </div>`;
-  }
+  var advancedOpen = (floor !== 'L') ? ' open' : '';
+  var floorOptions = ['L', 'M', 'H'].map(function(letter) {
+    return '<option value="' + letter + '"' + (floor === letter ? ' selected' : '') + '>'
+      + baselineLabel(letter) + (letter === 'L' ? ' (default)' : '') + '</option>';
+  }).join('');
 
   body.innerHTML = `
-    ${cisoStepProgressHtml(3, 'Baseline & scope')}
+    ${cisoStepProgressHtml(3, 'Program')}
+    <div class="section-title">This program is structured around NIST CSF 2.0</div>
+    <p class="program-structure-lead">Baselines (Low / Moderate / High) are selected for an information system, from that system\u2019s FIPS 199 categorization, inside its authorization boundary. You do not choose \u201cthe organization is Moderate.\u201d</p>
+    ${renderCsfProgramStructureHtml()}
+    <p class="program-structure-note">Govern is the ISP. Identify, Protect, Detect, Respond, and Recover are the domain policy packages. 800-53 controls implement those outcomes. RMF Prepare (SP 800-37 P-4) is organizationally-tailored control baselines and common controls \u2014 a tailoring and inheritance job, not an estate-wide Low / Moderate / High pick.</p>
+    <div class="common-floor-note">
+      <div class="common-floor-kicker">Inherited catalog</div>
+      <div class="common-floor-line">Common-control floor (${escapeHTML(floorLabel)}). Systems are categorized separately under FIPS 199.</div>
+      <div class="common-floor-sub">${floorCount} controls in the inherited common-control set (NIST 800-53B). A Moderate or High system pulls additional controls through baseline elevation in Assets &amp; SSP without flipping this floor.</div>
+    </div>
+    <p class="program-structure-flag">${escapeHTML(getProfileElevationFlagSentence())}</p>
     ${fismaToggleCard}
-    ${baselineBlock}
-    ${typeof renderCsfPrepareNoteHtml === 'function' ? renderCsfPrepareNoteHtml() : ''}
-
-    <div class="privacy-toggle-card ${state.privacyOverlay?'selected':''}" onclick="togglePrivacy()" style="margin-top:8px;">
-      <div class="pt-icon">🔒</div>
+    <div class="privacy-toggle-card compact ${state.privacyOverlay?'selected':''}" onclick="togglePrivacy()" style="margin-top:8px;">
       <div class="pt-info">
-        <div class="pt-name">Add Privacy Overlay (PT family + P-baseline controls + PM-18 through PM-28)</div>
-        <div class="pt-desc">Adds <strong>${privCount}</strong> catalog controls for PII processing, plus tiered PM privacy controls you confirm in Step 5. Use when systems process Personally Identifiable Information (PII).</div>
+        <div class="pt-name">Privacy overlay</div>
+        <div class="pt-desc">Adds <strong>${privCount}</strong> PT / P-baseline controls plus PM-18\u2013PM-28 when systems process PII.</div>
       </div>
       <div class="toggle-switch ${state.privacyOverlay?'on':''}"></div>
     </div>
-
-    ${state.baseline ? `
-    <div class="summary-box">
-      <h3>📊 Selected Program Scope</h3>
-      <div class="summary-kv"><span class="sk">Organizational baseline:</span><span class="sv">${state.baseline==='L'?'Low Impact':state.baseline==='M'?'Moderate Impact':'High Impact'}</span></div>
-      <div class="summary-kv" style="grid-column:1/-1;"><span class="sk">Basis for this baseline:</span><span class="sv" style="font-weight:500;line-height:1.55;">${escapeHTML(getBaselineRationaleSummaryText())}</span></div>
-      <div class="summary-kv"><span class="sk">Privacy Overlay:</span><span class="sv">${state.privacyOverlay?'Yes — PT (Privacy) family included':'No'}</span></div>
-      <div class="summary-kv"><span class="sk">Total Controls in Scope:</span><span class="sv">${BASELINE_COUNTS[state.baseline] || 0} controls across ${getActiveFamilies().filter(f=>f!=='PM').length} families${Object.values(state.pmControls||{}).filter(Boolean).length ? ' + ' + Object.values(state.pmControls||{}).filter(Boolean).length + ' PM controls' : ''}</span></div>
-      <div class="summary-kv"><span class="sk">Organization:</span><span class="sv">${state.orgName||'Not yet set'}</span></div>
-      <div class="summary-kv"><span class="sk">Program Owner:</span><span class="sv">${state.programOwner ? state.programOwner + ' — ' + (((state.programOwnerTitle || '').trim()) || getDefaultProgramOwnerTitle()) + (state.programOwnerEmail ? ' &lt;' + state.programOwnerEmail + '&gt;' : '') : 'Not yet assigned'}</span></div>
-    </div>` : ''}
+    <details class="common-floor-advanced"${advancedOpen}>
+      <summary>Advanced: change the inherited common-control floor</summary>
+      <p>Only if the catalog itself must start above Low. This is not a FIPS 199 decision for the organization.</p>
+      <select class="form-select" style="max-width:240px;" onchange="selectBaseline(this.value)">${floorOptions}</select>
+    </details>
   `;
 }
 
@@ -1545,8 +1447,8 @@ function renderCISOStep3Integrations() {
 
   body.innerHTML = `
     ${cisoStepProgressHtml(4, 'Reg mapping')}
-    <div class="section-title">Regulatory &amp; framework mapping</div>
-    <div class="section-subtitle">NIST 800-53 is your anchor. Choose voluntary standards and applicable laws \u2014 suggestions follow the organization profile from Step 2.</div>
+    <div class="section-title">Overlays on the CSF program</div>
+    <div class="section-subtitle">CSF 2.0 is already the program structure. Turn on ISO 27001, SOC 2, HIPAA, SOX, or other lenses the profile suggested \u2014 they do not change any system\u2019s 800-53 baseline.</div>
 
     ${typeof renderFrameworkSetupSectionHtml === 'function' ? renderFrameworkSetupSectionHtml() : ''}
 
@@ -1560,7 +1462,9 @@ function renderCISOStep3Integrations() {
 function applyCisoIsISSM() {}
 
 function selectBaseline(bl) {
+  var previous = state.baseline;
   state.baseline = bl;
+  if (typeof recordBaselineDecision === 'function') recordBaselineDecision(bl, previous);
   // Reset privacy PM controls so they re-apply correctly when Step 2 is next rendered
   resetPrivacyPMDefaults();
   renderCISOStep2Baseline();
@@ -1644,33 +1548,28 @@ function computeBaselineFromInfoTypes(typeIds) {
   return _fipsLetterFromRank(max);
 }
 
-/** Resolve the *effective* baseline (derived ∪ FISMA tailoring override). */
+/** Common-control floor for the inherited catalog. FISMA does not stamp this. */
 function resolveProgramBaseline() {
-  if (!state.fismaMode) return state.baseline || null;
-  var derived = computeBaselineFromInfoTypes(state.programInfoTypes);
-  var ov = state.baselineOverride;
-  if (ov === 'L' || ov === 'M' || ov === 'H') return ov;
-  return derived;
+  if (state.baseline === 'L' || state.baseline === 'M' || state.baseline === 'H') return state.baseline;
+  return 'L';
 }
 
-/** Recompute state.baseline as the effective baseline. */
+/** Keep state.baseline on the common-control floor (implicit Low if unset). */
 function _refreshEffectiveProgramBaseline() {
-  state.baseline = resolveProgramBaseline();
+  if (typeof ensureCommonControlFloor === 'function') ensureCommonControlFloor();
+  else if (!state.baseline) state.baseline = 'L';
 }
 
-/** Toggle FISMA / CUI mode. When turning on, derive baseline from current info-type selections. */
+/** Toggle FISMA / CUI as a federal-system path. Does not change the org floor. */
 function toggleProgramFismaMode() {
   state.fismaMode = !state.fismaMode;
   if (state.fismaMode) {
     if (!Array.isArray(state.programInfoTypes)) state.programInfoTypes = [];
-    _refreshEffectiveProgramBaseline();
-    resetPrivacyPMDefaults();
-    if (typeof addAuditEntry === 'function') addAuditEntry('program', '', 'FISMA / CUI mode enabled — baseline now derived from selected information types.');
+    if (typeof addAuditEntry === 'function') addAuditEntry('program', '', 'FISMA / CUI systems path enabled \u2014 information types are chosen per system in Assets & SSP. Common-control floor unchanged.');
   } else {
-    // Leaving FISMA mode: clear any tailoring override so the manual L/M/H pick is the source of truth again.
     state.baselineOverride = null;
     state.baselineOverrideRationale = '';
-    if (typeof addAuditEntry === 'function') addAuditEntry('program', '', 'FISMA / CUI mode disabled — baseline is now picked manually.');
+    if (typeof addAuditEntry === 'function') addAuditEntry('program', '', 'FISMA / CUI systems path disabled.');
   }
   if (typeof markDirty === 'function') markDirty();
   renderCISOStep2Baseline();
@@ -1990,8 +1889,9 @@ function renderISPEditorBody(body, opts) {
   opts = opts || {};
   var isRevision = opts.context === 'revision';
   if (!body) return;
+  if (typeof ensureCommonControlFloor === 'function') ensureCommonControlFloor();
   if (!state.baseline) {
-    body.innerHTML = '<div class="empty-state"><div class="es-icon">⚠️</div><div class="es-title">No Baseline Selected</div><p>Return to Step 3 to choose an impact level (Low, Moderate, or High) that matches your system\'s risk profile.</p></div>';
+    body.innerHTML = '<div class="empty-state"><div class="es-icon">⚠️</div><div class="es-title">Program floor not ready</div><p>Complete Organization and Profile first. The catalog uses a Low common-control floor; systems categorize under FIPS 199 in Assets &amp; SSP.</p></div>';
     return;
   }
   // Init policy state
@@ -2944,8 +2844,9 @@ function renderCsfFunctionGroupingHtml(families, merges) {
 function renderCISOStep4a() {
   const body = document.getElementById('ciso-step-7-body');
   if (!body) return;
+  if (typeof ensureCommonControlFloor === 'function') ensureCommonControlFloor();
   if (!state.baseline) {
-    body.innerHTML = '<div class="empty-state"><div class="es-icon">⚠️</div><div class="es-title">No Baseline Selected</div><p>Complete Step 3 first.</p></div>';
+    body.innerHTML = '<div class="empty-state"><div class="es-icon">⚠️</div><div class="es-title">Program floor not ready</div><p>Complete Organization and Profile first.</p></div>';
     return;
   }
   ensureCsfFunctionGrouping();
@@ -3163,8 +3064,9 @@ function applyProgramOwnerToAllDomains() {
 function renderCISOStep4b() {
   const body = document.getElementById('ciso-step-8-body');
   if (!body) return;
+  if (typeof ensureCommonControlFloor === 'function') ensureCommonControlFloor();
   if (!state.baseline) {
-    body.innerHTML = '<div class="empty-state"><div class="es-icon">⚠️</div><div class="es-title">No Baseline Selected</div><p>Complete Step 3 first.</p></div>';
+    body.innerHTML = '<div class="empty-state"><div class="es-icon">⚠️</div><div class="es-title">Program floor not ready</div><p>Complete Organization and Profile first.</p></div>';
     return;
   }
   ensureCsfFunctionGrouping();

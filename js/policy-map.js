@@ -3,7 +3,7 @@
 // Path A (build-from-scratch) stays in js/program.js unchanged.
 
 var POLICY_MAP_STEPS = 7;
-var POLICY_MAP_STEP_LABELS = ['Organization', 'Profile', 'Baseline', 'Catalog', 'Map', 'Coverage', 'Assign owners'];
+var POLICY_MAP_STEP_LABELS = ['Organization', 'Profile', 'Program', 'Catalog', 'Map', 'Coverage', 'Assign owners'];
 var POLICY_MAP_DOC_TYPES = [
   { id: 'policy', label: 'Policy', hint: 'Intent \u2014 what must be true' },
   { id: 'standard', label: 'Standard', hint: 'Measurable requirement' },
@@ -397,9 +397,8 @@ function policyMapGoTo(step) {
       step = 2;
     }
   }
-  if (step > 3 && !state.baseline) {
-    showToast('Please select a baseline impact level first.', true);
-    step = 3;
+  if (step > 3) {
+    if (typeof ensureCommonControlFloor === 'function') ensureCommonControlFloor();
   }
   state.policyMapStep = step;
   markDirty();
@@ -430,15 +429,7 @@ function policyMapValidateUpTo(fromStep) {
     }
   }
   if (fromStep >= 3) {
-    if (state.fismaMode) {
-      if (!Array.isArray(state.programInfoTypes) || state.programInfoTypes.length === 0) {
-        showToast('FISMA / CUI mode is on \u2014 pick at least one information type so a baseline can be derived.', true);
-        return false;
-      }
-    } else if (!state.baseline) {
-      showToast('Please select a baseline impact level before continuing.', true);
-      return false;
-    }
+    if (typeof ensureCommonControlFloor === 'function') ensureCommonControlFloor();
   }
   if (fromStep >= 4) {
     ensurePolicyCatalog();

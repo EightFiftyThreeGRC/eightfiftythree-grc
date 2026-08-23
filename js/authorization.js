@@ -17,6 +17,43 @@ function atoEnsureState() {
   if (!state.atoDecisions || typeof state.atoDecisions !== 'object') state.atoDecisions = {};
 }
 
+function _atoBaselineRank(ch) {
+  return { L: 1, M: 2, H: 3 }[ch] || 1;
+}
+
+function _atoBaselineLetter(r) {
+  return r === 3 ? 'H' : r === 2 ? 'M' : 'L';
+}
+
+/** FIPS 199 high-water of member assets, or an explicit boundary override. */
+function getAuthBoundaryBaseline(boundary) {
+  if (!boundary) return 'L';
+  if (boundary.baseline === 'L' || boundary.baseline === 'M' || boundary.baseline === 'H') return boundary.baseline;
+  var max = 1;
+  (boundary.assetIds || []).forEach(function(id) {
+    var cat = (state.assetCategorization || {})[String(id)];
+    var impact = (typeof computeAssetOverallFipsImpact === 'function') ? computeAssetOverallFipsImpact(cat) : 'L';
+    max = Math.max(max, _atoBaselineRank(impact));
+  });
+  return _atoBaselineLetter(max);
+}
+
+function setAuthBoundaryBaseline(boundaryId, letter) {
+  atoEnsureState();
+  var b = (state.authBoundaries || []).find(function(x) { return x.id === boundaryId; });
+  if (!b) return;
+  var next = (letter === 'M' || letter === 'H' || letter === 'L') ? letter : 'L';
+  var prev = b.baseline || '';
+  b.baseline = next;
+  if (typeof logFieldChange === 'function') logFieldChange('authBoundaries.' + boundaryId + '.baseline', prev, next);
+  if (typeof addAuditEntry === 'function') {
+    addAuditEntry('ato', boundaryId, 'Authorization-boundary baseline set to ' + next + ' (FIPS 199 / 800-53B for this system boundary, not the organization).');
+  }
+  if (typeof markDirty === 'function') markDirty();
+  if (typeof renderReports === 'function') setTimeout(function() { renderReports(); }, 0);
+  else if (typeof renderDashboard === 'function') setTimeout(function() { renderDashboard(); }, 0);
+}
+
 function atoNameByUserId(id) {
   var u = (state.users || []).find(function(x) { return x.id === id; });
   return u ? u.name : '';
@@ -203,8 +240,17 @@ function renderAuthorizationStatusPanelHtml() {
     var aoName = b.aoUserId ? atoNameByUserId(b.aoUserId) : '';
     var canDecide = atoCanDecide(b);
     var expires = b.atoExpiresDate ? ' · expires ' + escapeHTML(b.atoExpiresDate) : '';
+    var sysBl = getAuthBoundaryBaseline(b);
+    var blOpts = ['L', 'M', 'H'].map(function(letter) {
+      var name = letter === 'H' ? 'High' : letter === 'M' ? 'Moderate' : 'Low';
+      return '<option value="' + letter + '"' + (sysBl === letter ? ' selected' : '') + '>' + name + '</option>';
+    }).join('');
+    var bidJs = JSON.stringify(b.id);
     return '<tr>'
       + '<td style="padding:8px 10px;border-top:1px solid var(--border);font-weight:600;">' + escapeHTML(b.name || '(unnamed)') + '</td>'
+      + '<td style="padding:8px 10px;border-top:1px solid var(--border);">'
+      + '<select class="form-select" style="max-width:130px;font-size:12px;padding:4px 8px;" title="800-53 baseline for this authorization boundary" onchange="setAuthBoundaryBaseline(' + bidJs + ', this.value)">' + blOpts + '</select>'
+      + '</td>'
       + '<td style="padding:8px 10px;border-top:1px solid var(--border);"><span style="display:inline-block;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:700;color:' + color + ';background:' + bg + ';">' + label + '</span><span style="font-size:11px;color:var(--text-muted);margin-left:6px;">' + expires + '</span></td>'
       + '<td style="padding:8px 10px;border-top:1px solid var(--border);font-size:12px;color:var(--text-muted);">' + escapeHTML(aoName || '—') + '</td>'
       + '<td style="padding:8px 10px;border-top:1px solid var(--border);text-align:right;">'
@@ -218,11 +264,12 @@ function renderAuthorizationStatusPanelHtml() {
     + '<div style="background:white;border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:18px;max-width:920px;">'
     + '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;">'
     + '<div style="font-size:13px;font-weight:700;color:var(--navy);">🛡️ Authorization status</div>'
-    + '<div style="font-size:11px;color:var(--text-muted);">Boundaries · AO records ATO / IATT / Denial</div>'
+    + '<div style="font-size:11px;color:var(--text-muted);">System baseline is chosen per boundary (FIPS 199) \u2014 not for the organization</div>'
     + '</div>'
     + '<table style="width:100%;border-collapse:collapse;font-size:13px;">'
     + '<thead><tr style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--text-muted);">'
     + '<th style="text-align:left;padding:6px 10px;">Boundary</th>'
+    + '<th style="text-align:left;padding:6px 10px;">System baseline</th>'
     + '<th style="text-align:left;padding:6px 10px;">Status</th>'
     + '<th style="text-align:left;padding:6px 10px;">AO</th>'
     + '<th style="text-align:right;padding:6px 10px;">Action</th>'

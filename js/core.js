@@ -1099,7 +1099,7 @@ function getDefaultProgramOwnerTitle() {
 // APP STATE
 // ============================================================
 const state = {
-  baseline: null,           // 'L', 'M', or 'H' — the *effective* baseline applied to the program (after any FISMA tailoring)
+  baseline: null,           // 'L'|'M'|'H'|null — inherited common-control floor (implicit Low). Not an org FIPS 199 pick.
   privacyOverlay: false,    // true = include P controls
   fismaMode: false,         // true = program is FISMA / CUI / federal — baseline is derived from program info types instead of user-picked
   programInfoTypes: [],     // [info-type id, ...] — 800-60 types selected by CISO when fismaMode is on; drives derived baseline

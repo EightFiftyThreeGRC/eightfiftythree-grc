@@ -430,7 +430,7 @@ function renderOrgProfileFieldsHtml() {
   return '<div class="org-profile-fields">'
     + '<div class="org-profile-grid">'
     + renderOrgProfileSelectHtml('Workforce size', 'orgSizeBand', ORG_SIZE_OPTIONS,
-        'Aggregation signal only.')
+        'Informs overlay suggestions and which systems may need elevation \u2014 not an organizational 800-53 baseline.')
     + renderOrgProfileSelectHtml('Worst realistic consequence', 'orgImpactProfile', ORG_IMPACT_OPTIONS,
         'Compromise or outage \u2014 used to recommend a baseline.')
     + '</div>'
@@ -794,7 +794,7 @@ function renderFrameworksTab() {
     + '<table class="control-table fw-map-table"><thead><tr>'
     + '<th>Control</th><th>Name</th><th>CSF 2.0</th><th>Status</th>' + headCols
     + '</tr></thead><tbody>'
-    + (rows || '<tr><td colspan="' + (4 + active.length + activeLaws.length) + '" style="padding:24px;text-align:center;color:var(--text-muted);">No controls match \u2014 set a baseline in Program setup first.</td></tr>')
+    + (rows || '<tr><td colspan="' + (4 + active.length + activeLaws.length) + '" style="padding:24px;text-align:center;color:var(--text-muted);">No controls match \u2014 complete Program setup so the common-control floor can render.</td></tr>')
     + '</tbody></table>'
     + (controls.length > 200 ? '<div style="font-size:12px;color:var(--text-muted);padding:12px;">Showing first 200 of ' + controls.length + ' controls. Refine search to narrow.</div>' : '')
     + '</div></div>';

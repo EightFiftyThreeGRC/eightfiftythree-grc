@@ -7,7 +7,7 @@ function getSetupProgressSummary() {
   }
   var step = (typeof currentStep !== 'undefined' && currentStep.ciso) ? currentStep.ciso : 1;
   var total = (typeof CISO_WIZARD_STEPS === 'number') ? CISO_WIZARD_STEPS : 8;
-  var labels = (typeof CISO_STEP_LABELS !== 'undefined') ? CISO_STEP_LABELS : ['Organization', 'Profile', 'Baseline', 'Reg mapping', 'PM Controls', 'InfoSec Policy', 'Consolidate', 'Assign Owners'];
+  var labels = (typeof CISO_STEP_LABELS !== 'undefined') ? CISO_STEP_LABELS : ['Organization', 'Profile', 'Program', 'Reg mapping', 'PM Controls', 'InfoSec Policy', 'Consolidate', 'Assign Owners'];
   var pct = Math.round((step / total) * 100);
   return { step: step, pct: pct, label: labels[step - 1] || 'Organization', total: total };
 }

@@ -2663,12 +2663,12 @@ function renderAssetSSPStep2_SystemProfile(asset) {
     : renderAssetCIAGuidedPicker(asset.id, cat);
 
   var fipsBlock = ''
-    + '<div class="section-title" style="margin-top:8px;">Security categorization (FIPS 199)</div>'
-    + '<div class="section-subtitle">Categorize this system so the right controls apply. Overall impact is the high-water mark of C/I/A. Program baseline <strong>' + fipsLabels[programBl] + '</strong> sets organization-wide control coverage; it is not changed here.</div>'
+    + '<div class="section-title" style="margin-top:8px;">System baseline (FIPS 199)</div>'
+    + '<div class="section-subtitle">This is where you choose a baseline. Overall impact is the high-water mark of C/I/A for <em>this system</em>. The inherited common-control floor is <strong>' + fipsLabels[programBl] + '</strong> \u2014 it is not an organizational Moderate/High pick and is not changed here.</div>'
     + explainer
     + aiCiaCallout
-    + '<div style="margin-bottom:8px;font-size:13px;font-weight:700;color:var(--navy);">Overall system impact: <span style="color:var(--teal);">' + fipsLabels[assetImpact] + '</span>'
-    + ' <span style="font-size:12px;font-weight:600;color:var(--text-muted);">· Program baseline: ' + fipsLabels[programBl] + '</span></div>'
+    + '<div style="margin-bottom:8px;font-size:13px;font-weight:700;color:var(--navy);">This system\'s 800-53 baseline: <span style="color:var(--teal);">' + fipsLabels[assetImpact] + '</span>'
+    + ' <span style="font-size:12px;font-weight:600;color:var(--text-muted);">\u00b7 Common-control floor: ' + fipsLabels[programBl] + '</span></div>'
     + pickerHeader
     + '<div style="' + (isFisma ? '' : 'max-width:720px;') + 'margin-bottom:18px;">' + pickerBlock + '</div>'
     + '<div class="form-group" style="max-width:720px;margin-top:4px;">'
@@ -2691,9 +2691,9 @@ function renderAssetSSPStep2_SystemProfile(asset) {
   var mismatchBanner = '';
   if (_fipsOrder(assetImpact) > _fipsOrder(programBl)) {
     mismatchBanner = '<div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:10px;padding:12px 14px;margin-top:14px;margin-bottom:8px;font-size:12px;color:#92400e;line-height:1.55;max-width:920px;">'
-      + '<div style="font-weight:800;margin-bottom:4px;">Categorization above program baseline</div>'
-      + 'This asset\'s FIPS high-water mark (<strong>' + fipsLabels[assetImpact] + '</strong>) is above the organization\'s program baseline (<strong>' + fipsLabels[programBl] + '</strong>). '
-      + 'The program baseline is <em>not</em> auto-changed. The CISO may approve a tailored elevated asset subtype for this system class (NIST tailoring with additions). Details below.</div>';
+      + '<div style="font-weight:800;margin-bottom:4px;">This system is above the common-control floor</div>'
+      + 'This system\'s FIPS 199 high-water mark (<strong>' + fipsLabels[assetImpact] + '</strong>) is above the inherited common-control floor (<strong>' + fipsLabels[programBl] + '</strong>). '
+      + 'The organizational floor is <em>not</em> auto-changed. Elevation adds Moderate/High controls for this system class only. Details below.</div>';
   }
 
   return fipsBlock + mismatchBanner + elevationHtml;

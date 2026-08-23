@@ -202,7 +202,7 @@ function processBaselineElevationOnSystemProfile(asset, assetImpactLetter) {
     return '<div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:10px;padding:12px 14px;margin-bottom:16px;font-size:12px;color:#92400e;line-height:1.5;">'
       + '<div style="font-weight:800;margin-bottom:4px;">CISO notification</div>'
       + 'A recommendation has been sent to the CISO to create a <strong>' + escapeHTML(newRec.elevatedSubtypeName) + '</strong> asset type for high-risk systems like this. <strong>Status: Pending review.</strong> '
-      + 'The program baseline is unchanged; only a CISO decision can add a tailored system-class subtype to the asset catalog (NIST tailoring with additions at the system-class level).</div>';
+      + 'The common-control floor is unchanged; only a CISO decision can add a tailored system-class subtype so this system pulls Moderate/High controls without flipping the estate.</div>';
   }
 
   return '';
@@ -450,7 +450,7 @@ function renderBaselineElevationReportsSummaryHtml() {
     + (rj.length ? '<div style="margin-top:8px;font-size:12px;font-weight:700;">Declined (with rationale in audit)</div><ul style="margin:4px 0 0 18px;font-size:11px;color:var(--text-muted);">' + rj.map(function(x) {
         return '<li>' + escapeHTML(x.baseAssetTypeName) + ' → ' + x.targetBaseline + ' on ' + escapeHTML(x.decisionDate || '—') + '</li>';
       }).join('') + '</ul>' : '')
-    + '<div style="font-size:11px;color:var(--text-muted);margin-top:8px;">Amber System Profile messages reference this workflow; the program <code>baseline</code> in CISO setup is never auto-changed by these decisions.</div>'
+    + '<div style="font-size:11px;color:var(--text-muted);margin-top:8px;">Amber System Profile messages reference this workflow. The inherited common-control floor is never auto-changed by these decisions.</div>'
     + '</div>';
 }
 
