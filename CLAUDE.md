@@ -105,7 +105,8 @@ Program/CISO identity
 - `baseline` — `'L'`, `'M'`, or `'H'` (Low/Moderate/High NIST baseline)
 - `privacyOverlay` — boolean, includes Privacy (P) controls when true
 - `orgName`, `programOwner`, `programOwnerTitle`, `programOwnerEmail`
-- `cisoIsISSM` — CISO also wears ISSM hat (common in small orgs)
+- `cisoIsISSM` — legacy key name for the Step 1 answer **"This person also owns domain policies"**. Read it via `programOwnerOwnsDomainPolicies()`; when true, arriving at Assign owners defaults every unassigned domain to the program owner (`seedDomainOwnersFromProgramOwner()` in `js/program.js`, called from the `renderCISOStep` router so per-row edits are never overwritten). Also still gates the ISSM-row collapse in the ISP roles section.
+- `domainOwnerDefaultApplied` — the `cisoIsISSM` default has been written to `domainOwners` once. Re-armed by `setProgramOwnerOwnsDomainPolicies(true)`; left set by `clearAllDomainOwners()` so an explicit clear is not undone on the next visit.
 - `pmControls`, `cisoComplete`, `infoSecPolicy`
 
 Policies

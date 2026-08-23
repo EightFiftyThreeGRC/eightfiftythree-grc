@@ -1127,7 +1127,8 @@ const state = {
   programOwner: '',         // program owner full name (CISO / SAISO)
   programOwnerTitle: 'Chief Information Security Officer',  // title/role
   programOwnerEmail: '',    // program owner email
-  cisoIsISSM: false,        // true = CISO wears both hats (common in small teams)
+  cisoIsISSM: false,        // step 1 "this person also owns domain policies" (legacy key name)
+  domainOwnerDefaultApplied: false, // the cisoIsISSM default has been written to domainOwners once
   pmControls: {},           // { 'PM-1': true, ... }
   domainOwners: {},         // { 'AC': { name, email, role }, ... }
   policyDeadlines: {},      // { 'AC': '2026-06-01', ... }

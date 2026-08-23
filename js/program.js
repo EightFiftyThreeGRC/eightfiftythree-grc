@@ -250,7 +250,14 @@ function getCisoSetupStepDisplay(step, label) {
   var displayLabel = label || (CISO_STEP_LABELS[step - 1] || '');
   if (typeof getResolvedProgramPath === 'function' && getResolvedProgramPath() === 'map' && !state.cisoComplete) {
     total = (typeof POLICY_MAP_STEPS === 'number') ? POLICY_MAP_STEPS : 7;
-    if (step === 8) displayStep = 7;
+    // Path B reuses a few Path A panels; renumber those to their Path B position.
+    if (typeof policyMapPathAStep === 'function') {
+      for (var pb = 1; pb <= total; pb++) {
+        if (policyMapPathAStep(pb) === step) { displayStep = pb; break; }
+      }
+    } else if (step === CISO_WIZARD_STEPS) {
+      displayStep = total;
+    }
     if (typeof POLICY_MAP_STEP_LABELS !== 'undefined' && POLICY_MAP_STEP_LABELS[displayStep - 1]) {
       displayLabel = POLICY_MAP_STEP_LABELS[displayStep - 1];
     }
@@ -269,6 +276,11 @@ function refreshCurrentCisoStep() {
 }
 
 function renderCISOStep(step) {
+  // Arrival at Assign owners — apply the step 1 domain-policy-ownership default here
+  // rather than in the renderer, so per-row edits and clears are not overwritten.
+  if (step === CISO_WIZARD_STEPS && typeof seedDomainOwnersFromProgramOwner === 'function') {
+    seedDomainOwnersFromProgramOwner();
+  }
   if (step===1) renderCISOStep1();
   if (step===2) renderCISOStep1Profile();
   if (step===3) renderCISOStep2Baseline();
@@ -529,7 +541,8 @@ function cisoFinish() {
   const unassigned = masters.filter(f => !isValidOwnerEmail((state.domainOwners[f] || {}).email));
 
   if (unassigned.length > 0) {
-    showToast('Assign an owner email for all ' + unassigned.length + ' domain(s) before finalizing. Use the program owner button in Step 8.', true);
+    var ownerStepNo = getCisoSetupStepDisplay(CISO_WIZARD_STEPS, 'Assign owners').step;
+    showToast('Assign an owner email for all ' + unassigned.length + ' domain(s) before finalizing. Use the program owner button in Step ' + ownerStepNo + '.', true);
     return;
   }
   clearScopedUndoStack('program finalization');
@@ -1053,7 +1066,7 @@ function renderCISOStep1() {
         </div>
       </div>
       <label class="ciso-identity-opt">
-        <input type="checkbox" ${state.cisoIsISSM ? 'checked' : ''} onchange="state.cisoIsISSM=this.checked; window.markDirty();">
+        <input type="checkbox" ${state.cisoIsISSM ? 'checked' : ''} onchange="setProgramOwnerOwnsDomainPolicies(this.checked)">
         <span>This person also owns domain policies</span>
       </label>
     </div>
@@ -2985,6 +2998,77 @@ function applyOwnerEmailToFamilies(famList, email, meta) {
   return count;
 }
 
+/** Master domains needing an owner — one per Function policy document, PM excluded. */
+function getDomainOwnerMasters() {
+  var merges = state.policyMerges || {};
+  return getActiveFamilies().filter(function(f) { return f !== 'PM' && !merges[f]; });
+}
+
+/**
+ * Step 1 asks "This person also owns domain policies" — persisted under the legacy key
+ * `cisoIsISSM`. True only when that box is checked and step 1 holds a real identity.
+ */
+function programOwnerOwnsDomainPolicies() {
+  if (!state.cisoIsISSM) return false;
+  if (!(state.programOwner || '').trim()) return false;
+  return isValidOwnerEmail(state.programOwnerEmail);
+}
+
+/** True when every master domain is already rostered to the program owner. */
+function allDomainsOwnedByProgramOwner() {
+  var masters = getDomainOwnerMasters();
+  if (!masters.length) return false;
+  return masters.every(function(fam) {
+    return isSameOwnerEmail((state.domainOwners[fam] || {}).email, state.programOwnerEmail);
+  });
+}
+
+/** Step 1 checkbox — re-arms the default so it applies on the next visit to Assign owners. */
+function setProgramOwnerOwnsDomainPolicies(on) {
+  var prev = !!state.cisoIsISSM;
+  state.cisoIsISSM = !!on;
+  if (state.cisoIsISSM && !prev) state.domainOwnerDefaultApplied = false;
+  if (typeof logFieldChange === 'function') {
+    logFieldChange('cisoIsISSM', prev, state.cisoIsISSM);
+  }
+  markDirty();
+}
+
+/**
+ * Default unassigned domains to the program owner when step 1 said they own domain
+ * policies. These are real assignments — never tagged isDemoPlaceholder, so finalize is
+ * not blocked by blockActionIfDemoPlaceholders(). Only empty rows are written, so a
+ * domain handed to someone else keeps its owner. Applied once per answer
+ * (domainOwnerDefaultApplied) so an explicit clear is not undone on the next visit.
+ */
+function seedDomainOwnersFromProgramOwner() {
+  if (state.domainOwnerDefaultApplied) return 0;
+  if (!programOwnerOwnsDomainPolicies()) return 0;
+  if (!state.domainOwners) state.domainOwners = {};
+  var masters = getDomainOwnerMasters();
+  if (!masters.length) return 0;
+  var unassigned = masters.filter(function(fam) {
+    return !isValidOwnerEmail((state.domainOwners[fam] || {}).email);
+  });
+  state.domainOwnerDefaultApplied = true;
+  if (!unassigned.length) {
+    markDirty();
+    return 0;
+  }
+  ensureDefaultDeadlinesForMasters(masters);
+  var applied = applyOwnerEmailToFamilies(unassigned, (state.programOwnerEmail || '').trim(), {
+    name: (state.programOwner || '').trim(),
+    role: (state.programOwnerTitle || '').trim() || getDefaultProgramOwnerTitle()
+  });
+  if (typeof syncUsersFromState === 'function') syncUsersFromState();
+  markDirty();
+  try {
+    addAuditEntry('program', null, 'Domain policy ownership defaulted to the program owner for '
+      + applied + ' domain(s) \u2014 step 1 recorded that they also own domain policies');
+  } catch (e) { /* ignore */ }
+  return applied;
+}
+
 function applyProgramOwnerToAllDomains() {
   var email = (state.programOwnerEmail || '').trim();
   var name = (state.programOwner || '').trim();
@@ -2993,17 +3077,37 @@ function applyProgramOwnerToAllDomains() {
     goToStep('ciso', 1);
     return;
   }
-  var families = getActiveFamilies().filter(function(f) { return f !== 'PM'; });
-  var merges = state.policyMerges || {};
-  var masters = families.filter(function(f) { return !merges[f]; });
+  var masters = getDomainOwnerMasters();
   ensureDefaultDeadlinesForMasters(masters);
   applyOwnerEmailToFamilies(masters, email, {
     name: name,
     role: (state.programOwnerTitle || '').trim() || getDefaultProgramOwnerTitle()
   });
+  state.domainOwnerDefaultApplied = true;
   delete state._cisoOwnerEditFam;
   showToast('Assigned ' + name + ' as owner of all ' + masters.length + ' policy domains. Switch profiles in the sidebar to act as them.');
   renderActiveCisoSetupStep();
+}
+
+/** Inverse of "Assign all domains" — empty every row so owners can be entered by hand. */
+function clearAllDomainOwners() {
+  var masters = getDomainOwnerMasters();
+  if (!masters.length) return;
+  if (!window.confirm('Clear the owner on all ' + masters.length + ' policy domains?\n\nDraft deadlines are kept. You can re-assign the program owner or type owners row by row.')) return;
+  var merges = state.policyMerges || {};
+  var families = getActiveFamilies().filter(function(f) { return f !== 'PM'; });
+  masters.forEach(function(fam) {
+    [fam].concat(families.filter(function(f) { return merges[f] === fam; })).forEach(function(target) {
+      delete state.domainOwners[target];
+    });
+  });
+  state.domainOwnerDefaultApplied = true;
+  delete state._cisoOwnerEditFam;
+  if (typeof syncUsersFromState === 'function') syncUsersFromState();
+  markDirty();
+  try { addAuditEntry('program', null, 'Cleared domain policy owners on all ' + masters.length + ' domain(s)'); } catch (e) { /* ignore */ }
+  showToast('Cleared owners on ' + masters.length + ' policy domains.');
+  setTimeout(function() { renderActiveCisoSetupStep(); }, 0);
 }
 
 // --- Step 7: Assign Owners & Deadlines ---
@@ -3055,8 +3159,24 @@ function renderCISOStep4b() {
       + '<span class="owner-step-hero-missing">Add name and email in Step 1</span>';
   }
 
+  // Never ask for something already done: offer the inverse action once every domain
+  // is rostered to the program owner.
+  var heroActionHtml;
+  if (!canApplyOwner || !programOwnerName) {
+    heroActionHtml = '<button type="button" class="btn btn-secondary" onclick="goToStep(\'ciso\',1)">Go to Step 1 \u2014 add name and email</button>';
+  } else if (allDomainsOwnedByProgramOwner()) {
+    heroActionHtml = '<p class="owner-step-hero-note">'
+      + escapeHTML(programOwnerName) + ' owns all ' + masters.length
+      + ' policy domains' + (state.cisoIsISSM ? ' \u2014 the answer you gave in Step 1' : '')
+      + '. Change any row below to hand a domain to someone else.</p>'
+      + '<button type="button" class="btn btn-secondary" onclick="clearAllDomainOwners()">Clear all domain owners</button>';
+  } else {
+    heroActionHtml = '<button type="button" class="btn btn-primary" onclick="applyProgramOwnerToAllDomains()">Assign all domains</button>'
+      + (state.cisoIsISSM ? '<p class="owner-step-hero-note">Step 1 said the program owner also owns domain policies.</p>' : '');
+  }
+
   body.innerHTML = `
-    ${cisoStepProgressHtml(8, 'Assign owners')}
+    ${cisoStepProgressHtml(CISO_WIZARD_STEPS)}
     <div class="section-title">Assign owners</div>
     <div class="section-subtitle">Roster people locally with a name and email. Email is the unique key \u2014 switch profiles in the sidebar to act as them.</div>
 
@@ -3072,10 +3192,7 @@ function renderCISOStep4b() {
       </div>
       <div class="owner-step-hero-bar" aria-hidden="true"><div class="owner-step-hero-bar-fill" style="width:${pct}%;"></div></div>
       <div class="owner-step-hero-actions">
-        ${canApplyOwner && programOwnerName
-          ? '<button type="button" class="btn btn-primary" onclick="applyProgramOwnerToAllDomains()">Assign all domains</button>'
-          : '<button type="button" class="btn btn-secondary" onclick="goToStep(\'ciso\',1)">Go to Step 1 \u2014 add name and email</button>'}
-        ${state.cisoIsISSM && canApplyOwner && programOwnerName ? '<p class="owner-step-hero-note">Program owner also owns domain policies \u2014 click when ready.</p>' : ''}
+        ${heroActionHtml}
       </div>
     </div>
     ${returnedFams.length ? `
