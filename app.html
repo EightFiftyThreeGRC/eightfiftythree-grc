@@ -10,7 +10,7 @@
   <meta name="description" content="EightFiftyThree GRC — NIST SP 800-53 Rev. 5 program management">
   <title>EightFiftyThree GRC — Application</title>
 
-    <link rel="stylesheet" href="css/app.css?v=20260824b">
+    <link rel="stylesheet" href="css/app.css?v=20260824c">
 
 </head>
 <body>
@@ -294,7 +294,7 @@
     </div>
     <!-- WIZARD VIEW: 4-step flow (hidden until domain selected) — CISO-style top progress -->
     <div id="policy-wizard-panel" style="display:none; flex-direction:column; height:100%; overflow:hidden;">
-      <div id="policy-wizard-header" style="flex-shrink:0; background:white; border-bottom:1px solid var(--border); padding:12px 32px;"></div>
+      <div id="policy-wizard-header" class="policy-wiz-header"></div>
       <div class="wizard-container" id="policy-wizard-main" style="flex:1; min-height:0; overflow:hidden;">
         <div class="wizard-setup-progress" id="policy-setup-progress">
           <div class="ciso-setup-progress-track"><div class="ciso-setup-progress-fill" id="policy-setup-progress-fill"></div></div>
@@ -302,50 +302,36 @@
         </div>
         <div class="wizard-content">
           <!-- Step 1: Review & Custodian -->
-          <div class="wizard-step active" id="policy-step-1" style="height:100%;">
-            <div style="display:flex; height:100%; overflow:hidden;">
-              <div id="policy-step-1-help" style="width:240px; flex-shrink:0; overflow-y:auto; background:#fafbfc; border-right:1px solid var(--border); padding:20px 16px;"></div>
-              <div style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
-                <div id="policy-step-1-body" style="flex:1; overflow-y:auto; padding:28px 32px;"></div>
-                <div class="wizard-step-footer">
-                  <button class="btn btn-secondary" onclick="exitPolicyWizard()">← All Domains</button>
-                  <button class="btn btn-primary" onclick="policyNext(1)">Control Selection →</button>
-                </div>
-              </div>
+          <div class="wizard-step active" id="policy-step-1">
+            <div class="wizard-step-body" id="policy-step-1-body"></div>
+            <div class="wizard-step-footer">
+              <button class="btn btn-secondary" onclick="exitPolicyWizard()">← All Domains</button>
+              <button class="btn btn-primary" onclick="policyNext(1)">Control Selection →</button>
             </div>
           </div>
           <!-- Step 2: Control Selection -->
-          <div class="wizard-step" id="policy-step-2" style="height:100%;">
-            <div style="display:flex; height:100%; overflow:hidden;">
-              <div id="policy-step-2-help" style="width:240px; flex-shrink:0; overflow-y:auto; background:#fafbfc; border-right:1px solid var(--border); padding:20px 16px;"></div>
-              <div style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
-                <div id="policy-step-2-body" style="flex:1; overflow-y:auto; padding:24px 28px;"></div>
-                <div class="wizard-step-footer">
-                  <button class="btn btn-secondary" onclick="goToStep('policy',1)">← Back</button>
-                  <span id="policy-step-2-count" style="font-size:13px; color:var(--text-muted);"></span>
-                  <button class="btn btn-primary" onclick="policyNext(2)">Build Policy →</button>
-                </div>
-              </div>
+          <div class="wizard-step" id="policy-step-2">
+            <div class="wizard-step-body" id="policy-step-2-body"></div>
+            <div class="wizard-step-footer">
+              <button class="btn btn-secondary" onclick="goToStep('policy',1)">← Back</button>
+              <span id="policy-step-2-count" style="font-size:13px; color:var(--text-muted);"></span>
+              <button class="btn btn-primary" onclick="policyNext(2)">Build Policy →</button>
             </div>
           </div>
           <!-- Step 3: Policy Content -->
-          <div class="wizard-step" id="policy-step-3" style="height:100%;">
-            <div style="display:flex; flex-direction:column; height:100%;">
-              <div class="wizard-step-body" id="policy-step-3-body" style="padding:0;"></div>
-              <div class="wizard-step-footer">
-                <button class="btn btn-secondary" onclick="goToStep('policy',2)">← Back</button>
-                <button class="btn btn-primary" onclick="policyNext(3)">Assign Control Owners →</button>
-              </div>
+          <div class="wizard-step" id="policy-step-3">
+            <div class="wizard-step-body" id="policy-step-3-body"></div>
+            <div class="wizard-step-footer">
+              <button class="btn btn-secondary" onclick="goToStep('policy',2)">← Back</button>
+              <button class="btn btn-primary" onclick="policyNext(3)">Assign Control Owners →</button>
             </div>
           </div>
           <!-- Step 4: Control Owners -->
-          <div class="wizard-step" id="policy-step-4" style="height:100%;">
-            <div style="display:flex; flex-direction:column; height:100%;">
-              <div class="wizard-step-body" id="policy-step-4-body" style="padding:0;"></div>
-              <div class="wizard-step-footer">
-                <button class="btn btn-secondary" onclick="goToStep('policy',3)">← Back</button>
-                <button class="btn btn-navy" id="policy-submit-approval-btn" onclick="showSubmitModal()">✓ Submit for Approval</button>
-              </div>
+          <div class="wizard-step" id="policy-step-4">
+            <div class="wizard-step-body" id="policy-step-4-body"></div>
+            <div class="wizard-step-footer">
+              <button class="btn btn-secondary" onclick="goToStep('policy',3)">← Back</button>
+              <button class="btn btn-navy" id="policy-submit-approval-btn" onclick="showSubmitModal()">✓ Submit for Approval</button>
             </div>
           </div>
         </div>
@@ -676,7 +662,7 @@
 <script src="js/nist-control-text.js?v=20260624"></script>
 <script src="js/core.js?v=20260823n"></script>
 <script src="js/nist-csf-map.js?v=20260824a"></script>
-<script src="js/policies.js?v=20260824b"></script>
+<script src="js/policies.js?v=20260824c"></script>
 <script src="js/control-scope-defaults.js?v=20260707b"></script>
 <script src="js/controls.js?v=20260824b"></script>
 <script src="js/assets.js?v=20260824b"></script>
@@ -692,7 +678,7 @@
 <script src="js/session.js?v=20260823b"></script>
 <script src="js/program.js?v=20260824a"></script>
 <script src="js/policy-board.js?v=20260823f"></script>
-<script src="js/app.js?v=20260824b"></script>
+<script src="js/app.js?v=20260824c"></script>
 <script src="js/policy-map.js?v=20260823h"></script>
 
 </body>

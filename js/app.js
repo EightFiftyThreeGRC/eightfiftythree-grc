@@ -237,7 +237,9 @@ function toggleCustomApprover(policyKey, checkbox) {
   window.markDirty && window.markDirty();
 }
 
-function renderReviewCycleCard(policyKey, label) {
+function renderReviewCycleCard(policyKey, label, opts) {
+  opts = opts || {};
+  var compact = !!opts.compact;
   if (!state.policyReviewCycle) state.policyReviewCycle = {};
   if (!state.policyReviewCycle[policyKey]) state.policyReviewCycle[policyKey] = {};
   var rc = state.policyReviewCycle[policyKey];
@@ -283,19 +285,34 @@ function renderReviewCycleCard(policyKey, label) {
     && domainPolicyRequiresSeparateApprover(policyKey);
   var includeEmail = policyKey !== 'ISP';
   var fieldWidth = includeEmail ? '33%' : '50%';
-  var customFieldsHTML = '<div style="display:flex;gap:4px;">'
-    + '<input class="form-input" style="font-size:12px;width:' + fieldWidth + ';" placeholder="Approver name" autocomplete="off" value="' + escapeHTML(rc.approvedBy||'') + '" oninput="state.policyReviewCycle[\'' + escKey + '\'].approvedBy=this.value; window.markDirty();">'
-    + '<input class="form-input" style="font-size:12px;width:' + fieldWidth + ';" placeholder="Role (e.g. CIO)" autocomplete="off" value="' + escapeHTML(rc.approverRole||'') + '" oninput="state.policyReviewCycle[\'' + escKey + '\'].approverRole=this.value; window.markDirty();">'
-    + (includeEmail
-      ? '<input class="form-input" style="font-size:12px;width:33%;" placeholder="Email" autocomplete="off" value="' + escapeHTML(rc.approverEmail||'') + '" oninput="state.policyReviewCycle[\'' + escKey + '\'].approverEmail=this.value; window.markDirty();">'
-      : '')
-    + '</div>';
+  var customFieldsHTML = compact
+    ? '<div class="wiz-review-approver-fields">'
+      + '<input class="form-input" placeholder="Approver name" autocomplete="off" value="' + escapeHTML(rc.approvedBy||'') + '" oninput="state.policyReviewCycle[\'' + escKey + '\'].approvedBy=this.value; window.markDirty();">'
+      + '<input class="form-input" placeholder="Role (e.g. CIO)" autocomplete="off" value="' + escapeHTML(rc.approverRole||'') + '" oninput="state.policyReviewCycle[\'' + escKey + '\'].approverRole=this.value; window.markDirty();">'
+      + (includeEmail
+        ? '<input class="form-input" placeholder="Email" autocomplete="off" value="' + escapeHTML(rc.approverEmail||'') + '" oninput="state.policyReviewCycle[\'' + escKey + '\'].approverEmail=this.value; window.markDirty();">'
+        : '')
+      + '</div>'
+    : '<div style="display:flex;gap:4px;">'
+      + '<input class="form-input" style="font-size:12px;width:' + fieldWidth + ';" placeholder="Approver name" autocomplete="off" value="' + escapeHTML(rc.approvedBy||'') + '" oninput="state.policyReviewCycle[\'' + escKey + '\'].approvedBy=this.value; window.markDirty();">'
+      + '<input class="form-input" style="font-size:12px;width:' + fieldWidth + ';" placeholder="Role (e.g. CIO)" autocomplete="off" value="' + escapeHTML(rc.approverRole||'') + '" oninput="state.policyReviewCycle[\'' + escKey + '\'].approverRole=this.value; window.markDirty();">'
+      + (includeEmail
+        ? '<input class="form-input" style="font-size:12px;width:33%;" placeholder="Email" autocomplete="off" value="' + escapeHTML(rc.approverEmail||'') + '" oninput="state.policyReviewCycle[\'' + escKey + '\'].approverEmail=this.value; window.markDirty();">'
+        : '')
+      + '</div>';
   var approverHTML = '';
   if (requiresSeparate) {
-    approverHTML = '<div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;line-height:1.45;">'
+    approverHTML = '<div class="form-hint" style="margin-bottom:8px;">'
       + 'You are drafting this domain policy \u2014 it must be approved by someone other than you (separation of duties). Assign a separate reviewer below.'
       + '</div>'
       + '<div id="custom-approver-' + policyKey + '" style="display:block;margin-top:0;">'
+      + customFieldsHTML
+      + '</div>';
+  } else if (compact) {
+    approverHTML = '<div class="wiz-meta">' + escapeHTML(defaultApproverName || 'CISO') + ' \u00b7 Program Owner</div>'
+      + '<label class="ciso-identity-opt" style="margin-top:6px;">'
+      + '<input type="checkbox" ' + (isCustom ? 'checked' : '') + ' onclick="toggleCustomApprover(\'' + escKey + '\', this)"> <span>Different reviewer</span></label>'
+      + '<div id="custom-approver-' + policyKey + '" style="display:' + (isCustom ? 'block' : 'none') + ';margin-top:8px;">'
       + customFieldsHTML
       + '</div>';
   } else {
@@ -309,29 +326,42 @@ function renderReviewCycleCard(policyKey, label) {
       + '</div>';
   }
 
-  return '<div style="border:1px solid ' + rs.border + ';border-radius:10px;padding:16px 18px;margin-bottom:16px;background:' + rs.bg + ';">'
-    + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">'
-    + '<div style="font-size:13px;font-weight:700;color:var(--navy);display:flex;align-items:center;">' + reviewStatusDot(policyKey) + ' Policy Review Status — ' + label + '</div>'
-    + '<span style="font-size:11px;font-weight:600;color:' + rs.color + ';background:white;border:1px solid ' + rs.border + ';padding:2px 10px;border-radius:12px;">' + rs.label + '</span>'
-    + '</div>'
-    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">'
+  var fieldsHTML = '<div class="' + (compact ? 'wiz-review-grid' : '') + '" style="' + (compact ? '' : 'display:grid;grid-template-columns:1fr 1fr;gap:12px;') + '">'
     + '<div class="form-group" style="margin-bottom:0;">'
-    + '<label class="form-label" style="font-size:11px;">Last Reviewed</label>'
-    + '<input class="form-input" type="date" style="font-size:12px;" value="' + (rc.lastReviewed||'') + '" oninput="state.policyReviewCycle[\'' + escKey + '\'].lastReviewed=this.value; autoSetNextReview(\'' + escKey + '\');; window.markDirty();">'
+    + '<label class="form-label"' + (compact ? '' : ' style="font-size:11px;"') + '>Last Reviewed</label>'
+    + '<input class="form-input" type="date"' + (compact ? '' : ' style="font-size:12px;"') + ' value="' + (rc.lastReviewed||'') + '" oninput="state.policyReviewCycle[\'' + escKey + '\'].lastReviewed=this.value; autoSetNextReview(\'' + escKey + '\');; window.markDirty();">'
     + '</div>'
     + '<div class="form-group" style="margin-bottom:0;">'
-    + '<label class="form-label" style="font-size:11px;">Next Review Due</label>'
-    + '<input class="form-input" type="date" style="font-size:12px;border-color:' + rs.color + ';" value="' + (rc.nextReviewDue||'') + '" oninput="state.policyReviewCycle[\'' + escKey + '\'].nextReviewDue=this.value;; window.markDirty();">'
+    + '<label class="form-label"' + (compact ? '' : ' style="font-size:11px;"') + '>Next Review Due</label>'
+    + '<input class="form-input" type="date"' + (compact ? '' : ' style="font-size:12px;border-color:' + rs.color + ';"') + ' value="' + (rc.nextReviewDue||'') + '" oninput="state.policyReviewCycle[\'' + escKey + '\'].nextReviewDue=this.value;; window.markDirty();">'
     + '</div>'
     + '<div class="form-group" style="margin-bottom:0;">'
-    + '<label class="form-label" style="font-size:11px;">Approved By</label>'
+    + '<label class="form-label"' + (compact ? '' : ' style="font-size:11px;"') + '>Approved By</label>'
     + approverHTML
     + '</div>'
     + '<div class="form-group" style="margin-bottom:0;">'
-    + '<label class="form-label" style="font-size:11px;">Approval Date</label>'
-    + '<input class="form-input" type="date" style="font-size:12px;" value="' + (rc.approvalDate||'') + '" oninput="state.policyReviewCycle[\'' + escKey + '\'].approvalDate=this.value;; window.markDirty();">'
+    + '<label class="form-label"' + (compact ? '' : ' style="font-size:11px;"') + '>Approval Date</label>'
+    + '<input class="form-input" type="date"' + (compact ? '' : ' style="font-size:12px;"') + ' value="' + (rc.approvalDate||'') + '" oninput="state.policyReviewCycle[\'' + escKey + '\'].approvalDate=this.value;; window.markDirty();">'
     + '</div>'
+    + '</div>';
+
+  if (compact) {
+    return '<div class="wiz-review">'
+      + '<div class="wiz-review-head">'
+      + '<label class="form-label">Review dates</label>'
+      + '<span class="wiz-review-status" style="color:' + rs.color + ';">' + reviewStatusDot(policyKey) + escapeHTML(rs.label) + '</span>'
+      + '</div>'
+      + fieldsHTML
+      + '<div class="form-hint">NIST 800-53 requires policies be reviewed at least annually.</div>'
+      + '</div>';
+  }
+
+  return '<div style="border:1px solid ' + rs.border + ';border-radius:10px;padding:16px 18px;margin-bottom:16px;background:' + rs.bg + ';">'
+    + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">'
+    + '<div style="font-size:13px;font-weight:700;color:var(--navy);display:flex;align-items:center;">' + reviewStatusDot(policyKey) + ' Policy Review Status \u2014 ' + label + '</div>'
+    + '<span style="font-size:11px;font-weight:600;color:' + rs.color + ';background:white;border:1px solid ' + rs.border + ';padding:2px 10px;border-radius:12px;">' + rs.label + '</span>'
     + '</div>'
+    + fieldsHTML
     + '<div style="font-size:10px;color:var(--text-muted);margin-top:10px;">NIST 800-53 requires policies be reviewed at least annually. Auditors will ask: &ldquo;When was this last reviewed and by whom?&rdquo;</div>'
     + '</div>';
 }

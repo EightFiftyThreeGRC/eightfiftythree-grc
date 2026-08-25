@@ -1886,12 +1886,11 @@ function renderPolicyWizardChrome(step) {
   const mergedTitle = escapeHTML(getPolicyMergedTitle(fam));
   const allFams = getPolicyAllFamilies(fam);
   const badgesHtml = allFams.map(function(f){
-    return '<span class="family-badge" style="font-size:12px;">' + escapeHTML(f) + '</span>';
+    return '<span class="family-badge">' + escapeHTML(f) + '</span>';
   }).join('');
-  el.innerHTML = '<div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">'
-    + '<button type="button" class="btn btn-secondary btn-sm" onclick="exitPolicyWizard()">\u2190 All Domains</button>'
-    + '<span style="font-size:15px; font-weight:700; color:var(--navy);">' + mergedTitle + '</span>'
-    + '<span style="display:inline-flex; flex-wrap:wrap; gap:6px; align-items:center;">' + badgesHtml + '</span>'
+  el.innerHTML = '<div class="policy-wiz-header-row">'
+    + '<span class="policy-wiz-header-title">' + mergedTitle + '</span>'
+    + '<span class="policy-wiz-header-fams">' + badgesHtml + '</span>'
     + '</div>';
 }
 
@@ -1981,7 +1980,6 @@ function policyNext(fromStep) {
 // ============================================================
 function renderPolicyStep1() {
   const fam = state._policyDomain;
-  const helpEl = document.getElementById('policy-step-1-help');
   const body = document.getElementById('policy-step-1-body');
   if (!fam || !state.baseline) {
     if (body) body.innerHTML = '<div class="empty-state"><div class="es-icon">\uD83C\uDFDB\uFE0F</div><div class="es-title">CISO Setup Required</div><p>The CISO must complete program setup before policy owners can begin. Ask your CISO to finish organization identity, CSF structure, the ISP, and owner assignments.</p></div>';
@@ -2000,96 +1998,51 @@ function renderPolicyStep1() {
     state.policyCustodians[fam] = { name: currentUser.name, role: currentUser.note || 'Policy Custodian', email: currentUser.email || '' };
     Object.assign(custodian, state.policyCustodians[fam]);
   }
-  const allFams = getPolicyAllFamilies(fam);
-  const dd = DOMAIN_DEFAULTS[fam] || DOMAIN_DEFAULT_GENERIC;
-  // Count controls across all merged families
-  const ctrls = getDomainPolicySelectableControls(allFams).length;
-  const allBadgesHtml = allFams.map(function(f){
-    return '<span class="family-badge" style="font-size:11px;padding:2px 6px;">' + f + '</span>';
-  }).join(' ');
+  const escFam = String(fam).replace(/'/g, "\\'");
 
-  if (helpEl) helpEl.innerHTML = `
-    <div style="margin-bottom:16px;">
-      <div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted); margin-bottom:8px;">Step 1 of 4</div>
-      <div style="font-size:15px; font-weight:700; color:var(--navy);">Policy Owner</div>
-    </div>
-    <div style="background:rgba(59,130,246,0.08); border:1px solid rgba(59,130,246,0.25); border-radius:8px; padding:12px; margin-bottom:16px;">
-      <div style="font-size:12px; font-weight:700; color:#2563eb; margin-bottom:6px;">\u2139\uFE0F About this step</div>
-      <div style="font-size:12px; color:#1d4ed8; line-height:1.6;">Confirm the Policy Owner assignment from the CISO and optionally assign a Policy Custodian who manages day-to-day policy maintenance.</div>
-    </div>
-    <div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted); margin-bottom:8px;">Domain</div>
-    <div style="background:rgba(13,148,136,0.05); border:1px solid rgba(13,148,136,0.2); border-radius:8px; padding:12px; margin-bottom:16px;">
-      <div style="font-size:13px; font-weight:700; color:var(--navy); margin-bottom:4px;">${escapeHTML(mergedTitle)}</div>
-      <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px;">${allBadgesHtml}</div>
-      <div style="font-size:12px; color:var(--text-muted);">${ctrls} controls \u00b7 ${state.baseline==='L'?'Low':state.baseline==='M'?'Moderate':'High'} common-control floor</div>
-      <div style="margin-top:8px;">${chipHTML(status)}</div>
-    </div>
-    <div style="font-size:11px; color:var(--text-muted); line-height:1.6;">The Policy Custodian is responsible for ongoing maintenance and annual review of this policy document.</div>
-  `;
+  var ownerBlock = '';
+  if (isCustodianRole && !owner.name) {
+    ownerBlock = '<div class="form-hint">No owner assigned yet. Suggest one for the CISO to approve.</div>'
+      + '<input class="form-input" placeholder="Suggested owner name" value="' + escapeHTML((state._suggestedOwner||{})[fam]||'') + '"'
+      + ' oninput="if(!state._suggestedOwner)state._suggestedOwner={};state._suggestedOwner[\'' + escFam + '\']=this.value; window.markDirty();">'
+      + '<div class="form-hint">This suggestion will be visible to the CISO on the dashboard.</div>';
+  } else {
+    ownerBlock = '<div class="wiz-owner-name">' + escapeHTML(owner.name || '\u2014') + '</div>'
+      + (owner.role ? '<div class="wiz-meta">' + escapeHTML(owner.role) + '</div>' : '')
+      + (owner.email ? '<div class="wiz-meta">' + escapeHTML(owner.email) + '</div>' : '')
+      + '<div class="form-hint">' + (owner.name ? 'Assigned by the program owner.' : 'Not yet assigned \u2014 you may still continue.') + '</div>';
+  }
 
-  if (body) body.innerHTML = `
-    <div style="max-width:620px;">
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;">${allBadgesHtml}</div>
-      <div style="font-size:20px; font-weight:800; color:var(--navy); margin-bottom:6px;">${escapeHTML(mergedTitle)}</div>
-      <div style="font-size:13px; color:var(--text-muted); margin-bottom:28px;">${dd.purpose ? dd.purpose.slice(0,120) + '\u2026' : 'Domain-specific security policy'}</div>
-      <!-- Policy Owner -->
-      <div style="border:1px solid var(--border); border-radius:12px; padding:20px; margin-bottom:20px; background:white;">
-        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:${owner.name ? '8' : '12'}px;">
-          <div>
-            <div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted); margin-bottom:4px;">Domain policy owner</div>
-            ${isCustodianRole && !owner.name ? `
-              <div style="font-size:12px; color:var(--text-muted); margin-bottom:10px;">No owner assigned yet. Suggest one for the CISO to approve:</div>
-              <div style="display:flex; flex-direction:column; gap:8px;">
-                <input class="form-input" style="font-size:13px; font-weight:600;" placeholder="Suggested owner name" value="${escapeHTML((state._suggestedOwner||{})[fam]||'')}"
-                  oninput="if(!state._suggestedOwner)state._suggestedOwner={};state._suggestedOwner['${fam}']=this.value;; window.markDirty();">
-                <div style="font-size:11px; color:var(--text-muted);">This suggestion will be visible to the CISO on the dashboard.</div>
-              </div>
-            ` : `
-              <div style="font-size:15px; font-weight:700; color:var(--navy);">${escapeHTML(owner.name || '\u2014')}</div>
-              ${owner.role ? `<div style="font-size:13px; color:var(--text-muted);">${escapeHTML(owner.role)}</div>` : ''}
-              ${owner.email ? `<div style="font-size:12px; color:var(--teal); margin-top:4px;">${escapeHTML(owner.email)}</div>` : ''}
-            `}
-          </div>
-          ${owner.name
-            ? `<span class="chip chip-green">\u2713 Assigned by CISO</span>`
-            : `<span class="chip chip-amber">\u26A0 Not Yet Assigned</span>`}
-        </div>
-        ${!isCustodianRole && !owner.name ? `<div style="font-size:12px; color:var(--amber); margin-bottom:4px;">The CISO has not yet assigned a Policy Owner for this domain. You may still proceed.</div>` : ''}
-        ${deadline ? `<div style="font-size:12px; color:var(--text-muted); padding-top:8px; border-top:1px solid var(--border);">\uD83D\uDCC5 Policy due: <strong>${deadline}</strong></div>` : ''}
-      </div>
+  var returnBlock = !isCustodianRole
+    ? '<p class="wiz-quiet-action">Not the owner of this policy? '
+      + '<button type="button" class="wiz-text-btn" onclick="returnPolicyToCISO(\'' + escFam + '\')">Return to '
+      + escapeHTML(state.programOwnerTitle || 'Program Owner') + ' for reassignment</button></p>'
+    : '';
 
-      <!-- Policy Custodian -->
-      <div style="border:1px solid ${isCustodianRole ? 'rgba(13,148,136,0.3)' : 'var(--border)'}; border-radius:12px; padding:20px; margin-bottom:20px; background:${isCustodianRole ? 'rgba(13,148,136,0.02)' : 'white'};">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-          <div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted);">Policy Custodian ${isCustodianRole ? '' : '<span style="font-size:11px; font-weight:400;">(optional)</span>'}</div>
-          ${isCustodianRole && custodian.name ? `<span class="chip chip-green" style="font-size:10px;">\u2713 You</span>` : ''}
-        </div>
-        <div style="font-size:12px; color:var(--text-muted); margin-bottom:14px;">${isCustodianRole ? 'You are the custodian for this policy. Verify your details are correct.' : 'Manages day-to-day maintenance, annual reviews, and exception tracking.'}</div>
-        <div style="display:flex; flex-direction:column; gap:8px;">
-          <input class="form-input" id="custodianInput" style="font-size:13px; font-weight:600;" placeholder="Full name — e.g. Jane Smith" value="${escapeHTML(custodian.name||'')}" oninput="setPolicyCustodian('${fam}', 'name', this.value)">
-          <input class="form-input" style="font-size:12px;" placeholder="Title / Role — e.g. GRC Analyst" value="${escapeHTML(custodian.role||'')}" oninput="setPolicyCustodian('${fam}', 'role', this.value)">
-          <input class="form-input" type="email" style="font-size:12px;" placeholder="email@company.com" value="${escapeHTML(custodian.email||'')}" oninput="setPolicyCustodian('${fam}', 'email', this.value)">
-        </div>
-      </div>
-
-      <!-- Policy Review Cycle Tracking (Domain Policy) -->
-      ${renderReviewCycleCard(fam, mergedTitle)}
-
-      <!-- Return to CISO (only for ISSM / owner role, not custodians) -->
-      ${!isCustodianRole ? `
-      <div style="border:1px solid rgba(239,68,68,0.2); border-radius:12px; padding:16px; background:rgba(239,68,68,0.02);">
-        <div style="display:flex; align-items:flex-start; gap:12px;">
-          <div style="font-size:20px; flex-shrink:0; margin-top:2px;">&#x21A9;</div>
-          <div style="flex:1;">
-            <div style="font-size:13px; font-weight:700; color:var(--red); margin-bottom:4px;">Not your policy?</div>
-            <div style="font-size:12px; color:var(--text-muted); margin-bottom:12px; line-height:1.6;">If this domain was assigned to you in error, or you are not the correct Policy Owner, you can return it to the Program Owner for reassignment.</div>
-            <button class="btn btn-sm" style="background:white; border:1px solid rgba(239,68,68,0.4); color:var(--red); font-weight:600;"
-              onclick="returnPolicyToCISO('${fam}')">&#x21A9; Return to ${escapeHTML(state.programOwnerTitle||'Program Owner')} for Reassignment</button>
-          </div>
-        </div>
-      </div>` : ''}
-    </div>
-  `;
+  if (body) body.innerHTML =
+    '<div class="wiz-page">'
+    + '<div class="section-title">Confirm the owner</div>'
+    + '<div class="section-subtitle">The program owner already assigned this domain. Optionally name a custodian, then set review dates.</div>'
+    + '<div class="wiz-stack">'
+    + '<div class="form-group" style="margin-bottom:0;">'
+    + '<label class="form-label">Domain policy owner</label>'
+    + ownerBlock
+    + '<div class="wiz-meta" style="margin-top:8px;">Status \u00b7 ' + escapeHTML(status)
+    + (deadline ? ' \u00b7 Due ' + escapeHTML(String(deadline)) : '')
+    + '</div>'
+    + '</div>'
+    + '<div class="form-group" style="margin-bottom:0;">'
+    + '<label class="form-label">Policy custodian <span style="font-weight:400;color:var(--ink-5);">(optional)</span></label>'
+    + '<div class="form-hint">' + (isCustodianRole
+      ? 'You are the custodian for this policy. Verify your details are correct.'
+      : 'Day-to-day maintenance, annual reviews, and exception tracking.') + '</div>'
+    + '<input class="form-input" id="custodianInput" placeholder="Full name \u2014 e.g. Jane Smith" value="' + escapeHTML(custodian.name||'') + '" oninput="setPolicyCustodian(\'' + escFam + '\', \'name\', this.value)">'
+    + '<input class="form-input" placeholder="Title / Role \u2014 e.g. GRC Analyst" value="' + escapeHTML(custodian.role||'') + '" oninput="setPolicyCustodian(\'' + escFam + '\', \'role\', this.value)">'
+    + '<input class="form-input" type="email" placeholder="email@company.com" value="' + escapeHTML(custodian.email||'') + '" oninput="setPolicyCustodian(\'' + escFam + '\', \'email\', this.value)">'
+    + '</div>'
+    + renderReviewCycleCard(fam, mergedTitle, { compact: true })
+    + returnBlock
+    + '</div></div>';
 }
 
 // Returns true if the current user should have read-only access to the policy view
@@ -2211,7 +2164,6 @@ function sanitizeDomainPolicySelection(fam) {
 }
 
 function renderPolicyStep2() {
-  const helpEl = document.getElementById('policy-step-2-help');
   const body = document.getElementById('policy-step-2-body');
   if (!state.baseline) {
     if (body) body.innerHTML = '<div class="empty-state"><div class="es-icon">\uD83C\uDFDB\uFE0F</div><div class="es-title">CISO Setup Required</div><p>The CISO must complete program setup first, including CSF structure and owner assignments.</p></div>';
@@ -2254,48 +2206,37 @@ function renderPolicyStep2() {
   const footerCount = document.getElementById('policy-step-2-count');
   if (footerCount) footerCount.textContent = selected.length + ' selected (' + baselineControls.length + ' in the common-control floor)';
 
-  if (helpEl) helpEl.innerHTML = `
-    <div style="margin-bottom:16px;">
-      <div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted); margin-bottom:8px;">Step 2 of 4</div>
-      <div style="font-size:15px; font-weight:700; color:var(--navy);">Control Selection</div>
-    </div>
-    <div style="background:rgba(59,130,246,0.08); border:1px solid rgba(59,130,246,0.25); border-radius:8px; padding:12px; margin-bottom:16px;">
-      <div style="font-size:12px; font-weight:700; color:#2563eb; margin-bottom:6px;">\u2139\uFE0F About this step</div>
-      <div style="font-size:12px; color:#1d4ed8; line-height:1.6;">Controls in the inherited common-control floor are pre-selected. Deselect any that don't apply. You can add Moderate or High catalog controls when a system's risk profile needs them \u2014 Low / Moderate / High is chosen per system, not for the organization. <strong>Policy and Procedures (XX-1) controls are covered by your organization-wide Information Security Policy and are not listed here.</strong></div>
-    </div>
-    <div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted); margin-bottom:8px;">Quick Select</div>
-    <button class="btn btn-secondary btn-sm" style="width:100%; margin-bottom:6px;" onclick="selectAllDomainControls('${fam}','baseline')">\u21A9 Reset to common-control floor</button>
-    <button class="btn btn-secondary btn-sm" style="width:100%; margin-bottom:6px;" onclick="selectAllDomainControls('${fam}','none')">\u2610 Clear All</button>
-    <button class="btn btn-secondary btn-sm" style="width:100%; margin-bottom:6px;" onclick="addControlsFromOtherFamilies('${fam}')">+ Add control(s) from other families</button>
-    <div style="border-top:1px solid var(--border); padding-top:12px;">
-      <div style="font-size:13px; font-weight:700; color:var(--navy);" id="policy-step-2-count-side">${selected.length} <span style="font-weight:400; font-size:12px; color:var(--text-muted);">selected</span></div>
-      <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">${baselineControls.length} in the ${state.baseline==='L'?'Low':state.baseline==='M'?'Moderate':'High'} common-control floor</div>
-    </div>
-  `;
-
-  const allBadgesHtml2 = allFams.map(function(f){
-    return '<span class="family-badge" style="font-size:11px;padding:2px 6px;">' + f + '</span>';
-  }).join(' ');
+  const floorName = state.baseline==='L'?'Low':state.baseline==='M'?'Moderate':'High';
+  const extraCount = allFamControls.length - baselineControls.length;
+  const escFam = String(fam).replace(/'/g, "\\'");
   var policyFnHtml = (typeof renderCsfPolicyOrientationHtml === 'function')
-    ? renderCsfPolicyOrientationHtml(fam)
+    ? renderCsfPolicyOrientationHtml(fam, {
+        compact: true,
+        lead: 'CSF 2.0 outcomes this Function will cover. Checking an outcome does not auto-select 800-53 controls \u2014 pick those in the list below. Policy and Procedures (XX-1) live in the ISP.'
+      })
     : '';
-  if (body) body.innerHTML = `
-    <div style="margin-bottom:12px;">
-      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:4px;">${allBadgesHtml2}</div>
-      <div style="font-size:16px; font-weight:700; color:var(--navy);">${escapeHTML(mergedTitle)} — Controls</div>
-      <div style="font-size:13px; color:var(--text-muted);">${baselineControls.length} in the ${state.baseline==='L'?'Low':state.baseline==='M'?'Moderate':'High'} common-control floor${state.privacyOverlay?' + Privacy':''}. ${allFamControls.length - baselineControls.length > 0 ? (allFamControls.length - baselineControls.length) + ' additional controls available.' : ''} Low / Moderate / High for a system is chosen under FIPS 199 in Assets &amp; SSP. Select CSF outcomes in the list below; CSF tags on controls are official map entries only \u2014 unmapped means this program has no 800-53 \u2192 subcategory token.</div>
-    </div>
-    ${policyFnHtml}
-    <div class="filter-bar" style="margin-bottom:12px;">
-      <input type="text" id="ctrlFilter1" placeholder="Search controls\u2026" style="flex:1;" oninput="filterDomainControls()">
-      <select id="ctrlBaselineFilter" onchange="filterDomainControls()">
-        <option value="all" selected>All Controls</option>
-        <option value="required">In common-control floor</option>
-        <option value="optional">Optional / Enhanced</option>
-      </select>
-    </div>
-    <div class="table-scroll">
-      <table class="control-table" id="domainCtrlTable">
+  if (body) body.innerHTML =
+    '<div class="wiz-page wiz-page--wide">'
+    + '<div class="section-title">Choose outcomes, then controls</div>'
+    + '<div class="section-subtitle">' + baselineControls.length + ' in the ' + floorName + ' common-control floor'
+    + (state.privacyOverlay ? ' + Privacy' : '')
+    + (extraCount > 0 ? '. ' + extraCount + ' additional catalog controls available' : '')
+    + '. Low / Moderate / High for a system is chosen under FIPS 199 in Assets &amp; SSP. CSF tags on 800-53 rows are official map entries only.</div>'
+    + policyFnHtml
+    + '<div class="wiz-kicker">NIST SP 800-53 controls in this policy</div>'
+    + '<div class="filter-bar" style="margin-bottom:12px;">'
+    + '<input type="text" id="ctrlFilter1" placeholder="Search controls\u2026" style="flex:1;" oninput="filterDomainControls()">'
+    + '<select id="ctrlBaselineFilter" onchange="filterDomainControls()">'
+    + '<option value="all" selected>All Controls</option>'
+    + '<option value="required">In common-control floor</option>'
+    + '<option value="optional">Optional / Enhanced</option>'
+    + '</select>'
+    + '<button type="button" class="btn btn-secondary btn-sm" onclick="selectAllDomainControls(\'' + escFam + '\',\'baseline\')">Reset to floor</button>'
+    + '<button type="button" class="btn btn-secondary btn-sm" onclick="selectAllDomainControls(\'' + escFam + '\',\'none\')">Clear</button>'
+    + '<button type="button" class="btn btn-secondary btn-sm" onclick="addControlsFromOtherFamilies(\'' + escFam + '\')">Add from other families</button>'
+    + '</div>'
+    + '<div class="table-scroll">'
+    + `<table class="control-table" id="domainCtrlTable">
         <thead>
           <tr>
             <th style="width:44px;"><input type="checkbox" id="selectAllCb" style="accent-color:var(--teal);"
@@ -2359,7 +2300,7 @@ function renderPolicyStep2() {
         }).join('')}
       </div>
     </div>` : ''}
-  `;
+    ` + '</div>';
   setTimeout(filterDomainControls, 0);
 }
 
@@ -2483,7 +2424,7 @@ function filterDomainControls() {
   document.querySelectorAll('#domainCtrlTable tbody tr').forEach(function(row){
     const id       = (row.dataset.id||'').toLowerCase();
     const required = row.dataset.required||'required';
-    const name     = row.cells[2]?.textContent.toLowerCase()||'';
+    const name     = (row.textContent||'').toLowerCase();
     const matchQ   = !q || id.includes(q) || name.includes(q);
     const matchBL  = blf==='all' || blf===required;
     const visible  = matchQ && matchBL;
@@ -3717,69 +3658,35 @@ function renderPolicyStep3() {
   }).join('');
 
   body.innerHTML =
-    '<div style="display:flex;gap:0;height:100%;">' +
-
-    // ── LEFT PANEL ─────────────────────────────────────────────
-    '<div style="width:196px;flex-shrink:0;border-right:1px solid var(--border);padding:20px 14px;background:#fafbfc;display:flex;flex-direction:column;gap:12px;overflow-y:auto;">' +
-      '<div>' +
-        '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:8px;">Domain</div>' +
-        '<span class="family-badge" style="font-size:13px;">'+fam+'</span>' +
-        '<div style="font-size:13px;font-weight:600;margin-top:6px;">'+(FAMILIES[fam]||fam)+'</div>' +
+    '<div class="wiz-page wiz-page--wide">' +
+      '<input class="wiz-doc-title" value="'+escapeHTML(dp.title)+'" oninput="state.domainPolicies[\''+fam+'\'].title=this.value; window.markDirty();" placeholder="Policy Title">' +
+      '<div class="wiz-doc-meta">' +
+        '<div class="form-group">' +
+          '<label class="form-label">Version</label>' +
+          '<input class="form-input" value="'+escapeHTML(dp.version)+'" oninput="state.domainPolicies[\''+fam+'\'].version=this.value; window.markDirty();">' +
+        '</div>' +
+        '<div class="form-group">' +
+          '<label class="form-label">Effective date</label>' +
+          '<input class="form-input" type="date" value="'+escapeHTML(dp.effectiveDate||'')+'" oninput="state.domainPolicies[\''+fam+'\'].effectiveDate=this.value; window.markDirty();">' +
+        '</div>' +
+        '<div class="form-group">' +
+          '<label class="form-label">Review cycle</label>' +
+          '<select class="form-select" onchange="state.domainPolicies[\''+fam+'\'].reviewCycle=this.value">' +
+            '<option'+(dp.reviewCycle==='Annual'?' selected':'')+'>Annual</option>' +
+            '<option'+(dp.reviewCycle==='Semi-Annual'?' selected':'')+'>Semi-Annual</option>' +
+            '<option'+(dp.reviewCycle==='Quarterly'?' selected':'')+'>Quarterly</option>' +
+          '</select>' +
+        '</div>' +
+        '<div class="wiz-meta" style="padding-bottom:6px;">'+selected.length+' control'+(selected.length!==1?'s':'')+' in this policy</div>' +
       '</div>' +
-      '<div style="border-top:1px solid var(--border);padding-top:12px;">' +
-        '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:8px;">Controls in Policy</div>' +
-        '<div style="font-size:22px;font-weight:800;color:var(--navy);">'+selected.length+'</div>' +
-        '<div style="font-size:11px;color:var(--text-muted);">selected controls</div>' +
-        '<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px;max-height:120px;overflow-y:auto;">' +
-          selected.map(function(cid){ return '<span style="font-family:monospace;font-size:10px;font-weight:700;background:rgba(13,148,136,0.1);color:var(--teal);padding:2px 5px;border-radius:3px;">'+cid+'</span>'; }).join('') +
+      '<div class="wiz-doc-toolbar">' +
+        '<button type="button" class="btn btn-secondary btn-sm" onclick="addDomainCustomSection(\''+fam+'\')">+ Add Custom Section</button>' +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
+          '<button type="button" class="btn btn-secondary btn-sm" onclick="exportDomainPolicyPDF(\''+fam+'\')">Export PDF</button>' +
+          '<button type="button" class="btn btn-secondary btn-sm" onclick="exportDomainPolicyWord(\''+fam+'\')">Export Word</button>' +
         '</div>' +
       '</div>' +
-      '<div style="border-top:1px solid var(--border);padding-top:12px;">' +
-        '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:6px;">Version</div>' +
-        '<input class="form-input" style="font-size:13px;" value="'+escapeHTML(dp.version)+'" oninput="state.domainPolicies[\''+fam+'\'].version=this.value; window.markDirty();">' +
-      '</div>' +
-      '<div>' +
-        '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:6px;">Effective Date</div>' +
-        '<input class="form-input" type="date" style="font-size:12px;" value="'+dp.effectiveDate+'" oninput="state.domainPolicies[\''+fam+'\'].effectiveDate=this.value; window.markDirty();">' +
-      '</div>' +
-      '<div>' +
-        '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:6px;">Review Cycle</div>' +
-        '<select class="form-select" style="font-size:12px;" onchange="state.domainPolicies[\''+fam+'\'].reviewCycle=this.value">' +
-          '<option'+(dp.reviewCycle==='Annual'?' selected':'')+'>Annual</option>' +
-          '<option'+(dp.reviewCycle==='Semi-Annual'?' selected':'')+'>Semi-Annual</option>' +
-          '<option'+(dp.reviewCycle==='Quarterly'?' selected':'')+'>Quarterly</option>' +
-        '</select>' +
-      '</div>' +
-      '<div style="border-top:1px solid var(--border);padding-top:12px;margin-top:auto;">' +
-        '<div style="font-size:11px;color:var(--text-muted);line-height:1.5;">ℹ️ Domain policy for '+selected.length+' selected control'+(selected.length!==1?'s':'')+'. Governs implementation within the '+fam+' family.</div>' +
-      '</div>' +
-    '</div>' +
-
-    // ── RIGHT: POLICY DOCUMENT ──────────────────────────────────
-    '<div style="flex:1;overflow-y:auto;padding:24px 28px;">' +
-
-      // Title bar
-      '<div style="margin-bottom:20px;">' +
-        '<input style="font-size:22px;font-weight:800;color:var(--navy);border:none;border-bottom:2px solid var(--border);width:100%;padding:4px 0;background:transparent;outline:none;" value="'+escapeHTML(dp.title)+'" oninput="state.domainPolicies[\''+fam+'\'].title=this.value; window.markDirty();" placeholder="Policy Title">' +
-        '<div style="display:flex;gap:12px;margin-top:8px;align-items:center;">' +
-          '<span class="chip chip-blue">Draft</span>' +
-          '<span style="font-size:12px;color:var(--text-muted);">v'+escapeHTML(dp.version)+' · Effective '+dp.effectiveDate+' · '+dp.reviewCycle+' review</span>' +
-        '</div>' +
-      '</div>' +
-
-      // Toolbar
-      '<div style="display:flex;gap:10px;margin-bottom:20px;justify-content:space-between;align-items:center;">' +
-        '<button class="btn btn-secondary btn-sm" onclick="addDomainCustomSection(\''+fam+'\')" style="display:flex;align-items:center;gap:5px;">+ Add Custom Section</button>' +
-        '<div style="display:flex;gap:8px;">' +
-          '<button class="btn btn-secondary btn-sm" onclick="exportDomainPolicyPDF(\''+fam+'\')" style="display:flex;align-items:center;gap:5px;">📄 Export PDF</button>' +
-          '<button class="btn btn-secondary btn-sm" onclick="exportDomainPolicyWord(\''+fam+'\')" style="display:flex;align-items:center;gap:5px;">📝 Export Word</button>' +
-        '</div>' +
-      '</div>' +
-
-      // Sections
       '<div id="dp-sections-container-'+fam+'">' + sectionsHTML + '</div>' +
-
-    '</div>' +
     '</div>';
   autoExpandTextareas(body);
 }
@@ -4011,74 +3918,50 @@ function renderPolicyStep4() {
   const assignedCount = selected.filter(function(cid) { return isControlOwnerInviteReady((state.controlOwners || {})[cid]); }).length;
 
   body.innerHTML = `
-    <div style="display:flex; gap:0; height:100%;">
-
-      <!-- LEFT PANEL -->
-      <div style="width:200px; flex-shrink:0; border-right:1px solid var(--border); padding:20px 16px; background:#fafbfc; display:flex; flex-direction:column; gap:12px;">
-        <div>
-          <div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted); margin-bottom:6px;">Assignment Progress</div>
-          <div style="font-size:22px; font-weight:800; color:var(--navy);">${assignedCount}<span style="font-size:13px; font-weight:400; color:var(--text-muted);"> / ${selected.length}</span></div>
-          <div class="progress-bar-wrap" style="margin-top:6px;"><div class="progress-bar-fill" style="width:${selected.length?Math.round(assignedCount/selected.length*100):0}%"></div></div>
+    <div class="wiz-page wiz-page--wide">
+      <div class="section-title">Assign control owners</div>
+      <div class="section-subtitle"><span id="policy-step-4-ready-count">${assignedCount} of ${selected.length} ready for sign-up</span>. ${selected.length} controls in this policy. Each owner needs a work email so they can claim their controls.</div>
+      <div class="wiz-batch">
+        ${(()=>{
+          const people = [];
+          (state.users||[]).forEach(function(u) {
+            if (!u.name) return;
+            const m = ROLE_META[u.role] || {};
+            if (!people.find(function(p){ return p.name===u.name; }))
+              people.push({ name: u.name, role: m.label||u.role||'', email: u.email||'' });
+          });
+          const dOwner = state.domainOwners[fam];
+          if (dOwner && dOwner.name && !people.find(function(p){ return p.name===dOwner.name; }))
+            people.push({ name: dOwner.name, role: dOwner.role||'', email: dOwner.email||'' });
+          window._s4People = people;
+          if (!people.length) return '';
+          const opts = people.map(function(p,i){ return '<option value="' + i + '">' + escapeHTML(p.name) + (p.role?' \u2014 '+escapeHTML(p.role):'') + '</option>'; }).join('');
+          return '<div class="form-group">'
+            + '<label class="form-label">Quick-fill from</label>'
+            + '<select class="form-select" onchange="step4QuickFill(this.value);this.value=\'\'"><option value="">\u2014 pick a person\u2026</option>' + opts + '</select>'
+            + '</div>';
+        })()}
+        <div class="form-group">
+          <label class="form-label">Name</label>
+          <input class="form-input" id="batchOwnerName" placeholder="Owner name\u2026">
         </div>
-
-        <div style="border-top:1px solid var(--border); padding-top:12px;">
-          <div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted); margin-bottom:8px;">Batch Assign</div>
-
-          <!-- Quick-fill from known people (stored in window._s4People to avoid JSON-in-attribute bug) -->
-          ${(()=>{
-            const people = [];
-            // Users from state.users (control-owner and issm roles)
-            (state.users||[]).forEach(function(u) {
-              if (!u.name) return;
-              const m = ROLE_META[u.role] || {};
-              if (!people.find(function(p){ return p.name===u.name; }))
-                people.push({ name: u.name, role: m.label||u.role||'', email: u.email||'' });
-            });
-            // Domain owner if not already included
-            const dOwner = state.domainOwners[fam];
-            if (dOwner && dOwner.name && !people.find(function(p){ return p.name===dOwner.name; }))
-              people.push({ name: dOwner.name, role: dOwner.role||'', email: dOwner.email||'' });
-            window._s4People = people;
-            if (!people.length) return '';
-            const opts = people.map(function(p,i){ return '<option value="' + i + '">' + escapeHTML(p.name) + (p.role?' — '+escapeHTML(p.role):'') + '</option>'; }).join('');
-            return '<div class="form-group" style="margin-bottom:8px;">'
-              + '<label class="form-label" style="font-size:11px;">Quick-fill from</label>'
-              + '<select class="form-select" style="font-size:11px;" onchange="step4QuickFill(this.value);this.value=\'\'"><option value="">— pick a person…</option>' + opts + '</select>'
-              + '</div>';
-          })()}
-
-          <div class="form-group" style="margin-bottom:8px;">
-            <label class="form-label" style="font-size:11px;">Name</label>
-            <input class="form-input" id="batchOwnerName" style="font-size:12px;" placeholder="Owner name…">
-          </div>
-          <div class="form-group" style="margin-bottom:8px;">
-            <label class="form-label" style="font-size:11px;">Role / Title</label>
-            <input class="form-input" id="batchOwnerRole" style="font-size:12px;" placeholder="e.g. IT Security Manager">
-          </div>
-          <div class="form-group" style="margin-bottom:8px;">
-            <label class="form-label" style="font-size:11px;">Email <span class="required">*</span></label>
-            <input class="form-input" id="batchOwnerEmail" type="email" style="font-size:12px;" placeholder="email@org.com" autocomplete="email">
-          </div>
-          <button class="btn btn-primary btn-sm" style="width:100%; margin-bottom:6px;" onclick="batchAssignControlOwners('${fam}', false)">Apply to Unassigned</button>
-          <button class="btn btn-secondary btn-sm" style="width:100%; margin-bottom:6px;" onclick="batchAssignControlOwners('${fam}', true)">Overwrite All</button>
-          <button class="btn btn-secondary btn-sm" style="width:100%; margin-bottom:6px;" onclick="clearDomainControlOwners('${fam}')">Clear all assignments</button>
-          <button type="button" class="btn btn-secondary btn-sm" style="width:100%;" onclick="openBulkAssignControlModal('${fam}')">Bulk assign (picker)…</button>
+        <div class="form-group">
+          <label class="form-label">Role / Title</label>
+          <input class="form-input" id="batchOwnerRole" placeholder="e.g. IT Security Manager">
         </div>
-
-        <div style="margin-top:auto; border-top:1px solid var(--border); padding-top:12px;">
-          <div style="font-size:11px; color:var(--text-muted); line-height:1.5;">Each control owner needs a <strong>work email</strong> so they can sign up, claim their controls, and begin implementation in the Control Owner workspace.</div>
+        <div class="form-group">
+          <label class="form-label">Email <span class="required">*</span></label>
+          <input class="form-input" id="batchOwnerEmail" type="email" placeholder="email@org.com" autocomplete="email">
+        </div>
+        <div class="wiz-batch-actions">
+          <button type="button" class="btn btn-primary btn-sm" onclick="batchAssignControlOwners('${fam}', false)">Apply to unassigned</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="batchAssignControlOwners('${fam}', true)">Overwrite all</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="clearDomainControlOwners('${fam}')">Clear</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="openBulkAssignControlModal('${fam}')">Bulk assign\u2026</button>
         </div>
       </div>
 
-      <!-- RIGHT: CONTROL OWNER TABLE -->
-      <div style="flex:1; overflow-y:auto; padding:20px 24px;">
-        <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:4px;">
-          <div class="section-title" style="font-size:16px; margin-bottom:0;">Assign Control Owners</div>
-          <div style="font-size:12px; color:var(--text-muted);">${assignedCount} of ${selected.length} ready for sign-up</div>
-        </div>
-        <div class="section-subtitle" style="margin-bottom:16px;">${selected.length} controls in scope for <strong>${FAMILIES[fam]||fam}</strong>. Assign a name and <strong>work email</strong> for each owner so they can sign up and design their controls.</div>
-
-        <table class="control-table" style="width:100%; table-layout:fixed;">
+      <table class="control-table" style="width:100%; table-layout:fixed;">
           <colgroup>
             <col style="width:90px;">
             <col style="width:auto;">
@@ -4095,7 +3978,7 @@ function renderPolicyStep4() {
           ${(()=>{
             const cardUsers = (state.users||[]).filter(function(u){ return u.name; });
             const cardDOwner = state.domainOwners[fam];
-            if (cardDOwner && getOwnerDisplayName(cardDOwner) !== '—' && !cardUsers.find(function(u){ return u.name===cardDOwner.name; }))
+            if (cardDOwner && getOwnerDisplayName(cardDOwner) !== '\u2014' && !cardUsers.find(function(u){ return u.name===cardDOwner.name; }))
               cardUsers.unshift({ id:'_downer', name: cardDOwner.name, role: cardDOwner.role||'', email: cardDOwner.email||'' });
             window._s4People = cardUsers.map(function(u){ const m=ROLE_META[u.role]||{}; return { name:u.name, role:m.label||u.role||'', email:u.email||'' }; });
             return selected.map(function(cid) {
@@ -4105,12 +3988,11 @@ function renderPolicyStep4() {
               const inviteReady = isControlOwnerInviteReady(co);
               const assignStatus = getControlOwnerAssignStatus(co);
               const cidSafe = cid.replace(/[()]/g,'_');
-              // Find index of currently assigned person in roster
-              const assignedIdx = ownerName !== '—' ? cardUsers.findIndex(function(u){ return u.name===co.name; }) : -1;
-              const customSel = assignedIdx < 0 && ownerName !== '—' ? ' selected' : '';
-              const selectOpts = '<option value="">— assign owner…</option>'
-                + cardUsers.map(function(u,i){ return '<option value="' + i + '"' + (i===assignedIdx?' selected':'') + '>' + escapeHTML(u.name) + (u.role?' — '+escapeHTML((ROLE_META[u.role]||{}).label||u.role):'') + '</option>'; }).join('')
-                + '<option value="__custom__"' + customSel + '>+ Type a different name…</option>';
+              const assignedIdx = ownerName !== '\u2014' ? cardUsers.findIndex(function(u){ return u.name===co.name; }) : -1;
+              const customSel = assignedIdx < 0 && ownerName !== '\u2014' ? ' selected' : '';
+              const selectOpts = '<option value="">\u2014 assign owner\u2026</option>'
+                + cardUsers.map(function(u,i){ return '<option value="' + i + '"' + (i===assignedIdx?' selected':'') + '>' + escapeHTML(u.name) + (u.role?' \u2014 '+escapeHTML((ROLE_META[u.role]||{}).label||u.role):'') + '</option>'; }).join('')
+                + '<option value="__custom__"' + customSel + '>+ Type a different name\u2026</option>';
               var statusHtml = '<div class="co-assign-status" style="font-size:10px;color:' + assignStatus.color + ';margin-top:4px;">' + escapeHTML(assignStatus.text) + '</div>';
               return '<tr id="cocard-' + cidSafe + '" style="background:' + (inviteReady?'rgba(13,148,136,0.02)':'') + ';">'
                 + '<td><span class="control-id" style="font-size:12px;">' + cid + '</span></td>'
@@ -4120,7 +4002,7 @@ function renderPolicyStep4() {
                 + (cardUsers.length
                   ? '<select class="form-select" style="font-size:12px;margin-bottom:4px;" onchange="step4CardFill(\'' + cid + '\',this.value)">' + selectOpts + '</select>'
                   : '')
-                + '<input class="form-input co-name" data-cid="' + cid + '" style="font-size:12px;width:100%;box-sizing:border-box;margin-bottom:4px;" placeholder="Full name" value="' + escapeHTML(ownerName !== '—' ? (co.name || '') : '') + '" oninput="setCtrlOwner(\'' + cid + '\',\'name\',this.value);step4RosterSync(\'' + cid + '\');_coCardUpdate(\'' + cid + '\');">'
+                + '<input class="form-input co-name" data-cid="' + cid + '" style="font-size:12px;width:100%;box-sizing:border-box;margin-bottom:4px;" placeholder="Full name" value="' + escapeHTML(ownerName !== '\u2014' ? (co.name || '') : '') + '" oninput="setCtrlOwner(\'' + cid + '\',\'name\',this.value);step4RosterSync(\'' + cid + '\');_coCardUpdate(\'' + cid + '\');">'
                 + '<input class="form-input co-email" data-cid="' + cid + '" type="email" autocomplete="email" style="font-size:12px;width:100%;box-sizing:border-box;" placeholder="work email@org.com (required)" value="' + escapeHTML(co.email || '') + '" oninput="setCtrlOwner(\'' + cid + '\',\'email\',this.value);_coCardUpdate(\'' + cid + '\');">'
                 + statusHtml
                 + '</td>'
@@ -4129,7 +4011,6 @@ function renderPolicyStep4() {
           })()}
           </tbody>
         </table>
-      </div>
     </div>
   `;
   setTimeout(function() { updateDomainPolicySubmitButton(fam); }, 0);
@@ -4241,15 +4122,8 @@ function step4RefreshAssignmentProgress() {
   const assignedCount = selected.filter(function(c) {
     return isControlOwnerInviteReady((state.controlOwners || {})[c]);
   }).length;
-  const pct = selected.length ? Math.round(assignedCount / selected.length * 100) : 0;
-  const bar = document.querySelector('#policy-step-4-body .progress-bar-fill');
-  if (bar) bar.style.width = pct + '%';
-  const countEl = document.querySelector('#policy-step-4-body .section-title')?.parentElement?.querySelector('div[style*="font-size:12px"]');
+  const countEl = document.getElementById('policy-step-4-ready-count');
   if (countEl) countEl.textContent = assignedCount + ' of ' + selected.length + ' ready for sign-up';
-  const leftCount = document.querySelector('#policy-step-4-body div[style*="font-size:22px"]');
-  if (leftCount) {
-    leftCount.innerHTML = assignedCount + '<span style="font-size:13px; font-weight:400; color:var(--text-muted);"> / ' + selected.length + '</span>';
-  }
 }
 
 function setCtrlOwner(ctrlId, field, value) {
