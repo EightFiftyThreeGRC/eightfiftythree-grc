@@ -1729,7 +1729,9 @@ function renderCISOStep2() {
     </tr>`;
   };
 
-  var governHtml = (typeof renderCsfGovernOrientationHtml === 'function') ? renderCsfGovernOrientationHtml() : '';
+  var governHtml = (typeof renderCsfGovernOrientationHtml === 'function')
+    ? renderCsfGovernOrientationHtml({ showMappedPm: true })
+    : '';
 
   body.innerHTML = `
     ${cisoStepProgressHtml(5, 'PM Controls')}
@@ -2082,8 +2084,8 @@ function renderISPEditorBody(body, opts) {
     return `<div class="isp-section" data-section-idx="${si}" ${dragAttr} style="margin-bottom:28px;padding:4px;border-radius:6px;transition:background 0.15s;">${hdr}${content}</div>`;
   }).join('');
 
-  var ispGovernHtml = (typeof renderCsfGovernOrientationHtml === 'function')
-    ? renderCsfGovernOrientationHtml({ showMappedPm: true })
+  var ispGovernHtml = (!isRevision && typeof renderCsfGovernIspReminderHtml === 'function')
+    ? renderCsfGovernIspReminderHtml()
     : '';
   body.innerHTML = (isRevision ? buildISPRevisionBannerHtml() : '')
     + (isRevision ? '' : ('<div class="section-title">' + escapeHTML((isp.title || '').trim() || getDefaultISPTitle()) + '</div>'

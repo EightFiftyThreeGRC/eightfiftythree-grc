@@ -535,10 +535,6 @@ function refreshCsfSelectionUi() {
     renderCISOStep2();
     return;
   }
-  if (cisoOn && step.ciso === 6 && typeof renderCISOStep3 === 'function') {
-    renderCISOStep3();
-    return;
-  }
   if (policyOn && state && state._ispRevisionView && typeof renderCISOStep3 === 'function') {
     renderCISOStep3();
     return;
@@ -570,7 +566,7 @@ function renderCsfFunctionOrientationHtml(fnId, opts) {
   if (!meta) return '';
   ensureCsfSubcatsSeeded(fn);
   var compact = !!opts.compact;
-  var showMappedPm = fn === 'GV' && opts.showMappedPm !== false;
+  var showMappedPm = fn === 'GV' && !!opts.showMappedPm;
   var cats = getCsfCategoriesForFunction(fn);
   var allIds = getCsfSubcategoryIdsForFunction(fn);
   var selectedCount = allIds.filter(function(id) { return isCsfSubcatSelected(id); }).length;
@@ -610,7 +606,7 @@ function renderCsfFunctionOrientationHtml(fnId, opts) {
         mappedHtml = '<td class="csf-sub-maps">'
           + (pms.length
             ? pms.map(function(id) {
-                return '<span class="csf-tag csf-fn-gv">' + escapeHTML(id) + '</span>';
+                return '<span class="csf-tag csf-fn-gv csf-map-chip" title="Official 800-53 map (read-only)">' + escapeHTML(id) + '</span>';
               }).join('')
             : '<span class="csf-sub-maps-empty">\u2014</span>')
           + '</td>';
@@ -646,6 +642,18 @@ function renderCsfFunctionOrientationHtml(fnId, opts) {
 
 function renderCsfGovernOrientationHtml(opts) {
   return renderCsfFunctionOrientationHtml('GV', opts);
+}
+
+/** Compact Step 6 breadcrumb \u2014 counts only, no selection UI and no MAPS TO. */
+function renderCsfGovernIspReminderHtml() {
+  if (typeof escapeHTML !== 'function') return '';
+  ensureCsfSubcatsSeeded('GV');
+  var allIds = getCsfSubcategoryIdsForFunction('GV');
+  var selectedCount = allIds.filter(function(id) { return isCsfSubcatSelected(id); }).length;
+  return '<p class="csf-isp-crumb" role="note">'
+    + 'Govern outcomes: ' + selectedCount + ' of ' + allIds.length + ' selected \u2014 '
+    + '<button type="button" class="csf-isp-crumb-link" onclick="goToStep(\'ciso\', 5)">change on PM Controls</button>'
+    + '</p>';
 }
 
 function renderCsfPolicyOrientationHtml(fam, opts) {

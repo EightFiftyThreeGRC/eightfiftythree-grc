@@ -3750,7 +3750,6 @@ function renderPolicyStep3() {
 
     // ── RIGHT: POLICY DOCUMENT ──────────────────────────────────
     '<div style="flex:1;overflow-y:auto;padding:24px 28px;">' +
-      ((typeof renderCsfPolicyOrientationHtml === 'function') ? renderCsfPolicyOrientationHtml(fam, { compact: true }) : '') +
 
       // Title bar
       '<div style="margin-bottom:20px;">' +
