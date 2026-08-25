@@ -1607,6 +1607,7 @@ function enterAssetSSP(assetId) {
   }
   renderAssetWizardChrome();
   renderAssetSSPStep1();
+  if (typeof applySetupFocusMode === 'function') applySetupFocusMode();
 }
 
 function enterProcessSSP(procId) {
@@ -1625,6 +1626,7 @@ function enterProcessSSP(procId) {
   }
   renderAssetWizardChrome();
   renderProcessSSPStep1();
+  if (typeof applySetupFocusMode === 'function') applySetupFocusMode();
 }
 
 function exitAssetWizard() {
@@ -1635,6 +1637,7 @@ function exitAssetWizard() {
   state._selectedProcessId = null;
   currentStep.asset = 1;
   renderAssetTab();
+  if (typeof applySetupFocusMode === 'function') applySetupFocusMode();
 }
 
 /** After read-only SSP package view: return to Reports queue or Asset Library catalog. */
@@ -1666,6 +1669,8 @@ function _applySspReadOnlyLayout() {
   if (!tab) return;
   var nav = tab.querySelector('.wizard-container > .step-nav');
   if (nav) nav.style.display = 'none';
+  var progress = document.getElementById('asset-setup-progress');
+  if (progress) progress.style.display = 'none';
   for (var i = 2; i <= 4; i++) {
     var st = document.getElementById('asset-step-' + i);
     if (st) {
@@ -1687,6 +1692,8 @@ function _restoreAssetWizardLayoutAfterReadOnly() {
   if (!tab) return;
   var nav = tab.querySelector('.wizard-container > .step-nav');
   if (nav) nav.style.removeProperty('display');
+  var progress = document.getElementById('asset-setup-progress');
+  if (progress) progress.style.removeProperty('display');
   for (var i = 1; i <= 4; i++) {
     var st = document.getElementById('asset-step-' + i);
     if (st) st.style.removeProperty('display');
@@ -2369,57 +2376,27 @@ function renderAssetWizardChrome() {
   var isPrivacy = state.privacyOverlay;
   var sspLabel  = isPrivacy ? 'SPSP' : 'SSP';
   var isProc    = !!state._selectedProcessId;
-  var item, subtitle, step1Label;
+  var item, subtitle;
   if (isProc) {
     item       = (state.processes||[]).find(function(p){ return String(p.id)===String(state._selectedProcessId); });
     if (!item) return;
     var cat    = PROCESS_CATEGORIES.find(function(c){ return c.id === item.category; });
-    subtitle   = (cat ? cat.label : item.category||'Process') + ' · Process SSP';
-    step1Label = 'Process Profile';
+    subtitle   = (cat ? cat.label : item.category||'Process') + ' \u00b7 Process SSP';
   } else {
     item       = (state.assets||[]).find(function(a){ return String(a.id)===String(state._selectedAssetId); });
     if (!item) return;
-    subtitle   = _esc(item.type||'System') + ' · ' + sspLabel;
-    step1Label = 'Asset Profile';
+    subtitle   = _esc(item.type||'System') + ' \u00b7 ' + sspLabel;
   }
 
-  var steps = isProc
-    ? [
-        { n:1, label:step1Label, display:1 },
-        { n:2, label:'Control Attestations', display:2 },
-        { n:4, label:'Review & Sign Off', display:3 }
-      ]
-    : [
-        { n:1, label:step1Label, display:1 },
-        { n:2, label:'Control Attestations', display:2 },
-        { n:3, label:'Interconnections', display:3 },
-        { n:4, label:'Review & Sign Off', display:4 }
-      ];
-
-  var stepsHtml = steps.map(function(s) {
-    var active  = step === s.n;
-    var done    = step > s.n;
-    var circleStyle = active
-      ? 'background:var(--teal);color:white;'
-      : done ? 'background:var(--green);color:white;' : 'background:var(--border);color:var(--text-muted);';
-    return '<div class="step-item' + (active?' active':'') + '" onclick="goToStep(\'asset\',' + s.n + ')" style="cursor:pointer;">'
-      + '<div class="step-circle" style="' + circleStyle + (done?'font-size:12px;':' ') + '">' + (done?'✓':s.display) + '</div>'
-      + '<div class="step-info"><div class="step-num">Step ' + s.display + '</div><div class="step-name">' + s.label + '</div></div>'
-      + '</div>';
-  }).join('<div class="step-connector"></div>');
-
-  chrome.innerHTML = '<div style="display:flex;align-items:center;gap:0;padding:12px 0;">'
-    + '<button onclick="exitAssetWizard()" style="border:none;background:none;color:var(--teal);font-size:13px;font-weight:600;cursor:pointer;padding:6px 0;margin-right:24px;white-space:nowrap;">← All Assets &amp; Processes</button>'
-    + '<div style="margin-right:24px;flex-shrink:0;">'
-    + '<div style="font-size:14px;font-weight:700;color:var(--navy);">' + _esc(item.name) + '</div>'
-    + '<div style="font-size:11px;color:var(--text-muted);">' + subtitle + '</div>'
-    + '</div>'
-    + '<div class="step-nav" style="flex-direction:row;gap:0;padding:0;background:none;border:none;flex:1;">'
-    + stepsHtml
-    + '</div>'
-    + '</div>';
+  chrome.innerHTML = '<div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">'
+    + '<button type="button" class="btn btn-secondary btn-sm" onclick="exitAssetWizard()">\u2190 All Assets &amp; Processes</button>'
+    + '<div>'
+    + '<div style="font-size:15px;font-weight:700;color:var(--navy);">' + _esc(item.name) + '</div>'
+    + '<div style="font-size:12px;color:var(--text-muted);">' + subtitle + '</div>'
+    + '</div></div>';
   syncAssetSspStepNavLayout(step);
   syncAssetSspFooterNav();
+  if (typeof updateWorkspaceWizardProgress === 'function') updateWorkspaceWizardProgress('asset', step);
 }
 
 // ─── FIPS 199 + program baseline (V2/V3 baseline elevation) ─────────────────

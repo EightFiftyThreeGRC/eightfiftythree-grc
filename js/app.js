@@ -963,6 +963,9 @@ function goToStep(tabId, step) {
     if (typeof syncAssetSspStepNavLayout === 'function') syncAssetSspStepNavLayout(step);
     if (typeof syncAssetSspFooterNav === 'function') syncAssetSspFooterNav();
   }
+  if (tabId === 'policy' || tabId === 'control' || tabId === 'asset') {
+    updateWorkspaceWizardProgress(tabId, step);
+  }
   // Step bodies re-render via innerHTML, so retrofit keyboard access each time.
   if (typeof enhanceKeyboardAccessibility === 'function') enhanceKeyboardAccessibility();
 }
@@ -1214,9 +1217,60 @@ function setupMobileNav() {
   });
 }
 
+var WORKSPACE_WIZARD_STEP_LABELS = {
+  policy: ['Policy Owner', 'Control Selection', 'Policy Content', 'Control Owners'],
+  control: ['My Controls', 'Design Controls', 'Asset Requirements', 'Review & Submit'],
+  asset: ['Profile', 'Attestations', 'Interconnections', 'Review & Sign-Off']
+};
+
+function getActiveTabId() {
+  var el = document.querySelector('.tab-panel.active');
+  if (!el || !el.id) return '';
+  return el.id.replace(/^tab-/, '');
+}
+
+function isWorkspaceWizardActive() {
+  var tabId = getActiveTabId();
+  if (tabId === 'policy') {
+    return !!(state._policyWizardMode && state._policyDomain && !state._policyLibraryMode
+      && !state._policyDocView && !state._ispReviewView && !state._ispRevisionView);
+  }
+  if (tabId === 'control') {
+    return !state._controlLibraryMode;
+  }
+  if (tabId === 'asset') {
+    if (state._assetLibraryMode || state._assetTypeLibraryMode || state._sspReviewerReadOnly) return false;
+    return !!(state._selectedAssetId || state._selectedProcessId);
+  }
+  return false;
+}
+
+function updateWorkspaceWizardProgress(tabId, step) {
+  var labels = WORKSPACE_WIZARD_STEP_LABELS[tabId];
+  if (!labels) return;
+  var s = step || 1;
+  var displayStep = s;
+  var displayTotal = labels.length;
+  var name = labels[s - 1] || '';
+  if (tabId === 'asset' && typeof isProcessSspScope === 'function' && isProcessSspScope()) {
+    displayTotal = 3;
+    if (s <= 1) { displayStep = 1; name = 'Profile'; }
+    else if (s === 2) { displayStep = 2; name = 'Attestations'; }
+    else { displayStep = 3; name = 'Review & Sign-Off'; }
+  }
+  var fill = document.getElementById(tabId + '-setup-progress-fill');
+  var label = document.getElementById(tabId + '-setup-progress-label');
+  if (fill) fill.style.width = Math.round((displayStep / displayTotal) * 100) + '%';
+  if (label) label.textContent = 'Step ' + displayStep + ' of ' + displayTotal + ' \u00b7 ' + name;
+}
+
 function applySetupFocusMode() {
   var inSetup = !state.cisoComplete;
-  document.body.classList.toggle('setup-focus-mode', inSetup);
+  var inWizard = isWorkspaceWizardActive();
+  document.body.classList.toggle('setup-focus-mode', inSetup || inWizard);
+  document.body.classList.toggle('workspace-wizard-focus', !!inWizard);
+  if (inWizard) document.body.classList.remove('mobile-nav-open');
+  if (inWizard) updateWorkspaceWizardProgress(getActiveTabId(), currentStep[getActiveTabId()]);
   if (typeof applyPostSetupNav === 'function') applyPostSetupNav();
 }
 

@@ -10,7 +10,7 @@
   <meta name="description" content="EightFiftyThree GRC — NIST SP 800-53 Rev. 5 program management">
   <title>EightFiftyThree GRC — Application</title>
 
-    <link rel="stylesheet" href="css/app.css?v=20260824a">
+    <link rel="stylesheet" href="css/app.css?v=20260824b">
 
 </head>
 <body>
@@ -292,43 +292,13 @@
       </div>
       <div id="policy-list-body" style="padding:0 32px 32px;"></div>
     </div>
-    <!-- WIZARD VIEW: 4-step flow (hidden until domain selected) — same side step-nav pattern as CISO / control -->
+    <!-- WIZARD VIEW: 4-step flow (hidden until domain selected) — CISO-style top progress -->
     <div id="policy-wizard-panel" style="display:none; flex-direction:column; height:100%; overflow:hidden;">
       <div id="policy-wizard-header" style="flex-shrink:0; background:white; border-bottom:1px solid var(--border); padding:12px 32px;"></div>
       <div class="wizard-container" id="policy-wizard-main" style="flex:1; min-height:0; overflow:hidden;">
-        <div class="step-nav">
-          <div class="step-nav-title">Domain Policy Steps</div>
-          <div class="step-item active" onclick="goToStep('policy',1)" id="policy-step-item-1">
-            <div class="step-circle active" id="policy-circle-1">1</div>
-            <div class="step-info">
-              <div class="step-num">Step 1</div>
-              <div class="step-name">Policy Owner</div>
-            </div>
-          </div>
-          <div class="step-connector" id="policy-conn-1"></div>
-          <div class="step-item" onclick="goToStep('policy',2)" id="policy-step-item-2">
-            <div class="step-circle pending" id="policy-circle-2">2</div>
-            <div class="step-info">
-              <div class="step-num">Step 2</div>
-              <div class="step-name">Control Selection</div>
-            </div>
-          </div>
-          <div class="step-connector" id="policy-conn-2"></div>
-          <div class="step-item" onclick="goToStep('policy',3)" id="policy-step-item-3">
-            <div class="step-circle pending" id="policy-circle-3">3</div>
-            <div class="step-info">
-              <div class="step-num">Step 3</div>
-              <div class="step-name">Policy Content</div>
-            </div>
-          </div>
-          <div class="step-connector" id="policy-conn-3"></div>
-          <div class="step-item" onclick="goToStep('policy',4)" id="policy-step-item-4">
-            <div class="step-circle pending" id="policy-circle-4">4</div>
-            <div class="step-info">
-              <div class="step-num">Step 4</div>
-              <div class="step-name">Control Owners</div>
-            </div>
-          </div>
+        <div class="wizard-setup-progress" id="policy-setup-progress">
+          <div class="ciso-setup-progress-track"><div class="ciso-setup-progress-fill" id="policy-setup-progress-fill"></div></div>
+          <div class="ciso-setup-progress-label" id="policy-setup-progress-label">Step 1 of 4 · Policy Owner</div>
         </div>
         <div class="wizard-content">
           <!-- Step 1: Review & Custodian -->
@@ -403,32 +373,15 @@
             <p>Design how each assigned control is implemented, identify asset scope, and define what asset owners must do to comply.</p>
           </div>
           <div class="page-header-actions">
+            <button type="button" class="btn btn-secondary" onclick="showTab('home')">← Command Center</button>
             <button type="button" class="btn btn-secondary" onclick="goToControlLibrary()">Browse catalog</button>
           </div>
         </div>
       </div>
       <div class="wizard-container">
-        <div class="step-nav">
-          <div class="step-nav-title">Design Workflow</div>
-          <div class="step-item active" onclick="goToStep('control',1)" id="control-step-item-1">
-            <div class="step-circle active" id="control-circle-1">1</div>
-            <div class="step-info"><div class="step-num">Step 1</div><div class="step-name">My Controls</div></div>
-          </div>
-          <div class="step-connector" id="control-conn-1"></div>
-          <div class="step-item" onclick="goToStep('control',2)" id="control-step-item-2">
-            <div class="step-circle pending" id="control-circle-2">2</div>
-            <div class="step-info"><div class="step-num">Step 2</div><div class="step-name">Design Controls</div></div>
-          </div>
-          <div class="step-connector" id="control-conn-2"></div>
-          <div class="step-item" onclick="goToStep('control',3)" id="control-step-item-3">
-            <div class="step-circle pending" id="control-circle-3">3</div>
-            <div class="step-info"><div class="step-num">Step 3</div><div class="step-name">Asset Requirements</div></div>
-          </div>
-          <div class="step-connector" id="control-conn-3"></div>
-          <div class="step-item" onclick="goToStep('control',4)" id="control-step-item-4">
-            <div class="step-circle pending" id="control-circle-4">4</div>
-            <div class="step-info"><div class="step-num">Step 4</div><div class="step-name">Review &amp; Submit</div></div>
-          </div>
+        <div class="wizard-setup-progress" id="control-setup-progress">
+          <div class="ciso-setup-progress-track"><div class="ciso-setup-progress-fill" id="control-setup-progress-fill"></div></div>
+          <div class="ciso-setup-progress-label" id="control-setup-progress-label">Step 1 of 4 · My Controls</div>
         </div>
         <div class="wizard-content">
           <div class="wizard-step active" id="control-step-1">
@@ -510,27 +463,9 @@
       <div id="asset-wizard-panel" style="display:none; flex-direction:column; height:100%; overflow:hidden;">
         <div id="asset-wizard-chrome" style="flex-shrink:0; background:white; border-bottom:1px solid var(--border); padding:12px 32px;"></div>
         <div class="wizard-container" style="flex:1; min-height:0; overflow:hidden;">
-          <div class="step-nav">
-            <div class="step-nav-title">SSP Workflow</div>
-            <div class="step-item active" onclick="goToStep('asset',1)" id="asset-step-item-1">
-              <div class="step-circle active" id="asset-circle-1">1</div>
-              <div class="step-info"><div class="step-num">Step 1</div><div class="step-name">Profile</div></div>
-            </div>
-            <div class="step-connector" id="asset-conn-1"></div>
-            <div class="step-item" onclick="goToStep('asset',2)" id="asset-step-item-2">
-              <div class="step-circle pending" id="asset-circle-2">2</div>
-              <div class="step-info"><div class="step-num">Step 2</div><div class="step-name">Attestations</div></div>
-            </div>
-            <div class="step-connector" id="asset-conn-2"></div>
-            <div class="step-item" onclick="goToStep('asset',3)" id="asset-step-item-3">
-              <div class="step-circle pending" id="asset-circle-3">3</div>
-              <div class="step-info"><div class="step-num">Step 3</div><div class="step-name">Interconnections</div></div>
-            </div>
-            <div class="step-connector" id="asset-conn-3"></div>
-            <div class="step-item" onclick="goToStep('asset',4)" id="asset-step-item-4">
-              <div class="step-circle pending" id="asset-circle-4">4</div>
-              <div class="step-info"><div class="step-num">Step 4</div><div class="step-name">Review &amp; Sign-Off</div></div>
-            </div>
+          <div class="wizard-setup-progress" id="asset-setup-progress">
+            <div class="ciso-setup-progress-track"><div class="ciso-setup-progress-fill" id="asset-setup-progress-fill"></div></div>
+            <div class="ciso-setup-progress-label" id="asset-setup-progress-label">Step 1 of 4 · Profile</div>
           </div>
           <div class="wizard-content">
             <div class="wizard-step active" id="asset-step-1">
@@ -741,10 +676,10 @@
 <script src="js/nist-control-text.js?v=20260624"></script>
 <script src="js/core.js?v=20260823n"></script>
 <script src="js/nist-csf-map.js?v=20260824a"></script>
-<script src="js/policies.js?v=20260824a"></script>
+<script src="js/policies.js?v=20260824b"></script>
 <script src="js/control-scope-defaults.js?v=20260707b"></script>
-<script src="js/controls.js?v=20260823d"></script>
-<script src="js/assets.js?v=20260823c"></script>
+<script src="js/controls.js?v=20260824b"></script>
+<script src="js/assets.js?v=20260824b"></script>
 <script src="js/baseline-elevation.js?v=20260823b"></script>
 <script src="js/authorization.js?v=20260823b"></script>
 <script src="js/frameworks.js?v=20260823b"></script>
@@ -757,7 +692,7 @@
 <script src="js/session.js?v=20260823b"></script>
 <script src="js/program.js?v=20260824a"></script>
 <script src="js/policy-board.js?v=20260823f"></script>
-<script src="js/app.js?v=20260823d"></script>
+<script src="js/app.js?v=20260824b"></script>
 <script src="js/policy-map.js?v=20260823h"></script>
 
 </body>

@@ -434,10 +434,28 @@
     body:not(.setup-focus-mode) .ciso-setup-progress { display: none; }
     body:not(.setup-focus-mode) #ciso-step-nav-panel { display: flex; }
 
+    /* Workspace wizards (domain policy / control design / SSP): hide primary nav. */
+    body.workspace-wizard-focus .sidebar { display: none; }
+    body.workspace-wizard-focus .main {
+      margin-left: 0;
+      width: 100%;
+    }
+    body.workspace-wizard-focus .mobile-nav-toggle,
+    body.workspace-wizard-focus .mobile-nav-backdrop { display: none !important; }
+
+    .wizard-setup-progress,
     .ciso-setup-progress {
       width: 100%;
-      flex: 0 0 100%;
+      flex: 0 0 auto;
       margin-bottom: 4px;
+    }
+    .wizard-setup-progress { display: block; }
+    #policy-wizard-main > .wizard-content,
+    #control-workspace-panel .wizard-content,
+    #asset-wizard-panel .wizard-content {
+      flex: 1 1 auto;
+      min-width: 0;
+      width: 100%;
     }
     .ciso-setup-progress-track {
       height: 8px;
@@ -459,6 +477,7 @@
       letter-spacing: 0;
       line-height: 1.3;
       color: var(--ink-7);
+      overflow-wrap: anywhere;
     }
     .wizard-step-footer .btn-primary {
       min-height: 44px;
@@ -2169,6 +2188,9 @@
         padding-bottom: 8px;
         border-bottom: 1px solid var(--border);
       }
+      .ciso-setup-progress-label {
+        font-size: 13px;
+      }
       .step-item {
         min-height: 44px;
         align-items: center;
@@ -2229,6 +2251,10 @@
       }
       .step-nav {
         width: 200px;
+      }
+      body.workspace-wizard-focus .main {
+        margin-left: 0;
+        width: 100%;
       }
     }
 

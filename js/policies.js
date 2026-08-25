@@ -1677,7 +1677,12 @@ function enterPolicyWizard(fam) {
   const wizPanel = document.getElementById('policy-wizard-panel');
   if (listPanel) listPanel.style.display = 'none';
   if (wizPanel) wizPanel.style.display = 'flex';
+  if (typeof showTab === 'function') {
+    var polTab = document.getElementById('tab-policy');
+    if (polTab && !polTab.classList.contains('active')) showTab('policy');
+  }
   goToStep('policy', 1);
+  if (typeof applySetupFocusMode === 'function') applySetupFocusMode();
 }
 
 /** Lightweight modal — assign policy owner for a returned domain (no wizard). */
@@ -1759,12 +1764,14 @@ function openReturnedDomainPolicyRevision(fam) {
   if (listPanel) listPanel.style.display = 'none';
   if (wizPanel) wizPanel.style.display = 'flex';
   goToStep('policy', 3);
+  if (typeof applySetupFocusMode === 'function') applySetupFocusMode();
 }
 
 function exitPolicyWizard() {
   state._policyWizardMode = false;
   state._policyDocView = false;
   renderPolicyList();
+  if (typeof applySetupFocusMode === 'function') applySetupFocusMode();
 }
 
 function getPolicyMergedTitle(fam) {

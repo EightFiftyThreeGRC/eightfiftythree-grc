@@ -19,6 +19,9 @@ function renderControlTab() {
   if (library) library.style.display = 'none';
   if (workspace) workspace.style.display = '';
   renderControlStep(currentStep.control);
+  if (typeof updateWorkspaceWizardProgress === 'function') {
+    updateWorkspaceWizardProgress('control', currentStep.control);
+  }
 }
 
 function getControlComplianceSummary(controlId) {
