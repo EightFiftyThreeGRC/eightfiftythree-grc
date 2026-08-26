@@ -216,21 +216,38 @@ function toggleCustomApprover(policyKey, checkbox) {
   if (!state.policyReviewCycle[policyKey]) state.policyReviewCycle[policyKey] = {};
   var rc = state.policyReviewCycle[policyKey];
   var isCustom = checkbox.checked;
+  var sodMsg = policyKey === 'ISP'
+    ? (typeof ispApproverSodMessage === 'function'
+      ? ispApproverSodMessage()
+      : 'The person who owns and authors the Information Security Policy cannot also approve it (segregation of duties). Assign a different reviewer.')
+    : 'This domain policy must be approved by someone other than the policy drafter (separation of duties).';
+  if (!isCustom && policyKey === 'ISP') {
+    checkbox.checked = true;
+    if (typeof showToast === 'function') showToast(sodMsg, true);
+    return;
+  }
   if (policyKey !== 'ISP' && !isCustom
       && typeof domainPolicyRequiresSeparateApprover === 'function'
       && domainPolicyRequiresSeparateApprover(policyKey)) {
     checkbox.checked = true;
-    if (typeof showToast === 'function') {
-      showToast('This domain policy must be approved by someone other than the policy drafter (separation of duties).', true);
-    }
+    if (typeof showToast === 'function') showToast(sodMsg, true);
     return;
   }
   rc._customApprover = isCustom;
   if (!isCustom) {
-    // Domain policies are drafted by the ISSM but formally approved by the program owner (CISO) unless "Different approver" is used.
+    // Domain policies drafted by someone other than the program owner are
+    // approved by the CISO unless "Different reviewer" is used. ISP never
+    // falls back to the program owner (self-approval).
     rc.approvedBy = (state.programOwner || '').trim();
   } else {
     if (!rc.approvedBy) rc.approvedBy = '';
+    else if (policyKey === 'ISP'
+        && typeof ispApproverViolatesSeparationOfDuties === 'function'
+        && ispApproverViolatesSeparationOfDuties(rc.approverEmail, rc.approvedBy)) {
+      rc.approvedBy = '';
+      rc.approverEmail = '';
+      rc.approverRole = '';
+    }
   }
   var customDiv = document.getElementById('custom-approver-' + policyKey);
   if (customDiv) customDiv.style.display = isCustom ? 'block' : 'none';
@@ -250,19 +267,38 @@ function renderReviewCycleCard(policyKey, label, opts) {
   if (!rc.nextReviewDue)  { var d = new Date(rc.lastReviewed + 'T00:00:00'); d.setFullYear(d.getFullYear() + 1); rc.nextReviewDue = d.toISOString().slice(0, 10); }
   if (!rc.approvalDate)   { rc.approvalDate  = today; }
 
-  // Initialize default approver if not set (always program owner unless "Different approver")
-  if (!rc.approvedBy && !rc._customApprover) {
+  var ispSod = policyKey === 'ISP';
+  var domainNeedsSeparate = !ispSod
+    && typeof domainPolicyRequiresSeparateApprover === 'function'
+    && domainPolicyRequiresSeparateApprover(policyKey);
+  var requiresSeparate = ispSod || domainNeedsSeparate;
+
+  // Strip inherited self-approval defaults (ISP always; domain when the owner is also the program owner).
+  if (!rc._customApprover) {
+    if (ispSod && typeof ispApproverViolatesSeparationOfDuties === 'function'
+        && ispApproverViolatesSeparationOfDuties(rc.approverEmail, rc.approvedBy)) {
+      rc.approvedBy = '';
+      rc.approverEmail = '';
+      rc.approverRole = '';
+    } else if (domainNeedsSeparate
+        && typeof domainPolicyApproverViolatesSeparationOfDuties === 'function'
+        && domainPolicyApproverViolatesSeparationOfDuties(policyKey, rc.approverEmail, rc.approvedBy)) {
+      rc.approvedBy = '';
+      rc.approverEmail = '';
+      rc.approverRole = '';
+    }
+  }
+
+  // Default Approved By to the program owner only when that is a different person from the author.
+  if (!rc.approvedBy && !rc._customApprover && !requiresSeparate) {
     rc.approvedBy = (state.programOwner || '').trim();
   }
-  if (policyKey !== 'ISP'
-      && typeof domainPolicyRequiresSeparateApprover === 'function'
-      && domainPolicyRequiresSeparateApprover(policyKey)
-      && !rc._customApprover) {
+  if (requiresSeparate && !rc._customApprover) {
     rc._customApprover = true;
   }
 
   // Legacy: domain cards used ISSM name as "Approved By" while the badge said Program Owner — realign to program owner when still the old mistaken value.
-  if (policyKey !== 'ISP' && !rc._customApprover) {
+  if (!ispSod && !rc._customApprover) {
     var domOwnNm = ((state.domainOwners || {})[policyKey] || {}).name;
     domOwnNm = domOwnNm ? String(domOwnNm).trim() : '';
     var poNm = (state.programOwner || '').trim();
@@ -271,7 +307,7 @@ function renderReviewCycleCard(policyKey, label, opts) {
     }
   }
 
-  // Default approver name shown in the badge (same as ISP: program owner / CISO)
+  // Default approver name shown in the badge (domain policies: program owner / CISO)
   var defaultApproverName = (state.programOwner || '').trim();
 
   var rs = getReviewStatus(policyKey);
@@ -280,9 +316,6 @@ function renderReviewCycleCard(policyKey, label, opts) {
   // Always render both the default badge and the custom fields — the checkbox
   // toggles display:none/block on the custom div. No innerHTML swap needed.
   var isCustom = !!rc._customApprover;
-  var requiresSeparate = policyKey !== 'ISP'
-    && typeof domainPolicyRequiresSeparateApprover === 'function'
-    && domainPolicyRequiresSeparateApprover(policyKey);
   var includeEmail = policyKey !== 'ISP';
   var fieldWidth = includeEmail ? '33%' : '50%';
   var customFieldsHTML = compact
@@ -303,7 +336,7 @@ function renderReviewCycleCard(policyKey, label, opts) {
   var approverHTML = '';
   if (requiresSeparate) {
     approverHTML = '<div class="form-hint" style="margin-bottom:8px;">'
-      + 'You are drafting this domain policy \u2014 it must be approved by someone other than you (separation of duties). Assign a separate reviewer below.'
+      + 'The person who owns and authors this policy cannot also approve it (segregation of duties). Assign a different reviewer below.'
       + '</div>'
       + '<div id="custom-approver-' + policyKey + '" style="display:block;margin-top:0;">'
       + customFieldsHTML

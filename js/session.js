@@ -147,16 +147,24 @@ function canReassignProgramWork() {
 }
 
 // ── ISP approver authorization (separation of duties) ───────────────────────
+function ispApproverSodMessage() {
+  return 'The person who owns and authors the Information Security Policy cannot also approve it (segregation of duties). Assign a different reviewer.';
+}
+
 function getISPDesignatedApproverEmail() {
   var ps = (state.policyStatus || {}).ISP || {};
   var rc = (state.policyReviewCycle || {}).ISP || {};
-  return _sessionNormalizeEmail(ps.submittedToEmail || rc.approverEmail || state.programOwnerEmail || '');
+  var email = _sessionNormalizeEmail(ps.submittedToEmail || rc.approverEmail || '');
+  if (email && ispApproverViolatesSeparationOfDuties(email, '')) return '';
+  return email;
 }
 
 function getISPDesignatedApproverName() {
   var ps = (state.policyStatus || {}).ISP || {};
   var rc = (state.policyReviewCycle || {}).ISP || {};
-  return (ps.submittedTo || rc.approvedBy || '').trim();
+  var nm = (ps.submittedTo || rc.approvedBy || '').trim();
+  if (nm && ispApproverViolatesSeparationOfDuties('', nm)) return '';
+  return nm;
 }
 
 /** Email of the acting identity, or '' in Admin mode (which has no mailbox). */
@@ -178,14 +186,18 @@ function ispApproverViolatesSeparationOfDuties(approverEmail, approverName) {
 function canSessionApproveISP() {
   var ispSt = ((state.policyStatus || {}).ISP || {}).status || '';
   if (ispSt !== 'Under Review') return false;
+  // Admin mode and the program owner author the ISP — they cannot record their own approval.
+  if (isSessionProgramOwnerActor()) return false;
+  var user = getActingUser();
+  var sessionEmail = getSessionEmailForApproval();
+  var sessionName = user && user.name ? user.name : '';
+  if (ispApproverViolatesSeparationOfDuties(sessionEmail, sessionName)) return false;
   var approverEmail = getISPDesignatedApproverEmail();
   if (approverEmail) {
-    var sessionEmail = getSessionEmailForApproval();
     return !!sessionEmail && sessionEmail === approverEmail;
   }
-  // Legacy programs with no approver email — match the rostered approver by name.
+  // No approver email collected in setup — match the rostered reviewer by name.
   if (!state.currentUserId) return false;
-  var user = getActingUser();
   if (!user || user.role !== 'approver' || (user.families || []).indexOf('ISP') === -1) return false;
   var approverName = getISPDesignatedApproverName().toLowerCase();
   return !!(approverName && user.name && user.name.trim().toLowerCase() === approverName);
@@ -260,10 +272,21 @@ function getSessionReturnedDomainPoliciesNeedingOwner() {
   return out;
 }
 
-function validateISPApproverAssignment(rc, silent) {
-  // Setup no longer collects a distinct ISP approver email, and Next must
-  // not block on a missing or invalid address. Downstream Reports approval
-  // falls back to the program owner via getISPDesignatedApproverEmail.
+function validateISPApproverAssignment(rc, silent, opts) {
+  opts = opts || {};
+  rc = rc || (state.policyReviewCycle || {}).ISP || {};
+  var approverEmail = (rc.approverEmail || '').trim();
+  var approverName = (rc.approvedBy || '').trim();
+  if (ispApproverViolatesSeparationOfDuties(approverEmail, approverName)) {
+    if (!silent && typeof showToast === 'function') showToast(ispApproverSodMessage(), true);
+    return false;
+  }
+  if (opts.requireNamed && !approverName && !approverEmail) {
+    if (!silent && typeof showToast === 'function') {
+      showToast('Assign a reviewer other than the program owner before this policy can be approved.', true);
+    }
+    return false;
+  }
   return true;
 }
 
@@ -382,6 +405,7 @@ try {
   window.getISPDesignatedApproverEmail = getISPDesignatedApproverEmail;
   window.getISPDesignatedApproverName = getISPDesignatedApproverName;
   window.getSessionEmailForApproval = getSessionEmailForApproval;
+  window.ispApproverSodMessage = ispApproverSodMessage;
   window.ispApproverViolatesSeparationOfDuties = ispApproverViolatesSeparationOfDuties;
   window.canSessionApproveISP = canSessionApproveISP;
   window.canSessionReviseReturnedISP = canSessionReviseReturnedISP;

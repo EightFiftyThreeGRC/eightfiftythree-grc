@@ -119,17 +119,27 @@ function getPolicyPendingReviewerDisplay(policyKey) {
   var s = ((state.policyStatus || {})[policyKey] || {});
   var nm = (s.submittedTo || '').trim();
   var role = (s.submittedToRole || '').trim();
+  if (policyKey === 'ISP' && nm && typeof ispApproverViolatesSeparationOfDuties === 'function'
+      && ispApproverViolatesSeparationOfDuties(s.submittedToEmail, nm)) {
+    nm = '';
+    role = '';
+  }
   if (nm) return role ? nm + ' — ' + role : nm;
   var rc = (state.policyReviewCycle || {})[policyKey] || {};
-  if (rc._customApprover && (rc.approvedBy || '').trim()) {
+  if ((rc.approvedBy || '').trim()) {
     var ap = (rc.approvedBy || '').trim();
     var ar = (rc.approverRole || '').trim();
+    if (policyKey === 'ISP' && typeof ispApproverViolatesSeparationOfDuties === 'function'
+        && ispApproverViolatesSeparationOfDuties(rc.approverEmail, ap)) {
+      return 'A designated reviewer (not the program owner)';
+    }
     return ar ? ap + ' — ' + ar : ap;
   }
+  if (policyKey === 'ISP') return 'A designated reviewer (not the program owner)';
   var po = (state.programOwner || '').trim();
   var pt = (state.programOwnerTitle || 'CISO').trim();
   if (po) return pt ? po + ' — ' + pt : po;
-  return policyKey === 'ISP' ? 'Program owner / CISO' : 'Program owner (CISO)';
+  return 'Program owner (CISO)';
 }
 
 /** Approver routing from Step 1 review-cycle card (before or after submit). */
@@ -138,11 +148,18 @@ function getDomainPolicyApproverMeta(fam) {
   if (!state.policyReviewCycle) state.policyReviewCycle = {};
   var rc = state.policyReviewCycle[fam] || {};
   var useCustom = !!(rc._customApprover && (rc.approvedBy || '').trim());
+  var name = useCustom ? String(rc.approvedBy || '').trim() : String(state.programOwner || '').trim();
+  var role = useCustom ? String(rc.approverRole || '').trim() : String(state.programOwnerTitle || '').trim();
+  var email = useCustom ? String(rc.approverEmail || '').trim() : String(state.programOwnerEmail || '').trim();
+  if (typeof domainPolicyApproverViolatesSeparationOfDuties === 'function'
+      && domainPolicyApproverViolatesSeparationOfDuties(fam, email, name)) {
+    return { useCustom: true, name: '', role: '', email: '' };
+  }
   return {
     useCustom: useCustom,
-    name: useCustom ? String(rc.approvedBy || '').trim() : String(state.programOwner || '').trim(),
-    role: useCustom ? String(rc.approverRole || '').trim() : String(state.programOwnerTitle || '').trim(),
-    email: useCustom ? String(rc.approverEmail || '').trim() : String(state.programOwnerEmail || '').trim()
+    name: name,
+    role: role,
+    email: email
   };
 }
 
@@ -771,7 +788,15 @@ function renderPolicyLibraryCatalog() {
   }
   function getApprover(policyKey) {
     var rc = (state.policyReviewCycle || {})[policyKey] || {};
-    if (rc._customApprover && (rc.approvedBy || '').trim()) return rc.approvedBy.trim();
+    var named = (rc.approvedBy || '').trim();
+    if (policyKey === 'ISP') {
+      if (named && typeof ispApproverViolatesSeparationOfDuties === 'function'
+          && ispApproverViolatesSeparationOfDuties(rc.approverEmail, named)) {
+        return '\u2014';
+      }
+      return named || '\u2014';
+    }
+    if (rc._customApprover && named) return named;
     return (state.programOwner || '').trim() || 'CISO';
   }
 
@@ -4332,6 +4357,13 @@ function confirmSubmitDomainPolicy() {
   var reviewerRole = meta.role || (state.programOwnerTitle || '').trim();
   var reviewerEmail = meta.email || (state.programOwnerEmail || '').trim();
   var useCustom = meta.useCustom;
+  if (typeof domainPolicyApproverViolatesSeparationOfDuties === 'function'
+      && domainPolicyApproverViolatesSeparationOfDuties(fam, reviewerEmail, reviewerName)) {
+    if (typeof showToast === 'function') {
+      showToast('The person who owns and authors this policy cannot also approve it (segregation of duties). Assign a different reviewer.', true);
+    }
+    return;
+  }
   state.policyStatus[fam].submittedTo = reviewerName || 'Designated approver';
   state.policyStatus[fam].submittedToRole = reviewerRole;
   state.policyStatus[fam].submittedToEmail = reviewerEmail;

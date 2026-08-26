@@ -1789,6 +1789,19 @@ function toggleReportsView() {
 
 // ── ISP Approval actions (for 'approver' role) ────────────────────────────
 function approveISP() {
+  var sodMsg = typeof ispApproverSodMessage === 'function'
+    ? ispApproverSodMessage()
+    : 'The person who owns and authors the Information Security Policy cannot also approve it (segregation of duties). Assign a different reviewer.';
+  if (typeof isSessionProgramOwnerActor === 'function' && isSessionProgramOwnerActor()) {
+    showToast(sodMsg, true);
+    return;
+  }
+  var acting = typeof getActingUser === 'function' ? getActingUser() : null;
+  if (typeof ispApproverViolatesSeparationOfDuties === 'function'
+      && ispApproverViolatesSeparationOfDuties(acting && acting.email, acting && acting.name)) {
+    showToast(sodMsg, true);
+    return;
+  }
   if (typeof canSessionApproveISP === 'function' && !canSessionApproveISP()) {
     var approverEmail = typeof getISPDesignatedApproverEmail === 'function' ? getISPDesignatedApproverEmail() : '';
     var msg = approverEmail
@@ -1797,13 +1810,24 @@ function approveISP() {
     showToast(msg, true);
     return;
   }
+  if (!state.policyReviewCycle) state.policyReviewCycle = {};
+  var rcGate = state.policyReviewCycle.ISP || (state.policyReviewCycle.ISP = {});
+  if (typeof validateISPApproverAssignment === 'function'
+      && !validateISPApproverAssignment(rcGate, false, { requireNamed: true })) {
+    return;
+  }
   var notes = (document.getElementById('isp-approver-notes') || {}).value || '';
   if (!state.policyStatus) state.policyStatus = {};
   if (!state.policyReviewCycle) state.policyReviewCycle = {};
   var rc = state.policyReviewCycle.ISP || (state.policyReviewCycle.ISP = {});
   var prev = state.policyStatus.ISP || {};
   var approverUser = state.currentUserId ? (state.users||[]).find(function(u){ return u.id === state.currentUserId; }) : null;
-  var approverName = approverUser ? approverUser.name : (typeof getSessionActorName === 'function' ? getSessionActorName(rc.approvedBy || 'Approver') : (rc.approvedBy || 'Approver'));
+  var approverName = approverUser ? approverUser.name : (rc.approvedBy || 'Approver');
+  if (typeof ispApproverViolatesSeparationOfDuties === 'function'
+      && ispApproverViolatesSeparationOfDuties(approverUser && approverUser.email, approverName)) {
+    showToast(sodMsg, true);
+    return;
+  }
   state.policyStatus.ISP = {
     status: 'Approved',
     approvedBy: approverName,

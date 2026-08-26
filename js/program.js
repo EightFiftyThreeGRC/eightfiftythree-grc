@@ -332,8 +332,12 @@ function cisoNext(fromStep) {
     if (typeof ensureCommonControlFloor === 'function') ensureCommonControlFloor();
   }
   if (fromStep === cisoStepIndexByLabel('InfoSec Policy', 5)) {
-    // Finalize the ISP. Setup no longer collects an approver email, so do not
-    // block Next on a missing or invalid address.
+    // Identity SoD only: block Next if Approved By is the program owner.
+    // Empty Approved By is allowed — setup does not require a named reviewer yet.
+    if (typeof validateISPApproverAssignment === 'function') {
+      var ispRc = ((state.policyReviewCycle || {}).ISP) || {};
+      if (!validateISPApproverAssignment(ispRc, false)) return;
+    }
     try { submitISPForApproval(true); } catch (e) { console.warn('submitISPForApproval failed:', e); }
   }
   goToStep('ciso', fromStep+1);
@@ -371,6 +375,11 @@ function resubmitISPForApproval() {
     showToast('This policy is not awaiting resubmission.', true);
     return;
   }
+  var resubmitRc = ((state.policyReviewCycle || {}).ISP) || {};
+  if (typeof validateISPApproverAssignment === 'function'
+      && !validateISPApproverAssignment(resubmitRc, false, { requireNamed: true })) {
+    return;
+  }
   submitISPForApproval(false, { forceResubmit: true });
   exitISPRevisionEditor();
   markDirty();
@@ -379,9 +388,9 @@ function resubmitISPForApproval() {
 }
 
 // Finalizes the ISP when the CISO advances past the InfoSec Policy step (or resubmits).
-// Setup does not collect an approver email; fall back to the program owner so
-// Reports approval still has someone to match. options.forceEmail is kept for
-// callers that re-route after a status change. options.forceResubmit - program
+// Setup does not collect an approver email and does not require a named reviewer to
+// leave the step. Never fall back Approved By to the program owner (self-approval / SoD).
+// options.forceEmail is kept for callers that re-route after a status change. options.forceResubmit - program
 // owner resubmitting after an approver returned the ISP.
 function submitISPForApproval(silent, options) {
   options = options || {};
@@ -393,11 +402,20 @@ function submitISPForApproval(silent, options) {
   var rc = state.policyReviewCycle.ISP || (state.policyReviewCycle.ISP = {});
 
   var isCustom = !!rc._customApprover;
-  var approverName = (rc.approvedBy || '').trim() || (state.programOwner || '').trim();
-  var approverRole  = (rc.approverRole  || '').trim() || (state.programOwnerTitle || '').trim();
-  var approverEmail = (rc.approverEmail || '').trim() || (state.programOwnerEmail || '').trim();
+  var approverName = (rc.approvedBy || '').trim();
+  var approverRole  = (rc.approverRole  || '').trim();
+  var approverEmail = (rc.approverEmail || '').trim();
+  if (typeof ispApproverViolatesSeparationOfDuties === 'function'
+      && ispApproverViolatesSeparationOfDuties(approverEmail, approverName)) {
+    approverName = '';
+    approverEmail = '';
+    approverRole = '';
+    rc.approvedBy = '';
+    rc.approverEmail = '';
+    rc.approverRole = '';
+  }
 
-  // Persist whoever we resolved so later Reports / role-picker views have a label.
+  // Persist a designated different reviewer only — never the program owner.
   if (approverName) rc.approvedBy = approverName;
   if (approverRole) rc.approverRole = approverRole;
   if (approverEmail) rc.approverEmail = approverEmail;
@@ -414,47 +432,61 @@ function submitISPForApproval(silent, options) {
   var justSubmitted = false;
   var wantApproverEmail = isCustom && approverEmail && current !== 'Approved' && (forceEmail || forceResubmit || current !== 'Under Review');
   if (current === 'Returned' && !forceEmail && !forceResubmit) return;
+  var hasNamedApprover = !!(approverName || approverEmail);
   if (current !== 'Approved') {
-    justSubmitted = current !== 'Under Review' || forceResubmit;
-    if (forceResubmit && state.infoSecPolicy) {
-      if (!state.infoSecPolicy.revisionHistory) state.infoSecPolicy.revisionHistory = [];
-      var actor = typeof resolveProgramOwnerActorName === 'function'
-        ? resolveProgramOwnerActorName()
-        : ((state.programOwner || '').trim() || 'Program Owner');
-      if (!actor && typeof getSessionActorName === 'function') {
-        actor = getSessionActorName('Program Owner');
+    if (!hasNamedApprover) {
+      // Content can proceed without claiming an approver. Never persist the
+      // program owner as submittedTo (self-approval).
+      if (!state.policyStatus.ISP) state.policyStatus.ISP = {};
+      var prevRoute = state.policyStatus.ISP;
+      if (typeof ispApproverViolatesSeparationOfDuties === 'function'
+          && ispApproverViolatesSeparationOfDuties(prevRoute.submittedToEmail, prevRoute.submittedTo)) {
+        prevRoute.submittedTo = '';
+        prevRoute.submittedToEmail = '';
+        prevRoute.submittedToRole = '';
       }
-      state.infoSecPolicy.revisionHistory.push({
-        version: 'R' + (state.infoSecPolicy.revisionHistory.length + 1),
-        date: new Date().toISOString().slice(0, 10),
-        author: actor,
-        changes: 'Revised and resubmitted for approver review.'
-      });
-    }
-    state.policyStatus.ISP = {
-      status: 'Under Review',
-      submittedTo: approverName,
-      submittedToRole: approverRole,
-      submittedToEmail: approverEmail,
-      submittedAt: new Date().toISOString().slice(0, 10),
-      lastUpdated: new Date().toLocaleDateString(),
-      version: (state.infoSecPolicy && state.infoSecPolicy.version) || '1.0'
-    };
-    var auditMsg = forceResubmit
-      ? 'ISP revised and resubmitted for approval — routed to ' + approverName + (approverRole ? ' (' + approverRole + ')' : '')
-      : 'ISP submitted for approval — routed to ' + approverName + (approverRole ? ' (' + approverRole + ')' : '');
-    try { addAuditEntry('policy', 'ISP', auditMsg); } catch (e) { console.warn('audit log failed:', e); }
-    if (!silent) {
-      if (isCustom && approverEmail && current === 'Approved') {
-        showToast('ISP is already approved — no review requested.', true);
-      } else if (wantApproverEmail) {
-        // No email is sent: the approver is rostered so you can switch into
-        // their profile from the sidebar and review the ISP as them.
-        showToast('📨 ISP routed to ' + approverName + '. Switch to their profile to review it.');
-      } else if (forceResubmit) {
-        showToast('📨 ISP resubmitted to ' + approverName + ' for review.');
-      } else {
-        showToast('📨 ISP submitted to ' + approverName + ' for review.');
+    } else {
+      justSubmitted = current !== 'Under Review' || forceResubmit;
+      if (forceResubmit && state.infoSecPolicy) {
+        if (!state.infoSecPolicy.revisionHistory) state.infoSecPolicy.revisionHistory = [];
+        var actor = typeof resolveProgramOwnerActorName === 'function'
+          ? resolveProgramOwnerActorName()
+          : ((state.programOwner || '').trim() || 'Program Owner');
+        if (!actor && typeof getSessionActorName === 'function') {
+          actor = getSessionActorName('Program Owner');
+        }
+        state.infoSecPolicy.revisionHistory.push({
+          version: 'R' + (state.infoSecPolicy.revisionHistory.length + 1),
+          date: new Date().toISOString().slice(0, 10),
+          author: actor,
+          changes: 'Revised and resubmitted for approver review.'
+        });
+      }
+      state.policyStatus.ISP = {
+        status: 'Under Review',
+        submittedTo: approverName,
+        submittedToRole: approverRole,
+        submittedToEmail: approverEmail,
+        submittedAt: new Date().toISOString().slice(0, 10),
+        lastUpdated: new Date().toLocaleDateString(),
+        version: (state.infoSecPolicy && state.infoSecPolicy.version) || '1.0'
+      };
+      var auditMsg = forceResubmit
+        ? 'ISP revised and resubmitted for approval — routed to ' + approverName + (approverRole ? ' (' + approverRole + ')' : '')
+        : 'ISP submitted for approval — routed to ' + approverName + (approverRole ? ' (' + approverRole + ')' : '');
+      try { addAuditEntry('policy', 'ISP', auditMsg); } catch (e) { console.warn('audit log failed:', e); }
+      if (!silent) {
+        if (isCustom && approverEmail && current === 'Approved') {
+          showToast('ISP is already approved — no review requested.', true);
+        } else if (wantApproverEmail) {
+          // No email is sent: the approver is rostered so you can switch into
+          // their profile from the sidebar and review the ISP as them.
+          showToast('📨 ISP routed to ' + approverName + '. Switch to their profile to review it.');
+        } else if (forceResubmit) {
+          showToast('📨 ISP resubmitted to ' + approverName + ' for review.');
+        } else {
+          showToast('📨 ISP submitted to ' + approverName + ' for review.');
+        }
       }
     }
   }
