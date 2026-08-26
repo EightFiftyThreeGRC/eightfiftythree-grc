@@ -1122,7 +1122,7 @@ const state = {
   orgOwnership: '',         // leftover: 'government' | 'private'
   orgGovLevel: '',          // leftover: 'federal' | 'slg'
   orgSector: '',            // leftover: sector id
-  customRegFrameworks: [],  // [{ id, label, subtitle, kind:'standard'|'law', color, active }]
+  customRegFrameworks: [],  // [{ id, label, subtitle, kind, active, requirements:[{ id, code, title, text, controlIds:[] }] }]
   programOwner: '',         // program owner full name (CISO / SAISO)
   programOwnerTitle: 'Chief Information Security Officer',  // title/role
   programOwnerEmail: '',    // program owner email
@@ -1518,6 +1518,10 @@ function migrateRegMappingStateShape() {
   }
   if (state._regMappingInitialized === undefined) state._regMappingInitialized = false;
   if (!Array.isArray(state.customRegFrameworks)) state.customRegFrameworks = [];
+  state.customRegFrameworks.forEach(function(c) {
+    if (!c || typeof c !== 'object') return;
+    if (!Array.isArray(c.requirements)) c.requirements = [];
+  });
   if (!state.orgOwnership && state.orgSector) {
     var legacySector = state.orgSector;
     if (legacySector === 'federal') {

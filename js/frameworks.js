@@ -505,7 +505,8 @@ function addCustomRegFramework(label, kind, subtitle) {
     subtitle: String(subtitle || 'Custom').trim() || 'Custom',
     kind: kind,
     color: '#64748b',
-    active: true
+    active: true,
+    requirements: []
   });
   state._regMappingInitialized = true;
   markDirty();
@@ -528,9 +529,136 @@ function submitCustomRegFramework(kind) {
 function removeCustomRegFramework(id) {
   if (!state.customRegFrameworks) return;
   state.customRegFrameworks = state.customRegFrameworks.filter(function(c) { return c.id !== id; });
+  if (state._customRegLibraryId === id) state._customRegLibraryId = '';
   markDirty();
   if (typeof refreshCurrentCisoStep === 'function') refreshCurrentCisoStep();
   if (typeof renderFrameworksTab === 'function') renderFrameworksTab();
+}
+
+function getCustomRegEntry(id) {
+  return (state.customRegFrameworks || []).find(function(c) { return c && c.id === id; }) || null;
+}
+
+function ensureCustomRegRequirements(entry) {
+  if (!entry || typeof entry !== 'object') return [];
+  if (!Array.isArray(entry.requirements)) entry.requirements = [];
+  return entry.requirements;
+}
+
+function parseCustomRegControlIds(raw) {
+  var parts = String(raw || '').toUpperCase().split(/[\s,;]+/).filter(Boolean);
+  var known = {};
+  if (typeof CONTROLS !== 'undefined') {
+    CONTROLS.forEach(function(c) { if (c && c.id) known[c.id] = true; });
+  }
+  var out = [];
+  parts.forEach(function(id) {
+    if (known[id] && out.indexOf(id) < 0) out.push(id);
+  });
+  return out;
+}
+
+function openCustomRegRequirementLibrary(id) {
+  state._customRegLibraryId = id;
+  if (typeof showTab === 'function') showTab('frameworks');
+  else if (typeof renderFrameworksTab === 'function') renderFrameworksTab();
+}
+
+function closeCustomRegRequirementLibrary() {
+  state._customRegLibraryId = '';
+  if (typeof renderFrameworksTab === 'function') renderFrameworksTab();
+}
+
+function addCustomRegRequirement(regId) {
+  var entry = getCustomRegEntry(regId);
+  if (!entry) return;
+  var reqs = ensureCustomRegRequirements(entry);
+  reqs.push({
+    id: 'req-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 5),
+    code: '',
+    title: '',
+    text: '',
+    controlIds: []
+  });
+  markDirty();
+  setTimeout(function() { renderFrameworksTab(); }, 0);
+}
+
+function updateCustomRegRequirement(regId, reqId, field, value) {
+  var entry = getCustomRegEntry(regId);
+  if (!entry) return;
+  var reqs = ensureCustomRegRequirements(entry);
+  var row = reqs.find(function(r) { return r.id === reqId; });
+  if (!row) return;
+  if (field === 'controlIds') {
+    row.controlIds = parseCustomRegControlIds(value);
+    markDirty();
+    setTimeout(function() { renderFrameworksTab(); }, 0);
+    return;
+  }
+  if (field === 'code' || field === 'title' || field === 'text') {
+    var prev = row[field] || '';
+    row[field] = value;
+    if (typeof logFieldChange === 'function') {
+      logFieldChange('customRegFrameworks.' + regId + '.' + reqId + '.' + field, prev, value);
+    }
+  }
+  markDirty();
+}
+
+function removeCustomRegRequirement(regId, reqId) {
+  var entry = getCustomRegEntry(regId);
+  if (!entry) return;
+  entry.requirements = ensureCustomRegRequirements(entry).filter(function(r) { return r.id !== reqId; });
+  markDirty();
+  setTimeout(function() { renderFrameworksTab(); }, 0);
+}
+
+function getCustomRegMappedRefs(entry, ctrlId) {
+  var mapped = [];
+  ensureCustomRegRequirements(entry).forEach(function(r) {
+    var ids = r.controlIds || [];
+    if (ids.indexOf(ctrlId) < 0) return;
+    mapped.push(String(r.code || r.title || 'Requirement').trim() || 'Requirement');
+  });
+  return mapped;
+}
+
+function renderCustomRegRequirementLibraryHtml(regId) {
+  var entry = getCustomRegEntry(regId);
+  if (!entry) {
+    return '<p class="form-hint">That custom overlay is gone.</p>'
+      + '<button type="button" class="btn btn-secondary" onclick="closeCustomRegRequirementLibrary()">\u2190 Framework alignment</button>';
+  }
+  var meta = getCustomRegMeta(entry);
+  var reqs = ensureCustomRegRequirements(entry);
+  var kindLabel = entry.kind === 'standard' ? 'voluntary standard' : 'regulation';
+  var rows = reqs.map(function(r) {
+    var qReg = JSON.stringify(regId);
+    var qReq = JSON.stringify(r.id);
+    var ctrlVal = (r.controlIds || []).join(', ');
+    return '<div class="custom-reg-req-card">'
+      + '<div class="custom-reg-req-grid">'
+      + '<div class="form-group"><label class="form-label">Clause / ID</label>'
+      + '<input class="form-input" value="' + escapeHTML(r.code || '') + '" placeholder="e.g. Art. 32 or Req. 8.2.1" oninput="updateCustomRegRequirement(' + qReg + ',' + qReq + ',\'code\',this.value)"></div>'
+      + '<div class="form-group"><label class="form-label">Title</label>'
+      + '<input class="form-input" value="' + escapeHTML(r.title || '') + '" placeholder="Short name" oninput="updateCustomRegRequirement(' + qReg + ',' + qReq + ',\'title\',this.value)"></div>'
+      + '</div>'
+      + '<div class="form-group"><label class="form-label">Requirement text</label>'
+      + '<textarea class="form-input" rows="3" placeholder="Paste or write the obligation this program must meet." oninput="updateCustomRegRequirement(' + qReg + ',' + qReq + ',\'text\',this.value)">' + escapeHTML(r.text || '') + '</textarea></div>'
+      + '<div class="form-group"><label class="form-label">Maps to 800-53 controls</label>'
+      + '<input class="form-input" value="' + escapeHTML(ctrlVal) + '" placeholder="AC-2, IA-2, SC-7" onchange="updateCustomRegRequirement(' + qReg + ',' + qReq + ',\'controlIds\',this.value)">'
+      + '<div class="form-hint">Comma-separated control IDs from this program\u2019s catalog. Unknown IDs are dropped.</div></div>'
+      + '<button type="button" class="btn btn-secondary btn-sm" onclick="removeCustomRegRequirement(' + qReg + ',' + qReq + ')">Remove requirement</button>'
+      + '</div>';
+  }).join('');
+  return '<div class="custom-reg-lib">'
+    + '<button type="button" class="btn btn-secondary btn-sm" onclick="closeCustomRegRequirementLibrary()">\u2190 Framework alignment</button>'
+    + '<h2 style="margin:16px 0 6px;">' + escapeHTML(meta.label) + ' requirements</h2>'
+    + '<p class="form-hint" style="margin-bottom:16px;">This is the library for this custom ' + kindLabel + '. Add clauses here after setup. Mapping a clause to 800-53 controls is what shows up in the alignment table \u2014 the overlay name is not stamped on every control.</p>'
+    + (rows || '<div class="custom-reg-req-empty">No requirements yet. Add the first clause this program must meet.</div>')
+    + '<button type="button" class="btn btn-primary" onclick="addCustomRegRequirement(' + JSON.stringify(regId) + ')">+ Add requirement</button>'
+    + '</div>';
 }
 
 function toggleCustomRegFramework(id) {
@@ -545,7 +673,7 @@ function toggleCustomRegFramework(id) {
 
 function renderCustomRegAddFormHtml() {
   return '<div class="custom-reg-add" style="margin-top:16px;padding:14px;border:1px dashed #d8dee9;border-radius:12px;background:#fafbfc;">'
-    + '<div class="section-subtitle" style="margin-bottom:10px;">Add a custom framework or regulation (e.g., NIS2, EU AI Act, contract-specific CSF).</div>'
+    + '<div class="section-subtitle" style="margin-bottom:10px;">Add a name now. Requirement text is authored later in Framework alignment \u2192 Requirements library (e.g., NIS2, EU AI Act, CCPA, contract-specific CSF).</div>'
     + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">'
     + '<input class="form-input" id="customRegLabel" placeholder="Name (required)" onkeydown="if(event.key===\'Enter\')submitCustomRegFramework(\'law\')">'
     + '<input class="form-input" id="customRegSubtitle" placeholder="Short description (optional)">'
@@ -600,7 +728,9 @@ function getFrameworkRefsForControl(ctrlId) {
     if (refs.length) out[fw] = refs.slice();
   });
   getCustomRegFrameworks('standard').forEach(function(c) {
-    if (c.active) out[c.id] = [c.label];
+    if (!c.active) return;
+    var mapped = getCustomRegMappedRefs(c, ctrlId);
+    if (mapped.length) out[c.id] = mapped;
   });
   return out;
 }
@@ -615,7 +745,9 @@ function getLawRefsForControl(ctrlId) {
     if (refs.length) out[lawId] = refs.slice();
   });
   getCustomRegFrameworks('law').forEach(function(c) {
-    if (c.active) out[c.id] = [c.label];
+    if (!c.active) return;
+    var mapped = getCustomRegMappedRefs(c, ctrlId);
+    if (mapped.length) out[c.id] = mapped;
   });
   return out;
 }
@@ -688,6 +820,10 @@ function computeFrameworkCoverage(fwId) {
 function renderFrameworksTab() {
   var body = document.getElementById('frameworks-body');
   if (!body) return;
+  if (state._customRegLibraryId) {
+    body.innerHTML = renderCustomRegRequirementLibraryHtml(state._customRegLibraryId);
+    return;
+  }
   var active = getActiveFrameworkIds();
   var activeLaws = getActiveComplianceLawIds();
   var filterFw = state._frameworkFilter || '';
@@ -719,14 +855,14 @@ function renderFrameworksTab() {
     var meta = getCustomRegMeta(c);
     var on = !!c.active;
     var cov = computeFrameworkCoverage(c.id);
-    var customNote = '<div class="fw-coverage-stats" style="opacity:0.75;">Custom — tracked in your program; add control crosswalks as needed.</div>';
+    var customNote = '<div class="fw-coverage-stats" style="opacity:0.75;">Add requirement text in the library, then map clauses to 800-53.</div>';
     return '<div class="fw-coverage-card' + (on ? '' : ' fw-coverage-card-off') + '" style="--fw-color:' + meta.color + ';">'
       + '<div class="fw-coverage-head">'
       + '<div><div class="fw-coverage-title">' + escapeHTML(meta.label) + '</div>'
       + '<div class="fw-coverage-sub">' + escapeHTML(meta.subtitle) + '</div></div>'
       + '<label class="fw-toggle" onclick="event.stopPropagation();"><input type="checkbox"' + (on ? ' checked' : '') + ' onchange="toggleActiveFramework(\'' + c.id + '\')"><span class="fw-toggle-track"></span></label>'
       + '</div>'
-      + (on ? customNote : '<div class="fw-coverage-stats" style="opacity:0.6;">Tracking off — enable to include in posture</div>')
+      + (on ? customNote + '<button type="button" class="btn btn-secondary btn-sm" onclick="openCustomRegRequirementLibrary(\'' + c.id + '\')">Requirements library \u2192</button>' : '<div class="fw-coverage-stats" style="opacity:0.6;">Tracking off \u2014 enable to include in posture</div>')
       + '<button type="button" class="btn btn-secondary btn-sm" onclick="removeCustomRegFramework(\'' + c.id + '\')">Remove</button>'
       + '</div>';
   }).join('');
@@ -899,12 +1035,15 @@ function renderComplianceLawCoverageCardsHtml() {
     return renderLawCoverageCard(meta, on, 'toggleActiveComplianceLaw(\'' + lawId + '\')');
   }).join('');
   cards += getCustomRegFrameworks('law').map(function(c) {
-    return renderLawCoverageCard(getCustomRegMeta(c), !!c.active, 'toggleActiveComplianceLaw(\'' + c.id + '\')', 'removeCustomRegFramework(\'' + c.id + '\')');
+    return renderLawCoverageCard(getCustomRegMeta(c), !!c.active, 'toggleActiveComplianceLaw(\'' + c.id + '\')', 'removeCustomRegFramework(\'' + c.id + '\')', c.id);
   }).join('');
   return '<div class="fw-setup-section" style="margin-top:8px;"><div class="section-title" style="margin-bottom:10px;">Laws &amp; regulations</div><div class="fw-coverage-grid">' + cards + '</div></div>';
 }
 
-function renderLawCoverageCard(meta, on, toggleAttr, removeAttr) {
+function renderLawCoverageCard(meta, on, toggleAttr, removeAttr, libraryId) {
+  var libBtn = (on && libraryId)
+    ? '<button type="button" class="btn btn-secondary btn-sm" onclick="openCustomRegRequirementLibrary(\'' + libraryId + '\')">Requirements library \u2192</button>'
+    : '';
   return '<div class="fw-coverage-card' + (on ? '' : ' fw-coverage-card-off') + '" style="--fw-color:' + meta.color + ';">'
     + '<div class="fw-coverage-head">'
     + '<div><div class="fw-coverage-title">' + escapeHTML(meta.label) + '</div>'
@@ -912,7 +1051,8 @@ function renderLawCoverageCard(meta, on, toggleAttr, removeAttr) {
     + '<label class="fw-toggle" onclick="event.stopPropagation();"><input type="checkbox"' + (on ? ' checked' : '') + ' onchange="' + toggleAttr + '"><span class="fw-toggle-track"></span></label>'
     + '</div>'
     + (on
-      ? '<div class="fw-coverage-stats">' + (meta.custom ? 'Custom regulation tracked in your program.' : 'Tracking on — citations appear in the mapping table when enabled.') + '</div>'
+      ? '<div class="fw-coverage-stats">' + (meta.custom ? 'Add requirement text in the library, then map clauses to 800-53.' : 'Tracking on \u2014 citations appear in the mapping table when enabled.') + '</div>'
+      + libBtn
       + (removeAttr ? '<button type="button" class="btn btn-secondary btn-sm" onclick="' + removeAttr + '">Remove</button>' : '')
       : '<div class="fw-coverage-stats" style="opacity:0.6;">Tracking off</div>')
     + '</div>';
