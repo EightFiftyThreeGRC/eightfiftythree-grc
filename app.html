@@ -140,7 +140,7 @@
     <div class="wizard-container">
       <div class="ciso-setup-progress" id="ciso-setup-progress">
         <div class="ciso-setup-progress-track"><div class="ciso-setup-progress-fill" id="ciso-setup-progress-fill"></div></div>
-        <div class="ciso-setup-progress-label" id="ciso-setup-progress-label">Step 1 of 8 · Organization</div>
+        <div class="ciso-setup-progress-label" id="ciso-setup-progress-label">Step 1 of 7 · Organization</div>
       </div>
       <div class="step-nav" id="ciso-step-nav-panel">
         <div class="step-nav-title">Program Setup Steps</div>
@@ -156,7 +156,7 @@
           <div class="step-circle pending" id="ciso-circle-2">2</div>
           <div class="step-info">
             <div class="step-num">Step 2</div>
-            <div class="step-name">Profile</div>
+            <div class="step-name">Program</div>
           </div>
         </div>
         <div class="step-connector" id="ciso-conn-2"></div>
@@ -164,7 +164,7 @@
           <div class="step-circle pending" id="ciso-circle-3">3</div>
           <div class="step-info">
             <div class="step-num">Step 3</div>
-            <div class="step-name">Program</div>
+            <div class="step-name">Reg mapping</div>
           </div>
         </div>
         <div class="step-connector" id="ciso-conn-3"></div>
@@ -172,7 +172,7 @@
           <div class="step-circle pending" id="ciso-circle-4">4</div>
           <div class="step-info">
             <div class="step-num">Step 4</div>
-            <div class="step-name">Reg mapping</div>
+            <div class="step-name">PM Controls</div>
           </div>
         </div>
         <div class="step-connector" id="ciso-conn-4"></div>
@@ -180,7 +180,7 @@
           <div class="step-circle pending" id="ciso-circle-5">5</div>
           <div class="step-info">
             <div class="step-num">Step 5</div>
-            <div class="step-name">PM Controls</div>
+            <div class="step-name">InfoSec Policy</div>
           </div>
         </div>
         <div class="step-connector" id="ciso-conn-5"></div>
@@ -188,7 +188,7 @@
           <div class="step-circle pending" id="ciso-circle-6">6</div>
           <div class="step-info">
             <div class="step-num">Step 6</div>
-            <div class="step-name">InfoSec Policy</div>
+            <div class="step-name">Policy set</div>
           </div>
         </div>
         <div class="step-connector" id="ciso-conn-6"></div>
@@ -196,14 +196,6 @@
           <div class="step-circle pending" id="ciso-circle-7">7</div>
           <div class="step-info">
             <div class="step-num">Step 7</div>
-            <div class="step-name">Policy set</div>
-          </div>
-        </div>
-        <div class="step-connector" id="ciso-conn-7"></div>
-        <div class="step-item" onclick="goToStep('ciso',8)" id="ciso-step-item-8">
-          <div class="step-circle pending" id="ciso-circle-8">8</div>
-          <div class="step-info">
-            <div class="step-num">Step 8</div>
             <div class="step-name">Assign Owners</div>
           </div>
         </div>
@@ -214,55 +206,48 @@
           <div class="wizard-step-body" id="ciso-step-1-body"></div>
           <div class="wizard-step-footer">
             <span></span>
-            <button class="btn btn-primary" onclick="cisoNext(1)">Next: Profile →</button>
+            <button class="btn btn-primary" onclick="cisoNext(1)">Next: Program →</button>
           </div>
         </div>
         <div class="wizard-step" id="ciso-step-2">
           <div class="wizard-step-body" id="ciso-step-2-body"></div>
           <div class="wizard-step-footer">
             <button class="btn btn-secondary" onclick="goToStep('ciso',1)">← Back</button>
-            <button class="btn btn-primary" onclick="cisoNext(2)">Next: Program →</button>
+            <button class="btn btn-primary" onclick="cisoNext(2)">Next: Reg mapping →</button>
           </div>
         </div>
         <div class="wizard-step" id="ciso-step-3">
           <div class="wizard-step-body" id="ciso-step-3-body"></div>
           <div class="wizard-step-footer">
             <button class="btn btn-secondary" onclick="goToStep('ciso',2)">← Back</button>
-            <button class="btn btn-primary" onclick="cisoNext(3)">Next: Reg mapping →</button>
+            <button class="btn btn-primary" onclick="cisoNext(3)">Next: PM Controls →</button>
           </div>
         </div>
         <div class="wizard-step" id="ciso-step-4">
           <div class="wizard-step-body" id="ciso-step-4-body"></div>
           <div class="wizard-step-footer">
             <button class="btn btn-secondary" onclick="goToStep('ciso',3)">← Back</button>
-            <button class="btn btn-primary" onclick="cisoNext(4)">Next: PM Controls →</button>
+            <button class="btn btn-primary" onclick="cisoNext(4)">Next: InfoSec Policy →</button>
           </div>
         </div>
         <div class="wizard-step" id="ciso-step-5">
           <div class="wizard-step-body" id="ciso-step-5-body"></div>
           <div class="wizard-step-footer">
             <button class="btn btn-secondary" onclick="goToStep('ciso',4)">← Back</button>
-            <button class="btn btn-primary" onclick="cisoNext(5)">Next: InfoSec Policy →</button>
+            <button class="btn btn-primary" onclick="cisoNext(5)">Next: Policy set →</button>
           </div>
         </div>
         <div class="wizard-step" id="ciso-step-6">
           <div class="wizard-step-body" id="ciso-step-6-body"></div>
           <div class="wizard-step-footer">
             <button class="btn btn-secondary" onclick="goToStep('ciso',5)">← Back</button>
-            <button class="btn btn-primary" onclick="cisoNext(6)">Next: Policy set →</button>
+            <button class="btn btn-primary" onclick="cisoNext(6)">Next: Assign Owners →</button>
           </div>
         </div>
         <div class="wizard-step" id="ciso-step-7">
           <div class="wizard-step-body" id="ciso-step-7-body"></div>
           <div class="wizard-step-footer">
             <button class="btn btn-secondary" onclick="goToStep('ciso',6)">← Back</button>
-            <button class="btn btn-primary" onclick="cisoNext(7)">Next: Assign Owners →</button>
-          </div>
-        </div>
-        <div class="wizard-step" id="ciso-step-8">
-          <div class="wizard-step-body" id="ciso-step-8-body"></div>
-          <div class="wizard-step-footer">
-            <button class="btn btn-secondary" onclick="goToStep('ciso',7)">← Back</button>
             <button class="btn btn-navy" id="ciso-finalise-btn" onclick="cisoFinish()">✓ Finalize Program Setup</button>
           </div>
         </div>
@@ -660,26 +645,26 @@
 })(window);
 </script>
 <script src="js/nist-control-text.js?v=20260624"></script>
-<script src="js/core.js?v=20260823n"></script>
-<script src="js/nist-csf-map.js?v=20260824a"></script>
+<script src="js/core.js?v=20260826c"></script>
+<script src="js/nist-csf-map.js?v=20260826c"></script>
 <script src="js/policies.js?v=20260824c"></script>
 <script src="js/control-scope-defaults.js?v=20260707b"></script>
 <script src="js/controls.js?v=20260824b"></script>
 <script src="js/assets.js?v=20260824b"></script>
 <script src="js/baseline-elevation.js?v=20260823b"></script>
 <script src="js/authorization.js?v=20260823b"></script>
-<script src="js/frameworks.js?v=20260823b"></script>
+<script src="js/frameworks.js?v=20260826c"></script>
 <script src="js/risk.js?v=20260707b"></script>
-<script src="js/hub.js?v=20260823e"></script>
+<script src="js/hub.js?v=20260826c"></script>
 <script src="js/reports.js?v=20260823c"></script>
 <script src="js/admin.js?v=20260823b"></script>
 <!-- Acting identity + permission helpers. No accounts: Admin mode or impersonate
      a rostered person via the role picker. Data stays in this browser. -->
 <script src="js/session.js?v=20260823b"></script>
-<script src="js/program.js?v=20260826a"></script>
-<script src="js/policy-board.js?v=20260823f"></script>
-<script src="js/app.js?v=20260824c"></script>
-<script src="js/policy-map.js?v=20260823h"></script>
+<script src="js/program.js?v=20260826c"></script>
+<script src="js/policy-board.js?v=20260826c"></script>
+<script src="js/app.js?v=20260826c"></script>
+<script src="js/policy-map.js?v=20260826c"></script>
 
 </body>
 </html>

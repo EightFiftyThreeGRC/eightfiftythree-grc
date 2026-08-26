@@ -52,15 +52,10 @@ var SLG_SECTOR_OPTIONS = [
   { id: 'justice_public_safety', label: 'Justice / public safety' }
 ];
 
-// ─── ORGANIZATION PROFILE (setup Step 2) ───────────────────────────────────
-// Inputs to two derived recommendations:
-//   \u2022 Step 3 \u2014 a provisional NIST 800-53 baseline (recommendBaseline, js/program.js)
-//   \u2022 Step 4 \u2014 voluntary standards + laws (recommendRegMapping).
-//     Profile answers (orgNonUsFootprint, orgSoc2Demand, orgDataTypes, sector)
-//     pre-select overlays and the UI cites the Profile reason. Sector alone
-//     is not a positive ISO / SOC 2 signal.
-// Sector / government level live in the classification fields and are reused
-// by both engines. Identity (org name + owner) is Step 1.
+// ─── ORGANIZATION PROFILE (retired) ────────────────────────────────────────
+// Setup no longer asks workforce / impact / sector / data / SOC 2 / non-US.
+// Leftover org* keys may still exist on saved programs; they are not read for
+// overlay pre-select or baseline recommendation. Overlay toggles are manual.
 var ORG_SIZE_OPTIONS = [
   { id: '', label: 'Select workforce size\u2026' },
   { id: 'lt50', label: 'Under 50 people' },
@@ -115,23 +110,11 @@ function orgDataTypeLabel(id) {
 
 /** True once every profile question that feeds a recommendation is answered. */
 function isOrgProfileComplete() {
-  return !!state.orgSizeBand
-    && !!state.orgImpactProfile
-    && !!state.orgNonUsFootprint
-    && !!state.orgSoc2Demand
-    && getOrgDataTypes().length > 0;
+  return false;
 }
 
-/** First missing required field on the Profile step (classification + profile). */
+/** Profile step removed \u2014 never block navigation on leftover org* fields. */
 function getOrgProfileIncompleteMessage() {
-  if (!state.orgOwnership) return 'Select organization type before continuing.';
-  if (state.orgOwnership === 'government' && !state.orgGovLevel) return 'Select government level before continuing.';
-  if (!state.orgSector) return 'Select sector before continuing.';
-  if (!state.orgSizeBand) return 'Select workforce size before continuing.';
-  if (!state.orgImpactProfile) return 'Select the worst realistic consequence before continuing.';
-  if (!getOrgDataTypes().length) return 'Select which data is in scope (or None of the above) before continuing.';
-  if (!state.orgNonUsFootprint) return 'Say whether you operate outside the US before continuing.';
-  if (!state.orgSoc2Demand) return 'Say whether customers or investors require a SOC 2 before continuing.';
   return '';
 }
 
@@ -337,150 +320,33 @@ function getRegSuggestionsForProfile(key) {
 }
 
 /**
- * Step 4 overlay recommendations from the Step 2 Profile.
- *
- * Positive signals only \u2014 a "no" never turns a lens off if another answer
- * independently recommends it:
- *   \u2022 ISO 27001  \u2014 orgNonUsFootprint === 'yes' (US-only is not a positive signal)
- *   \u2022 SOC 2      \u2014 orgSoc2Demand === 'yes'
- *   \u2022 HIPAA      \u2014 PHI in scope, or healthcare / Medicare-integrator sector
- *   \u2022 GLBA       \u2014 financial-services sector
- *   \u2022 SOX        \u2014 financial-reporting data, or financial-services sector
- *   \u2022 FERPA      \u2014 education sector
- *   \u2022 FISMA      \u2014 federal program, CUI, or the Program-step FISMA toggle
- *   \u2022 State privacy \u2014 consumer/employee PII, or SLG general government
+ * Overlays are fully manual. Profile answers used to pre-select ISO/SOC 2/HIPAA
+ * here; that step is gone, so nothing is recommended or auto-checked.
  */
 function recommendRegMapping() {
-  var profileReady = typeof isOrgProfileComplete === 'function' && isOrgProfileComplete();
-  var data = typeof getOrgDataTypes === 'function' ? getOrgDataTypes() : [];
-  var has = function(id) { return data.indexOf(id) >= 0; };
-  var isGov = state.orgOwnership === 'government';
-  var isFederal = isGov && state.orgGovLevel === 'federal';
-  var isSlg = isGov && state.orgGovLevel === 'slg';
-  var sector = state.orgSector || '';
-
-  var standards = {
-    iso27001: { recommended: false, certainty: '', reason: '' },
-    soc2: { recommended: false, certainty: '', reason: '' }
-  };
-  var laws = {};
-  Object.keys(COMPLIANCE_LAW_META).forEach(function(id) {
-    laws[id] = { recommended: false, certainty: '', reason: '' };
-  });
-  var factors = [];
-
-  function recStandard(id, certainty, reason, factorLabel) {
-    if (!standards[id]) return;
-    if (!standards[id].recommended) {
-      standards[id].recommended = true;
-      standards[id].certainty = certainty;
-      standards[id].reason = reason;
-      factors.push({ label: factorLabel || reason, detail: reason });
-    }
-  }
-  function recLaw(id, certainty, reason, factorLabel) {
-    if (!laws[id]) return;
-    if (!laws[id].recommended) {
-      laws[id].recommended = true;
-      laws[id].certainty = certainty;
-      laws[id].reason = reason;
-      factors.push({ label: factorLabel || reason, detail: reason });
-    }
-  }
-
-  if (state.orgNonUsFootprint === 'yes') {
-    recStandard('iso27001', 'high', 'Recommended from Profile: operate outside the US', 'ISO 27001');
-  }
-  if (state.orgSoc2Demand === 'yes') {
-    recStandard('soc2', 'high', 'Recommended from Profile: customers require SOC 2', 'SOC 2');
-  }
-
-  if (has('phi')) {
-    recLaw('hipaa', 'high', 'Recommended from Profile: PHI in scope', 'HIPAA');
-  } else if (sector === 'healthcare' || sector === 'medicare_integrator') {
-    recLaw('hipaa', 'high', 'Recommended from Profile: healthcare sector', 'HIPAA');
-  }
-  if (sector === 'financial') {
-    recLaw('glba', 'high', 'Recommended from Profile: financial services sector', 'GLBA');
-  }
-  if (has('finrep')) {
-    recLaw('sox', 'high', 'Recommended from Profile: financial-reporting-relevant data', 'SOX');
-  } else if (sector === 'financial') {
-    recLaw('sox', 'medium', 'Recommended from Profile: financial services sector', 'SOX');
-  }
-  if (sector === 'education') {
-    recLaw('ferpa', 'high', 'Recommended from Profile: education sector', 'FERPA');
-  }
-  if (isFederal) {
-    recLaw('fisma', 'high', 'Recommended from Profile: federal program', 'FISMA');
-  } else if (has('cui')) {
-    recLaw('fisma', 'high', 'Recommended from Profile: CUI / federal contract information', 'FISMA');
-  } else if (state.fismaMode) {
-    recLaw('fisma', 'high', 'Recommended from Program: FISMA / CUI systems toggle', 'FISMA');
-  }
-  if (has('pii')) {
-    recLaw('state_privacy', 'high', 'Recommended from Profile: consumer or employee PII', 'State privacy laws');
-  } else if (isSlg && sector === 'general') {
-    recLaw('state_privacy', 'medium', 'Recommended from Profile: state & local government', 'State privacy laws');
-  }
-
-  var stdNames = Object.keys(standards).filter(function(id) { return standards[id].recommended; })
-    .map(function(id) { return FRAMEWORK_META[id].label; });
-  var lawNames = Object.keys(laws).filter(function(id) { return laws[id].recommended; })
-    .map(function(id) { return COMPLIANCE_LAW_META[id].label; });
-  var allNames = stdNames.concat(lawNames);
-
-  var summary;
-  if (!profileReady) {
-    summary = 'Finish the Profile in Step 2 to pre-select overlays from those answers.';
-  } else if (allNames.length) {
-    summary = allNames.join(', ') + (allNames.length === 1 ? ' is' : ' are')
-      + ' recommended from your Profile answers. You can still change any switch.';
-    if (state.orgNonUsFootprint === 'no' && !standards.iso27001.recommended) {
-      summary += ' ISO 27001 is not recommended \u2014 US-only is not a positive ISO signal.';
-    }
-  } else {
-    summary = 'No overlay is recommended from this Profile. You can still turn any of them on.';
-    if (state.orgNonUsFootprint === 'no') {
-      summary += ' US-only is not a positive ISO 27001 signal.';
-    }
-  }
-
   return {
-    available: profileReady,
-    standards: standards,
-    laws: laws,
-    factors: factors,
-    summary: summary,
+    available: false,
+    standards: {
+      iso27001: { recommended: false, certainty: '', reason: '' },
+      soc2: { recommended: false, certainty: '', reason: '' }
+    },
+    laws: Object.keys(COMPLIANCE_LAW_META).reduce(function(acc, id) {
+      acc[id] = { recommended: false, certainty: '', reason: '' };
+      return acc;
+    }, {}),
+    factors: [],
+    summary: 'Overlays are optional. Turn on any lens that applies \u2014 nothing is pre-selected.',
     caveat: 'These are optional overlays. They do not change any system\u2019s 800-53 baseline.',
-    profileKey: typeof getOrgProfileSignature === 'function' ? getOrgProfileSignature() : ''
+    profileKey: ''
   };
 }
 
-/** Persist the live recommendation and pre-select matching overlays. */
+/** Profile removed: overlays are fully manual. Never pre-check from leftover org* fields. */
 function applyRegMappingRecommendations(force) {
-  if (!force && state._regMappingInitialized) return false;
-  var rec = recommendRegMapping();
   if (!state.activeFrameworks) state.activeFrameworks = {};
   if (!state.activeComplianceLaws) state.activeComplianceLaws = {};
-  Object.keys(FRAMEWORK_META).forEach(function(id) {
-    var item = rec.standards[id];
-    state.activeFrameworks[id] = !!(item && item.recommended);
-  });
-  Object.keys(COMPLIANCE_LAW_META).forEach(function(id) {
-    var item = rec.laws[id];
-    state.activeComplianceLaws[id] = !!(item && item.recommended);
-  });
-  state.regMappingRecommendation = {
-    standards: rec.standards,
-    laws: rec.laws,
-    summary: rec.summary,
-    computedAt: new Date().toISOString(),
-    profileKey: rec.profileKey
-  };
   state._regMappingInitialized = true;
-  if (typeof markDirty === 'function') markDirty();
-  return true;
+  return false;
 }
 
 function isOrgClassificationComplete() {
@@ -781,7 +647,7 @@ function toggleActiveFramework(fwId) {
   markDirty();
   renderFrameworksTab();
   if (typeof refreshCurrentCisoStep === 'function') refreshCurrentCisoStep();
-  else if (typeof renderCISOStep3Integrations === 'function' && document.getElementById('ciso-step-4-body')) renderCISOStep3Integrations();
+  else if (typeof renderCISOStep3Integrations === 'function' && (document.getElementById('ciso-step-3-body') || document.getElementById('ciso-step-4-body'))) renderCISOStep3Integrations();
 }
 
 function toggleActiveComplianceLaw(lawId) {
@@ -796,7 +662,7 @@ function toggleActiveComplianceLaw(lawId) {
   markDirty();
   renderFrameworksTab();
   if (typeof refreshCurrentCisoStep === 'function') refreshCurrentCisoStep();
-  else if (typeof renderCISOStep3Integrations === 'function' && document.getElementById('ciso-step-4-body')) renderCISOStep3Integrations();
+  else if (typeof renderCISOStep3Integrations === 'function' && (document.getElementById('ciso-step-3-body') || document.getElementById('ciso-step-4-body'))) renderCISOStep3Integrations();
 }
 
 function computeFrameworkCoverage(fwId) {
@@ -970,47 +836,24 @@ function renderFrameworkDashboardStripHtml() {
 }
 
 function renderRegMappingRecommendationHtml() {
-  if (typeof renderRecommendationPanelHtml !== 'function' || typeof recommendRegMapping !== 'function') return '';
-  var rec = recommendRegMapping();
-  var stdOn = Object.keys(rec.standards || {}).filter(function(id) { return rec.standards[id] && rec.standards[id].recommended; });
-  var lawOn = Object.keys(rec.laws || {}).filter(function(id) { return rec.laws[id] && rec.laws[id].recommended; });
-  var names = stdOn.map(function(id) { return FRAMEWORK_META[id].label; })
-    .concat(lawOn.map(function(id) { return COMPLIANCE_LAW_META[id].label; }));
-  var verdict = names.length
-    ? names.join(', ') + ' recommended from Profile'
-    : 'No overlay is recommended from this Profile';
-  return renderRecommendationPanelHtml({
-    heading: 'From your Profile',
-    verdict: verdict,
-    tone: names.length ? 'ok' : 'info',
-    summary: rec.summary,
-    factors: rec.factors,
-    caveat: rec.caveat
-  });
+  return '';
 }
 
 function renderFrameworkSetupSectionHtml() {
   var af = state.activeFrameworks || {};
-  var rec = typeof recommendRegMapping === 'function' ? recommendRegMapping() : null;
   var rows = Object.keys(FRAMEWORK_META).map(function(fwId) {
     var meta = FRAMEWORK_META[fwId];
     var on = !!af[fwId];
-    var item = rec && rec.standards ? rec.standards[fwId] : null;
-    var suggested = !!(item && item.recommended);
-    var reason = suggested ? (item.reason || '') : '';
-    return renderRegSetupRow(meta, on, suggested, 'toggleActiveFramework(\'' + fwId + '\')', null, reason);
+    return renderRegSetupRow(meta, on, false, 'toggleActiveFramework(\'' + fwId + '\')', null, '');
   }).join('');
   rows += getCustomRegFrameworks('standard').map(function(c) {
     var meta = getCustomRegMeta(c);
     return renderRegSetupRow(meta, !!c.active, false, 'toggleActiveFramework(\'' + c.id + '\')', 'removeCustomRegFramework(\'' + c.id + '\')');
   }).join('');
-  var profileHint = rec && rec.available
-    ? '<div class="form-hint" style="margin-bottom:12px;"><strong>' + escapeHTML(getOrgClassificationSummary() || 'Profile') + '</strong> \u2014 switches start from your Profile answers. You can still turn any overlay on or off. <span class="fw-setup-suggested-inline">Recommended</span> items cite the Profile signal.</div>'
-    : '<div class="form-hint" style="margin-bottom:12px;">Complete the Profile in Step 2 to pre-select overlays. You can still enable any lens now.</div>';
   return '<div class="fw-setup-section">'
     + '<div class="section-title" style="margin-bottom:4px;">Voluntary standards &amp; frameworks</div>'
     + '<div class="section-subtitle" style="margin-bottom:8px;">NIST 800-53 is your anchor. CSF 2.0 is always on as the outcome language for this program \u2014 it is not an optional overlay. Enable other lenses below to see ISO, SOC 2, and similar crosswalks on every control.</div>'
-    + profileHint
+    + '<div class="form-hint" style="margin-bottom:12px;">Turn on any overlay that applies. Nothing is pre-selected.</div>'
     + '<div class="fw-setup-list">' + rows + '</div>'
     + '</div>';
 }
@@ -1033,14 +876,10 @@ function renderRegSetupRow(meta, on, suggested, toggleFn, removeFn, reason) {
 
 function renderComplianceLawSetupSectionHtml() {
   var laws = state.activeComplianceLaws || {};
-  var rec = typeof recommendRegMapping === 'function' ? recommendRegMapping() : null;
   var rows = Object.keys(COMPLIANCE_LAW_META).map(function(lawId) {
     var meta = COMPLIANCE_LAW_META[lawId];
     var on = !!laws[lawId];
-    var item = rec && rec.laws ? rec.laws[lawId] : null;
-    var suggested = !!(item && item.recommended);
-    var reason = suggested ? (item.reason || '') : '';
-    return renderRegSetupRow(meta, on, suggested, 'toggleActiveComplianceLaw(\'' + lawId + '\')', null, reason);
+    return renderRegSetupRow(meta, on, false, 'toggleActiveComplianceLaw(\'' + lawId + '\')', null, '');
   }).join('');
   rows += getCustomRegFrameworks('law').map(function(c) {
     var meta = getCustomRegMeta(c);

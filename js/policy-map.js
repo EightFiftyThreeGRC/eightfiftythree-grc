@@ -2,8 +2,8 @@
 // Globals only. Load after program.js and app.js so hooks can wrap the CISO wizard.
 // Path A (build-from-scratch) stays in js/program.js unchanged.
 
-var POLICY_MAP_STEPS = 7;
-var POLICY_MAP_STEP_LABELS = ['Organization', 'Profile', 'Program', 'Catalog', 'Map', 'Policy set', 'Assign owners'];
+var POLICY_MAP_STEPS = 6;
+var POLICY_MAP_STEP_LABELS = ['Organization', 'Program', 'Catalog', 'Map', 'Policy set', 'Assign owners'];
 var POLICY_MAP_DOC_TYPES = [
   { id: 'policy', label: 'Policy', hint: 'Intent \u2014 what must be true' },
   { id: 'standard', label: 'Standard', hint: 'Measurable requirement' },
@@ -33,18 +33,17 @@ function migrateUnifiedSetupPath() {
   var s = parseInt(state.policyMapStep, 10) || 1;
   var dest = 1;
   if (s <= 1) dest = 1;
-  else if (s === 2) dest = 2;
-  else if (s === 3) dest = 3;
-  else if (s === 4 || s === 5) dest = 6;
-  else if (s === 6) dest = 7;
-  else dest = 8;
+  else if (s === 2 || s === 3) dest = 2;
+  else if (s === 4 || s === 5) dest = 5;
+  else if (s === 6) dest = 6;
+  else dest = 7;
   state.cisoSetupStep = dest;
   if (typeof currentStep !== 'undefined') currentStep.ciso = dest;
   if (s >= 5 && typeof applyPolicyCatalogToProgram === 'function') {
     try { applyPolicyCatalogToProgram(); } catch (e) { /* keep going */ }
   }
   state.programPath = 'build';
-  state.policyMapWizardRev = Math.max(parseInt(state.policyMapWizardRev, 10) || 0, 3);
+  state.policyMapWizardRev = Math.max(parseInt(state.policyMapWizardRev, 10) || 0, 4);
   if (typeof markDirty === 'function') markDirty();
 }
 
@@ -514,13 +513,6 @@ function policyMapGoTo(step) {
     step = 1;
   }
   if (step > 2) {
-    var profileMsg = typeof getOrgProfileIncompleteMessage === 'function' ? getOrgProfileIncompleteMessage() : '';
-    if (profileMsg) {
-      if (typeof showToast === 'function') showToast(profileMsg, true);
-      step = 2;
-    }
-  }
-  if (step > 3) {
     if (typeof ensureCommonControlFloor === 'function') ensureCommonControlFloor();
   }
   state.policyMapStep = step;
@@ -544,17 +536,9 @@ function policyMapValidateUpTo(fromStep) {
     }
   }
   if (fromStep >= 2) {
-    if (typeof toastCisoProfileIncomplete === 'function') {
-      if (toastCisoProfileIncomplete()) return false;
-    } else if (typeof getOrgProfileIncompleteMessage === 'function') {
-      var msg = getOrgProfileIncompleteMessage();
-      if (msg) { showToast(msg, true); return false; }
-    }
-  }
-  if (fromStep >= 3) {
     if (typeof ensureCommonControlFloor === 'function') ensureCommonControlFloor();
   }
-  if (fromStep >= 4) {
+  if (fromStep >= 3) {
     ensurePolicyCatalog();
     var named = state.policyCatalog.filter(function(d) { return d && String(d.title || '').trim(); });
     if (!named.length) {
@@ -562,7 +546,7 @@ function policyMapValidateUpTo(fromStep) {
       return false;
     }
   }
-  if (fromStep >= 5) {
+  if (fromStep >= 4) {
     var anyMapped = state.policyCatalog.some(function(d) {
       return d && ((d.familyCodes && d.familyCodes.length) || (d.controlIds && d.controlIds.length)
         || (d.csfFunctions && d.csfFunctions.length) || d.isProgramPolicy);
@@ -577,7 +561,7 @@ function policyMapValidateUpTo(fromStep) {
 
 function policyMapNext(fromStep) {
   if (!policyMapValidateUpTo(fromStep)) return;
-  if (fromStep === 3) policyMapEnsurePmDefaults();
+  if (fromStep === 2) policyMapEnsurePmDefaults();
   policyMapGoTo(fromStep + 1);
 }
 
@@ -602,14 +586,13 @@ function policyMapSetChrome(mode) {
 
 function policyMapSyncStepNav() {
   var step = parseInt(state.policyMapStep, 10) || 1;
-  for (var i = 1; i <= 8; i++) {
+  var pathAMax = (typeof CISO_WIZARD_STEPS === 'number') ? CISO_WIZARD_STEPS : 7;
+  for (var i = 1; i <= pathAMax; i++) {
     var item = document.getElementById('ciso-step-item-' + i);
     var conn = document.getElementById('ciso-conn-' + i);
-    if (i === 8) {
+    if (i > POLICY_MAP_STEPS) {
       if (item) item.style.display = 'none';
       if (conn) conn.style.display = 'none';
-      var conn7 = document.getElementById('ciso-conn-7');
-      if (conn7) conn7.style.display = 'none';
       continue;
     }
     if (item) {
@@ -620,9 +603,9 @@ function policyMapSyncStepNav() {
       if (nameEl) nameEl.textContent = POLICY_MAP_STEP_LABELS[i - 1] || '';
       if (numEl) numEl.textContent = 'Step ' + i;
     }
-    if (conn) conn.style.display = (i < 7) ? '' : 'none';
+    if (conn) conn.style.display = (i < POLICY_MAP_STEPS) ? '' : 'none';
   }
-  for (var c = 1; c <= 7; c++) {
+  for (var c = 1; c <= POLICY_MAP_STEPS; c++) {
     var circle = document.getElementById('ciso-circle-' + c);
     var navItem = document.getElementById('ciso-step-item-' + c);
     if (!circle || !navItem) continue;
@@ -641,8 +624,9 @@ function policyMapSyncStepNav() {
 
 function restorePathAStepNav() {
   var labels = (typeof CISO_STEP_LABELS !== 'undefined') ? CISO_STEP_LABELS
-    : ['Organization', 'Profile', 'Program', 'Reg mapping', 'PM Controls', 'InfoSec Policy', 'Policy set', 'Assign Owners'];
-  for (var i = 1; i <= 8; i++) {
+    : ['Organization', 'Program', 'Reg mapping', 'PM Controls', 'InfoSec Policy', 'Policy set', 'Assign Owners'];
+  var maxNav = (typeof CISO_WIZARD_STEPS === 'number') ? CISO_WIZARD_STEPS : 7;
+  for (var i = 1; i <= maxNav; i++) {
     var item = document.getElementById('ciso-step-item-' + i);
     var conn = document.getElementById('ciso-conn-' + i);
     if (item) {
@@ -677,12 +661,11 @@ function policyMapUpdateProgress(step) {
  */
 var POLICY_MAP_PATH_A_PANELS = [
   { key: 'organization', pathBStep: 1, pathAStep: 1, pathALabel: 'Organization' },
-  { key: 'profile', pathBStep: 2, pathAStep: 2, pathALabel: 'Profile' },
-  { key: 'program', pathBStep: 3, pathAStep: 3, pathALabel: 'Program' },
-  { key: 'assignOwners', pathBStep: POLICY_MAP_STEPS, pathAStep: 8, pathALabel: 'Assign Owners' }
+  { key: 'program', pathBStep: 2, pathAStep: 2, pathALabel: 'Program' },
+  { key: 'assignOwners', pathBStep: POLICY_MAP_STEPS, pathAStep: 7, pathALabel: 'Assign Owners' }
 ];
 /** First Path B step with its own renderer — where Path-A-only steps land. */
-var POLICY_MAP_FIRST_OWN_STEP = 4;
+var POLICY_MAP_FIRST_OWN_STEP = 3;
 
 /**
  * Resolve one mapping against the live CISO_STEP_LABELS. If Path A was re-numbered the
@@ -721,7 +704,7 @@ function policyMapStepForPathAStep(pathAStep) {
 
 /** Activate one Path A wizard panel and deactivate the rest. */
 function policyMapActivatePathAPanel(pathAStep) {
-  var max = (typeof CISO_WIZARD_STEPS === 'number') ? CISO_WIZARD_STEPS : 8;
+  var max = (typeof CISO_WIZARD_STEPS === 'number') ? CISO_WIZARD_STEPS : 7;
   for (var i = 1; i <= max; i++) {
     var panel = document.getElementById('ciso-step-' + i);
     if (panel) panel.classList.toggle('active', i === pathAStep);
@@ -751,8 +734,8 @@ function policyMapShowPathAStep(pathAStep, pathBStep) {
 
 /** Path A footers that Path B rewrites, with their app.html defaults for restoration. */
 var POLICY_MAP_PATH_A_FOOTERS = [
-  { panel: 3, sel: '.btn-primary', text: 'Next: Reg mapping \u2192', onclick: 'cisoNext(3)' },
-  { panel: 8, sel: '.btn-secondary', text: '\u2190 Back', onclick: "goToStep('ciso',7)" }
+  { panel: 2, sel: '.btn-primary', text: 'Next: Reg mapping \u2192', onclick: 'cisoNext(2)' },
+  { panel: 7, sel: '.btn-secondary', text: '\u2190 Back', onclick: "goToStep('ciso',6)" }
 ];
 
 function policyMapFooterButton(panel, sel) {
@@ -768,13 +751,13 @@ function policyMapPatchPathAFooters(step) {
     restorePathAFooters();
     return;
   }
-  var btn3 = policyMapFooterButton(3, '.btn-primary');
-  if (btn3) {
-    btn3.textContent = 'Next: Catalog documents \u2192';
-    btn3.setAttribute('onclick', 'policyMapNext(3)');
+  var btn2 = policyMapFooterButton(2, '.btn-primary');
+  if (btn2) {
+    btn2.textContent = 'Next: Catalog documents \u2192';
+    btn2.setAttribute('onclick', 'policyMapNext(2)');
   }
   if (step === POLICY_MAP_STEPS) {
-    var back = policyMapFooterButton(8, '.btn-secondary');
+    var back = policyMapFooterButton(7, '.btn-secondary');
     if (back) {
       back.setAttribute('onclick', 'policyMapGoTo(' + (POLICY_MAP_STEPS - 1) + ')');
       back.textContent = '\u2190 Back to ' + (POLICY_MAP_STEP_LABELS[POLICY_MAP_STEPS - 2] || 'previous step').toLowerCase();
@@ -816,13 +799,13 @@ function renderPolicyMapWizardBody(step) {
   var root = document.getElementById('pmap-root');
   if (!root) return;
   var inner = '';
-  if (step === 4) inner = renderPolicyMapCatalogHtml();
-  else if (step === 5) inner = renderPolicyMapAlignHtml();
+  if (step === 3) inner = renderPolicyMapCatalogHtml();
+  else if (step === 4) inner = renderPolicyMapAlignHtml();
   else inner = renderPolicyMapCoverageHtml();
 
   var backStep = step - 1;
-  var nextLabel = step === 4 ? 'Next: Map to NIST \u2192' : step === 5 ? 'Next: Policy set \u2192' : 'Next: Assign owners \u2192';
-  var nextFn = step === 6 ? 'policyMapConfirmCoverage()' : 'policyMapNext(' + step + ')';
+  var nextLabel = step === 3 ? 'Next: Map to NIST \u2192' : step === 4 ? 'Next: Policy set \u2192' : 'Next: Assign owners \u2192';
+  var nextFn = step === 5 ? 'policyMapConfirmCoverage()' : 'policyMapNext(' + step + ')';
 
   root.innerHTML = ''
     + '<div class="wizard-step active pmap-step">'
@@ -836,7 +819,7 @@ function renderPolicyMapWizardBody(step) {
 function policyMapRerender() {
   setTimeout(function() {
     var step = parseInt(state.policyMapStep, 10) || 1;
-    if (step === 4 || step === 5 || step === 6) renderPolicyMapWizardBody(step);
+    if (step === 3 || step === 4 || step === 5) renderPolicyMapWizardBody(step);
   }, 0);
 }
 
@@ -1237,7 +1220,7 @@ function policyMapLeftoverFamilies(fnDocs) {
 }
 
 function policyMapConfirmCoverage() {
-  if (!policyMapValidateUpTo(5)) return;
+  if (!policyMapValidateUpTo(4)) return;
   if (typeof ensureCsfFunctionGrouping === 'function') ensureCsfFunctionGrouping();
   applyPolicyCatalogToProgram();
   if (!state.policyPriorities) state.policyPriorities = {};
@@ -1254,7 +1237,7 @@ function policyMapConfirmCoverage() {
     addAuditEntry('program', null, 'Policy set confirmed (' + (state.policyCatalog || []).length + ' catalog documents)');
   } catch (e) { /* ignore */ }
   showToast('Policy set saved. Mapped documents count as coverage; remaining Function policies can be drafted after owners are assigned.');
-  policyMapGoTo(7);
+  policyMapGoTo(POLICY_MAP_STEPS);
 }
 
 function policyMapDraftMissing(fam) {
@@ -1276,7 +1259,7 @@ function policyMapDraftMissing(fam) {
 }
 
 function policyMapAddAnother() {
-  state.policyMapStep = 4;
+  state.policyMapStep = 3;
   policyMapAddDocument();
 }
 

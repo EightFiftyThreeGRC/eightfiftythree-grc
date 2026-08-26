@@ -328,9 +328,11 @@ function policyBoardRerender() {
   _policyBoardDrag = null;
   setTimeout(function() {
     var mapStep = parseInt(state && state.policyMapStep, 10) || 1;
-    if (typeof shouldRenderPolicyMapSetup === 'function' && shouldRenderPolicyMapSetup() && mapStep === 6
+    if (typeof shouldRenderPolicyMapSetup === 'function' && shouldRenderPolicyMapSetup()
+        && typeof POLICY_MAP_STEP_LABELS !== 'undefined'
+        && mapStep === (POLICY_MAP_STEP_LABELS.indexOf('Policy set') + 1)
         && typeof renderPolicyMapWizardBody === 'function') {
-      renderPolicyMapWizardBody(6);
+      renderPolicyMapWizardBody(mapStep);
       return;
     }
     if (typeof renderActiveCisoSetupStep === 'function') renderActiveCisoSetupStep();

@@ -4,8 +4,8 @@ function getSetupProgressSummary() {
   var persisted = parseInt(state.cisoSetupStep, 10) || 0;
   var live = (typeof currentStep !== 'undefined' && currentStep.ciso) ? currentStep.ciso : 0;
   var step = persisted || live || 1;
-  var total = (typeof CISO_WIZARD_STEPS === 'number') ? CISO_WIZARD_STEPS : 8;
-  var labels = (typeof CISO_STEP_LABELS !== 'undefined') ? CISO_STEP_LABELS : ['Organization', 'Profile', 'Program', 'Reg mapping', 'PM Controls', 'InfoSec Policy', 'Policy set', 'Assign Owners'];
+  var total = (typeof CISO_WIZARD_STEPS === 'number') ? CISO_WIZARD_STEPS : 7;
+  var labels = (typeof CISO_STEP_LABELS !== 'undefined') ? CISO_STEP_LABELS : ['Organization', 'Program', 'Reg mapping', 'PM Controls', 'InfoSec Policy', 'Policy set', 'Assign Owners'];
   var pct = Math.round((step / total) * 100);
   return { step: step, pct: pct, label: labels[step - 1] || 'Organization', total: total };
 }
@@ -166,7 +166,7 @@ function getNextActions(limit) {
 
   if (!state.cisoComplete) {
     var p = getSetupProgressSummary();
-    var total = p.total || ((typeof CISO_WIZARD_STEPS === 'number') ? CISO_WIZARD_STEPS : 8);
+    var total = p.total || ((typeof CISO_WIZARD_STEPS === 'number') ? CISO_WIZARD_STEPS : 7);
     actions.push({
       priority: 1,
       icon: '🏛️',

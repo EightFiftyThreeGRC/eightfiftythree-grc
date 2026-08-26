@@ -176,13 +176,13 @@ function updateCISOFinishBtn() {
     return;
   }
 
-  // Consolidate: hide finalize — use Next in footer to reach Assign Owners
-  if (currentStep.ciso === 7) {
+  // Policy set: hide finalize — use Next in footer to reach Assign Owners
+  if (currentStep.ciso === cisoStepIndexByLabel('Policy set', CISO_WIZARD_STEPS - 1)) {
     btn.style.display = 'none';
     return;
   }
   // Assign Owners: show finalize when all owners assigned
-  if (currentStep.ciso === 8) {
+  if (currentStep.ciso === cisoStepIndexByLabel('Assign Owners', CISO_WIZARD_STEPS)) {
     btn.style.display = '';
     const ready = allOwnersAssigned();
     btn.innerHTML = ready ? '✓ Finalise Program Setup' : '✓ Finalise Program Setup — assign all owners first';
@@ -209,8 +209,8 @@ function updateCISOFinishBtn() {
 // renderCISOStep router, cisoNext, allOwnersAssigned,
 // updateCISOFinishBtn, goToStep, etc.
 // ============================================================
-var CISO_WIZARD_STEPS = 8;
-var CISO_STEP_LABELS = ['Organization', 'Profile', 'Program', 'Reg mapping', 'PM Controls', 'InfoSec Policy', 'Policy set', 'Assign Owners'];
+var CISO_WIZARD_STEPS = 7;
+var CISO_STEP_LABELS = ['Organization', 'Program', 'Reg mapping', 'PM Controls', 'InfoSec Policy', 'Policy set', 'Assign Owners'];
 
 /** Label-first lookup so a re-number warns instead of painting the wrong step. */
 function cisoStepIndexByLabel(label, fallback) {
@@ -245,11 +245,14 @@ function updateCisoSetupProgress(step) {
 }
 
 function getCisoSetupStepDisplay(step, label) {
-  var displayStep = step;
   var total = CISO_WIZARD_STEPS;
   var displayLabel = label || (CISO_STEP_LABELS[step - 1] || '');
-  if (label) cisoStepIndexByLabel(label, step);
+  var displayStep = label ? cisoStepIndexByLabel(label, step) : step;
   return { step: displayStep, total: total, label: displayLabel };
+}
+
+function cisoStepBodyId(label, fallback) {
+  return 'ciso-step-' + cisoStepIndexByLabel(label, fallback) + '-body';
 }
 
 function cisoStepProgressHtml(step, label) {
@@ -272,21 +275,20 @@ function renderCISOStep(step) {
     state.cisoSetupStep = step;
     if (typeof markDirty === 'function') markDirty();
   }
-  if (step===1) renderCISOStep1();
-  if (step===2) renderCISOStep1Profile();
-  if (step===3) renderCISOStep2Baseline();
-  if (step===4) renderCISOStep3Integrations();
-  if (step===5) renderCISOStep2();
-  if (step===6) renderCISOStep3();
-  if (step===7) renderCISOStep4a();
-  if (step===8) renderCISOStep4b();
+  if (step === cisoStepIndexByLabel('Organization', 1)) renderCISOStep1();
+  if (step === cisoStepIndexByLabel('Program', 2)) renderCISOStep2Baseline();
+  if (step === cisoStepIndexByLabel('Reg mapping', 3)) renderCISOStep3Integrations();
+  if (step === cisoStepIndexByLabel('PM Controls', 4)) renderCISOStep2();
+  if (step === cisoStepIndexByLabel('InfoSec Policy', 5)) renderCISOStep3();
+  if (step === cisoStepIndexByLabel('Policy set', 6)) renderCISOStep4a();
+  if (step === cisoStepIndexByLabel('Assign Owners', 7)) renderCISOStep4b();
   updateCisoSetupProgress(step);
 }
 
 /** After merge/unmerge while on consolidate or assign-owners, refresh the visible panel only. */
 function renderActiveCisoSetupStep() {
-  if (currentStep.ciso === 8) renderCISOStep4b();
-  else if (currentStep.ciso === 7) renderCISOStep4a();
+  if (currentStep.ciso === cisoStepIndexByLabel('Assign Owners', CISO_WIZARD_STEPS)) renderCISOStep4b();
+  else if (currentStep.ciso === cisoStepIndexByLabel('Policy set', CISO_WIZARD_STEPS - 1)) renderCISOStep4a();
 }
 
 function toastCisoIdentityIncomplete() {
@@ -318,27 +320,18 @@ function toastCisoIdentityIncomplete() {
 }
 
 function toastCisoProfileIncomplete() {
-  var msg = typeof getOrgProfileIncompleteMessage === 'function' ? getOrgProfileIncompleteMessage() : '';
-  if (msg) {
-    showToast(msg, true);
-    return true;
-  }
   return false;
 }
 
 function cisoNext(fromStep) {
   if (fromStep >= CISO_WIZARD_STEPS) return;
-  if (fromStep===1) {
+  if (fromStep === cisoStepIndexByLabel('Organization', 1)) {
     if (toastCisoIdentityIncomplete()) return;
   }
-  if (fromStep===2) {
-    if (toastCisoProfileIncomplete()) return;
+  if (fromStep === cisoStepIndexByLabel('Program', 2)) {
     if (typeof ensureCommonControlFloor === 'function') ensureCommonControlFloor();
   }
-  if (fromStep===3) {
-    if (typeof ensureCommonControlFloor === 'function') ensureCommonControlFloor();
-  }
-  if (fromStep===6) {
+  if (fromStep === cisoStepIndexByLabel('InfoSec Policy', 5)) {
     // Finalize the ISP. Setup no longer collects an approver email, so do not
     // block Next on a missing or invalid address.
     try { submitISPForApproval(true); } catch (e) { console.warn('submitISPForApproval failed:', e); }
@@ -497,7 +490,7 @@ function cisoFinish() {
   const unassigned = masters.filter(f => !isValidOwnerEmail((state.domainOwners[f] || {}).email));
 
   if (unassigned.length > 0) {
-    var ownerStepNo = getCisoSetupStepDisplay(CISO_WIZARD_STEPS, 'Assign owners').step;
+    var ownerStepNo = getCisoSetupStepDisplay(CISO_WIZARD_STEPS, 'Assign Owners').step;
     showToast('Assign an owner email for all ' + unassigned.length + ' domain(s) before finalizing. Use the program owner button in Step ' + ownerStepNo + '.', true);
     return;
   }
@@ -990,7 +983,7 @@ function openProcessSspFromLibrary(procId) {
 // CISO STEP 4 — REGULATORY MAPPING
 // ============================================================
 function renderCISOStep1() {
-  const body = document.getElementById('ciso-step-1-body');
+  const body = document.getElementById(cisoStepBodyId('Organization', 1));
   if (!body) return;
 
   body.innerHTML = `
@@ -1029,23 +1022,8 @@ function renderCISOStep1() {
   `;
 }
 
-function renderCISOStep1Profile() {
-  const body = document.getElementById('ciso-step-2-body');
-  if (!body) return;
-
-  body.innerHTML = `
-    ${cisoStepProgressHtml(2, 'Profile')}
-    <div class="section-title">A few questions</div>
-    <div class="section-subtitle">These answers suggest overlays and flag systems that may need a higher FIPS 199 categorization. Nothing here is asked again.</div>
-    <div class="ciso-profile-stack">
-      ${typeof renderOrgClassificationFieldsHtml === 'function' ? renderOrgClassificationFieldsHtml() : ''}
-      ${typeof renderOrgProfileFieldsHtml === 'function' ? renderOrgProfileFieldsHtml() : ''}
-    </div>
-  `;
-}
-
 // ============================================================
-// ORGANIZATIONAL BASELINE RECOMMENDATION (SETUP STEP 2)
+// ORGANIZATIONAL BASELINE RECOMMENDATION (retired Profile inputs)
 // ============================================================
 // What Step 2 actually selects is the *organization's* starting baseline: the
 // default, centrally-implemented, inheritable control set (common controls, the
@@ -1111,6 +1089,17 @@ function getOrgBaselineScopeCaveat(level) {
  *   fismaSuggested \u2014 federal / CUI program, so the info-types path is the better fit
  */
 function recommendBaseline() {
+  // Profile step removed 2026-08-26. Do not invent a floor from leftover org* fields.
+  return {
+    available: false,
+    level: (state.baseline === 'M' || state.baseline === 'H') ? state.baseline : 'L',
+    label: baselineLabel((state.baseline === 'M' || state.baseline === 'H') ? state.baseline : 'L'),
+    summary: '',
+    factors: [],
+    caveat: getOrgBaselineScopeCaveat((state.baseline === 'M' || state.baseline === 'H') ? state.baseline : 'L'),
+    fismaSuggested: !!state.fismaMode,
+    profileKey: ''
+  };
   var profileReady = typeof isOrgProfileComplete === 'function' && isOrgProfileComplete();
   var data = typeof getOrgDataTypes === 'function' ? getOrgDataTypes() : [];
   var has = function(id) { return data.indexOf(id) >= 0; };
@@ -1369,7 +1358,7 @@ function renderCsfProgramStructureHtml() {
 }
 
 function renderCISOStep2Baseline() {
-  const body = document.getElementById('ciso-step-3-body');
+  const body = document.getElementById(cisoStepBodyId('Program', 2));
   if (!body) return;
 
   ensureCommonControlFloor();
@@ -1387,13 +1376,12 @@ function renderCISOStep2Baseline() {
   const floorCount = typeof baselineCount === 'function' ? baselineCount(floor) : (BASELINE_COUNTS[floor] || 0);
   const privCount = typeof getPrivacyOnlyCatalogControlCount === 'function' ? getPrivacyOnlyCatalogControlCount() : 0;
   const isFisma = !!state.fismaMode;
-  const rec = typeof recommendBaseline === 'function' ? recommendBaseline() : { fismaSuggested: false };
 
   const fismaToggleCard = `
     <div class="privacy-toggle-card compact ${isFisma?'selected':''}" onclick="toggleProgramFismaMode()" style="margin-bottom:10px;border-color:${isFisma?'#7c3aed':'var(--border)'};${isFisma?'background:#f5f3ff;':''}">
       <div class="pt-info">
         <div class="pt-name">FISMA / CUI systems</div>
-        <div class="pt-desc">Federal, FedRAMP, DoD RMF, or CUI systems categorize from 800-60 information types in Assets &amp; SSP. This does not stamp the organization Moderate.${!isFisma && rec.fismaSuggested ? ' Profile suggests those systems exist.' : ''}</div>
+        <div class="pt-desc">Federal, FedRAMP, DoD RMF, or CUI systems categorize from 800-60 information types in Assets &amp; SSP. This does not stamp the organization Moderate.</div>
       </div>
       <div class="toggle-switch ${isFisma?'on':''}"></div>
     </div>`;
@@ -1405,7 +1393,7 @@ function renderCISOStep2Baseline() {
   }).join('');
 
   body.innerHTML = `
-    ${cisoStepProgressHtml(3, 'Program')}
+    ${cisoStepProgressHtml(2, 'Program')}
     <div class="section-title">This program is structured around NIST CSF 2.0</div>
     <p class="program-structure-lead">This step sets program structure and the inherited common-control floor. You do not choose \u201cthe organization is Moderate.\u201d Low / Moderate / High is chosen later for each information system in Assets &amp; SSP.</p>
     ${renderCsfProgramStructureHtml()}
@@ -1415,7 +1403,6 @@ function renderCISOStep2Baseline() {
       <div class="common-floor-line">${escapeHTML(floorLabel)} control baseline (RMF inherited catalog floor). Each system categorizes later in Assets &amp; SSP.</div>
       <div class="common-floor-sub">${floorCount} controls in the inherited common-control set. A Moderate or High system pulls additional controls through baseline elevation in Assets &amp; SSP without flipping this floor.</div>
     </div>
-    <p class="program-structure-flag">${escapeHTML(getProfileElevationFlagSentence())}</p>
     ${fismaToggleCard}
     <div class="privacy-toggle-card compact ${state.privacyOverlay?'selected':''}" onclick="togglePrivacy()" style="margin-top:8px;">
       <div class="pt-info">
@@ -1433,17 +1420,13 @@ function renderCISOStep2Baseline() {
 }
 
 function renderCISOStep3Integrations() {
-  const body = document.getElementById('ciso-step-4-body');
+  const body = document.getElementById(cisoStepBodyId('Reg mapping', 3));
   if (!body) return;
 
-  if (typeof applyRegMappingRecommendations === 'function') applyRegMappingRecommendations(false);
-
   body.innerHTML = `
-    ${cisoStepProgressHtml(4, 'Reg mapping')}
+    ${cisoStepProgressHtml(3, 'Reg mapping')}
     <div class="section-title">Overlays on the CSF program</div>
-    <div class="section-subtitle">CSF 2.0 is already the program structure. Turn on ISO 27001, SOC 2, HIPAA, SOX, or other lenses the profile suggested \u2014 they do not change any system\u2019s 800-53 baseline.</div>
-
-    ${typeof renderRegMappingRecommendationHtml === 'function' ? renderRegMappingRecommendationHtml() : ''}
+    <div class="section-subtitle">CSF 2.0 is already the program structure. Turn on ISO 27001, SOC 2, HIPAA, SOX, or other lenses yourself \u2014 they do not change any system\u2019s 800-53 baseline.</div>
 
     ${typeof renderFrameworkSetupSectionHtml === 'function' ? renderFrameworkSetupSectionHtml() : ''}
 
@@ -1665,7 +1648,7 @@ const PM_STATEMENTS = {
 // Program Management controls toggle + auto-draft statements.
 // ============================================================
 function renderCISOStep2() {
-  const body = document.getElementById('ciso-step-5-body');
+  const body = document.getElementById(cisoStepBodyId('PM Controls', 4));
   if (!body) return;
   const pmControls = CONTROLS.filter(c => c.f==='PM');
   const coreControls = pmControls.filter(c => c.bl.some(b=>['L','M','H'].includes(b)));
@@ -1734,7 +1717,7 @@ function renderCISOStep2() {
     : '';
 
   body.innerHTML = `
-    ${cisoStepProgressHtml(5, 'PM Controls')}
+    ${cisoStepProgressHtml(4, 'PM Controls')}
     <div class="section-title">Govern \u2014 CSF outcomes, then PM controls</div>
     <div class="section-subtitle">CSF subcategories are the primary choice. The Information Security Policy is the Govern (GV) policy. Select or deselect official GV outcomes, then review the 800-53 Program Management controls that implement them.</div>
     ${governHtml}
@@ -1744,7 +1727,7 @@ function renderCISOStep2() {
 
     <div class="info-alert">
       <div class="ia-icon">ℹ️</div>
-      <div class="ia-text"><strong>PM-1, PM-2, and PM-9 are pre-selected</strong> as they form the foundation of any security program. Clearing a mapped CSF outcome will not uncheck these CORE controls. All other PM controls follow the CSF selection when they have an official map entry \u2014 you can still check extras. PM controls are organization-wide and apply regardless of impact level.${state.privacyOverlay ? ` <strong style="color:#6366f1;">Privacy overlay is active:</strong> PM-18 through PM-${state.baseline==='H'?'28':state.baseline==='M'?'25':'20(1)'} are also pre-selected — these support the privacy program plan, leadership, disclosures, and PII governance requirements appropriate for the ${state.baseline==='H'?'High':state.baseline==='M'?'Moderate':'Low'} common-control floor. Policy requirements for these controls are automatically added to your Tier 1 policy in Step 6.` : ''}</div>
+      <div class="ia-text"><strong>PM-1, PM-2, and PM-9 are pre-selected</strong> as they form the foundation of any security program. Clearing a mapped CSF outcome will not uncheck these CORE controls. All other PM controls follow the CSF selection when they have an official map entry \u2014 you can still check extras. PM controls are organization-wide and apply regardless of impact level.${state.privacyOverlay ? ` <strong style="color:#6366f1;">Privacy overlay is active:</strong> PM-18 through PM-${state.baseline==='H'?'28':state.baseline==='M'?'25':'20(1)'} are also pre-selected — these support the privacy program plan, leadership, disclosures, and PII governance requirements appropriate for the ${state.baseline==='H'?'High':state.baseline==='M'?'Moderate':'Low'} common-control floor. Policy requirements for these controls are automatically added to your Tier 1 policy in Step ${cisoStepIndexByLabel('InfoSec Policy', 5)}.` : ''}</div>
     </div>
 
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; gap:12px; flex-wrap:wrap;">
@@ -1905,7 +1888,7 @@ function renderCISOStep3() {
     renderISPRevisionPanel();
     return;
   }
-  var body = document.getElementById('ciso-step-6-body');
+  var body = document.getElementById(cisoStepBodyId('InfoSec Policy', 5));
   if (!body) return;
   renderISPEditorBody(body, { context: 'setup' });
 }
@@ -1934,7 +1917,7 @@ function renderISPEditorBody(body, opts) {
   if (!body) return;
   if (typeof ensureCommonControlFloor === 'function') ensureCommonControlFloor();
   if (!state.baseline) {
-    body.innerHTML = '<div class="empty-state"><div class="es-icon">⚠️</div><div class="es-title">Program floor not ready</div><p>Complete Organization and Profile first. The catalog uses a Low common-control floor; systems categorize under FIPS 199 in Assets &amp; SSP.</p></div>';
+    body.innerHTML = '<div class="empty-state"><div class="es-icon">⚠️</div><div class="es-title">Program floor not ready</div><p>Complete Organization first. The catalog uses a Low common-control floor; systems categorize under FIPS 199 in Assets &amp; SSP.</p></div>';
     return;
   }
   // Init policy state
@@ -2087,7 +2070,7 @@ function renderISPEditorBody(body, opts) {
   var ispGovernHtml = (!isRevision && typeof renderCsfGovernIspReminderHtml === 'function')
     ? renderCsfGovernIspReminderHtml()
     : '';
-  body.innerHTML = (isRevision ? buildISPRevisionBannerHtml() : '')
+  body.innerHTML = (isRevision ? buildISPRevisionBannerHtml() : cisoStepProgressHtml(5, 'InfoSec Policy'))
     + (isRevision ? '' : ('<div class="section-title">' + escapeHTML((isp.title || '').trim() || getDefaultISPTitle()) + '</div>'
       + '<div class="section-subtitle">This is the Govern (GV) policy. Review and edit it here. Domain Function policies later implement Identify, Protect, Detect, Respond, and Recover.</div>'))
     + ispGovernHtml
@@ -2864,11 +2847,11 @@ function renderUnifiedPolicySetCoverageHtml() {
 }
 
 function renderCISOStep4a() {
-  const body = document.getElementById('ciso-step-7-body');
+  const body = document.getElementById(cisoStepBodyId('Policy set', 6));
   if (!body) return;
   if (typeof ensureCommonControlFloor === 'function') ensureCommonControlFloor();
   if (!state.baseline) {
-    body.innerHTML = '<div class="empty-state"><div class="es-icon">⚠️</div><div class="es-title">Program floor not ready</div><p>Complete Organization and Profile first.</p></div>';
+    body.innerHTML = '<div class="empty-state"><div class="es-icon">⚠️</div><div class="es-title">Program floor not ready</div><p>Complete Organization first.</p></div>';
     return;
   }
   ensureCsfFunctionGrouping();
@@ -2880,11 +2863,8 @@ function renderCISOStep4a() {
   const priorityCounts = { now: 0, soon: 0, later: 0 };
   masters.forEach(f => priorityCounts[getPriority(f)]++);
 
-  var setMeta = getCisoSetupStepDisplay(7, 'Policy set');
   body.innerHTML = `
-    <div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:16px;">
-      <span style="opacity:0.55;margin-right:8px;">Step ${setMeta.step} of ${setMeta.total}</span> ${escapeHTML(setMeta.label)}
-    </div>
+    ${cisoStepProgressHtml(6, 'Policy set')}
 
     <div class="section-title">Policy set</div>
     <div class="section-subtitle">Everyone sees the same picture: what you already have versus what still needs a Function policy. Document structure first \u2014 the ISP (Govern) plus Function policy documents. Drag families between documents, or use Move and Merge. Then set urgency.</div>
@@ -3165,11 +3145,11 @@ function clearAllDomainOwners() {
 
 // --- Step 7: Assign Owners & Deadlines ---
 function renderCISOStep4b() {
-  const body = document.getElementById('ciso-step-8-body');
+  const body = document.getElementById(cisoStepBodyId('Assign Owners', 7));
   if (!body) return;
   if (typeof ensureCommonControlFloor === 'function') ensureCommonControlFloor();
   if (!state.baseline) {
-    body.innerHTML = '<div class="empty-state"><div class="es-icon">⚠️</div><div class="es-title">Program floor not ready</div><p>Complete Organization and Profile first.</p></div>';
+    body.innerHTML = '<div class="empty-state"><div class="es-icon">⚠️</div><div class="es-title">Program floor not ready</div><p>Complete Organization first.</p></div>';
     return;
   }
   ensureCsfFunctionGrouping();

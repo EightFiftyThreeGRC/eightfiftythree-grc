@@ -531,7 +531,7 @@ function refreshCsfSelectionUi() {
   var cisoOn = cisoTab && cisoTab.classList.contains('active');
   var policyOn = policyTab && policyTab.classList.contains('active');
   var step = (typeof currentStep !== 'undefined') ? currentStep : {};
-  if (cisoOn && step.ciso === 5 && typeof renderCISOStep2 === 'function') {
+  if (cisoOn && typeof cisoStepIndexByLabel === 'function' && step.ciso === cisoStepIndexByLabel('PM Controls', 4) && typeof renderCISOStep2 === 'function') {
     renderCISOStep2();
     return;
   }
