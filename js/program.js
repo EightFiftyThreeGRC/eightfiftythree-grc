@@ -1401,7 +1401,7 @@ function renderCISOStep2Baseline() {
   var advancedOpen = (floor !== 'L') ? ' open' : '';
   var floorOptions = ['L', 'M', 'H'].map(function(letter) {
     return '<option value="' + letter + '"' + (floor === letter ? ' selected' : '') + '>'
-      + baselineLabel(letter) + (letter === 'L' ? ' (default)' : '') + '</option>';
+      + baselineLabel(letter) + ' \u2014 800-53B baseline' + (letter === 'L' ? ' (default)' : '') + '</option>';
   }).join('');
 
   body.innerHTML = `
@@ -1411,9 +1411,9 @@ function renderCISOStep2Baseline() {
     ${renderCsfProgramStructureHtml()}
     <p class="program-structure-note">Govern is the ISP. Identify, Protect, Detect, Respond, and Recover are the domain policy packages. 800-53 controls implement those outcomes. RMF Prepare (SP 800-37 P-4) is organizationally-tailored control baselines and common controls \u2014 a tailoring and inheritance job, not an estate-wide Low / Moderate / High pick.</p>
     <div class="common-floor-note">
-      <div class="common-floor-kicker">Inherited catalog</div>
-      <div class="common-floor-line">Common-control floor (${escapeHTML(floorLabel)}). Each system categorizes later in Assets &amp; SSP.</div>
-      <div class="common-floor-sub">${floorCount} controls in the inherited common-control set (NIST 800-53B). A Moderate or High system pulls additional controls through baseline elevation in Assets &amp; SSP without flipping this floor.</div>
+      <div class="common-floor-kicker">NIST SP 800-53B</div>
+      <div class="common-floor-line">${escapeHTML(floorLabel)} control baseline (RMF inherited catalog floor). Each system categorizes later in Assets &amp; SSP.</div>
+      <div class="common-floor-sub">${floorCount} controls in the inherited common-control set. A Moderate or High system pulls additional controls through baseline elevation in Assets &amp; SSP without flipping this floor.</div>
     </div>
     <p class="program-structure-flag">${escapeHTML(getProfileElevationFlagSentence())}</p>
     ${fismaToggleCard}
@@ -1425,9 +1425,9 @@ function renderCISOStep2Baseline() {
       <div class="toggle-switch ${state.privacyOverlay?'on':''}"></div>
     </div>
     <details class="common-floor-advanced"${advancedOpen}>
-      <summary>Advanced: change the inherited common-control floor</summary>
-      <p>Only if the catalog itself must start above Low. This does not categorize any information system.</p>
-      <select class="form-select" style="max-width:240px;" onchange="selectBaseline(this.value)">${floorOptions}</select>
+      <summary>Advanced: NIST SP 800-53B control baseline</summary>
+      <p>RMF inherited common-control floor for the program catalog. Only if the catalog itself must start above Low. This does not categorize any information system \u2014 FIPS 199 stays at Assets &amp; SSP.</p>
+      <select class="form-select" style="max-width:360px;" aria-label="NIST SP 800-53B control baseline" onchange="selectBaseline(this.value)">${floorOptions}</select>
     </details>
   `;
 }
