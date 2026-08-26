@@ -156,30 +156,39 @@ var NIST_CSF_FAMILY_DEFAULT = {
 };
 
 // Parent-control tokens: "PR.AA" or "PR.AA:PR.AA-01". Enhancements inherit the parent.
+// All family Policy and Procedures (XX-1), PM-1 (program plan), and PT-1 (privacy overlay)
+// map to GV.PO-01 and GV.PO-02 per CSF 2.0 informative references (NIST SP 800-53 Rev. 5
+// OLIR / CSWP 29). Do not infer these at render time; keep them explicit here.
+var NIST_CSF_PO_TOKENS = ['GV.PO:GV.PO-01', 'GV.PO:GV.PO-02'];
 var NIST_CSF_MAP = {
-  'AC-1': ['GV.PO:GV.PO-01'], 'AC-2': ['PR.AA:PR.AA-01', 'PR.AA:PR.AA-05'], 'AC-3': ['PR.AA:PR.AA-05'],
+  'AC-1': NIST_CSF_PO_TOKENS, 'AC-2': ['PR.AA:PR.AA-01', 'PR.AA:PR.AA-05'], 'AC-3': ['PR.AA:PR.AA-05'],
   'AC-5': ['PR.AA:PR.AA-05'], 'AC-6': ['PR.AA:PR.AA-05'], 'AC-7': ['PR.AA:PR.AA-03'],
   'AC-17': ['PR.AA:PR.AA-05', 'PR.IR:PR.IR-01'], 'AC-18': ['PR.IR', 'PR.AA'],
-  'AT-1': ['GV.PO:GV.PO-01'], 'AT-2': ['PR.AT:PR.AT-01'], 'AT-3': ['PR.AT:PR.AT-02'],
-  'AU-1': ['GV.PO:GV.PO-01'], 'AU-2': ['DE.CM:DE.CM-03', 'PR.PS:PR.PS-04'], 'AU-6': ['DE.AE:DE.AE-02', 'DE.AE:DE.AE-03'],
+  'AT-1': NIST_CSF_PO_TOKENS, 'AT-2': ['PR.AT:PR.AT-01'], 'AT-3': ['PR.AT:PR.AT-02'],
+  'AU-1': NIST_CSF_PO_TOKENS, 'AU-2': ['DE.CM:DE.CM-03', 'PR.PS:PR.PS-04'], 'AU-6': ['DE.AE:DE.AE-02', 'DE.AE:DE.AE-03'],
   'AU-12': ['PR.PS:PR.PS-04'],
-  'CA-1': ['GV.PO:GV.PO-01'], 'CA-2': ['ID.IM'], 'CA-3': ['ID.AM'], 'CA-5': ['ID.IM'],
+  'CA-1': NIST_CSF_PO_TOKENS, 'CA-2': ['ID.IM'], 'CA-3': ['ID.AM'], 'CA-5': ['ID.IM'],
   'CA-6': ['GV.OV', 'GV.RR'], 'CA-7': ['DE.CM:DE.CM-01'], 'CA-8': ['ID.IM'],
-  'CM-1': ['GV.PO:GV.PO-01'], 'CM-2': ['PR.PS:PR.PS-01'], 'CM-6': ['PR.PS:PR.PS-01'],
+  'CM-1': NIST_CSF_PO_TOKENS, 'CM-2': ['PR.PS:PR.PS-01'], 'CM-6': ['PR.PS:PR.PS-01'],
   'CM-7': ['PR.PS:PR.PS-05'], 'CM-8': ['ID.AM:ID.AM-01', 'ID.AM:ID.AM-02'],
-  'CP-1': ['GV.PO:GV.PO-01'], 'CP-2': ['RC.RP:RC.RP-01', 'PR.IR:PR.IR-03'], 'CP-9': ['PR.DS:PR.DS-11', 'RC.RP'],
+  'CP-1': NIST_CSF_PO_TOKENS, 'CP-2': ['RC.RP:RC.RP-01', 'PR.IR:PR.IR-03'], 'CP-9': ['PR.DS:PR.DS-11', 'RC.RP'],
   'CP-10': ['RC.RP:RC.RP-04'],
-  'IA-1': ['GV.PO:GV.PO-01'], 'IA-2': ['PR.AA:PR.AA-03'], 'IA-4': ['PR.AA:PR.AA-01'],
+  'IA-1': NIST_CSF_PO_TOKENS, 'IA-2': ['PR.AA:PR.AA-03'], 'IA-4': ['PR.AA:PR.AA-01'],
   'IA-5': ['PR.AA:PR.AA-01'], 'IA-8': ['PR.AA:PR.AA-03'], 'IA-12': ['PR.AA:PR.AA-02'],
-  'IR-1': ['GV.PO:GV.PO-01'], 'IR-4': ['RS.MI:RS.MI-01', 'RS.MI:RS.MI-02'], 'IR-6': ['RS.CO:RS.CO-02'],
+  'IR-1': NIST_CSF_PO_TOKENS, 'IR-4': ['RS.MI:RS.MI-01', 'RS.MI:RS.MI-02'], 'IR-6': ['RS.CO:RS.CO-02'],
   'IR-8': ['RS.MA:RS.MA-01'],
-  'PE-3': ['PR.AA:PR.AA-06'], 'PE-6': ['DE.CM:DE.CM-02'],
-  'PL-1': ['GV.PO:GV.PO-01'], 'PL-2': ['GV.PO:GV.PO-01'],
-  'PM-1': ['GV.PO:GV.PO-01'], 'PM-5': ['ID.AM:ID.AM-01'], 'PM-9': ['GV.RM:GV.RM-01', 'ID.RA'],
-  'RA-3': ['ID.RA:ID.RA-05'], 'RA-5': ['ID.RA:ID.RA-01'],
-  'SA-3': ['PR.PS:PR.PS-06'],
-  'SC-7': ['PR.IR:PR.IR-01'], 'SC-8': ['PR.DS:PR.DS-02'], 'SC-28': ['PR.DS:PR.DS-01'],
-  'SI-2': ['PR.PS:PR.PS-02'], 'SI-4': ['DE.CM:DE.CM-09']
+  'MA-1': NIST_CSF_PO_TOKENS,
+  'MP-1': NIST_CSF_PO_TOKENS,
+  'PE-1': NIST_CSF_PO_TOKENS, 'PE-3': ['PR.AA:PR.AA-06'], 'PE-6': ['DE.CM:DE.CM-02'],
+  'PL-1': NIST_CSF_PO_TOKENS, 'PL-2': ['GV.PO:GV.PO-01'],
+  'PM-1': NIST_CSF_PO_TOKENS, 'PM-5': ['ID.AM:ID.AM-01'], 'PM-9': ['GV.RM:GV.RM-01', 'ID.RA'],
+  'PS-1': NIST_CSF_PO_TOKENS,
+  'PT-1': NIST_CSF_PO_TOKENS,
+  'RA-1': NIST_CSF_PO_TOKENS, 'RA-3': ['ID.RA:ID.RA-05'], 'RA-5': ['ID.RA:ID.RA-01'],
+  'SA-1': NIST_CSF_PO_TOKENS, 'SA-3': ['PR.PS:PR.PS-06'],
+  'SC-1': NIST_CSF_PO_TOKENS, 'SC-7': ['PR.IR:PR.IR-01'], 'SC-8': ['PR.DS:PR.DS-02'], 'SC-28': ['PR.DS:PR.DS-01'],
+  'SI-1': NIST_CSF_PO_TOKENS, 'SI-2': ['PR.PS:PR.PS-02'], 'SI-4': ['DE.CM:DE.CM-09'],
+  'SR-1': NIST_CSF_PO_TOKENS
 };
 
 // ---------------------------------------------------------------------------
