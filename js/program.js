@@ -1381,7 +1381,7 @@ function renderCISOStep2Baseline() {
     <div class="privacy-toggle-card compact ${isFisma?'selected':''}" onclick="toggleProgramFismaMode()" style="margin-bottom:10px;border-color:${isFisma?'#7c3aed':'var(--border)'};${isFisma?'background:#f5f3ff;':''}">
       <div class="pt-info">
         <div class="pt-name">FISMA / CUI systems</div>
-        <div class="pt-desc">Federal, FedRAMP, DoD RMF, or CUI systems categorize from 800-60 information types in Assets &amp; SSP. This does not stamp the organization Moderate.</div>
+        <div class="pt-desc">Federal, FedRAMP, DoD RMF, or CUI systems categorize from 800-60 information types in Assets &amp; SSP.</div>
       </div>
       <div class="toggle-switch ${isFisma?'on':''}"></div>
     </div>`;

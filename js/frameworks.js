@@ -6,12 +6,12 @@ var FRAMEWORK_META = {
 };
 
 var COMPLIANCE_LAW_META = {
-  hipaa:         { id: 'hipaa',         label: 'HIPAA',              subtitle: 'Security & Privacy Rule', color: '#34C759', bg: '#f0fdf4' },
-  glba:          { id: 'glba',          label: 'GLBA',               subtitle: 'Safeguards Rule', color: '#0d9488', bg: '#f0fdfa' },
-  ferpa:         { id: 'ferpa',         label: 'FERPA',              subtitle: 'Student records', color: '#6366f1', bg: '#eef2ff' },
-  sox:           { id: 'sox',           label: 'SOX',                subtitle: 'IT general controls', color: '#b45309', bg: '#fffbeb' },
-  fisma:         { id: 'fisma',         label: 'FISMA',              subtitle: 'Federal systems', color: '#7c3aed', bg: '#f5f3ff' },
-  state_privacy: { id: 'state_privacy', label: 'State privacy laws', subtitle: 'CCPA / CPRA / similar', color: '#64748b', bg: '#f8fafc' }
+  hipaa: { id: 'hipaa', label: 'HIPAA',   subtitle: 'Security & Privacy Rule', color: '#34C759', bg: '#f0fdf4' },
+  pci:   { id: 'pci',   label: 'PCI DSS', subtitle: 'Cardholder data environment', color: '#0ea5e9', bg: '#f0f9ff' },
+  sox:   { id: 'sox',   label: 'SOX',     subtitle: 'IT general controls', color: '#b45309', bg: '#fffbeb' },
+  glba:  { id: 'glba',  label: 'GLBA',    subtitle: 'Safeguards Rule', color: '#0d9488', bg: '#f0fdfa' },
+  ferpa: { id: 'ferpa', label: 'FERPA',   subtitle: 'Student records', color: '#6366f1', bg: '#eef2ff' },
+  fisma: { id: 'fisma', label: 'FISMA',   subtitle: 'Federal systems', color: '#7c3aed', bg: '#f5f3ff' }
 };
 
 var ORG_OWNERSHIP_OPTIONS = [
@@ -179,7 +179,7 @@ function toggleOrgDataType(id) {
 
 // Keys: private:<sector> | government:<federal|slg>:<sector>
 var REG_SUGGESTION_MAP = {
-  'private:commercial':         { frameworks: ['iso27001', 'soc2'], laws: ['state_privacy'] },
+  'private:commercial':         { frameworks: ['iso27001', 'soc2'], laws: [] },
   'private:healthcare':         { frameworks: ['iso27001', 'soc2'], laws: ['hipaa'] },
   'private:financial':          { frameworks: ['iso27001', 'soc2'], laws: ['glba', 'sox'] },
   'private:education':          { frameworks: ['iso27001', 'soc2'], laws: ['ferpa'] },
@@ -188,7 +188,7 @@ var REG_SUGGESTION_MAP = {
   'government:federal:civilian':          { frameworks: ['iso27001'], laws: ['fisma'] },
   'government:federal:intelligence':      { frameworks: ['iso27001'], laws: ['fisma'] },
   'government:federal:law_enforcement':   { frameworks: ['iso27001'], laws: ['fisma'] },
-  'government:slg:general':               { frameworks: ['iso27001', 'soc2'], laws: ['fisma', 'state_privacy'] },
+  'government:slg:general':               { frameworks: ['iso27001', 'soc2'], laws: ['fisma'] },
   'government:slg:healthcare':            { frameworks: ['iso27001', 'soc2'], laws: ['hipaa', 'fisma'] },
   'government:slg:medicare_integrator':   { frameworks: ['iso27001', 'soc2'], laws: ['hipaa', 'fisma'] },
   'government:slg:education':             { frameworks: ['iso27001', 'soc2'], laws: ['ferpa', 'fisma'] },
@@ -200,7 +200,7 @@ var GENERIC_LAW_REF = {
   ferpa: 'FERPA §99.31',
   sox: 'SOX ITGC',
   fisma: 'FISMA / NIST RMF',
-  state_privacy: 'State privacy statute'
+  pci: 'PCI DSS'
 };
 
 var FAMILY_LAW_REFS = {};
@@ -887,7 +887,7 @@ function renderComplianceLawSetupSectionHtml() {
   }).join('');
   return '<div class="fw-setup-section" style="margin-top:24px;">'
     + '<div class="section-title" style="margin-bottom:4px;">Compliance frameworks (laws &amp; regulations)</div>'
-    + '<div class="section-subtitle" style="margin-bottom:12px;">Separate from voluntary standards \u2014 track statutory and regulatory obligations.</div>'
+    + '<div class="section-subtitle" style="margin-bottom:12px;">Named US obligations to track against the 800-53 program. HIPAA carries a control crosswalk; the others are tracking labels. CCPA, NIS2, and anything else go under Add law / regulation.</div>'
     + '<div class="fw-setup-list">' + rows + '</div>'
     + '</div>';
 }

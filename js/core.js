@@ -1503,6 +1503,19 @@ function migrateRegMappingStateShape() {
   }
   if (state.activeFrameworks.cis) delete state.activeFrameworks.cis;
   if (state.activeComplianceLaws.mar_e) delete state.activeComplianceLaws.mar_e;
+  delete state.activeComplianceLaws.state_privacy;
+  if (Array.isArray(state.customRegFrameworks) && state.customRegFrameworks.length) {
+    var keptCustom = [];
+    state.customRegFrameworks.forEach(function(c) {
+      var lab = String((c && c.label) || '').replace(/\s+/g, ' ').trim().toLowerCase();
+      if (c && c.kind === 'law' && (lab === 'pci' || lab === 'pci dss')) {
+        if (c.active !== false) state.activeComplianceLaws.pci = true;
+        return;
+      }
+      keptCustom.push(c);
+    });
+    state.customRegFrameworks = keptCustom;
+  }
   if (state._regMappingInitialized === undefined) state._regMappingInitialized = false;
   if (!Array.isArray(state.customRegFrameworks)) state.customRegFrameworks = [];
   if (!state.orgOwnership && state.orgSector) {
