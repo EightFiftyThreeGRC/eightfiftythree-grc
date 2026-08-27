@@ -291,7 +291,8 @@
     /* Program lifecycle — one-line caption, not three product cards */
     .program-phase-bar {
       flex-shrink: 0;
-      padding: 10px 40px 0;
+      /* top padding clears the fixed persist toolbar + reset button */
+      padding: 56px 40px 0;
       background: transparent;
       border-bottom: none;
     }
@@ -340,7 +341,8 @@
 
     @media (max-width: 900px) {
       .program-phase-bar {
-        padding: 8px 16px 0;
+        /* top padding clears the fixed persist toolbar (top:58 + one wrapped row) */
+        padding: 96px 16px 0;
       }
     }
 
@@ -2249,6 +2251,14 @@
         display: none;
       }
 
+      #app-persist-toolbar,
+      #resetBtn,
+      .program-phase-bar,
+      .print-btn,
+      #reportsPrintBtn {
+        display: none !important;
+      }
+
       .main {
         margin-left: 0;
       }
@@ -2400,6 +2410,7 @@
       #app-persist-toolbar {
         top: 58px !important;
         right: 12px !important;
+        padding-right: 84px; /* keep wrapped rows clear of the fixed reset button */
         left: 68px;
         max-width: none !important;
         flex-wrap: wrap;
@@ -4775,3 +4786,9 @@
 
 
 
+
+    @media (max-width: 480px) {
+      .program-phase-bar {
+        padding-top: 132px;
+      }
+    }

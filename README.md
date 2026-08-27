@@ -1,10 +1,10 @@
 # EightFiftyThree GRC
 
-Browser-based NIST SP 800-53 Rev. 5 program management tool. No account, no backend — your program lives in your browser, and you switch between program roles to see each person's workspace.
+Browser-based cyber GRC program management tool built around NIST CSF 2.0, NIST RMF, and NIST SP 800-53 Rev. 5 — the program layer (InfoSec Policy + Function policies) is organized by CSF 2.0 outcomes, and 800-53 controls implement them, with per-system Low/Moderate/High categorization downstream in Assets & SSP. No account, no backend — your program lives in your browser, and you switch between program roles to see each person's workspace.
 
 **[Launch the tool](https://eightfiftythreegrc.github.io/eightfiftythree-grc/)** (repo: [EightFiftyThreeGRC/eightfiftythree-grc](https://github.com/EightFiftyThreeGRC/eightfiftythree-grc))
 
-If the link shows “404 / There isn’t a GitHub Pages site here,” open the repo on GitHub → **Settings → Pages** → set **Source** to **GitHub Actions**, then push to `main` (or run the **Deploy GitHub Pages** workflow manually).
+If the link shows “404 / There isn’t a GitHub Pages site here,” open the repo on GitHub → **Settings → Pages** → set **Source** to **Deploy from a branch** (`main` / root). Pushing to `main` redeploys automatically — there is deliberately no custom deploy workflow.
 
 ## Repository Status
 
@@ -18,7 +18,8 @@ This repository is the canonical source for the public **EightFiftyThree GRC** r
 
 The application guides teams through a full governance workflow:
 
-- CISO setup wizard (baseline, privacy overlay, PM controls, ISP, policy ownership)
+- Program setup wizard (7 steps: organization, program structure, reg mapping, PM controls, InfoSec Policy, policy set, owners)
+- NIST CSF 2.0 alignment throughout: Govern lives in the ISP, the five other Functions become domain-policy packages, every 800-53 control carries a primary CSF 2.0 outcome tag, and a derived CSF Organizational Profile (Target from policy commitments, Current from control status) is exportable as CSV
 - Domain policy ownership and lifecycle tracking
 - Control owner assignment and control implementation status
 - Asset and process mapping for SSP-style attestations
@@ -34,17 +35,25 @@ Zero-dependency, no-build static web app. UI and logic run client-side and the p
 index.html                  public landing page (links to app.html)
 app.html                    UI shell, sidebar, tab containers, role picker overlay
 css/landing.css             landing page styles
-css/app.css                 all app styles (single mobile breakpoint)
+css/app.css                 all app styles (responsive breakpoints + print)
 js/session.js               acting identity + permission / separation-of-duties helpers
 js/nist-control-text.js     verbatim NIST 800-53 control text lookup
-js/core.js                  STATE shape, defaults, persistence, audit/change log
-js/program.js               CISO setup wizard + demo snapshots
+js/core.js                  STATE shape, defaults, persistence, audit/change log,
+                            800-53 catalog + demo snapshots
+js/nist-csf-map.js          CSF 2.0 reference data + 1-1 800-53-to-CSF primary map
+js/csf-profile.js           derived CSF 2.0 Organizational Profile + CSV export
+js/program.js               program setup wizard
+js/policy-board.js          CSF Function / family grouping board
+js/policy-map.js            legacy policy-catalog mapping helpers
+js/control-scope-defaults.js per-control default asset-type scoping
+js/risk.js                  Risks & Issues workspace
 js/policies.js              Domain Policies wizard + policy library
 js/controls.js              Control Implementation wizard + control library
 js/assets.js                Assets & SSP wizard + asset libraries
 js/baseline-elevation.js    Baseline elevation triggers and review flow
 js/authorization.js         AO decision data + decision modal
-js/frameworks.js            Framework alignment tab (ISO 27001 / SOC 2 / HIPAA crosswalks)
+js/frameworks.js            Framework alignment tab (CSF Profile panel; ISO 27001 /
+                            SOC 2 / HIPAA crosswalks; tracked reg lenses)
 js/hub.js                   Command Center home tab
 js/reports.js               Reports & Dashboard, audit/change-log, review queues
 js/admin.js                 Users & roles, profile / account menu
@@ -94,9 +103,10 @@ These are candidates, not commitments — prioritized by whether they make the t
 ### Smoke test before shipping
 
 1. `node --check js/<each file>.js` — syntax validation across all modules.
-2. Walk the CISO wizard end to end (Step 1 → Step 5, including the "different approver" path on Step 3).
+2. Walk the program setup wizard end to end (all 7 steps, Organization → Assign Owners).
 3. Reset the program and confirm it returns to a fresh state.
 4. Add roster users, then use the sidebar profile button to act as each one and confirm they see only the intended tabs.
+5. Open Framework alignment and confirm the CSF 2.0 Organizational Profile panel renders and exports CSV.
 
 ## Documentation
 

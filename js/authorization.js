@@ -309,7 +309,8 @@ function renderAuthorizationStatusPanelHtml() {
     + '<div style="font-size:13px;font-weight:700;color:var(--navy);">🛡️ Authorization status</div>'
     + '<div style="font-size:11px;color:var(--text-muted);">System baseline is chosen per boundary (FIPS 199) \u2014 not for the organization</div>'
     + '</div>'
-    + '<table style="width:100%;border-collapse:collapse;font-size:13px;">'
+    + '<div class="table-scroll" style="max-height:none;overflow-x:auto;">'
+    + '<table style="width:100%;min-width:560px;border-collapse:collapse;font-size:13px;">'
     + '<thead><tr style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--text-muted);">'
     + '<th style="text-align:left;padding:6px 10px;">Boundary</th>'
     + '<th style="text-align:left;padding:6px 10px;">System baseline</th>'
@@ -318,6 +319,6 @@ function renderAuthorizationStatusPanelHtml() {
     + '<th style="text-align:right;padding:6px 10px;">Action</th>'
     + '</tr></thead><tbody>'
     + rows
-    + '</tbody></table>'
+    + '</tbody></table></div>'
     + '</div>';
 }

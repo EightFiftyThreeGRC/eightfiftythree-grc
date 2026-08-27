@@ -211,21 +211,21 @@ var FAMILY_FRAMEWORK_REFS = {
   AC: { iso27001: ['A.5.15','A.5.16','A.5.17','A.5.18','A.8.2','A.8.3','A.8.5'], soc2: ['CC6.1','CC6.2','CC6.3','CC6.6'], hipaa: ['§164.308(a)(3)','§164.308(a)(4)','§164.312(a)(1)'] },
   AT: { iso27001: ['A.6.3','A.6.4'], soc2: ['CC1.4','CC2.2'], hipaa: ['§164.308(a)(5)'] },
   AU: { iso27001: ['A.8.15','A.8.16'], soc2: ['CC7.2','CC7.3'], hipaa: ['§164.312(b)'] },
-  CA: { iso27001: ['A.8.8','A.8.9'], soc2: ['CC8.1'], hipaa: ['§164.308(a)(8)'] },
-  CM: { iso27001: ['A.8.9','A.8.19','A.8.32'], soc2: ['CC8.1'], hipaa: ['§164.310(d)(1)'] },
+  CA: { iso27001: ['A.5.35','A.5.36','A.8.34'], soc2: ['CC4.1','CC4.2'], hipaa: ['§164.308(a)(8)'] },
+  CM: { iso27001: ['A.8.9','A.8.19','A.8.32'], soc2: ['CC8.1'], hipaa: ['§164.308(a)(8)','§164.312(c)(1)'] },
   CP: { iso27001: ['A.5.29','A.5.30','A.8.13','A.8.14'], soc2: ['A1.2','A1.3'], hipaa: ['§164.308(a)(7)'] },
   IA: { iso27001: ['A.5.16','A.5.17','A.8.5'], soc2: ['CC6.1','CC6.6'], hipaa: ['§164.312(d)'] },
   IR: { iso27001: ['A.5.24','A.5.25','A.5.26','A.5.27'], soc2: ['CC7.4','CC7.5'], hipaa: ['§164.308(a)(6)'] },
   MA: { iso27001: ['A.7.13','A.8.1'], soc2: ['CC8.1'], hipaa: ['§164.310(a)(2)'] },
-  MP: { iso27001: ['A.5.10','A.5.11','A.5.12','A.7.10'], soc2: ['CC6.7'], hipaa: ['§164.310(c)'] },
+  MP: { iso27001: ['A.5.10','A.5.11','A.5.12','A.7.10'], soc2: ['CC6.7'], hipaa: ['§164.310(d)(1)'] },
   PE: { iso27001: ['A.7.1','A.7.2','A.7.3','A.7.4'], soc2: ['CC6.4'], hipaa: ['§164.310(a)(1)','§164.310(b)'] },
   PL: { iso27001: ['A.5.1','A.5.2','A.5.4'], soc2: ['CC1.1','CC2.1'], hipaa: ['§164.308(a)(1)'] },
   PM: { iso27001: ['A.5.1','A.5.2','A.5.4','A.5.35'], soc2: ['CC1.1','CC1.2'], hipaa: ['§164.308(a)(1)','§164.316'] },
   PS: { iso27001: ['A.6.1','A.6.2','A.6.4'], soc2: ['CC1.4'], hipaa: ['§164.308(a)(3)(ii)(A)'] },
   PT: { iso27001: ['A.5.33','A.5.34','A.8.10','A.8.11'], soc2: ['P1.1','P2.1'], hipaa: ['§164.308(a)(1)','§164.502'] },
   RA: { iso27001: ['A.5.7','A.5.8','A.8.8'], soc2: ['CC3.1','CC3.2'], hipaa: ['§164.308(a)(1)(ii)(A)'] },
-  SA: { iso27001: ['A.5.19','A.5.20','A.5.21','A.5.23'], soc2: ['CC9.2'], hipaa: ['§164.308(b)'] },
-  SC: { iso27001: ['A.5.14','A.8.20','A.8.21','A.8.22'], soc2: ['CC6.6','CC6.7'], hipaa: ['§164.312(e)(1)'] },
+  SA: { iso27001: ['A.8.25','A.8.26','A.8.27','A.8.28','A.8.29','A.5.19','A.5.20','A.5.23'], soc2: ['CC9.2','CC8.1'], hipaa: ['§164.308(b)'] },
+  SC: { iso27001: ['A.5.14','A.8.20','A.8.21','A.8.22','A.8.24'], soc2: ['CC6.6','CC6.7'], hipaa: ['§164.312(e)(1)'] },
   SI: { iso27001: ['A.8.7','A.8.8'], soc2: ['CC7.1'], hipaa: ['§164.308(a)(5)(ii)(B)'] },
   SR: { iso27001: ['A.5.19','A.5.20','A.5.21','A.5.22'], soc2: ['CC9.2'], hipaa: ['§164.308(b)(1)'] }
 };
@@ -236,7 +236,7 @@ var CONTROL_FRAMEWORK_OVERRIDES = {
   'AC-2':  { iso27001: ['A.5.16','A.5.18','A.8.2'], soc2: ['CC6.1','CC6.2'], hipaa: ['§164.312(a)(1)','§164.312(a)(2)(i)'] },
   'AC-3':  { iso27001: ['A.8.3'], soc2: ['CC6.1'], hipaa: ['§164.312(a)(1)'] },
   'AU-2':  { iso27001: ['A.8.15'], soc2: ['CC7.2'], hipaa: ['§164.312(b)'] },
-  'CM-2':  { iso27001: ['A.8.9'], soc2: ['CC8.1'], hipaa: ['§164.310(d)(1)'] },
+  'CM-2':  { iso27001: ['A.8.9'], soc2: ['CC8.1'], hipaa: ['§164.308(a)(8)'] },
   'CP-1':  { iso27001: ['A.5.29'], soc2: ['A1.2'], hipaa: ['§164.308(a)(7)'] },
   'IA-2':  { iso27001: ['A.8.5'], soc2: ['CC6.1'], hipaa: ['§164.312(d)'] },
   'IR-1':  { iso27001: ['A.5.24'], soc2: ['CC7.4'], hipaa: ['§164.308(a)(6)'] },
@@ -919,8 +919,9 @@ function renderFrameworksTab() {
     + '<div class="fw-intro">'
     + '<p>Your NIST 800-53 program is always expressible as <strong>CSF 2.0</strong> outcomes (Govern, Identify, Protect, Detect, Respond, Recover). That mapping is inherent \u2014 not an optional overlay. Enable ISO 27001, SOC 2, or laws below when you need those additional lenses. Coverage updates as control owners mark implementation.</p>'
     + '</div>'
-    + (typeof renderCsfCoverageStripHtml === 'function' ? renderCsfCoverageStripHtml('panel') : '')
+    + (typeof renderCsfProfilePanelHtml === 'function' ? renderCsfProfilePanelHtml() : (typeof renderCsfCoverageStripHtml === 'function' ? renderCsfCoverageStripHtml('panel') : ''))
     + '<div class="fw-coverage-grid">' + cards + '</div>'
+    + '<p class="csf-disclaimer">Indicative alignment for scoping conversations \u2014 not a certified crosswalk, an attestation mapping, or legal advice.</p>'
     + (typeof renderComplianceLawCoverageCardsHtml === 'function' ? renderComplianceLawCoverageCardsHtml() : '')
     + '<div class="fw-map-panel">'
     + '<div class="fw-map-toolbar">'
@@ -1051,7 +1052,7 @@ function renderLawCoverageCard(meta, on, toggleAttr, removeAttr, libraryId) {
     + '<label class="fw-toggle" onclick="event.stopPropagation();"><input type="checkbox"' + (on ? ' checked' : '') + ' onchange="' + toggleAttr + '"><span class="fw-toggle-track"></span></label>'
     + '</div>'
     + (on
-      ? '<div class="fw-coverage-stats">' + (meta.custom ? 'Add requirement text in the library, then map clauses to 800-53.' : 'Tracking on \u2014 citations appear in the mapping table when enabled.') + '</div>'
+      ? '<div class="fw-coverage-stats">' + (meta.custom ? 'Add requirement text in the library, then map clauses to 800-53.' : (typeof GENERIC_LAW_REF !== 'undefined' && GENERIC_LAW_REF[meta.id] && meta.id !== 'hipaa' ? 'Tracked program-wide \u2014 no control-level crosswalk yet.' : 'Tracking on \u2014 citations appear in the mapping table when enabled.')) + '</div>'
       + libBtn
       + (removeAttr ? '<button type="button" class="btn btn-secondary btn-sm" onclick="' + removeAttr + '">Remove</button>' : '')
       : '<div class="fw-coverage-stats" style="opacity:0.6;">Tracking off</div>')

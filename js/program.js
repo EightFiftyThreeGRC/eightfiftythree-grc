@@ -152,6 +152,14 @@ function renderCISOTab() {
   updateCISOFinishBtn();
 }
 
+function countUnassignedDomains() {
+  if (!state.baseline) return 0;
+  const families = getActiveFamilies().filter(f => f !== 'PM');
+  const merges = state.policyMerges || {};
+  const masters = families.filter(f => !merges[f]);
+  return masters.filter(fam => !isValidOwnerEmail((state.domainOwners[fam] || {}).email)).length;
+}
+
 function allOwnersAssigned() {
   if (!state.baseline) return false;
   const families = getActiveFamilies().filter(f => f !== 'PM');
@@ -185,7 +193,8 @@ function updateCISOFinishBtn() {
   if (currentStep.ciso === cisoStepIndexByLabel('Assign Owners', CISO_WIZARD_STEPS)) {
     btn.style.display = '';
     const ready = allOwnersAssigned();
-    btn.innerHTML = ready ? '✓ Finalise Program Setup' : '✓ Finalise Program Setup — assign all owners first';
+    var missingN = (typeof countUnassignedDomains === 'function') ? countUnassignedDomains() : 0;
+    btn.innerHTML = ready ? '✓ Finalise Program Setup' : ('✓ Finalise Program Setup — ' + (missingN ? missingN + ' domain' + (missingN === 1 ? '' : 's') + ' still need an owner' : 'assign all owners first'));
     btn.onclick = ready ? cisoFinish : null;
     btn.disabled = !ready;
     btn.style.background = ready ? '' : '#94a3b8';
@@ -256,6 +265,11 @@ function cisoStepBodyId(label, fallback) {
 }
 
 function cisoStepProgressHtml(step, label) {
+  // The persistent progress label + header subtitle already announce the step;
+  // an in-body copy tripled the same line (QA 2026-08-27). Kept as a no-op.
+  return '';
+}
+function _retiredCisoStepProgressHtml(step, label) {
   var meta = getCisoSetupStepDisplay(step, label);
   return '<div class="ciso-step-progress" style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:16px;">Step '
     + meta.step + ' of ' + meta.total + ' \u00b7 ' + escapeHTML(meta.label) + '</div>';

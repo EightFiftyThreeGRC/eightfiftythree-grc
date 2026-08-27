@@ -1348,7 +1348,8 @@ var _ESC_CLOSABLE_MODALS = [
   { id: 'resetModalOverlay',             close: null },
   { id: 'atoDecisionOverlay',            close: 'closeAtoDecisionModal' },
   { id: 'riskModalOverlay',              close: null },
-  { id: 'snapshotModal',                 close: '_closeSnapModal' }
+  { id: 'snapshotModal',                 close: '_closeSnapModal' },
+  { id: 'profileSetupOverlay',           close: 'hideProfileSetupModal' }
 ];
 
 document.addEventListener('keydown', function(ev) {
@@ -1357,6 +1358,8 @@ document.addEventListener('keydown', function(ev) {
     var m = _ESC_CLOSABLE_MODALS[i];
     var el = document.getElementById(m.id);
     if (!el) continue;
+    // Static overlays (e.g. profileSetupOverlay) stay in the DOM while hidden.
+    if (el.style && el.style.display === 'none') continue;
     var fn = m.close && window[m.close];
     if (typeof fn === 'function') fn(); else el.remove();
     ev.stopPropagation();

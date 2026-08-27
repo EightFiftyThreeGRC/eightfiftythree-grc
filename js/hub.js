@@ -1165,7 +1165,7 @@ function getHubWorkspaces() {
     workspaces.push({
       icon: '\u25C7',
       label: 'Frameworks',
-      desc: 'CSF 2.0 outcomes \u2014 ISO, SOC 2, HIPAA, SOX overlays',
+      desc: 'CSF 2.0 outcomes \u2014 ISO, SOC 2, HIPAA + tracked laws',
       fn: "showTab('frameworks')",
       group: 'design'
     });

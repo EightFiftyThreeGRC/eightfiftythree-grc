@@ -586,7 +586,7 @@ function renderAssetTypesInventory(body) {
   var retiredTypes = _invRetiredBuiltInAssetTypes();
   var groups = (typeof getAllAssetTypeGroups === 'function') ? getAllAssetTypeGroups().filter(function(g) { return g !== 'Process'; }) : [];
   var subtypeCount = sections.reduce(function(n, s) { return n + s.types.length; }, 0);
-  var html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">'
+  var html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-bottom:14px;">'
     + '<div style="background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:16px;">'
     + '<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px;">Add category</div>'
     + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">Creates a new section header in control design (e.g. Operational Technology).</div>'
@@ -710,7 +710,7 @@ function renderProcessTypesInventory(body) {
   var retiredTypes = _invRetiredProcessTypes();
   var categories = (typeof getActiveProcessCategories === 'function') ? getActiveProcessCategories() : [];
   var subtypeCount = sections.reduce(function(n, s) { return n + s.types.length; }, 0);
-  var html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">'
+  var html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-bottom:14px;">'
     + '<div style="background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:16px;">'
     + '<div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px;">Add category</div>'
     + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">Creates a process domain header (e.g. Privacy Operations).</div>'
@@ -2365,7 +2365,7 @@ function renderReports() {
       </div>
     </div>
 
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:24px;">
+    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:20px; margin-bottom:24px;">
       <div style="background:white; border:1px solid var(--border); border-radius:10px; padding:20px;">
         <div style="font-weight:700; font-size:14px; margin-bottom:14px; color:var(--navy);">Control Implementation Status</div>
         ${[['Implemented',implemented,'var(--green)'],['Planned',planned,'var(--amber)'],['Not Started',notStarted,'var(--red)'],['Not Applicable',notApplicable,'var(--slate)']].map(([label,count,color])=>`

@@ -3266,7 +3266,7 @@ function syncSspReviewerToReviewQueue(scopeId, isProcessSsp) {
   }
 }
 
-/** Default SSP reviewer: first ISSM, else first AO, approver, or CISO (small-org assumption). The formal authorization decision lives in the Authorization tab. */
+/** Default SSP reviewer: first ISSM, else first AO, approver, or CISO (small-org assumption). The formal authorization decision lives in the AO Decision modal on the Reports dashboard. */
 function getDefaultSspReviewerUser(excludeSubmitterName, excludeSubmitterEmail) {
   var list = state.users || [];
   function isExcluded(u) {

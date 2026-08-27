@@ -15,3 +15,5 @@ err.tmp
 
 # Internal Cursor prompt drafts — keep local, do not deploy
 ASSET_OWNER_UPGRADE_PROMPT*.md
+tmp_*.js
+tools/_*

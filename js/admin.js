@@ -245,7 +245,8 @@ function renderRolePickerProfiles() {
     // Use the first record's ID — applyRoleView finds all sibling records by name/email.
     var loginId = person.primaryId;
 
-    html += '<div onclick="selectUserProfile(\'' + loginId + '\')" '
+    html += '<div onclick="selectUserProfile(\'' + loginId + '\')" role="button" tabindex="0" '
+      + 'onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();this.click();}" '
       + 'style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:20px;cursor:pointer;transition:all 0.15s;" '
       + 'onmouseenter="this.style.background=\'rgba(255,255,255,0.12)\';this.style.borderColor=\'' + pm.color + '\';" '
       + 'onmouseleave="this.style.background=\'rgba(255,255,255,0.06)\';this.style.borderColor=\'rgba(255,255,255,0.1)\';">'
@@ -800,7 +801,7 @@ function renderUsersTab() {
   html += '<div style="background:white;border:1px solid #e2e8f0;border-radius:12px;padding:20px;margin-bottom:24px;' + (readOnly ? 'opacity:0.7;' : '') + '">'
     + '<div style="font-size:14px;font-weight:700;color:#1e293b;margin-bottom:6px;">Program roles</div>'
     + '<div style="font-size:12px;color:#64748b;margin-bottom:14px;line-height:1.5;">Rename any role to match your organization&rsquo;s vocabulary (e.g. call the Policy Owner a &ldquo;Domain Owner&rdquo;). Labels carry through the whole program. Built-in roles can be renamed but not deleted; custom roles can be renamed or removed.</div>'
-    + '<div class="table-scroll"><table style="width:100%;border-collapse:collapse;font-size:13px;">'
+    + '<div class="table-scroll" style="max-height:none;"><table style="width:100%;border-collapse:collapse;font-size:13px;">'
     + '<thead><tr style="border-bottom:2px solid #e2e8f0;text-align:left;">'
     + '<th style="padding:8px 10px;font-weight:600;">Role</th><th style="padding:8px 10px;font-weight:600;">Type</th><th style="padding:8px 10px;font-weight:600;">Id</th><th style="padding:8px 10px;font-weight:600;">Tab access</th><th style="padding:8px 10px;font-weight:600;">Users</th><th style="padding:8px 10px;font-weight:600;text-align:right;">Label</th>'
     + '</tr></thead><tbody>'
