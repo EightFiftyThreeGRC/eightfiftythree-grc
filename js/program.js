@@ -1679,6 +1679,36 @@ const PM_STATEMENTS = {
 // CISO STEP 2 — PM CONTROLS
 // Program Management controls toggle + auto-draft statements.
 // ============================================================
+function renderCsfGroupedControlRowsHtml(controls, renderRow, opts) {
+  opts = opts || {};
+  var colspan = opts.colspan || 2;
+  var list = (controls || []).filter(Boolean);
+  var grouped = (typeof groupControlIdsByCsfSubcategory === 'function')
+    ? groupControlIdsByCsfSubcategory(list.map(function(c) { return c.id; }))
+    : { order: [], groups: {}, unmapped: list.map(function(c) { return c.id; }) };
+  var byId = {};
+  list.forEach(function(c) { byId[c.id] = c; });
+  function rowsFor(ids) {
+    return (ids || []).map(function(id) {
+      var c = byId[id];
+      return c ? (renderRow(c) || '') : '';
+    }).join('');
+  }
+  var html = '';
+  grouped.order.forEach(function(key) {
+    var body = rowsFor(grouped.groups[key]);
+    if (!body) return;
+    html += '<tr class="csf-nest-row"><td colspan="' + colspan + '">'
+      + (typeof renderCsfSubcategoryHeadingHtml === 'function' ? renderCsfSubcategoryHeadingHtml(key) : escapeHTML(key))
+      + '</td></tr>' + body;
+  });
+  var unmappedBody = rowsFor(grouped.unmapped);
+  if (unmappedBody) {
+    html += '<tr class="csf-nest-row csf-nest-row--unmapped"><td colspan="' + colspan + '"><div class="csf-nest-head"><span class="csf-tag csf-unmapped">Unmapped</span><span class="csf-nest-head-name">No official 800-53 \u2192 CSF 2.0 map entry</span></div></td></tr>' + unmappedBody;
+  }
+  return html;
+}
+
 function renderCISOStep2() {
   const body = document.getElementById(cisoStepBodyId('PM Controls', 4));
   if (!body) return;
@@ -1709,14 +1739,11 @@ function renderCISOStep2() {
     const isPrivacyDefault = getPrivacyPMDefaults().includes(c.id);
     const implementsSelected = !!mappedPm[c.id];
     const selectedSubs = (typeof getCsfSelectedSubsForPm === 'function') ? getCsfSelectedSubsForPm(c.id) : [];
-    const explicitSubs = (typeof getCsfExplicitMappingsForControl === 'function')
-      ? getCsfExplicitMappingsForControl(c.id).filter(function(m) { return m.sub; })
-      : [];
-    const coreHeld = isRequired && !!state.pmControls[c.id] && explicitSubs.length > 0 && selectedSubs.length === 0;
+    const primarySub = (typeof getCsfPrimarySubcategory === 'function') ? getCsfPrimarySubcategory(c.id) : '';
+    const coreHeld = isRequired && !!state.pmControls[c.id] && !!primarySub && selectedSubs.length === 0;
     if (showMappedOnly && !state.pmControls[c.id] && !implementsSelected && !isRequired) return '';
     const rowClass = implementsSelected ? ' class="csf-pm-mapped"' : (coreHeld ? ' class="csf-pm-core-held"' : '');
     const rowBg = isRequired ? 'background:rgba(13,148,136,0.04);' : isPrivacyDefault ? 'background:rgba(99,102,241,0.04);' : '';
-    const csfTags = (typeof renderCsfExplicitTagsHtml === 'function') ? renderCsfExplicitTagsHtml(c.id) : '';
     const implNote = implementsSelected && selectedSubs.length
       ? '<div class="csf-pm-impl">Implements ' + selectedSubs.map(function(s) { return escapeHTML(s); }).join(', ') + '</div>'
       : '';
@@ -1737,7 +1764,7 @@ function renderCISOStep2() {
         </label>
       </td>
       <td>
-        <div style="font-weight:600;font-size:13px;">${c.n}${csfTags ? ' ' + csfTags : ''}</div>
+        <div style="font-weight:600;font-size:13px;">${c.n}</div>
         <div style="font-size:12px;color:var(--text-muted);margin-top:2px;line-height:1.4;">${PM_STATEMENTS[c.id]||''}</div>
         ${implNote}${heldNote}
       </td>
@@ -1778,7 +1805,7 @@ function renderCISOStep2() {
     <div class="table-scroll" style="margin-bottom:20px;">
       <table class="control-table">
         <thead><tr><th style="width:120px;">Control ID</th><th>Control Name</th></tr></thead>
-        <tbody id="tbod-${Math.random().toString(36).slice(2,8)}">${coreControls.map(renderRow).join('')}</tbody>
+        <tbody id="tbod-${Math.random().toString(36).slice(2,8)}">${renderCsfGroupedControlRowsHtml(coreControls, renderRow)}</tbody>
       </table>
     </div>
 
@@ -1787,7 +1814,7 @@ function renderCISOStep2() {
     <div class="table-scroll">
       <table class="control-table">
         <thead><tr><th style="width:120px;">Control ID</th><th>Control Name</th></tr></thead>
-        <tbody id="tbod-${Math.random().toString(36).slice(2,8)}">${privControls.map(renderRow).join('')}</tbody>
+        <tbody id="tbod-${Math.random().toString(36).slice(2,8)}">${renderCsfGroupedControlRowsHtml(privControls, renderRow)}</tbody>
       </table>
     </div>` : ''}
 
@@ -1847,7 +1874,7 @@ function buildDefaultISPRoles(ownerTitle) {
 }
 
 /** PM IDs covered by consolidated ISP Govern clauses \u2014 do not auto-draft a second row. */
-var ISP_GOVERN_COVERED_PM_IDS = { 'PM-6': true, 'PM-11': true, 'PM-30': true, 'PM-30(1)': true };
+var ISP_GOVERN_COVERED_PM_IDS = { 'PM-1': true, 'PM-6': true, 'PM-11': true, 'PM-30': true, 'PM-30(1)': true };
 
 function ispOrgDisplayName() {
   return (state && state.orgName) ? state.orgName : 'the organization';
@@ -1863,7 +1890,7 @@ function getDefaultIspReq3Text(orgNameVal) {
   return orgNameVal + ' shall establish, document, implement, and maintain an information security risk management strategy aligned to organizational risk tolerance and the strategic priorities established by executive leadership. The program shall define and maintain risk appetite and risk tolerance statements; integrate cybersecurity risk management activities and outcomes into enterprise risk management; establish and communicate strategic direction for appropriate risk response options; establish lines of communication for cybersecurity risks, including risks from suppliers and other third parties; define a standardized method for calculating, documenting, categorizing, and prioritizing cybersecurity risks; and characterize strategic opportunities (positive risks) in organizational cybersecurity risk discussions. Risk management activities shall be integrated into the system development life cycle and mission/business processes. [NIST 800-53: PM-9]';
 }
 function getDefaultIspReq4Text(orgNameVal) {
-  return orgNameVal + ' shall develop, document, disseminate, and annually review and update policies and procedures for applicable NIST 800-53 control family domains. Related domains may be combined into a single policy document where appropriate. Each domain policy shall state requirements (\'what must be done\'), and be supported by implementing procedures (\'how to do it\'). Policies shall be approved by the CISO and posted in the organization\'s policy repository. [NIST 800-53: all -1 controls]';
+  return orgNameVal + ' shall develop, document, disseminate, and annually review and update (1) an organization-wide information security program plan that provides an overview of the security requirements for the organization and a description of the security program controls and common controls in place or planned, and (2) policies and procedures for applicable NIST 800-53 control family domains. Related domains may be combined into a single policy document where appropriate. Each domain policy shall state requirements (\'what must be done\'), and be supported by implementing procedures (\'how to do it\'). Policies shall be approved by the CISO and posted in the organization\'s policy repository. Review and update shall follow the policy review cycle. [NIST 800-53: PM-1 and all family -1 controls]';
 }
 function getDefaultIspReqOcText(orgNameVal) {
   return orgNameVal + ' shall define and maintain an understanding of organizational context so that the organizational mission informs cybersecurity risk management. Internal and external stakeholders, and their needs and expectations regarding cybersecurity risk management, shall be understood and considered. Legal, regulatory, and contractual requirements regarding cybersecurity \u2014 including privacy and civil liberties obligations \u2014 shall be understood and managed. Critical objectives, capabilities, and services that external stakeholders depend on or expect from the organization, and the outcomes, capabilities, and services the organization depends on, shall be understood and communicated. [NIST 800-53: PM-11]';
@@ -1876,14 +1903,15 @@ function getDefaultIspReqScText(orgNameVal) {
 }
 
 function buildDefaultIspGovernRequirements(orgNameVal, minus1) {
+  var minus1Ids = (minus1 || []).slice();
+  if (minus1Ids.indexOf('PM-1') === -1) minus1Ids = ['PM-1'].concat(minus1Ids);
   return [
-    { id: 'IS-REQ-1', purpose: 'isp-plan', text: getDefaultIspReq1Text(orgNameVal), controls: ['PM-1'], csf: ['GV.PO-01', 'GV.PO-02'] },
-    { id: 'IS-REQ-2', purpose: 'isp-roles', text: getDefaultIspReq2Text(orgNameVal), controls: ['PM-2', 'PS-1'], csf: ['GV.RR-01', 'GV.RR-02', 'GV.RR-03', 'GV.RR-04'] },
-    { id: 'IS-REQ-3', purpose: 'isp-risk', text: getDefaultIspReq3Text(orgNameVal), controls: ['PM-9'], csf: ['GV.RM-01', 'GV.RM-02', 'GV.RM-03', 'GV.RM-04', 'GV.RM-05', 'GV.RM-06', 'GV.RM-07'] },
-    { id: 'IS-REQ-4', purpose: 'isp-domain-policy', text: getDefaultIspReq4Text(orgNameVal), controls: minus1 || [], csf: ['GV.PO-01', 'GV.PO-02'] },
-    { id: 'IS-REQ-5', purpose: 'gv-oc', text: getDefaultIspReqOcText(orgNameVal), controls: ['PM-11'], csf: ['GV.OC-01', 'GV.OC-02', 'GV.OC-03', 'GV.OC-04', 'GV.OC-05'] },
-    { id: 'IS-REQ-6', purpose: 'gv-ov', text: getDefaultIspReqOvText(orgNameVal), controls: ['PM-6'], csf: ['GV.OV-01', 'GV.OV-02', 'GV.OV-03'] },
-    { id: 'IS-REQ-7', purpose: 'gv-sc', text: getDefaultIspReqScText(orgNameVal), controls: ['SR-1', 'PM-30', 'SA-9'], csf: ['GV.SC-01', 'GV.SC-02', 'GV.SC-03', 'GV.SC-04', 'GV.SC-05', 'GV.SC-06', 'GV.SC-07', 'GV.SC-08', 'GV.SC-09', 'GV.SC-10'] }
+    { id: 'IS-REQ-1', purpose: 'isp-roles', text: getDefaultIspReq2Text(orgNameVal), controls: ['PM-2', 'PS-1'], csf: ['GV.RR-01', 'GV.RR-02', 'GV.RR-03', 'GV.RR-04'] },
+    { id: 'IS-REQ-2', purpose: 'isp-risk', text: getDefaultIspReq3Text(orgNameVal), controls: ['PM-9'], csf: ['GV.RM-01', 'GV.RM-02', 'GV.RM-03', 'GV.RM-04', 'GV.RM-05', 'GV.RM-06', 'GV.RM-07'] },
+    { id: 'IS-REQ-3', purpose: 'isp-domain-policy', text: getDefaultIspReq4Text(orgNameVal), controls: minus1Ids, csf: ['GV.PO-01'] },
+    { id: 'IS-REQ-4', purpose: 'gv-oc', text: getDefaultIspReqOcText(orgNameVal), controls: ['PM-11'], csf: ['GV.OC-01', 'GV.OC-02', 'GV.OC-03', 'GV.OC-04', 'GV.OC-05'] },
+    { id: 'IS-REQ-5', purpose: 'gv-ov', text: getDefaultIspReqOvText(orgNameVal), controls: ['PM-6'], csf: ['GV.OV-01', 'GV.OV-02', 'GV.OV-03'] },
+    { id: 'IS-REQ-6', purpose: 'gv-sc', text: getDefaultIspReqScText(orgNameVal), controls: ['SR-1', 'PM-30', 'PM-30(1)', 'SA-9'], csf: ['GV.SC-01', 'GV.SC-02', 'GV.SC-03', 'GV.SC-04', 'GV.SC-05', 'GV.SC-06', 'GV.SC-07', 'GV.SC-08', 'GV.SC-09', 'GV.SC-10'] }
   ];
 }
 
@@ -1916,7 +1944,88 @@ function ispReqLooksLikeLegacyDefault(text, kind) {
     return t.indexOf('Risk management activities shall be integrated into the system development life cycle') !== -1
       && t.indexOf('risk appetite and risk tolerance') === -1;
   }
+  if (kind === 'plan') {
+    return t.indexOf('organization-wide information security program plan') !== -1
+      && t.indexOf('all family -1') === -1
+      && t.indexOf('control family domains') === -1;
+  }
+  if (kind === 'domain-policy') {
+    return t.indexOf('policies and procedures for applicable NIST 800-53 control family domains') !== -1
+      && t.indexOf('information security program plan') === -1;
+  }
   return false;
+}
+
+function ispReqIsSolePm1Host(req) {
+  if (!req) return false;
+  var ctrls = req.controls || [];
+  return ctrls.length === 1 && ctrls[0] === 'PM-1';
+}
+
+function ensurePm1OnDomainPolicyReq(req4) {
+  if (!req4) return;
+  if (!req4.controls) req4.controls = [];
+  if (req4.controls.indexOf('PM-1') === -1) req4.controls.unshift('PM-1');
+  req4.purpose = 'isp-domain-policy';
+  req4.csf = ['GV.PO-01'];
+}
+
+/** Once-only: fold the retired isp-plan (PM-1-only) row into the -1 / GV.PO-01 requirement. */
+function ensureIspPm1FoldedIntoMinus1() {
+  var isp = state.infoSecPolicy;
+  if (!isp || !Array.isArray(isp.requirements) || !isp.requirements.length) return false;
+  if (isp._ispPm1FoldedIntoMinus1) return false;
+  var orgNameVal = ispOrgDisplayName();
+  var req4 = findIspReqByPurpose(isp, 'isp-domain-policy');
+  if (!req4) {
+    var minus1Hits = (isp.requirements || []).filter(function(r) {
+      return (r.controls || []).length > 5 && (r.controls || []).some(function(id) { return /-1$/.test(String(id)); });
+    });
+    req4 = minus1Hits[0] || null;
+  }
+  var plan = findIspReqByPurpose(isp, 'isp-plan');
+  if (!plan) {
+    var sole = (isp.requirements || []).filter(ispReqIsSolePm1Host);
+    if (sole.length === 1 && sole[0] !== req4) plan = sole[0];
+  }
+  if (plan && req4 && plan === req4) plan = null;
+  var changed = false;
+  if (!req4 && plan && (ispReqIsSolePm1Host(plan) || ispReqLooksLikeLegacyDefault(plan.text, 'plan'))) {
+    req4 = plan;
+    plan = null;
+    ensurePm1OnDomainPolicyReq(req4);
+    if (ispReqLooksLikeLegacyDefault(req4.text, 'plan') || !req4.text) req4.text = getDefaultIspReq4Text(orgNameVal);
+    changed = true;
+  }
+  if (req4) {
+    ensurePm1OnDomainPolicyReq(req4);
+    if (ispReqLooksLikeLegacyDefault(req4.text, 'domain-policy')) {
+      req4.text = getDefaultIspReq4Text(orgNameVal);
+      changed = true;
+    }
+  }
+  if (plan && req4 && plan !== req4) {
+    ensurePm1OnDomainPolicyReq(req4);
+    plan.controls = (plan.controls || []).filter(function(id) { return id !== 'PM-1'; });
+    var dropPlan = !plan.controls.length || ispReqIsSolePm1Host(plan) || ispReqLooksLikeLegacyDefault(plan.text, 'plan');
+    if (dropPlan) {
+      var idx = isp.requirements.indexOf(plan);
+      if (idx >= 0) {
+        isp.requirements.splice(idx, 1);
+        changed = true;
+      }
+    }
+  }
+  (isp.requirements || []).forEach(function(r) {
+    if (!r || r === req4) return;
+    if ((r.controls || []).indexOf('PM-1') === -1) return;
+    r.controls = r.controls.filter(function(id) { return id !== 'PM-1'; });
+    changed = true;
+  });
+  isp._ispPm1FoldedIntoMinus1 = true;
+  if (changed && typeof renumberReqs === 'function') renumberReqs();
+  if (changed && typeof markDirty === 'function') markDirty();
+  return changed;
 }
 
 function ispReqLooksLikeShortPmDraft(req, pmId, orgNameVal) {
@@ -1993,6 +2102,7 @@ function ensureISPGovernRequirements() {
   var isp = state.infoSecPolicy;
   if (!isp || !Array.isArray(isp.requirements) || !isp.requirements.length) return;
   var orgNameVal = ispOrgDisplayName();
+  ensureIspPm1FoldedIntoMinus1();
   var req2 = findIspReqByPurpose(isp, 'isp-roles') || findIspReqByPrimaryControl(isp, 'PM-2');
   if (req2) {
     if (!req2.purpose) req2.purpose = 'isp-roles';
@@ -2008,11 +2118,6 @@ function ensureISPGovernRequirements() {
     if (ispReqLooksLikeLegacyDefault(req3.text, 'risk')) req3.text = getDefaultIspReq3Text(orgNameVal);
     if (!req3.csf || !req3.csf.length) req3.csf = ['GV.RM-01', 'GV.RM-02', 'GV.RM-03', 'GV.RM-04', 'GV.RM-05', 'GV.RM-06', 'GV.RM-07'];
   }
-  var req1 = findIspReqByPurpose(isp, 'isp-plan') || findIspReqByPrimaryControl(isp, 'PM-1');
-  if (req1) {
-    if (!req1.purpose) req1.purpose = 'isp-plan';
-    if (!req1.csf || !req1.csf.length) req1.csf = ['GV.PO-01', 'GV.PO-02'];
-  }
   var req4 = findIspReqByPurpose(isp, 'isp-domain-policy');
   if (!req4) {
     var minus1Hits = (isp.requirements || []).filter(function(r) {
@@ -2021,8 +2126,11 @@ function ensureISPGovernRequirements() {
     req4 = minus1Hits[0] || null;
   }
   if (req4) {
-    if (!req4.purpose) req4.purpose = 'isp-domain-policy';
-    if (!req4.csf || !req4.csf.length) req4.csf = ['GV.PO-01', 'GV.PO-02'];
+    ensurePm1OnDomainPolicyReq(req4);
+    if (ispReqLooksLikeLegacyDefault(req4.text, 'domain-policy')) req4.text = getDefaultIspReq4Text(orgNameVal);
+    var poCsf = (req4.csf || []).filter(function(id) { return id !== 'GV.PO-02'; });
+    if (poCsf.indexOf('GV.PO-01') === -1) poCsf.unshift('GV.PO-01');
+    req4.csf = poCsf.length ? poCsf : ['GV.PO-01'];
   }
   if (isp._ispGovernGvSeeded) return;
   var changed = false;
@@ -2038,7 +2146,7 @@ function ensureISPGovernRequirements() {
   }, orgNameVal) || changed;
   changed = applyIspGovernClause(isp, {
     id: 'IS-REQ-SC', purpose: 'gv-sc', absorbPm: 'PM-30', skipIfControl: 'PM-30',
-    text: getDefaultIspReqScText(orgNameVal), controls: ['SR-1', 'PM-30', 'SA-9'],
+    text: getDefaultIspReqScText(orgNameVal), controls: ['SR-1', 'PM-30', 'PM-30(1)', 'SA-9'],
     csf: ['GV.SC-01', 'GV.SC-02', 'GV.SC-03', 'GV.SC-04', 'GV.SC-05', 'GV.SC-06', 'GV.SC-07', 'GV.SC-08', 'GV.SC-09', 'GV.SC-10']
   }, orgNameVal) || changed;
   isp._ispGovernGvSeeded = true;
@@ -2062,16 +2170,26 @@ function getIspReqCsfSubIds(req) {
   return out;
 }
 
-function renderIspReqCsfChipsHtml(req) {
-  if (typeof escapeHTML !== 'function') return '';
-  var ids = getIspReqCsfSubIds(req);
-  if (!ids.length) return '';
-  var chips = ids.map(function(id) {
-    var title = (typeof CSF_SUBCATEGORIES !== 'undefined' && CSF_SUBCATEGORIES[id]) ? CSF_SUBCATEGORIES[id] : id;
-    var fn = id.split('.')[0];
-    return '<span class="csf-tag csf-fn-' + escapeHTML(fn.toLowerCase()) + '" title="' + escapeHTML(title) + '">' + escapeHTML(id) + '</span>';
-  }).join('');
-  return '<span class="csf-tag-group isp-req-csf">' + chips + '</span>';
+function renderIspReqControlChipsHtml(req, oi) {
+  var ids = (req && req.controls) || [];
+  var grouped = (typeof groupControlIdsByCsfSubcategory === 'function')
+    ? groupControlIdsByCsfSubcategory(ids)
+    : { order: [], groups: {}, unmapped: ids.slice() };
+  function chip(cid) {
+    var cidEsc = String(cid).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    return '<span class="isp-ctrl-chip"><span style="font-family:monospace;">' + escapeHTML(cid) + '</span><span style="cursor:pointer;color:var(--red);margin-left:1px;font-family:sans-serif;" onclick="removeReqControl(' + oi + ',\'' + cidEsc + '\')">\u2715</span></span>';
+  }
+  var blocks = grouped.order.map(function(key) {
+    var chips = (grouped.groups[key] || []).map(chip).join('');
+    if (!chips) return '';
+    return '<div class="csf-nest-block">'
+      + (typeof renderCsfSubcategoryHeadingHtml === 'function' ? renderCsfSubcategoryHeadingHtml(key) : '<div class="csf-nest-head">' + escapeHTML(key) + '</div>')
+      + '<div class="csf-nest-chips">' + chips + '</div></div>';
+  }).filter(Boolean);
+  if (grouped.unmapped.length) {
+    blocks.push('<div class="csf-nest-block csf-nest-block--unmapped"><div class="csf-nest-head"><span class="csf-tag csf-unmapped">Unmapped</span></div><div class="csf-nest-chips">' + grouped.unmapped.map(chip).join('') + '</div></div>');
+  }
+  return '<div class="csf-nest-wrap">' + blocks.join('') + '</div>';
 }
 
 function ensureISPSectionMigrations() {
@@ -2204,9 +2322,10 @@ function renderISPEditorBody(body, opts) {
       ],
       roles: buildDefaultISPRoles(ownerTitle),
       _ispGovernGvSeeded: true,
+      _ispPm1FoldedIntoMinus1: true,
       requirements: [
         ...buildDefaultIspGovernRequirements(orgNameVal, minus1),
-        // Privacy overlay requirements — injected after Govern clauses (IS-REQ-5–7)
+        // Privacy overlay requirements — injected after Govern clauses (OC / OV / SCRM)
         ...(state.privacyOverlay ? [
           { id:'IS-REQ-8', purpose:'privacy-plan', text:`${orgNameVal} shall develop, document, disseminate, review, and update an organization-wide privacy program plan that provides an overview of the privacy requirements for the organization and describes the privacy program controls in place or planned. The plan shall be reviewed and updated at least annually and shall designate a Senior Agency Official for Privacy (SAOP) or equivalent. [NIST 800-53: PM-18, PM-19]`, controls:['PM-18','PM-19'] },
           { id:'IS-REQ-9', purpose:'privacy-notices', text:`${orgNameVal} shall establish mechanisms to make privacy program information available to the public and shall develop and maintain privacy policies for organizational websites, mobile applications, and other digital services. Privacy notices shall be accessible, written in plain language, and updated whenever PII processing activities change. [NIST 800-53: PM-20, PM-20(1)]`, controls:['PM-20','PM-20(1)'] },
@@ -2226,6 +2345,7 @@ function renderISPEditorBody(body, opts) {
         { title:'NIST SP 800-37 Rev. 2 (RMF)', desc:'Risk Management Framework for Information Systems and Organizations: A System Life Cycle Approach.', url:'https://csrc.nist.gov/publications/detail/sp/800-37/rev-2/final' },
       ],
     };
+    if (typeof renumberReqs === 'function') renumberReqs();
   }
 
   // Migration: if old format (no sections array), convert
@@ -2276,6 +2396,9 @@ function renderISPEditorBody(body, opts) {
   const allActivePM = Object.keys(state.pmControls).filter(id => state.pmControls[id]);
   const mappedControls = isp.requirements.flatMap(r => r.controls);
   const unmappedPM = allActivePM.filter(id => !mappedControls.includes(id));
+  var missingCsfSubs = (typeof getMissingCsfSubIdsForFunction === 'function')
+    ? getMissingCsfSubIdsForFunction('GV', isp.requirements)
+    : [];
 
   // Build sections HTML
   const sectionsHTML = isp.sections.map((sec, si) => {
@@ -2358,16 +2481,29 @@ function renderISPEditorBody(body, opts) {
     ${renderReviewCycleCard('ISP', (isp.title || '').trim() || getDefaultISPTitle())}
 
     ${unmappedPM.length > 0 ? `
-    <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:12px 16px;display:flex;gap:10px;align-items:center;margin-bottom:20px;font-size:13px;">
+    <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:12px 16px;display:flex;gap:10px;align-items:center;margin-bottom:12px;font-size:13px;">
       <span>⚠️</span>
       <div style="flex:1;color:#b91c1c;">
         <strong>Warning:</strong> ${unmappedPM.length} active PM control${unmappedPM.length>1?'s have':' has'} no control objective mapped: <strong>${unmappedPM.join(', ')}</strong>.
       </div>
       <button class="btn btn-sm" onclick="autoDraftUnmappedPM()" style="background:#b91c1c;color:white;border:none;white-space:nowrap;flex-shrink:0;">Auto-Draft Requirements</button>
     </div>` : `
-    <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px 16px;display:flex;gap:10px;margin-bottom:20px;font-size:13px;">
+    <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px 16px;display:flex;gap:10px;margin-bottom:12px;font-size:13px;">
       <span>✅</span>
       <div style="color:#166534;"><strong>All active PM controls are mapped to policy requirements.</strong></div>
+    </div>`}
+
+    ${missingCsfSubs.length > 0 ? `
+    <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:12px 16px;display:flex;gap:10px;align-items:center;margin-bottom:20px;font-size:13px;">
+      <span>⚠️</span>
+      <div style="flex:1;color:#b91c1c;">
+        <strong>Warning:</strong> ${missingCsfSubs.length} selected Govern subcategor${missingCsfSubs.length>1?'ies have':'y has'} no ISP requirement: <strong>${missingCsfSubs.join(', ')}</strong>.
+      </div>
+      <button class="btn btn-sm" onclick="autoDraftUnmappedCsf()" style="background:#b91c1c;color:white;border:none;white-space:nowrap;flex-shrink:0;">Auto-Draft Requirements</button>
+    </div>` : `
+    <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px 16px;display:flex;gap:10px;margin-bottom:20px;font-size:13px;">
+      <span>✅</span>
+      <div style="color:#166534;"><strong>All selected Govern subcategories are mapped to policy requirements.</strong></div>
     </div>`}
 
     <div style="display:flex;gap:10px;margin-bottom:20px;justify-content:space-between;align-items:center;">
@@ -2621,13 +2757,8 @@ function renderRequirementsSection(unmappedPM) {
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
             <span style="cursor:grab;color:var(--text-muted);font-size:14px;" title="Drag to reorder">⠿</span>
             <span style="font-size:12px;font-weight:800;color:var(--teal);background:rgba(13,148,136,0.1);padding:4px 12px;border-radius:12px;letter-spacing:0.3px;">${req.id}</span>
-            ${renderIspReqCsfChipsHtml(req)}
-            <div style="display:flex;flex-wrap:wrap;gap:4px;">
-              ${req.controls.map(cid => {
-                var csf = (typeof renderCsfTagsHtml === 'function') ? renderCsfTagsHtml(cid, { compact: true, hideUnmapped: true }) : '';
-                var cidEsc = String(cid).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-                return `<span style="display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;background:white;border:1px solid rgba(13,148,136,0.3);border-radius:14px;padding:4px 8px;font-size:11px;font-weight:600;color:var(--teal);"><span style="font-family:monospace;">${cid}</span>${csf}<span style="cursor:pointer;color:var(--red);margin-left:1px;font-family:sans-serif;" onclick="removeReqControl(${oi},'${cidEsc}')">\u2715</span></span>`;
-              }).join('')}
+            <div style="display:flex;flex-wrap:wrap;align-items:flex-start;gap:8px;">
+              ${renderIspReqControlChipsHtml(req, oi)}
               <button onclick="addReqControl(${oi})" style="background:none;border:1px dashed var(--border);border-radius:14px;padding:2px 8px;font-size:11px;color:var(--text-muted);cursor:pointer;">+ control</button>
             </div>
           </div>
@@ -2642,7 +2773,7 @@ function renderRequirementsSection(unmappedPM) {
   }).join('');
   return `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-      <div style="font-size:11px;color:var(--text-muted);">Each requirement is a control objective mapped to specific NIST 800-53 controls. CSF 2.0 tags are outcome labels on those controls.</div>
+      <div style="font-size:11px;color:var(--text-muted);">Each requirement is a control objective mapped to NIST 800-53 controls, grouped under their CSF 2.0 subcategory.</div>
       <button class="btn btn-secondary btn-sm" onclick="addPolicyReq()">+ Add Requirement</button>
     </div>
     <div id="policy-reqs-list">
@@ -2748,6 +2879,27 @@ function renderControlsSection(activeControls, mappedControls, allActivePM) {
 // Auto-draft unmapped PM controls
 function autoDraftUnmappedPM() {
   draftUnmappedPMRequirements(true);
+}
+
+function draftUnmappedCsfIspRequirements(rerender) {
+  var isp = state.infoSecPolicy;
+  if (!isp || !Array.isArray(isp.requirements)) return 0;
+  if (typeof draftUnmappedCsfRequirements !== 'function') return 0;
+  var n = draftUnmappedCsfRequirements('GV', isp.requirements, {
+    orgName: ispOrgDisplayName(),
+    idPrefix: 'IS-REQ-'
+  });
+  if (n && typeof renumberReqs === 'function') renumberReqs();
+  if (n && typeof markDirty === 'function') markDirty();
+  if (n && rerender !== false && typeof renderCISOStep3 === 'function') renderCISOStep3();
+  return n;
+}
+
+function autoDraftUnmappedCsf() {
+  var n = draftUnmappedCsfIspRequirements(true);
+  if (typeof showToast === 'function') {
+    showToast(n ? ('Drafted ' + n + ' CSF requirement' + (n === 1 ? '' : 's') + '.') : 'All selected Govern subcategories are already mapped.');
+  }
 }
 
 

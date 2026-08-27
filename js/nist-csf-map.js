@@ -155,48 +155,53 @@ var NIST_CSF_FAMILY_DEFAULT = {
   RA: 'ID.RA', SA: 'PR.PS', SC: 'PR.IR', SI: 'PR.PS', SR: 'GV.SC'
 };
 
-// Parent-control tokens: "PR.AA" or "PR.AA:PR.AA-01". Enhancements inherit the parent.
-// All family Policy and Procedures (XX-1), PM-1 (program plan), and PT-1 (privacy overlay)
-// map to GV.PO-01 and GV.PO-02 per CSF 2.0 informative references (NIST SP 800-53 Rev. 5
-// OLIR / CSWP 29). Do not infer these at render time; keep them explicit here.
-var NIST_CSF_PO_TOKENS = ['GV.PO:GV.PO-01', 'GV.PO:GV.PO-02'];
+// Product 1-1 rule (not official CSF informative refs): each 800-53 control maps
+// to exactly one CSF 2.0 subcategory. Official OLIR / CSWP 29 rows often list
+// several; this program keeps a single primary so Unmapped vs tagged stays honest.
+//   1. XX-1 Policy and Procedures (including PM-1, PT-1, SR-1) \u2192 GV.PO-01.
+//      GV.PO-02 (review / update) lives in ISP requirement / review-cycle text,
+//      not a second tag on the same control.
+//   2. Else the first subcategory token already in the map (historically treated
+//      as primary). For PM / ISP-tier controls, prefer the first Govern (GV.*) token.
+//   3. Category-only official rows stay category-level (no invented subcategory).
+//   4. Do not invent rows for controls absent from this table \u2014 they stay Unmapped.
+// Tokens: "PR.AA" or "PR.AA:PR.AA-01". Enhancements inherit the parent.
+var NIST_CSF_PO_TOKEN = 'GV.PO:GV.PO-01';
 var NIST_CSF_MAP = {
-  'AC-1': NIST_CSF_PO_TOKENS, 'AC-2': ['PR.AA:PR.AA-01', 'PR.AA:PR.AA-05'], 'AC-3': ['PR.AA:PR.AA-05'],
-  'AC-5': ['PR.AA:PR.AA-05'], 'AC-6': ['PR.AA:PR.AA-05'], 'AC-7': ['PR.AA:PR.AA-03'],
-  'AC-17': ['PR.AA:PR.AA-05', 'PR.IR:PR.IR-01'], 'AC-18': ['PR.IR', 'PR.AA'],
-  'AT-1': NIST_CSF_PO_TOKENS, 'AT-2': ['PR.AT:PR.AT-01'], 'AT-3': ['PR.AT:PR.AT-02'],
-  'AU-1': NIST_CSF_PO_TOKENS, 'AU-2': ['DE.CM:DE.CM-03', 'PR.PS:PR.PS-04'], 'AU-6': ['DE.AE:DE.AE-02', 'DE.AE:DE.AE-03'],
-  'AU-12': ['PR.PS:PR.PS-04'],
-  'CA-1': NIST_CSF_PO_TOKENS, 'CA-2': ['ID.IM'], 'CA-3': ['ID.AM'], 'CA-5': ['ID.IM'],
-  'CA-6': ['GV.OV', 'GV.RR'], 'CA-7': ['DE.CM:DE.CM-01'], 'CA-8': ['ID.IM'],
-  'CM-1': NIST_CSF_PO_TOKENS, 'CM-2': ['PR.PS:PR.PS-01'], 'CM-6': ['PR.PS:PR.PS-01'],
-  'CM-7': ['PR.PS:PR.PS-05'], 'CM-8': ['ID.AM:ID.AM-01', 'ID.AM:ID.AM-02'],
-  'CP-1': NIST_CSF_PO_TOKENS, 'CP-2': ['RC.RP:RC.RP-01', 'PR.IR:PR.IR-03'], 'CP-9': ['PR.DS:PR.DS-11', 'RC.RP'],
-  'CP-10': ['RC.RP:RC.RP-04'],
-  'IA-1': NIST_CSF_PO_TOKENS, 'IA-2': ['PR.AA:PR.AA-03'], 'IA-4': ['PR.AA:PR.AA-01'],
-  'IA-5': ['PR.AA:PR.AA-01'], 'IA-8': ['PR.AA:PR.AA-03'], 'IA-12': ['PR.AA:PR.AA-02'],
-  'IR-1': NIST_CSF_PO_TOKENS, 'IR-4': ['RS.MI:RS.MI-01', 'RS.MI:RS.MI-02'], 'IR-6': ['RS.CO:RS.CO-02'],
-  'IR-8': ['RS.MA:RS.MA-01'],
-  'MA-1': NIST_CSF_PO_TOKENS,
-  'MP-1': NIST_CSF_PO_TOKENS,
-  'PE-1': NIST_CSF_PO_TOKENS, 'PE-3': ['PR.AA:PR.AA-06'], 'PE-6': ['DE.CM:DE.CM-02'],
-  'PL-1': NIST_CSF_PO_TOKENS, 'PL-2': ['GV.PO:GV.PO-01'],
-  'PM-1': NIST_CSF_PO_TOKENS, 'PM-2': ['GV.RR:GV.RR-01', 'GV.RR:GV.RR-02', 'GV.RR:GV.RR-03'],
-  'PM-5': ['ID.AM:ID.AM-01'],
-  'PM-6': ['GV.OV:GV.OV-01', 'GV.OV:GV.OV-03'],
-  'PM-9': ['GV.RM:GV.RM-01', 'GV.RM:GV.RM-02', 'GV.RM:GV.RM-03', 'GV.RM:GV.RM-04', 'GV.RM:GV.RM-06', 'GV.RM:GV.RM-07', 'ID.RA'],
-  'PM-11': ['GV.OC:GV.OC-01', 'GV.OC:GV.OC-02', 'GV.OC:GV.OC-04', 'GV.OC:GV.OC-05'],
-  'PM-30': ['GV.SC:GV.SC-01', 'GV.SC:GV.SC-03', 'GV.SC:GV.SC-09'],
-  'PM-30(1)': ['GV.SC:GV.SC-04'],
-  'PS-1': NIST_CSF_PO_TOKENS,
-  'PT-1': NIST_CSF_PO_TOKENS,
-  'RA-1': NIST_CSF_PO_TOKENS, 'RA-3': ['ID.RA:ID.RA-05'], 'RA-5': ['ID.RA:ID.RA-01'],
-  'SA-1': NIST_CSF_PO_TOKENS, 'SA-3': ['PR.PS:PR.PS-06'],
-  'SC-1': NIST_CSF_PO_TOKENS, 'SC-7': ['PR.IR:PR.IR-01'], 'SC-8': ['PR.DS:PR.DS-02'], 'SC-28': ['PR.DS:PR.DS-01'],
-  'SI-1': NIST_CSF_PO_TOKENS, 'SI-2': ['PR.PS:PR.PS-02'], 'SI-4': ['DE.CM:DE.CM-09'],
-  // SR-1 is the family Policy and Procedures control (GV.PO) and the SCRM policy
-  // floor (GV.SC) per CSF 2.0 informative references. Do not mutate NIST_CSF_PO_TOKENS.
-  'SR-1': NIST_CSF_PO_TOKENS.concat(['GV.SC:GV.SC-01', 'GV.SC:GV.SC-05', 'GV.SC:GV.SC-09', 'GV.SC:GV.SC-10'])
+  'AC-1': NIST_CSF_PO_TOKEN, 'AC-2': 'PR.AA:PR.AA-01', 'AC-3': 'PR.AA:PR.AA-05',
+  'AC-5': 'PR.AA:PR.AA-05', 'AC-6': 'PR.AA:PR.AA-05', 'AC-7': 'PR.AA:PR.AA-03',
+  'AC-17': 'PR.AA:PR.AA-05', 'AC-18': 'PR.IR',
+  'AT-1': NIST_CSF_PO_TOKEN, 'AT-2': 'PR.AT:PR.AT-01', 'AT-3': 'PR.AT:PR.AT-02',
+  'AU-1': NIST_CSF_PO_TOKEN, 'AU-2': 'DE.CM:DE.CM-03', 'AU-6': 'DE.AE:DE.AE-02',
+  'AU-12': 'PR.PS:PR.PS-04',
+  'CA-1': NIST_CSF_PO_TOKEN, 'CA-2': 'ID.IM', 'CA-3': 'ID.AM', 'CA-5': 'ID.IM',
+  'CA-6': 'GV.OV', 'CA-7': 'DE.CM:DE.CM-01', 'CA-8': 'ID.IM',
+  'CM-1': NIST_CSF_PO_TOKEN, 'CM-2': 'PR.PS:PR.PS-01', 'CM-6': 'PR.PS:PR.PS-01',
+  'CM-7': 'PR.PS:PR.PS-05', 'CM-8': 'ID.AM:ID.AM-01',
+  'CP-1': NIST_CSF_PO_TOKEN, 'CP-2': 'RC.RP:RC.RP-01', 'CP-9': 'PR.DS:PR.DS-11',
+  'CP-10': 'RC.RP:RC.RP-04',
+  'IA-1': NIST_CSF_PO_TOKEN, 'IA-2': 'PR.AA:PR.AA-03', 'IA-4': 'PR.AA:PR.AA-01',
+  'IA-5': 'PR.AA:PR.AA-01', 'IA-8': 'PR.AA:PR.AA-03', 'IA-12': 'PR.AA:PR.AA-02',
+  'IR-1': NIST_CSF_PO_TOKEN, 'IR-4': 'RS.MI:RS.MI-01', 'IR-6': 'RS.CO:RS.CO-02',
+  'IR-8': 'RS.MA:RS.MA-01',
+  'MA-1': NIST_CSF_PO_TOKEN,
+  'MP-1': NIST_CSF_PO_TOKEN,
+  'PE-1': NIST_CSF_PO_TOKEN, 'PE-3': 'PR.AA:PR.AA-06', 'PE-6': 'DE.CM:DE.CM-02',
+  'PL-1': NIST_CSF_PO_TOKEN, 'PL-2': 'GV.PO:GV.PO-01',
+  'PM-1': NIST_CSF_PO_TOKEN, 'PM-2': 'GV.RR:GV.RR-01',
+  'PM-5': 'ID.AM:ID.AM-01',
+  'PM-6': 'GV.OV:GV.OV-01',
+  'PM-9': 'GV.RM:GV.RM-01',
+  'PM-11': 'GV.OC:GV.OC-01',
+  'PM-30': 'GV.SC:GV.SC-01',
+  'PM-30(1)': 'GV.SC:GV.SC-04',
+  'PS-1': NIST_CSF_PO_TOKEN,
+  'PT-1': NIST_CSF_PO_TOKEN,
+  'RA-1': NIST_CSF_PO_TOKEN, 'RA-3': 'ID.RA:ID.RA-05', 'RA-5': 'ID.RA:ID.RA-01',
+  'SA-1': NIST_CSF_PO_TOKEN, 'SA-3': 'PR.PS:PR.PS-06',
+  'SC-1': NIST_CSF_PO_TOKEN, 'SC-7': 'PR.IR:PR.IR-01', 'SC-8': 'PR.DS:PR.DS-02', 'SC-28': 'PR.DS:PR.DS-01',
+  'SI-1': NIST_CSF_PO_TOKEN, 'SI-2': 'PR.PS:PR.PS-02', 'SI-4': 'DE.CM:DE.CM-09',
+  'SR-1': NIST_CSF_PO_TOKEN
 };
 
 // ---------------------------------------------------------------------------
@@ -337,8 +342,78 @@ function getCsfMappingsForControl(ctrlId) {
 }
 
 function getCsfPrimaryMapping(ctrlId) {
-  var maps = getCsfMappingsForControl(ctrlId);
+  var maps = getCsfExplicitMappingsForControl(ctrlId);
+  if (maps.length) return maps[0];
+  maps = getCsfMappingsForControl(ctrlId);
   return maps.length ? maps[0] : null;
+}
+
+/** Explicit-map subcategory only \u2014 empty string if Unmapped or category-level. */
+function getCsfPrimarySubcategory(ctrlId) {
+  var maps = getCsfExplicitMappingsForControl(ctrlId);
+  if (!maps.length) return '';
+  return maps[0].sub || '';
+}
+
+function getCsfPrimaryGroupKey(ctrlId) {
+  var maps = getCsfExplicitMappingsForControl(ctrlId);
+  if (!maps.length) return '';
+  return maps[0].sub || maps[0].cat || '';
+}
+
+function getCsfCategoryIdFromSub(subOrCat) {
+  var s = String(subOrCat || '').trim();
+  if (!s) return '';
+  if (CSF_CATEGORIES[s]) return s;
+  var i = s.lastIndexOf('-');
+  if (i < 0) return s;
+  var cat = s.slice(0, i);
+  return CSF_CATEGORIES[cat] ? cat : s;
+}
+
+function groupControlIdsByCsfSubcategory(ctrlIds) {
+  var groups = {};
+  var unmapped = [];
+  (ctrlIds || []).forEach(function(id) {
+    var key = getCsfPrimaryGroupKey(id);
+    if (!key) {
+      unmapped.push(id);
+      return;
+    }
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(id);
+  });
+  var order = Object.keys(groups).sort();
+  return { order: order, groups: groups, unmapped: unmapped };
+}
+
+function groupCsfSubIdsByCategory(subIds) {
+  var groups = {};
+  (subIds || []).forEach(function(id) {
+    var cat = getCsfCategoryIdFromSub(id);
+    if (!cat) return;
+    if (!groups[cat]) groups[cat] = [];
+    groups[cat].push(id);
+  });
+  var order = Object.keys(groups).sort();
+  order.forEach(function(cat) {
+    groups[cat].sort();
+  });
+  return { order: order, groups: groups };
+}
+
+function renderCsfSubcategoryHeadingHtml(subOrCat) {
+  if (typeof escapeHTML !== 'function') return '';
+  var id = String(subOrCat || '');
+  if (!id) return '';
+  var fn = id.split('.')[0] || '';
+  var name = (typeof CSF_SUBCATEGORIES !== 'undefined' && CSF_SUBCATEGORIES[id])
+    ? CSF_SUBCATEGORIES[id]
+    : getCsfCategoryLabel(id);
+  return '<div class="csf-nest-head">'
+    + '<span class="csf-tag csf-fn-' + escapeHTML(fn.toLowerCase()) + '">' + escapeHTML(id) + '</span>'
+    + (name ? '<span class="csf-nest-head-name">' + escapeHTML(name) + '</span>' : '')
+    + '</div>';
 }
 
 function getCsfCategoryLabel(catId) {
@@ -391,7 +466,7 @@ function getCsfExplicitMappingsForControl(ctrlId) {
     seen[key] = true;
     out.push(m);
   });
-  return out;
+  return out.slice(0, 1);
 }
 
 function getCsfExplicitPmControlsForCategory(catId) {
@@ -476,6 +551,154 @@ function getCsfSelectedSubIds() {
   return Object.keys(CSF_SUBCATEGORIES).filter(function(id) {
     return !!state.csfSelectedSubcats[id];
   });
+}
+
+function getCsfSelectedSubIdsForFunction(fnId) {
+  ensureCsfSubcatsSeeded(fnId);
+  return getCsfSubcategoryIdsForFunction(fnId).filter(function(id) {
+    return isCsfSubcatSelected(id);
+  });
+}
+
+var CSF_CAT_ISP_PURPOSE = {
+  'GV.PO': 'isp-domain-policy',
+  'GV.OC': 'gv-oc',
+  'GV.OV': 'gv-ov',
+  'GV.SC': 'gv-sc',
+  'GV.RR': 'isp-roles',
+  'GV.RM': 'isp-risk'
+};
+
+function getCoveredCsfSubIdsFromRequirements(requirements, opts) {
+  opts = opts || {};
+  var set = {};
+  (requirements || []).forEach(function(req) {
+    if (!req) return;
+    (req.controls || []).forEach(function(cid) {
+      var sub = getCsfPrimarySubcategory(cid);
+      if (sub) set[sub] = true;
+    });
+    (req.csf || []).forEach(function(id) {
+      var s = String(id || '').trim();
+      if (s && CSF_SUBCATEGORIES[s]) set[s] = true;
+    });
+    if (req.purpose === 'isp-domain-policy') set['GV.PO-02'] = true;
+  });
+  if (opts.extra) {
+    Object.keys(opts.extra).forEach(function(id) {
+      if (opts.extra[id]) set[id] = true;
+    });
+  }
+  return set;
+}
+
+function getMissingCsfSubIdsForFunction(fnId, requirements, opts) {
+  var covered = getCoveredCsfSubIdsFromRequirements(requirements, opts);
+  return getCsfSelectedSubIdsForFunction(fnId).filter(function(id) {
+    return !covered[id];
+  });
+}
+
+function getDefaultCsfGapReqText(orgNameVal, catId, subIds) {
+  var org = orgNameVal || 'the organization';
+  var cat = CSF_CATEGORIES[catId];
+  var catName = cat ? cat.name : catId;
+  var fnName = cat ? getCsfFunctionLabel(cat.fn) : '';
+  var listed = (subIds || []).join(', ');
+  var lead = fnName ? (fnName + ' / ' + catName) : catName;
+  return org + ' shall implement the selected CSF 2.0 ' + lead
+    + ' outcomes (' + listed + '). Implementation shall be documented, reviewed on the policy cycle, and updated when requirements, threats, technology, or mission change. [NIST CSF 2.0: ' + listed + ']';
+}
+
+function findReqForCsfCategory(requirements, catId) {
+  var purpose = CSF_CAT_ISP_PURPOSE[catId] || ('csf-gap-' + catId);
+  var i;
+  for (i = 0; i < (requirements || []).length; i++) {
+    if (requirements[i] && requirements[i].purpose === purpose) return requirements[i];
+  }
+  for (i = 0; i < (requirements || []).length; i++) {
+    if (requirements[i] && requirements[i].purpose === ('csf-gap-' + catId)) return requirements[i];
+  }
+  var hits = [];
+  (requirements || []).forEach(function(req) {
+    var csf = req && req.csf || [];
+    if (!csf.length) return;
+    var allThisCat = csf.every(function(id) { return getCsfCategoryIdFromSub(id) === catId; });
+    if (allThisCat) hits.push(req);
+  });
+  return hits.length === 1 ? hits[0] : null;
+}
+
+var CSF_GAP_SKIP_CTRL = { 'PM-1': true, 'PM-6': true, 'PM-11': true, 'PM-30': true, 'PM-30(1)': true };
+
+function collectRequirementControlIds(requirements) {
+  var set = {};
+  (requirements || []).forEach(function(req) {
+    (req && req.controls || []).forEach(function(id) { if (id) set[id] = true; });
+  });
+  return set;
+}
+
+function getOfficialControlsForCsfSubs(subIds) {
+  var want = {};
+  (subIds || []).forEach(function(id) { want[id] = true; });
+  var out = [];
+  Object.keys(NIST_CSF_MAP).forEach(function(cid) {
+    var sub = getCsfPrimarySubcategory(cid);
+    if (sub && want[sub]) out.push(cid);
+  });
+  out.sort();
+  return out;
+}
+
+/**
+ * Draft consolidated requirements for selected CSF subs that no requirement covers.
+ * One new/updated IS-REQ per Category \u2014 never one row per subcategory.
+ * Returns the number of requirements created or updated.
+ */
+function draftUnmappedCsfRequirements(fnId, requirements, opts) {
+  opts = opts || {};
+  if (!Array.isArray(requirements)) return 0;
+  var missing = getMissingCsfSubIdsForFunction(fnId, requirements, opts);
+  if (!missing.length) return 0;
+  var grouped = groupCsfSubIdsByCategory(missing);
+  var listed = collectRequirementControlIds(requirements);
+  var orgNameVal = opts.orgName || (typeof state !== 'undefined' && state && state.orgName) || 'the organization';
+  var idPrefix = opts.idPrefix || 'IS-REQ-';
+  var created = 0;
+  grouped.order.forEach(function(catId) {
+    var subs = grouped.groups[catId] || [];
+    if (!subs.length) return;
+    var existing = findReqForCsfCategory(requirements, catId);
+    if (existing) {
+      if (!existing.csf) existing.csf = [];
+      var seen = {};
+      existing.csf.forEach(function(id) { seen[id] = true; });
+      var added = false;
+      subs.forEach(function(id) {
+        if (seen[id]) return;
+        existing.csf.push(id);
+        seen[id] = true;
+        added = true;
+      });
+      if (added) created++;
+      return;
+    }
+    var controls = getOfficialControlsForCsfSubs(subs).filter(function(cid) {
+      return !listed[cid];
+    });
+    controls.forEach(function(cid) { listed[cid] = true; });
+    var n = requirements.length + 1;
+    requirements.push({
+      id: idPrefix + n,
+      purpose: CSF_CAT_ISP_PURPOSE[catId] || ('csf-gap-' + catId),
+      text: getDefaultCsfGapReqText(orgNameVal, catId, subs),
+      controls: controls,
+      csf: subs.slice()
+    });
+    created++;
+  });
+  return created;
 }
 
 function getCsfPmIdsForSelectedSubs() {

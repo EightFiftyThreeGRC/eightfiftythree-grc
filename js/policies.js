@@ -2268,31 +2268,29 @@ function renderPolicyStep2() {
               onchange="selectAllDomainControls('${fam}', this.checked ? 'all' : 'none');"
               ${selected.length===allFamControls.length?'checked':''}></th>
             <th style="width:90px;">Control ID</th>
-            <th style="width:120px;">CSF 2.0</th>
             <th>Name</th>
             <th style="width:110px;">800-53B</th>
           </tr>
         </thead>
         <tbody id="tbod-${Math.random().toString(36).slice(2,8)}">
-          ${allFamControls.map(c=>{
-            const inProgramBaseline = c.bl.includes(state.baseline) || (state.privacyOverlay && c.bl.includes('P'));
-            return `
-          <tr data-id="${c.id}" data-required="${inProgramBaseline?'required':'optional'}" style="${!inProgramBaseline?'background:rgba(248,250,252,0.8);':''}">
-            <td><input type="checkbox" class="domain-cb" data-id="${c.id}" ${selected.includes(c.id)?'checked':''}
-              style="accent-color:var(--teal);"
-              onchange="toggleDomainControl('${fam}','${c.id}',this.checked);"></td>
-            <td>
-              <span class="control-id">${c.id}</span>
-              ${!inProgramBaseline?'<div style="font-size:9px;font-weight:700;color:#64748b;letter-spacing:0.4px;margin-top:2px;">OPTIONAL</div>':''}
-            </td>
-            <td>${typeof renderCsfTagsHtml === 'function' ? renderCsfTagsHtml(c.id, { compact: true }) : ''}</td>
-            <td style="font-size:13px;color:${inProgramBaseline?'var(--navy)':'var(--text-muted)'};">
-              ${c.n}
-              <div style="font-size:11px;color:var(--text-muted);font-weight:400;margin-top:2px;line-height:1.35;">${ctrlShortDesc(c)}</div>
-            </td>
-            <td>${minBaselinePill(c.bl)}</td>
-          </tr>`;
-          }).join('')}
+          ${typeof renderCsfGroupedControlRowsHtml === 'function'
+            ? renderCsfGroupedControlRowsHtml(allFamControls, function(c) {
+                const inProgramBaseline = c.bl.includes(state.baseline) || (state.privacyOverlay && c.bl.includes('P'));
+                return '<tr data-id="' + c.id + '" data-required="' + (inProgramBaseline?'required':'optional') + '" style="' + (!inProgramBaseline?'background:rgba(248,250,252,0.8);':'') + '">'
+                  + '<td><input type="checkbox" class="domain-cb" data-id="' + c.id + '" ' + (selected.includes(c.id)?'checked':'')
+                  + ' style="accent-color:var(--teal);" onchange="toggleDomainControl(\'' + fam + '\',\'' + c.id + '\',this.checked);"></td>'
+                  + '<td><span class="control-id">' + c.id + '</span>'
+                  + (!inProgramBaseline?'<div style="font-size:9px;font-weight:700;color:#64748b;letter-spacing:0.4px;margin-top:2px;">OPTIONAL</div>':'')
+                  + '</td>'
+                  + '<td style="font-size:13px;color:' + (inProgramBaseline?'var(--navy)':'var(--text-muted)') + ';">'
+                  + c.n
+                  + '<div style="font-size:11px;color:var(--text-muted);font-weight:400;margin-top:2px;line-height:1.35;">' + ctrlShortDesc(c) + '</div></td>'
+                  + '<td>' + minBaselinePill(c.bl) + '</td></tr>';
+              }, { colspan: 4 })
+            : allFamControls.map(function(c) {
+                const inProgramBaseline = c.bl.includes(state.baseline) || (state.privacyOverlay && c.bl.includes('P'));
+                return '<tr data-id="' + c.id + '"><td></td><td>' + c.id + '</td><td>' + c.n + '</td><td></td></tr>';
+              }).join('')}
         </tbody>
       </table>
     </div>
@@ -2446,7 +2444,9 @@ function filterDomainControls() {
   const blf = document.getElementById('ctrlBaselineFilter')?.value||'all';
   var visibleCount = 0;
   var checkedCount = 0;
-  document.querySelectorAll('#domainCtrlTable tbody tr').forEach(function(row){
+  var rows = Array.prototype.slice.call(document.querySelectorAll('#domainCtrlTable tbody tr'));
+  rows.forEach(function(row){
+    if (row.classList.contains('csf-nest-row')) return;
     const id       = (row.dataset.id||'').toLowerCase();
     const required = row.dataset.required||'required';
     const name     = (row.textContent||'').toLowerCase();
@@ -2459,6 +2459,15 @@ function filterDomainControls() {
       var cb = row.querySelector('.domain-cb');
       if (cb && cb.checked) checkedCount++;
     }
+  });
+  rows.forEach(function(row, i) {
+    if (!row.classList.contains('csf-nest-row')) return;
+    var any = false;
+    for (var j = i + 1; j < rows.length; j++) {
+      if (rows[j].classList.contains('csf-nest-row')) break;
+      if (rows[j].style.display !== 'none') { any = true; break; }
+    }
+    row.style.display = any ? '' : 'none';
   });
   // Reset select-all checkbox to reflect visible rows only
   const selectAllCb = document.getElementById('selectAllCb');
@@ -3755,26 +3764,46 @@ function _renderDomainRoles(fam, dp) {
 
 function _renderDomainRequirements(fam, dp, selected) {
   const esc_fam = fam.replace(/'/g,"\\'");
-  // Controls already mapped to at least one requirement
   const allMapped = (dp.requirements||[]).reduce(function(acc,r){ return acc.concat(r.controls||[]); }, []);
-  // Controls available to add to a new requirement (in selected but not yet in any req)
   const unmapped = selected.filter(function(cid){ return !allMapped.includes(cid); });
+  var pfn = (typeof getCsfPolicyFunctionForFamily === 'function') ? getCsfPolicyFunctionForFamily(fam) : '';
+  var missingCsf = (pfn && typeof getMissingCsfSubIdsForFunction === 'function')
+    ? getMissingCsfSubIdsForFunction(pfn, dp.requirements || [])
+    : [];
 
-  let html = '<div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;line-height:1.55;">Each row is a <strong>policy-level control objective</strong> in plain language. Map <strong>one or more</strong> controls from this family (including enhancements) to the same objective where that makes sense. CSF 2.0 tags next to each 800-53 ID are outcome labels (Function / Category) \u2014 aligned to CSF 2.0, not a substitute for your organization\u2019s CSF Profile. The control design wizard is where owners operationalize literal NIST text (parts a\u2013e, enhancements, parameters) so implementation meets both this objective and the official control statement.</div>';
+  let html = '<div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;line-height:1.55;">Each row is a <strong>policy-level control objective</strong> in plain language. Mapped 800-53 controls are grouped under their CSF 2.0 subcategory. The control design wizard is where owners operationalize literal NIST text.</div>';
+
+  if (missingCsf.length) {
+    html += '<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px 12px;display:flex;gap:10px;align-items:center;margin-bottom:12px;font-size:12px;">'
+      + '<div style="flex:1;color:#b91c1c;"><strong>Warning:</strong> ' + missingCsf.length + ' selected CSF subcategor' + (missingCsf.length>1?'ies have':'y has') + ' no requirement: <strong>' + missingCsf.join(', ') + '</strong>.</div>'
+      + '<button type="button" class="btn btn-sm" onclick="autoDraftUnmappedDomainCsf(\'' + esc_fam + '\')" style="background:#b91c1c;color:white;border:none;white-space:nowrap;flex-shrink:0;">Auto-Draft</button>'
+      + '</div>';
+  } else if (pfn) {
+    html += '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:12px;color:#166534;"><strong>All selected ' + escapeHTML(pfn) + ' subcategories are mapped to policy requirements.</strong></div>';
+  }
 
   (dp.requirements||[]).forEach(function(req, qi) {
-    const ctrlTags = (req.controls||[]).map(function(cid) {
+    var grouped = (typeof groupControlIdsByCsfSubcategory === 'function')
+      ? groupControlIdsByCsfSubcategory(req.controls || [])
+      : { order: [], groups: {}, unmapped: (req.controls || []).slice() };
+    function chip(cid) {
       const ctrl = CONTROLS.find(function(c){ return c.id===cid; });
-      const csf = (typeof renderCsfTagsHtml === 'function') ? renderCsfTagsHtml(cid) : '';
-      return '<span style="display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:11px;background:rgba(13,148,136,0.08);color:var(--teal);padding:4px 8px;border-radius:10px;margin-right:4px;">' +
-        '<span style="font-family:monospace;font-weight:700;">' + cid + '</span>' +
-        (ctrl?'<span style="font-family:sans-serif;font-size:10px;font-weight:400;color:var(--text-muted);max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+ctrl.n+'</span>':'') +
-        csf +
-        '<button style="background:none;border:none;color:var(--teal);cursor:pointer;font-size:11px;padding:0 0 0 2px;line-height:1;" onclick="removeDomainReqCtrl(\''+esc_fam+'\','+qi+',\''+cid+'\')">\u00d7</button>' +
-      '</span>';
-    }).join('');
+      return '<span class="isp-ctrl-chip">'
+        + '<span style="font-family:monospace;font-weight:700;">' + cid + '</span>'
+        + (ctrl?'<span style="font-family:sans-serif;font-size:10px;font-weight:400;color:var(--text-muted);max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+ctrl.n+'</span>':'')
+        + '<button style="background:none;border:none;color:var(--teal);cursor:pointer;font-size:11px;padding:0 0 0 2px;line-height:1;" onclick="removeDomainReqCtrl(\''+esc_fam+'\','+qi+',\''+cid+'\')">\u00d7</button>'
+        + '</span>';
+    }
+    var nest = '';
+    grouped.order.forEach(function(key) {
+      nest += '<div class="csf-nest-block">'
+        + (typeof renderCsfSubcategoryHeadingHtml === 'function' ? renderCsfSubcategoryHeadingHtml(key) : '<div class="csf-nest-head">' + escapeHTML(key) + '</div>')
+        + '<div class="csf-nest-chips">' + (grouped.groups[key] || []).map(chip).join('') + '</div></div>';
+    });
+    if (grouped.unmapped.length) {
+      nest += '<div class="csf-nest-block csf-nest-block--unmapped"><div class="csf-nest-head"><span class="csf-tag csf-unmapped">Unmapped</span></div><div class="csf-nest-chips">' + grouped.unmapped.map(chip).join('') + '</div></div>';
+    }
 
-    // Build the "add control" picker: select from controls that are in selected[] and not already in THIS requirement
     const availableForReq = selected.filter(function(cid){ return !(req.controls||[]).includes(cid); });
     const addCtrlPicker = availableForReq.length > 0
       ? '<span style="display:inline-flex;align-items:center;gap:4px;">' +
@@ -3789,7 +3818,8 @@ function _renderDomainRequirements(fam, dp, selected) {
       '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">' +
         '<div>' +
           '<span style="font-size:11px;font-weight:700;color:var(--teal);background:rgba(13,148,136,0.1);padding:2px 8px;border-radius:10px;white-space:nowrap;margin-right:8px;">'+req.id+'</span>' +
-          '<div style="display:inline-flex;flex-wrap:wrap;align-items:center;gap:4px;margin-top:6px;">'+ctrlTags+addCtrlPicker+'</div>' +
+          '<div class="csf-nest-wrap" style="margin-top:6px;">'+nest+'</div>' +
+          (addCtrlPicker ? '<div style="margin-top:6px;">'+addCtrlPicker+'</div>' : '') +
         '</div>' +
         '<div style="display:flex;gap:4px;flex-shrink:0;">' +
           (qi>0?'<button class="btn btn-secondary btn-sm" style="padding:2px 6px;font-size:11px;" onclick="moveDomainReq(\''+esc_fam+'\','+qi+',-1)" title="Move up">▲</button>':'') +
@@ -3801,7 +3831,6 @@ function _renderDomainRequirements(fam, dp, selected) {
     '</div>';
   });
 
-  // New blank requirement button + unmapped controls hint
   html += '<div style="display:flex;align-items:center;gap:10px;margin-top:4px;">' +
     '<button class="btn btn-secondary btn-sm" onclick="addDomainReq(\''+esc_fam+'\')">+ Add Requirement</button>' +
     (unmapped.length>0 ? '<span style="font-size:11px;color:var(--amber);">⚠ '+unmapped.length+' selected control'+(unmapped.length>1?'s':'')+' not yet in any requirement: '+unmapped.join(', ')+'</span>' : '<span style="font-size:11px;color:var(--green);">✓ All selected controls are mapped.</span>') +
@@ -3848,6 +3877,24 @@ function addDomainReq(fam) {
   if (!dp.requirements) dp.requirements = [];
   dp.requirements.push({ id: fam+'-REQ-'+(n+1), controls: [], text: '' });
   renderPolicyStep3();
+}
+
+function autoDraftUnmappedDomainCsf(fam) {
+  if (!state.domainPolicies || !state.domainPolicies[fam]) return;
+  var dp = state.domainPolicies[fam];
+  if (!dp.requirements) dp.requirements = [];
+  var pfn = (typeof getCsfPolicyFunctionForFamily === 'function') ? getCsfPolicyFunctionForFamily(fam) : '';
+  if (!pfn || typeof draftUnmappedCsfRequirements !== 'function') return;
+  var n = draftUnmappedCsfRequirements(pfn, dp.requirements, {
+    orgName: (state.orgName || 'the organization'),
+    idPrefix: fam + '-REQ-'
+  });
+  if (n && typeof renumberDomainReqs === 'function') renumberDomainReqs(fam);
+  if (n && typeof markDirty === 'function') markDirty();
+  setTimeout(function() { renderPolicyStep3(); }, 0);
+  if (typeof showToast === 'function') {
+    showToast(n ? ('Drafted ' + n + ' CSF requirement' + (n === 1 ? '' : 's') + '.') : 'All selected subcategories are already mapped.');
+  }
 }
 function removeDomainReq(fam, qi) {
   if (!state.domainPolicies || !state.domainPolicies[fam] || !state.domainPolicies[fam].requirements) return;
