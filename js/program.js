@@ -1846,6 +1846,234 @@ function buildDefaultISPRoles(ownerTitle) {
   return roles;
 }
 
+/** PM IDs covered by consolidated ISP Govern clauses \u2014 do not auto-draft a second row. */
+var ISP_GOVERN_COVERED_PM_IDS = { 'PM-6': true, 'PM-11': true, 'PM-30': true, 'PM-30(1)': true };
+
+function ispOrgDisplayName() {
+  return (state && state.orgName) ? state.orgName : 'the organization';
+}
+
+function getDefaultIspReq1Text(orgNameVal) {
+  return orgNameVal + ' shall develop, document, disseminate, review, and update an organization-wide information security program plan that provides an overview of the security requirements for the organization and a description of the security program controls and common controls in place or planned. The plan shall be reviewed and updated at least annually. [NIST 800-53: PM-1]';
+}
+function getDefaultIspReq2Text(orgNameVal) {
+  return orgNameVal + ' shall designate a senior official with the authority, mission, and resources to coordinate, develop, implement, and maintain an organization-wide information security program. Organizational leadership shall be accountable for cybersecurity risk and shall foster a culture that is risk-aware, ethical, and continually improving. Clear ownership shall be established at the program level, domain level, control level, and asset level. Cybersecurity roles, responsibilities, and authorities shall be communicated, understood, and enforced, and adequate resources shall be allocated commensurate with the cybersecurity risk strategy. Cybersecurity shall be included in human resources practices, including personnel screening, onboarding, transfers, and termination. [NIST 800-53: PM-2, PS-1]';
+}
+function getDefaultIspReq3Text(orgNameVal) {
+  return orgNameVal + ' shall establish, document, implement, and maintain an information security risk management strategy aligned to organizational risk tolerance and the strategic priorities established by executive leadership. The program shall define and maintain risk appetite and risk tolerance statements; integrate cybersecurity risk management activities and outcomes into enterprise risk management; establish and communicate strategic direction for appropriate risk response options; establish lines of communication for cybersecurity risks, including risks from suppliers and other third parties; define a standardized method for calculating, documenting, categorizing, and prioritizing cybersecurity risks; and characterize strategic opportunities (positive risks) in organizational cybersecurity risk discussions. Risk management activities shall be integrated into the system development life cycle and mission/business processes. [NIST 800-53: PM-9]';
+}
+function getDefaultIspReq4Text(orgNameVal) {
+  return orgNameVal + ' shall develop, document, disseminate, and annually review and update policies and procedures for applicable NIST 800-53 control family domains. Related domains may be combined into a single policy document where appropriate. Each domain policy shall state requirements (\'what must be done\'), and be supported by implementing procedures (\'how to do it\'). Policies shall be approved by the CISO and posted in the organization\'s policy repository. [NIST 800-53: all -1 controls]';
+}
+function getDefaultIspReqOcText(orgNameVal) {
+  return orgNameVal + ' shall define and maintain an understanding of organizational context so that the organizational mission informs cybersecurity risk management. Internal and external stakeholders, and their needs and expectations regarding cybersecurity risk management, shall be understood and considered. Legal, regulatory, and contractual requirements regarding cybersecurity \u2014 including privacy and civil liberties obligations \u2014 shall be understood and managed. Critical objectives, capabilities, and services that external stakeholders depend on or expect from the organization, and the outcomes, capabilities, and services the organization depends on, shall be understood and communicated. [NIST 800-53: PM-11]';
+}
+function getDefaultIspReqOvText(orgNameVal) {
+  return orgNameVal + ' shall review cybersecurity risk management strategy outcomes to inform and adjust strategy and direction; review and adjust the cybersecurity risk management strategy to ensure coverage of organizational requirements and risks; and evaluate organizational cybersecurity risk management performance and make adjustments as needed. The program shall develop, monitor, and report information security measures of performance that support this oversight. [NIST 800-53: PM-6]';
+}
+function getDefaultIspReqScText(orgNameVal) {
+  return orgNameVal + ' shall establish and maintain a cybersecurity supply chain risk management (SCRM) program, including strategy, objectives, policies, and processes agreed to by organizational stakeholders. Cybersecurity roles and responsibilities for suppliers, customers, and partners shall be established, communicated, and coordinated internally and externally. SCRM shall be integrated into cybersecurity and enterprise risk management, risk assessment, and improvement processes. Suppliers shall be known and prioritized by criticality as a program obligation. Requirements to address cybersecurity risks in supply chains shall be established, prioritized, and integrated into contracts and other agreements with suppliers and relevant third parties. Planning and due diligence shall be performed before entering into formal supplier or other third-party relationships. Risks posed by suppliers, their products and services, and other third parties shall be recorded, prioritized, assessed, responded to, and monitored over the course of the relationship. Relevant suppliers and other third parties shall be included in incident planning, response, and recovery. Supply chain security practices shall be integrated into cybersecurity and enterprise risk management and monitored throughout the technology product and service life cycle. SCRM plans shall include provisions for activities after the conclusion of a partnership or service agreement. [NIST 800-53: SR-1, PM-30, SA-9]';
+}
+
+function buildDefaultIspGovernRequirements(orgNameVal, minus1) {
+  return [
+    { id: 'IS-REQ-1', purpose: 'isp-plan', text: getDefaultIspReq1Text(orgNameVal), controls: ['PM-1'], csf: ['GV.PO-01', 'GV.PO-02'] },
+    { id: 'IS-REQ-2', purpose: 'isp-roles', text: getDefaultIspReq2Text(orgNameVal), controls: ['PM-2', 'PS-1'], csf: ['GV.RR-01', 'GV.RR-02', 'GV.RR-03', 'GV.RR-04'] },
+    { id: 'IS-REQ-3', purpose: 'isp-risk', text: getDefaultIspReq3Text(orgNameVal), controls: ['PM-9'], csf: ['GV.RM-01', 'GV.RM-02', 'GV.RM-03', 'GV.RM-04', 'GV.RM-05', 'GV.RM-06', 'GV.RM-07'] },
+    { id: 'IS-REQ-4', purpose: 'isp-domain-policy', text: getDefaultIspReq4Text(orgNameVal), controls: minus1 || [], csf: ['GV.PO-01', 'GV.PO-02'] },
+    { id: 'IS-REQ-5', purpose: 'gv-oc', text: getDefaultIspReqOcText(orgNameVal), controls: ['PM-11'], csf: ['GV.OC-01', 'GV.OC-02', 'GV.OC-03', 'GV.OC-04', 'GV.OC-05'] },
+    { id: 'IS-REQ-6', purpose: 'gv-ov', text: getDefaultIspReqOvText(orgNameVal), controls: ['PM-6'], csf: ['GV.OV-01', 'GV.OV-02', 'GV.OV-03'] },
+    { id: 'IS-REQ-7', purpose: 'gv-sc', text: getDefaultIspReqScText(orgNameVal), controls: ['SR-1', 'PM-30', 'SA-9'], csf: ['GV.SC-01', 'GV.SC-02', 'GV.SC-03', 'GV.SC-04', 'GV.SC-05', 'GV.SC-06', 'GV.SC-07', 'GV.SC-08', 'GV.SC-09', 'GV.SC-10'] }
+  ];
+}
+
+function findIspReqByPurpose(isp, purpose) {
+  if (!isp || !isp.requirements) return null;
+  for (var i = 0; i < isp.requirements.length; i++) {
+    if (isp.requirements[i] && isp.requirements[i].purpose === purpose) return isp.requirements[i];
+  }
+  return null;
+}
+
+function findIspReqByPrimaryControl(isp, cid) {
+  if (!isp || !isp.requirements) return null;
+  var hits = [];
+  isp.requirements.forEach(function(r) {
+    if (r && (r.controls || []).indexOf(cid) !== -1) hits.push(r);
+  });
+  if (hits.length === 1) return hits[0];
+  var exact = hits.filter(function(r) { return (r.controls || []).length === 1; });
+  return exact[0] || null;
+}
+
+function ispReqLooksLikeLegacyDefault(text, kind) {
+  var t = String(text || '');
+  if (kind === 'roles') {
+    return t.indexOf('Clear ownership shall be established at the program level, domain level, control level, and asset level') !== -1
+      && t.indexOf('Organizational leadership shall be accountable') === -1;
+  }
+  if (kind === 'risk') {
+    return t.indexOf('Risk management activities shall be integrated into the system development life cycle') !== -1
+      && t.indexOf('risk appetite and risk tolerance') === -1;
+  }
+  return false;
+}
+
+function ispReqLooksLikeShortPmDraft(req, pmId, orgNameVal) {
+  if (!req) return false;
+  var ctrls = req.controls || [];
+  if (ctrls.length !== 1 || ctrls[0] !== pmId) return false;
+  var stmts = {
+    'PM-6': orgNameVal + ' shall develop, monitor, and report on information security measures of performance. [NIST 800-53: PM-6]',
+    'PM-11': orgNameVal + ' shall define mission and business processes with consideration for information security and privacy. [NIST 800-53: PM-11]',
+    'PM-30': orgNameVal + ' shall implement PM-30 per NIST 800-53 Rev. 5. [NIST 800-53: PM-30]'
+  };
+  var alt30 = orgNameVal + ' shall develop an organization-wide supply chain risk management strategy and implementation plan. [NIST 800-53: PM-30]';
+  var t = String(req.text || '').trim();
+  if (pmId === 'PM-30') return t === stmts['PM-30'] || t === alt30;
+  return !!(stmts[pmId] && t === stmts[pmId]);
+}
+
+function getIspGovernInsertIndex(reqs) {
+  var lastGv = -1;
+  var firstPrivacy = -1;
+  reqs.forEach(function(r, i) {
+    var p = r && r.purpose;
+    if (p === 'gv-oc' || p === 'gv-ov' || p === 'gv-sc') lastGv = i;
+    var ctrls = (r && r.controls) || [];
+    if (firstPrivacy < 0 && ctrls.some(function(id) { return /^PM-(1[89]|2[0-8])/.test(id); })) firstPrivacy = i;
+  });
+  if (lastGv >= 0) return lastGv + 1;
+  if (firstPrivacy >= 0) return firstPrivacy;
+  if (reqs.length >= 4) return 4;
+  return reqs.length;
+}
+
+function applyIspGovernClause(isp, spec, orgNameVal) {
+  var existing = findIspReqByPurpose(isp, spec.purpose);
+  if (existing) return false;
+  var absorbPm = spec.absorbPm;
+  if (absorbPm) {
+    var draft = null;
+    (isp.requirements || []).some(function(r) {
+      if (ispReqLooksLikeShortPmDraft(r, absorbPm, orgNameVal)) { draft = r; return true; }
+      return false;
+    });
+    if (draft) {
+      draft.purpose = spec.purpose;
+      draft.text = spec.text;
+      draft.controls = spec.controls.slice();
+      draft.csf = spec.csf.slice();
+      return true;
+    }
+  }
+  if (spec.skipIfControl && findIspReqByPrimaryControl(isp, spec.skipIfControl) && spec.purpose !== 'gv-sc') {
+    var hit = findIspReqByPrimaryControl(isp, spec.skipIfControl);
+    if (hit && !hit.purpose) {
+      hit.purpose = spec.purpose;
+      hit.csf = spec.csf.slice();
+      if (!ispReqLooksLikeShortPmDraft(hit, spec.skipIfControl, orgNameVal)) return false;
+      hit.text = spec.text;
+      hit.controls = spec.controls.slice();
+      return true;
+    }
+  }
+  var insertAt = getIspGovernInsertIndex(isp.requirements);
+  isp.requirements.splice(insertAt, 0, {
+    id: spec.id,
+    purpose: spec.purpose,
+    text: spec.text,
+    controls: spec.controls.slice(),
+    csf: spec.csf.slice()
+  });
+  return true;
+}
+
+function ensureISPGovernRequirements() {
+  var isp = state.infoSecPolicy;
+  if (!isp || !Array.isArray(isp.requirements) || !isp.requirements.length) return;
+  var orgNameVal = ispOrgDisplayName();
+  var req2 = findIspReqByPurpose(isp, 'isp-roles') || findIspReqByPrimaryControl(isp, 'PM-2');
+  if (req2) {
+    if (!req2.purpose) req2.purpose = 'isp-roles';
+    if (ispReqLooksLikeLegacyDefault(req2.text, 'roles')) {
+      req2.text = getDefaultIspReq2Text(orgNameVal);
+      if ((req2.controls || []).indexOf('PS-1') === -1) req2.controls = (req2.controls || []).concat(['PS-1']);
+    }
+    if (!req2.csf || !req2.csf.length) req2.csf = ['GV.RR-01', 'GV.RR-02', 'GV.RR-03', 'GV.RR-04'];
+  }
+  var req3 = findIspReqByPurpose(isp, 'isp-risk') || findIspReqByPrimaryControl(isp, 'PM-9');
+  if (req3) {
+    if (!req3.purpose) req3.purpose = 'isp-risk';
+    if (ispReqLooksLikeLegacyDefault(req3.text, 'risk')) req3.text = getDefaultIspReq3Text(orgNameVal);
+    if (!req3.csf || !req3.csf.length) req3.csf = ['GV.RM-01', 'GV.RM-02', 'GV.RM-03', 'GV.RM-04', 'GV.RM-05', 'GV.RM-06', 'GV.RM-07'];
+  }
+  var req1 = findIspReqByPurpose(isp, 'isp-plan') || findIspReqByPrimaryControl(isp, 'PM-1');
+  if (req1) {
+    if (!req1.purpose) req1.purpose = 'isp-plan';
+    if (!req1.csf || !req1.csf.length) req1.csf = ['GV.PO-01', 'GV.PO-02'];
+  }
+  var req4 = findIspReqByPurpose(isp, 'isp-domain-policy');
+  if (!req4) {
+    var minus1Hits = (isp.requirements || []).filter(function(r) {
+      return (r.controls || []).length > 5 && (r.controls || []).some(function(id) { return /-1$/.test(String(id)); });
+    });
+    req4 = minus1Hits[0] || null;
+  }
+  if (req4) {
+    if (!req4.purpose) req4.purpose = 'isp-domain-policy';
+    if (!req4.csf || !req4.csf.length) req4.csf = ['GV.PO-01', 'GV.PO-02'];
+  }
+  if (isp._ispGovernGvSeeded) return;
+  var changed = false;
+  changed = applyIspGovernClause(isp, {
+    id: 'IS-REQ-OC', purpose: 'gv-oc', absorbPm: 'PM-11', skipIfControl: 'PM-11',
+    text: getDefaultIspReqOcText(orgNameVal), controls: ['PM-11'],
+    csf: ['GV.OC-01', 'GV.OC-02', 'GV.OC-03', 'GV.OC-04', 'GV.OC-05']
+  }, orgNameVal) || changed;
+  changed = applyIspGovernClause(isp, {
+    id: 'IS-REQ-OV', purpose: 'gv-ov', absorbPm: 'PM-6', skipIfControl: 'PM-6',
+    text: getDefaultIspReqOvText(orgNameVal), controls: ['PM-6'],
+    csf: ['GV.OV-01', 'GV.OV-02', 'GV.OV-03']
+  }, orgNameVal) || changed;
+  changed = applyIspGovernClause(isp, {
+    id: 'IS-REQ-SC', purpose: 'gv-sc', absorbPm: 'PM-30', skipIfControl: 'PM-30',
+    text: getDefaultIspReqScText(orgNameVal), controls: ['SR-1', 'PM-30', 'SA-9'],
+    csf: ['GV.SC-01', 'GV.SC-02', 'GV.SC-03', 'GV.SC-04', 'GV.SC-05', 'GV.SC-06', 'GV.SC-07', 'GV.SC-08', 'GV.SC-09', 'GV.SC-10']
+  }, orgNameVal) || changed;
+  isp._ispGovernGvSeeded = true;
+  if (changed && typeof renumberReqs === 'function') renumberReqs();
+  if (changed && typeof markDirty === 'function') markDirty();
+}
+
+function getIspReqCsfSubIds(req) {
+  var seen = {};
+  var out = [];
+  function add(id) {
+    var s = String(id || '').trim();
+    if (!s || seen[s]) return;
+    if (s.indexOf('GV.') !== 0) return;
+    if (typeof CSF_SUBCATEGORIES !== 'undefined' && CSF_SUBCATEGORIES && !CSF_SUBCATEGORIES[s]) return;
+    seen[s] = true;
+    out.push(s);
+  }
+  (req && req.csf || []).forEach(add);
+  out.sort();
+  return out;
+}
+
+function renderIspReqCsfChipsHtml(req) {
+  if (typeof escapeHTML !== 'function') return '';
+  var ids = getIspReqCsfSubIds(req);
+  if (!ids.length) return '';
+  var chips = ids.map(function(id) {
+    var title = (typeof CSF_SUBCATEGORIES !== 'undefined' && CSF_SUBCATEGORIES[id]) ? CSF_SUBCATEGORIES[id] : id;
+    var fn = id.split('.')[0];
+    return '<span class="csf-tag csf-fn-' + escapeHTML(fn.toLowerCase()) + '" title="' + escapeHTML(title) + '">' + escapeHTML(id) + '</span>';
+  }).join('');
+  return '<span class="csf-tag-group isp-req-csf">' + chips + '</span>';
+}
+
 function ensureISPSectionMigrations() {
   var isp = state.infoSecPolicy;
   if (!isp || !isp.sections) return;
@@ -1883,7 +2111,10 @@ function draftUnmappedPMRequirements(rerender) {
   if (!isp || !isp.requirements) return 0;
   var allActivePM = Object.keys(state.pmControls || {}).filter(function(id) { return state.pmControls[id]; });
   var mapped = isp.requirements.flatMap(function(r) { return r.controls || []; });
-  var unmapped = allActivePM.filter(function(id) { return mapped.indexOf(id) < 0; });
+  var unmapped = allActivePM.filter(function(id) {
+    if (ISP_GOVERN_COVERED_PM_IDS[id]) return false;
+    return mapped.indexOf(id) < 0;
+  });
   if (!unmapped.length) return 0;
   var orgNameVal = state.orgName || 'the organization';
   var stmts = {
@@ -1972,22 +2203,20 @@ function renderISPEditorBody(body, opts) {
         { type:'revision-history', title:'Revision History' },
       ],
       roles: buildDefaultISPRoles(ownerTitle),
+      _ispGovernGvSeeded: true,
       requirements: [
-        { id:'IS-REQ-1', text:`${orgNameVal} shall develop, document, disseminate, review, and update an organization-wide information security program plan that provides an overview of the security requirements for the organization and a description of the security program controls and common controls in place or planned. The plan shall be reviewed and updated at least annually. [NIST 800-53: PM-1]`, controls:['PM-1'] },
-        { id:'IS-REQ-2', text:`${orgNameVal} shall designate a senior official with the authority, mission, and resources to coordinate, develop, implement, and maintain an organization-wide information security program. Clear ownership shall be established at the program level, domain level, control level, and asset level. [NIST 800-53: PM-2]`, controls:['PM-2'] },
-        { id:'IS-REQ-3', text:`${orgNameVal} shall establish, document, implement, and maintain an information security risk management strategy aligned to organizational risk tolerance and the strategic priorities established by executive leadership. Risk management activities shall be integrated into the system development life cycle and mission/business processes. [NIST 800-53: PM-9]`, controls:['PM-9'] },
-        { id:'IS-REQ-4', text:`${orgNameVal} shall develop, document, disseminate, and annually review and update policies and procedures for applicable NIST 800-53 control family domains. Related domains may be combined into a single policy document where appropriate. Each domain policy shall state requirements ('what must be done'), and be supported by implementing procedures ('how to do it'). Policies shall be approved by the CISO and posted in the organization's policy repository. [NIST 800-53: all -1 controls]`, controls: minus1 },
-        // Privacy overlay requirements — injected automatically when privacy baseline is selected
+        ...buildDefaultIspGovernRequirements(orgNameVal, minus1),
+        // Privacy overlay requirements — injected after Govern clauses (IS-REQ-5–7)
         ...(state.privacyOverlay ? [
-          { id:'IS-REQ-5', text:`${orgNameVal} shall develop, document, disseminate, review, and update an organization-wide privacy program plan that provides an overview of the privacy requirements for the organization and describes the privacy program controls in place or planned. The plan shall be reviewed and updated at least annually and shall designate a Senior Agency Official for Privacy (SAOP) or equivalent. [NIST 800-53: PM-18, PM-19]`, controls:['PM-18','PM-19'] },
-          { id:'IS-REQ-6', text:`${orgNameVal} shall establish mechanisms to make privacy program information available to the public and shall develop and maintain privacy policies for organizational websites, mobile applications, and other digital services. Privacy notices shall be accessible, written in plain language, and updated whenever PII processing activities change. [NIST 800-53: PM-20, PM-20(1)]`, controls:['PM-20','PM-20(1)'] },
+          { id:'IS-REQ-8', purpose:'privacy-plan', text:`${orgNameVal} shall develop, document, disseminate, review, and update an organization-wide privacy program plan that provides an overview of the privacy requirements for the organization and describes the privacy program controls in place or planned. The plan shall be reviewed and updated at least annually and shall designate a Senior Agency Official for Privacy (SAOP) or equivalent. [NIST 800-53: PM-18, PM-19]`, controls:['PM-18','PM-19'] },
+          { id:'IS-REQ-9', purpose:'privacy-notices', text:`${orgNameVal} shall establish mechanisms to make privacy program information available to the public and shall develop and maintain privacy policies for organizational websites, mobile applications, and other digital services. Privacy notices shall be accessible, written in plain language, and updated whenever PII processing activities change. [NIST 800-53: PM-20, PM-20(1)]`, controls:['PM-20','PM-20(1)'] },
           ...((['M','H'].includes(state.baseline)) ? [
-            { id:'IS-REQ-7', text:`${orgNameVal} shall maintain an accurate accounting of all disclosures of Personally Identifiable Information (PII) and make that accounting available to individuals upon request. The organization shall also establish and enforce policies and procedures to ensure PII collected or maintained by the organization is accurate, relevant, timely, and complete. [NIST 800-53: PM-21, PM-22]`, controls:['PM-21','PM-22'] },
-            { id:'IS-REQ-8', text:`${orgNameVal} shall minimize the use of PII in testing, training, and research activities. Where PII must be used, it shall be authorized, documented, and subjected to the same safeguards as production data. De-identification or synthetic data alternatives shall be used whenever feasible. [NIST 800-53: PM-25]`, controls:['PM-25'] },
+            { id:'IS-REQ-10', purpose:'privacy-disclosures', text:`${orgNameVal} shall maintain an accurate accounting of all disclosures of Personally Identifiable Information (PII) and make that accounting available to individuals upon request. The organization shall also establish and enforce policies and procedures to ensure PII collected or maintained by the organization is accurate, relevant, timely, and complete. [NIST 800-53: PM-21, PM-22]`, controls:['PM-21','PM-22'] },
+            { id:'IS-REQ-11', purpose:'privacy-minimization', text:`${orgNameVal} shall minimize the use of PII in testing, training, and research activities. Where PII must be used, it shall be authorized, documented, and subjected to the same safeguards as production data. De-identification or synthetic data alternatives shall be used whenever feasible. [NIST 800-53: PM-25]`, controls:['PM-25'] },
           ] : []),
           ...(state.baseline === 'H' ? [
-            { id:'IS-REQ-9', text:`${orgNameVal} shall establish a data governance body with authority to coordinate data governance activities organization-wide, including oversight of PII processing, data classification, and information lifecycle management. The organization shall also implement a process for receiving, tracking, and responding to privacy complaints and inquiries from individuals. [NIST 800-53: PM-23, PM-26]`, controls:['PM-23','PM-26'] },
-            { id:'IS-REQ-10', text:`${orgNameVal} shall ensure that a Data Integrity Board (or equivalent oversight body) reviews and approves computer matching programs and agreements involving PII before execution. The organization shall submit privacy reports to applicable oversight bodies as required by law, regulation, or organizational policy. [NIST 800-53: PM-24, PM-27]`, controls:['PM-24','PM-27'] },
+            { id:'IS-REQ-12', purpose:'privacy-governance', text:`${orgNameVal} shall establish a data governance body with authority to coordinate data governance activities organization-wide, including oversight of PII processing, data classification, and information lifecycle management. The organization shall also implement a process for receiving, tracking, and responding to privacy complaints and inquiries from individuals. [NIST 800-53: PM-23, PM-26]`, controls:['PM-23','PM-26'] },
+            { id:'IS-REQ-13', purpose:'privacy-matching', text:`${orgNameVal} shall ensure that a Data Integrity Board (or equivalent oversight body) reviews and approves computer matching programs and agreements involving PII before execution. The organization shall submit privacy reports to applicable oversight bodies as required by law, regulation, or organizational policy. [NIST 800-53: PM-24, PM-27]`, controls:['PM-24','PM-27'] },
           ] : []),
         ] : []),
       ],
@@ -2029,6 +2258,7 @@ function renderISPEditorBody(body, opts) {
 
   ensureISPSectionMigrations();
   ensureISPPrivacyRoles();
+  ensureISPGovernRequirements();
 
   if (state.infoSecPolicy && !state.infoSecPolicy._pmAutoSeeded) {
     draftUnmappedPMRequirements(false);
@@ -2391,10 +2621,12 @@ function renderRequirementsSection(unmappedPM) {
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
             <span style="cursor:grab;color:var(--text-muted);font-size:14px;" title="Drag to reorder">⠿</span>
             <span style="font-size:12px;font-weight:800;color:var(--teal);background:rgba(13,148,136,0.1);padding:4px 12px;border-radius:12px;letter-spacing:0.3px;">${req.id}</span>
+            ${renderIspReqCsfChipsHtml(req)}
             <div style="display:flex;flex-wrap:wrap;gap:4px;">
               ${req.controls.map(cid => {
-                var csf = (typeof renderCsfTagsHtml === 'function') ? renderCsfTagsHtml(cid) : '';
-                return `<span style="display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;background:white;border:1px solid rgba(13,148,136,0.3);border-radius:14px;padding:4px 8px;font-size:11px;font-weight:600;color:var(--teal);"><span style="font-family:monospace;">${cid}</span>${csf}<span style="cursor:pointer;color:var(--red);margin-left:1px;font-family:sans-serif;" onclick="removeReqControl(${oi},'${cid}')">\u2715</span></span>`;
+                var csf = (typeof renderCsfTagsHtml === 'function') ? renderCsfTagsHtml(cid, { compact: true, hideUnmapped: true }) : '';
+                var cidEsc = String(cid).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                return `<span style="display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;background:white;border:1px solid rgba(13,148,136,0.3);border-radius:14px;padding:4px 8px;font-size:11px;font-weight:600;color:var(--teal);"><span style="font-family:monospace;">${cid}</span>${csf}<span style="cursor:pointer;color:var(--red);margin-left:1px;font-family:sans-serif;" onclick="removeReqControl(${oi},'${cidEsc}')">\u2715</span></span>`;
               }).join('')}
               <button onclick="addReqControl(${oi})" style="background:none;border:1px dashed var(--border);border-radius:14px;padding:2px 8px;font-size:11px;color:var(--text-muted);cursor:pointer;">+ control</button>
             </div>

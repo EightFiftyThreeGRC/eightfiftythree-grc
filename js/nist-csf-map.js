@@ -181,14 +181,22 @@ var NIST_CSF_MAP = {
   'MP-1': NIST_CSF_PO_TOKENS,
   'PE-1': NIST_CSF_PO_TOKENS, 'PE-3': ['PR.AA:PR.AA-06'], 'PE-6': ['DE.CM:DE.CM-02'],
   'PL-1': NIST_CSF_PO_TOKENS, 'PL-2': ['GV.PO:GV.PO-01'],
-  'PM-1': NIST_CSF_PO_TOKENS, 'PM-5': ['ID.AM:ID.AM-01'], 'PM-9': ['GV.RM:GV.RM-01', 'ID.RA'],
+  'PM-1': NIST_CSF_PO_TOKENS, 'PM-2': ['GV.RR:GV.RR-01', 'GV.RR:GV.RR-02', 'GV.RR:GV.RR-03'],
+  'PM-5': ['ID.AM:ID.AM-01'],
+  'PM-6': ['GV.OV:GV.OV-01', 'GV.OV:GV.OV-03'],
+  'PM-9': ['GV.RM:GV.RM-01', 'GV.RM:GV.RM-02', 'GV.RM:GV.RM-03', 'GV.RM:GV.RM-04', 'GV.RM:GV.RM-06', 'GV.RM:GV.RM-07', 'ID.RA'],
+  'PM-11': ['GV.OC:GV.OC-01', 'GV.OC:GV.OC-02', 'GV.OC:GV.OC-04', 'GV.OC:GV.OC-05'],
+  'PM-30': ['GV.SC:GV.SC-01', 'GV.SC:GV.SC-03', 'GV.SC:GV.SC-09'],
+  'PM-30(1)': ['GV.SC:GV.SC-04'],
   'PS-1': NIST_CSF_PO_TOKENS,
   'PT-1': NIST_CSF_PO_TOKENS,
   'RA-1': NIST_CSF_PO_TOKENS, 'RA-3': ['ID.RA:ID.RA-05'], 'RA-5': ['ID.RA:ID.RA-01'],
   'SA-1': NIST_CSF_PO_TOKENS, 'SA-3': ['PR.PS:PR.PS-06'],
   'SC-1': NIST_CSF_PO_TOKENS, 'SC-7': ['PR.IR:PR.IR-01'], 'SC-8': ['PR.DS:PR.DS-02'], 'SC-28': ['PR.DS:PR.DS-01'],
   'SI-1': NIST_CSF_PO_TOKENS, 'SI-2': ['PR.PS:PR.PS-02'], 'SI-4': ['DE.CM:DE.CM-09'],
-  'SR-1': NIST_CSF_PO_TOKENS
+  // SR-1 is the family Policy and Procedures control (GV.PO) and the SCRM policy
+  // floor (GV.SC) per CSF 2.0 informative references. Do not mutate NIST_CSF_PO_TOKENS.
+  'SR-1': NIST_CSF_PO_TOKENS.concat(['GV.SC:GV.SC-01', 'GV.SC:GV.SC-05', 'GV.SC:GV.SC-09', 'GV.SC:GV.SC-10'])
 };
 
 // ---------------------------------------------------------------------------
