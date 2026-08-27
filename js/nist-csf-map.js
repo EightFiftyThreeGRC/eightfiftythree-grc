@@ -489,7 +489,7 @@ function renderCsfSubcategoryNameHtml(subOrCat) {
   return '<div class="csf-nest-head-name">' + escapeHTML(name) + '</div>';
 }
 
-/** Purple subcategory pill + 800-53 chips on one row; official sentence muted underneath. */
+/** Purple subcategory pill + 800-53 chips on one row. Outcome sentences live in the requirement body. */
 function renderCsfNestedControlGroupHtml(key, chipsHtml) {
   var heading = renderCsfSubcategoryHeadingHtml(key, { includeName: false })
     || '<div class="csf-nest-head">' + (typeof escapeHTML === 'function' ? escapeHTML(key) : String(key || '')) + '</div>';
@@ -498,7 +498,6 @@ function renderCsfNestedControlGroupHtml(key, chipsHtml) {
     + heading
     + (chipsHtml || '')
     + '</div>'
-    + renderCsfSubcategoryNameHtml(key)
     + '</div>';
 }
 

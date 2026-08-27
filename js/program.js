@@ -2186,7 +2186,6 @@ function renderIspReqControlChipsHtml(req, oi) {
     return '<div class="csf-nest-block">'
       + (typeof renderCsfSubcategoryHeadingHtml === 'function' ? renderCsfSubcategoryHeadingHtml(key, { includeName: false }) : '<div class="csf-nest-head">' + escapeHTML(key) + '</div>')
       + '<div class="csf-nest-chips">' + chips + '</div>'
-      + (typeof renderCsfSubcategoryNameHtml === 'function' ? renderCsfSubcategoryNameHtml(key) : '')
       + '</div>';
   }).filter(Boolean);
   if (grouped.unmapped.length) {
