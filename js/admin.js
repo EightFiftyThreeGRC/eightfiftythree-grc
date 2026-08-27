@@ -380,6 +380,13 @@ function applyRoleView(userId) {
   }
   showTab(defaultTab);
 
+  if (state._landIspReviewAfterRoleSwitch) {
+    state._landIspReviewAfterRoleSwitch = false;
+    setTimeout(function() {
+      if (typeof goToCISOPolicyEditor === 'function') goToCISOPolicyEditor();
+    }, 0);
+  }
+
   // For policy-based roles: pre-select first assigned family from any ISSM/custodian record
   var policyFams = [];
   allRecords.forEach(function(rec) {
@@ -712,7 +719,13 @@ function syncUsersFromState() {
     var approverKey = currentApproverName.toLowerCase();
     if (approverKey === defaultApproverName.toLowerCase() || approverKey === cisoNameKey) return;
 
-    upsertUser({ name: currentApproverName, email: rc.approverEmail || '', role: 'approver', families: [policyKey] });
+    upsertUser({
+      name: currentApproverName,
+      email: rc.approverEmail || '',
+      role: 'approver',
+      families: [policyKey],
+      note: (rc.approverRole || '').trim()
+    });
   });
 
   // 6. Asset Owners → asset-owner (aggregate by name from state.assets)

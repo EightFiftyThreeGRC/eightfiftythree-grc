@@ -264,15 +264,37 @@ function getNextActions(limit) {
         action: "showTab('reports');goToCISOPolicyEditor();"
       });
     } else {
+      var named = typeof ispHasNamedReviewer === 'function' && ispHasNamedReviewer();
       var approverNm = typeof getISPDesignatedApproverName === 'function' ? getISPDesignatedApproverName() : '';
-      actions.push({
-        priority: 1,
-        icon: '📋',
-        label: 'ISP awaiting ' + (approverNm || 'approver'),
-        desc: 'Switch profile to that person to approve or return the ISP.',
-        stage: 'govern',
-        action: "typeof showRolePicker === 'function' ? showRolePicker() : showTab('reports');"
-      });
+      var canName = typeof canSessionNameISPApprover === 'function' && canSessionNameISPApprover();
+      if (!named && canName) {
+        actions.push({
+          priority: 1,
+          icon: '📋',
+          label: 'Name the ISP approver',
+          desc: 'The program owner cannot approve their own policy. Name a different reviewer.',
+          stage: 'govern',
+          action: 'openNameISPApproverModal();'
+        });
+      } else if (named) {
+        actions.push({
+          priority: 1,
+          icon: '📋',
+          label: 'Review as ' + approverNm,
+          desc: 'Switch into that identity to approve or return the ISP. Admin cannot sign.',
+          stage: 'govern',
+          action: 'reviewISPAsNamedApprover();'
+        });
+      } else {
+        actions.push({
+          priority: 1,
+          icon: '📋',
+          label: 'ISP awaiting approver',
+          desc: 'A reviewer other than the program owner must be named before this policy can be approved.',
+          stage: 'govern',
+          action: "typeof goToCISOPolicyEditor === 'function' ? goToCISOPolicyEditor() : showTab('reports');"
+        });
+      }
     }
   }
 
@@ -508,7 +530,41 @@ function getJourneyStages() {
   var ispStatus = typeof getISPStatus === 'function' ? getISPStatus() : 'Not Started';
   var ispApproved = ispStatus === 'Approved';
   var canApproveIsp = typeof canSessionApproveISP === 'function' && canSessionApproveISP();
-  if (has('policy') || canApproveIsp) {
+  if (has('policy') || canApproveIsp || (typeof canSessionNameISPApprover === 'function' && canSessionNameISPApprover())) {
+    var namedReviewer = typeof ispHasNamedReviewer === 'function' && ispHasNamedReviewer();
+    var reviewerName = typeof getISPDesignatedApproverName === 'function' ? getISPDesignatedApproverName() : '';
+    var reviewerRole = typeof getISPDesignatedApproverRole === 'function' ? getISPDesignatedApproverRole() : '';
+    var canNameIsp = typeof canSessionNameISPApprover === 'function' && canSessionNameISPApprover();
+    var governCta = 'Open the ISP';
+    var governAction = 'goToCISOPolicyEditor()';
+    var governSecondaryCta = '';
+    var governSecondaryAction = '';
+    var governMeta = 'ISP status: ' + ispStatus;
+    if (ispStatus === 'Under Review' && canApproveIsp) {
+      governCta = 'Review the ISP';
+      governAction = 'goToCISOPolicyEditor()';
+      governMeta = reviewerName
+        ? 'ISP status: Under Review \u00b7 Awaiting ' + reviewerName + (reviewerRole ? ' (' + reviewerRole + ')' : '')
+        : governMeta;
+    } else if (ispStatus === 'Under Review' && !namedReviewer) {
+      governMeta = 'ISP status: Under Review \u00b7 No reviewer named \u2014 the program owner cannot approve their own policy';
+      if (canNameIsp) {
+        governCta = 'Name the ISP approver';
+        governAction = 'openNameISPApproverModal()';
+        governSecondaryCta = 'Read the policy';
+        governSecondaryAction = 'goToCISOPolicyEditor()';
+      } else {
+        governCta = 'Read the policy';
+        governAction = 'goToCISOPolicyEditor()';
+      }
+    } else if (ispStatus === 'Under Review' && namedReviewer) {
+      governMeta = 'ISP status: Under Review \u00b7 Awaiting ' + reviewerName
+        + (reviewerRole ? ' (' + reviewerRole + ')' : '');
+      governCta = 'Review as ' + reviewerName;
+      governAction = 'reviewISPAsNamedApprover()';
+      governSecondaryCta = 'Read the policy';
+      governSecondaryAction = 'goToCISOPolicyEditor()';
+    }
     stages.push({
       id: 'govern',
       label: 'Govern policy',
@@ -517,9 +573,11 @@ function getJourneyStages() {
         : ispStatus === 'Under Review' ? 'Get the Information Security Policy approved'
         : 'Finish the Information Security Policy',
       why: 'The ISP is your Govern layer. Every Function policy and control underneath inherits its authority, so nothing below it is defensible until it is formally approved.',
-      meta: 'ISP status: ' + ispStatus,
-      cta: 'Open the ISP',
-      action: 'goToCISOPolicyEditor()',
+      meta: governMeta,
+      cta: governCta,
+      action: governAction,
+      secondaryCta: governSecondaryCta,
+      secondaryAction: governSecondaryAction,
       complete: ispApproved,
       pct: ispApproved ? 100 : (ispStatus === 'Under Review' ? 60 : ispStatus === 'Not Started' ? 0 : 30)
     });
@@ -749,7 +807,7 @@ function renderJourneyStepsHtml(stages, focusId) {
 /* Next-action labels double as status lines ("ISP awaiting Morgan Chen",
    "Overdue: ..."). Only an imperative one can be borrowed for the primary
    button; anything else keeps the stage's own verb and becomes context. */
-var JOURNEY_CTA_VERB = /^(Approve|Assign|Categorize|Continue|Design|Draft|Open|Reassign|Record|Register|Review|Revise|Submit|Triage)\b/;
+var JOURNEY_CTA_VERB = /^(Approve|Assign|Categorize|Continue|Design|Draft|Name|Open|Reassign|Record|Register|Review|Revise|Submit|Triage)\b/;
 
 /** The single next action the journey adopts from getNextActions(), or null. */
 function getJourneyAdoptedAction(stage) {
@@ -770,14 +828,110 @@ function getJourneyStageMeta(stage) {
 function renderJourneyCtaHtml(stage) {
   var adopted = getJourneyAdoptedAction(stage);
   var label = adopted ? adopted.label : stage.cta;
+  var html;
   if (adopted && adopted.kind === 'ssp-review') {
     ensureHubActionDelegation();
-    return '<button type="button" class="btn onboard-cta" data-hub-action="ssp-review"'
+    html = '<button type="button" class="btn onboard-cta" data-hub-action="ssp-review"'
       + ' data-scope-id="' + escapeHTML(adopted.scopeId || '') + '"'
       + ' data-is-process="' + (adopted.isProcess ? '1' : '0') + '">' + escapeHTML(label) + '</button>';
+  } else {
+    var action = (adopted && adopted.action) ? adopted.action : stage.action;
+    html = '<button type="button" class="btn onboard-cta" onclick="' + action + '">' + escapeHTML(label) + '</button>';
   }
-  var action = (adopted && adopted.action) ? adopted.action : stage.action;
-  return '<button type="button" class="btn onboard-cta" onclick="' + action + '">' + escapeHTML(label) + '</button>';
+  var secondaryLabel = stage.secondaryCta || '';
+  var secondaryAction = stage.secondaryAction || '';
+  if (secondaryLabel && secondaryAction) {
+    html += '<p class="journey-secondary"><button type="button" class="onboard-path-switch-btn" onclick="'
+      + secondaryAction + '">' + escapeHTML(secondaryLabel) + '</button></p>';
+  }
+  return html;
+}
+
+function openNameISPApproverModal() {
+  if (typeof canSessionNameISPApprover === 'function' && !canSessionNameISPApprover()) {
+    if (typeof showToast === 'function') {
+      showToast('Only Admin or the program owner can name the ISP reviewer.', true);
+    }
+    return;
+  }
+  var overlay = document.getElementById('ispApproverOverlay');
+  if (!overlay) return;
+  var rc = ((state.policyReviewCycle || {}).ISP) || {};
+  var nameEl = document.getElementById('ispApproverName');
+  var roleEl = document.getElementById('ispApproverRole');
+  if (nameEl) nameEl.value = (typeof getISPDesignatedApproverName === 'function' ? getISPDesignatedApproverName() : '') || rc.approvedBy || '';
+  if (roleEl) roleEl.value = (typeof getISPDesignatedApproverRole === 'function' ? getISPDesignatedApproverRole() : '') || rc.approverRole || '';
+  overlay.style.display = 'flex';
+  setTimeout(function() { if (nameEl) nameEl.focus(); }, 0);
+}
+
+function closeNameISPApproverModal() {
+  var overlay = document.getElementById('ispApproverOverlay');
+  if (overlay) overlay.style.display = 'none';
+}
+
+function saveNamedISPApprover() {
+  if (typeof canSessionNameISPApprover === 'function' && !canSessionNameISPApprover()) {
+    if (typeof showToast === 'function') {
+      showToast('Only Admin or the program owner can name the ISP reviewer.', true);
+    }
+    return;
+  }
+  var nameEl = document.getElementById('ispApproverName');
+  var roleEl = document.getElementById('ispApproverRole');
+  var name = nameEl ? String(nameEl.value || '').trim() : '';
+  var role = roleEl ? String(roleEl.value || '').trim() : '';
+  if (!name) {
+    if (typeof showToast === 'function') showToast('Enter the reviewer\u2019s name.', true);
+    if (nameEl) nameEl.focus();
+    return;
+  }
+  if (typeof ispApproverViolatesSeparationOfDuties === 'function'
+      && ispApproverViolatesSeparationOfDuties('', name)) {
+    if (typeof showToast === 'function') {
+      showToast(typeof ispApproverSodMessage === 'function'
+        ? ispApproverSodMessage()
+        : 'The program owner cannot approve their own policy.', true);
+    }
+    return;
+  }
+  if (!state.policyReviewCycle) state.policyReviewCycle = {};
+  var rc = state.policyReviewCycle.ISP || (state.policyReviewCycle.ISP = {});
+  rc.approvedBy = name;
+  rc.approverRole = role;
+  rc._customApprover = true;
+  if (typeof submitISPForApproval === 'function') submitISPForApproval(false);
+  else if (typeof markDirty === 'function') markDirty();
+  closeNameISPApproverModal();
+  setTimeout(function() {
+    if (typeof renderHomeTab === 'function') renderHomeTab();
+  }, 0);
+}
+
+function reviewISPAsNamedApprover() {
+  if (typeof canSessionApproveISP === 'function' && canSessionApproveISP()) {
+    if (typeof goToCISOPolicyEditor === 'function') goToCISOPolicyEditor();
+    return;
+  }
+  if (typeof ispHasNamedReviewer === 'function' && !ispHasNamedReviewer()) {
+    openNameISPApproverModal();
+    return;
+  }
+  if (typeof syncUsersFromState === 'function') syncUsersFromState();
+  var user = typeof findISPApproverRosterUser === 'function' ? findISPApproverRosterUser() : null;
+  if (!user || !user.id) {
+    if (typeof canSessionNameISPApprover === 'function' && canSessionNameISPApprover()) {
+      openNameISPApproverModal();
+      return;
+    }
+    if (typeof showToast === 'function') {
+      showToast('The named reviewer is not on the roster yet. Ask the program owner to name them again.', true);
+    }
+    return;
+  }
+  state._landIspReviewAfterRoleSwitch = true;
+  if (typeof selectUserProfile === 'function') selectUserProfile(user.id);
+  else if (typeof applyRoleView === 'function') applyRoleView(user.id);
 }
 
 /** Guided landing. Returns false when no stage applies, so home falls back to the dashboard. */
@@ -1250,6 +1404,10 @@ try {
   window.getJourneyStages = getJourneyStages;
   window.focusJourneyStage = focusJourneyStage;
   window.deferJourneyStage = deferJourneyStage;
+  window.openNameISPApproverModal = openNameISPApproverModal;
+  window.closeNameISPApproverModal = closeNameISPApproverModal;
+  window.saveNamedISPApprover = saveNamedISPApprover;
+  window.reviewISPAsNamedApprover = reviewISPAsNamedApprover;
   window.renderCommandCenterDashboard = renderCommandCenterDashboard;
   window.startProgramSetup = startProgramSetup;
   window.startUnifiedProgramSetup = startUnifiedProgramSetup;

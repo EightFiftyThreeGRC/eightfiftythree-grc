@@ -167,6 +167,52 @@ function getISPDesignatedApproverName() {
   return nm;
 }
 
+function getISPDesignatedApproverRole() {
+  var ps = (state.policyStatus || {}).ISP || {};
+  var rc = (state.policyReviewCycle || {}).ISP || {};
+  return (ps.submittedToRole || rc.approverRole || '').trim();
+}
+
+function ispHasNamedReviewer() {
+  return !!(getISPDesignatedApproverEmail() || getISPDesignatedApproverName());
+}
+
+/** Admin or the program owner can name who reviews the ISP. Not a signatory. */
+function canSessionNameISPApprover() {
+  if (!state.currentUserId) return true;
+  return isSessionProgramOwnerActor();
+}
+
+function findISPApproverRosterUser() {
+  var email = getISPDesignatedApproverEmail();
+  var name = getISPDesignatedApproverName();
+  var users = state.users || [];
+  function isApprover(u) {
+    if (!u) return false;
+    if (u.role === 'approver') return true;
+    return (u.roles || []).indexOf('approver') !== -1;
+  }
+  if (email) {
+    var em = email;
+    var byEmail = users.find(function(u) {
+      return isApprover(u) && _sessionNormalizeEmail(u.email) === em;
+    });
+    if (byEmail) return byEmail;
+  }
+  if (name) {
+    var nm = name.toLowerCase();
+    var withIsp = users.find(function(u) {
+      return isApprover(u) && (u.name || '').trim().toLowerCase() === nm
+        && (u.families || []).indexOf('ISP') !== -1;
+    });
+    if (withIsp) return withIsp;
+    return users.find(function(u) {
+      return isApprover(u) && (u.name || '').trim().toLowerCase() === nm;
+    }) || null;
+  }
+  return null;
+}
+
 /** Email of the acting identity, or '' in Admin mode (which has no mailbox). */
 function getSessionEmailForApproval() {
   var u = getActingUser();
@@ -404,6 +450,10 @@ try {
   window.canReassignProgramWork = canReassignProgramWork;
   window.getISPDesignatedApproverEmail = getISPDesignatedApproverEmail;
   window.getISPDesignatedApproverName = getISPDesignatedApproverName;
+  window.getISPDesignatedApproverRole = getISPDesignatedApproverRole;
+  window.ispHasNamedReviewer = ispHasNamedReviewer;
+  window.canSessionNameISPApprover = canSessionNameISPApprover;
+  window.findISPApproverRosterUser = findISPApproverRosterUser;
   window.getSessionEmailForApproval = getSessionEmailForApproval;
   window.ispApproverSodMessage = ispApproverSodMessage;
   window.ispApproverViolatesSeparationOfDuties = ispApproverViolatesSeparationOfDuties;

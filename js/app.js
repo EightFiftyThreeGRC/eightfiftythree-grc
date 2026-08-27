@@ -316,22 +316,14 @@ function renderReviewCycleCard(policyKey, label, opts) {
   // Always render both the default badge and the custom fields — the checkbox
   // toggles display:none/block on the custom div. No innerHTML swap needed.
   var isCustom = !!rc._customApprover;
-  var includeEmail = policyKey !== 'ISP';
-  var fieldWidth = includeEmail ? '33%' : '50%';
   var customFieldsHTML = compact
     ? '<div class="wiz-review-approver-fields">'
       + '<input class="form-input" placeholder="Approver name" autocomplete="off" value="' + escapeHTML(rc.approvedBy||'') + '" oninput="state.policyReviewCycle[\'' + escKey + '\'].approvedBy=this.value; window.markDirty();">'
       + '<input class="form-input" placeholder="Role (e.g. CIO)" autocomplete="off" value="' + escapeHTML(rc.approverRole||'') + '" oninput="state.policyReviewCycle[\'' + escKey + '\'].approverRole=this.value; window.markDirty();">'
-      + (includeEmail
-        ? '<input class="form-input" placeholder="Email" autocomplete="off" value="' + escapeHTML(rc.approverEmail||'') + '" oninput="state.policyReviewCycle[\'' + escKey + '\'].approverEmail=this.value; window.markDirty();">'
-        : '')
       + '</div>'
     : '<div style="display:flex;gap:4px;">'
-      + '<input class="form-input" style="font-size:12px;width:' + fieldWidth + ';" placeholder="Approver name" autocomplete="off" value="' + escapeHTML(rc.approvedBy||'') + '" oninput="state.policyReviewCycle[\'' + escKey + '\'].approvedBy=this.value; window.markDirty();">'
-      + '<input class="form-input" style="font-size:12px;width:' + fieldWidth + ';" placeholder="Role (e.g. CIO)" autocomplete="off" value="' + escapeHTML(rc.approverRole||'') + '" oninput="state.policyReviewCycle[\'' + escKey + '\'].approverRole=this.value; window.markDirty();">'
-      + (includeEmail
-        ? '<input class="form-input" style="font-size:12px;width:33%;" placeholder="Email" autocomplete="off" value="' + escapeHTML(rc.approverEmail||'') + '" oninput="state.policyReviewCycle[\'' + escKey + '\'].approverEmail=this.value; window.markDirty();">'
-        : '')
+      + '<input class="form-input" style="font-size:12px;width:50%;" placeholder="Approver name" autocomplete="off" value="' + escapeHTML(rc.approvedBy||'') + '" oninput="state.policyReviewCycle[\'' + escKey + '\'].approvedBy=this.value; window.markDirty();">'
+      + '<input class="form-input" style="font-size:12px;width:50%;" placeholder="Role (e.g. CIO)" autocomplete="off" value="' + escapeHTML(rc.approverRole||'') + '" oninput="state.policyReviewCycle[\'' + escKey + '\'].approverRole=this.value; window.markDirty();">'
       + '</div>';
   var approverHTML = '';
   if (requiresSeparate) {

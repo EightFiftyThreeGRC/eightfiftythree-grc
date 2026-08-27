@@ -2034,7 +2034,6 @@ function renderPolicyStep1() {
   } else {
     ownerBlock = '<div class="wiz-owner-name">' + escapeHTML(owner.name || '\u2014') + '</div>'
       + (owner.role ? '<div class="wiz-meta">' + escapeHTML(owner.role) + '</div>' : '')
-      + (owner.email ? '<div class="wiz-meta">' + escapeHTML(owner.email) + '</div>' : '')
       + '<div class="form-hint">' + (owner.name ? 'Assigned by the program owner.' : 'Not yet assigned \u2014 you may still continue.') + '</div>';
   }
 
@@ -2063,7 +2062,6 @@ function renderPolicyStep1() {
       : 'Day-to-day maintenance, annual reviews, and exception tracking.') + '</div>'
     + '<input class="form-input" id="custodianInput" placeholder="Full name \u2014 e.g. Jane Smith" value="' + escapeHTML(custodian.name||'') + '" oninput="setPolicyCustodian(\'' + escFam + '\', \'name\', this.value)">'
     + '<input class="form-input" placeholder="Title / Role \u2014 e.g. GRC Analyst" value="' + escapeHTML(custodian.role||'') + '" oninput="setPolicyCustodian(\'' + escFam + '\', \'role\', this.value)">'
-    + '<input class="form-input" type="email" placeholder="email@company.com" value="' + escapeHTML(custodian.email||'') + '" oninput="setPolicyCustodian(\'' + escFam + '\', \'email\', this.value)">'
     + '</div>'
     + renderReviewCycleCard(fam, mergedTitle, { compact: true })
     + returnBlock
