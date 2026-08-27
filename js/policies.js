@@ -4150,12 +4150,12 @@ function renderPolicyStep4() {
   const selected = (state.policySelectedControls||{})[fam]||[];
   if (!state.controlOwners) state.controlOwners = {};
   const dp = state.domainPolicies?.[fam];
-  const assignedCount = selected.filter(function(cid) { return isControlOwnerInviteReady((state.controlOwners || {})[cid]); }).length;
+  const assignedCount = selected.filter(function(cid) { return hasRealControlOwner((state.controlOwners || {})[cid]); }).length;
 
   body.innerHTML = `
     <div class="wiz-page wiz-page--wide">
       <div class="section-title">Assign control owners</div>
-      <div class="section-subtitle"><span id="policy-step-4-ready-count">${assignedCount} of ${selected.length} ready for sign-up</span>. ${selected.length} controls in this policy. Each owner needs a work email so they can claim their controls.</div>
+      <div class="section-subtitle"><span id="policy-step-4-ready-count">${assignedCount} of ${selected.length} assigned</span>. ${selected.length} controls in this policy.</div>
       <div class="wiz-batch">
         ${(()=>{
           const people = [];
@@ -4183,10 +4183,6 @@ function renderPolicyStep4() {
         <div class="form-group">
           <label class="form-label">Role / Title</label>
           <input class="form-input" id="batchOwnerRole" placeholder="e.g. IT Security Manager">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Email <span class="required">*</span></label>
-          <input class="form-input" id="batchOwnerEmail" type="email" placeholder="email@org.com" autocomplete="email">
         </div>
         <div class="wiz-batch-actions">
           <button type="button" class="btn btn-primary btn-sm" onclick="batchAssignControlOwners('${fam}', false)">Apply to unassigned</button>
@@ -4220,7 +4216,7 @@ function renderPolicyStep4() {
               const ctrl = CONTROLS.find(function(c){ return c.id===cid; });
               const co = state.controlOwners[cid]||{};
               const ownerName = getOwnerDisplayName(co);
-              const inviteReady = isControlOwnerInviteReady(co);
+              const inviteReady = hasRealControlOwner(co);
               const assignStatus = getControlOwnerAssignStatus(co);
               const cidSafe = cid.replace(/[()]/g,'_');
               const assignedIdx = ownerName !== '\u2014' ? cardUsers.findIndex(function(u){ return u.name===co.name; }) : -1;
@@ -4237,8 +4233,7 @@ function renderPolicyStep4() {
                 + (cardUsers.length
                   ? '<select class="form-select" style="font-size:12px;margin-bottom:4px;" onchange="step4CardFill(\'' + cid + '\',this.value)">' + selectOpts + '</select>'
                   : '')
-                + '<input class="form-input co-name" data-cid="' + cid + '" style="font-size:12px;width:100%;box-sizing:border-box;margin-bottom:4px;" placeholder="Full name" value="' + escapeHTML(ownerName !== '\u2014' ? (co.name || '') : '') + '" oninput="setCtrlOwner(\'' + cid + '\',\'name\',this.value);step4RosterSync(\'' + cid + '\');_coCardUpdate(\'' + cid + '\');">'
-                + '<input class="form-input co-email" data-cid="' + cid + '" type="email" autocomplete="email" style="font-size:12px;width:100%;box-sizing:border-box;" placeholder="work email@org.com (required)" value="' + escapeHTML(co.email || '') + '" oninput="setCtrlOwner(\'' + cid + '\',\'email\',this.value);_coCardUpdate(\'' + cid + '\');">'
+                + '<input class="form-input co-name" data-cid="' + cid + '" style="font-size:12px;width:100%;box-sizing:border-box;" placeholder="Full name" value="' + escapeHTML(ownerName !== '\u2014' ? (co.name || '') : '') + '" oninput="setCtrlOwner(\'' + cid + '\',\'name\',this.value);step4RosterSync(\'' + cid + '\');_coCardUpdate(\'' + cid + '\');">'
                 + statusHtml
                 + '</td>'
                 + '</tr>';
@@ -4258,7 +4253,6 @@ function step4QuickFill(idx) {
   if (!p) return;
   const n = document.getElementById('batchOwnerName'); if (n) n.value = p.name||'';
   const r = document.getElementById('batchOwnerRole'); if (r) r.value = p.role||'';
-  const e = document.getElementById('batchOwnerEmail'); if (e) e.value = p.email||'';
 }
 
 function clearDomainControlOwners(fam) {
@@ -4288,7 +4282,6 @@ function step4CardFill(cid, idx) {
   const cidSafe = cid.replace(/[()]/g,'_');
   const row = document.getElementById('cocard-' + cidSafe);
   const nameInput = row ? row.querySelector('.co-name') : null;
-  const emailInput = row ? row.querySelector('.co-email') : null;
   if (idx === '__custom__') {
     if (nameInput) nameInput.focus();
     return;
@@ -4298,7 +4291,6 @@ function step4CardFill(cid, idx) {
     setCtrlOwner(cid, 'role', '');
     setCtrlOwner(cid, 'email', '');
     if (nameInput) { nameInput.value = ''; nameInput.focus(); }
-    if (emailInput) emailInput.value = '';
     _coCardUpdate(cid);
     return;
   }
@@ -4308,7 +4300,6 @@ function step4CardFill(cid, idx) {
   setCtrlOwner(cid, 'role',  p.role||'');
   setCtrlOwner(cid, 'email', p.email||'');
   if (nameInput) nameInput.value = p.name||'';
-  if (emailInput) emailInput.value = p.email||'';
   _coCardUpdate(cid);
 }
 
@@ -4318,28 +4309,25 @@ function step4RosterSync(cid) {
   const row = document.getElementById('cocard-' + cidSafe);
   const sel = row && row.querySelector('td select.form-select');
   const nameInput = row && row.querySelector('.co-name');
-  const emailInput = row && row.querySelector('.co-email');
   if (!sel || !nameInput) return;
   const n = (nameInput.value || '').trim();
   const people = window._s4People || [];
   const rosterIdx = people.findIndex(function(p) { return (p.name || '').trim() === n; });
   if (rosterIdx >= 0) {
     sel.value = String(rosterIdx);
-    if (emailInput && !isValidOwnerEmail(emailInput.value) && people[rosterIdx].email) {
-      emailInput.value = people[rosterIdx].email;
-      setCtrlOwner(cid, 'email', people[rosterIdx].email);
-    }
+    var rosterEmail = people[rosterIdx].email || '';
+    if (rosterEmail) setCtrlOwner(cid, 'email', rosterEmail);
   } else if (n) sel.value = '__custom__';
   else sel.value = '';
 }
 
-// Update row status to reflect invite-ready state (name + work email).
+// Update row status to reflect assigned state.
 function _coCardUpdate(cid) {
   const cidSafe = cid.replace(/[()]/g,'_');
   const card = document.getElementById('cocard-' + cidSafe);
   if (!card) return;
   const co = (state.controlOwners || {})[cid] || {};
-  const inviteReady = isControlOwnerInviteReady(co);
+  const inviteReady = hasRealControlOwner(co);
   const assignStatus = getControlOwnerAssignStatus(co);
   card.style.borderColor = inviteReady ? 'rgba(13,148,136,0.3)' : 'var(--border)';
   card.style.background  = inviteReady ? 'rgba(13,148,136,0.02)' : 'white';
@@ -4355,10 +4343,10 @@ function step4RefreshAssignmentProgress() {
   const fam = state._policyDomain;
   const selected = (state.policySelectedControls||{})[fam]||[];
   const assignedCount = selected.filter(function(c) {
-    return isControlOwnerInviteReady((state.controlOwners || {})[c]);
+    return hasRealControlOwner((state.controlOwners || {})[c]);
   }).length;
   const countEl = document.getElementById('policy-step-4-ready-count');
-  if (countEl) countEl.textContent = assignedCount + ' of ' + selected.length + ' ready for sign-up';
+  if (countEl) countEl.textContent = assignedCount + ' of ' + selected.length + ' assigned';
 }
 
 function setCtrlOwner(ctrlId, field, value) {
@@ -4384,7 +4372,7 @@ function runBulkControlOwnerAssign(fam, cidList, person, overwrite, onDone) {
     var end = Math.min(i + 10, cidList.length);
     for (; i < end; i++) {
       var cid = cidList[i];
-      if (!overwrite && isControlOwnerInviteReady(state.controlOwners[cid])) continue;
+      if (!overwrite && hasRealControlOwner(state.controlOwners[cid])) continue;
       var prevName = (state.controlOwners[cid] || {}).name;
       state.controlOwners[cid] = { name: person.name, role: person.role, email: person.email };
       logFieldChange('controlOwners.' + cid + '.name', prevName, person.name);
@@ -4403,19 +4391,18 @@ function runBulkControlOwnerAssign(fam, cidList, person, overwrite, onDone) {
 function batchAssignControlOwners(fam, overwrite) {
   const name = document.getElementById('batchOwnerName')?.value.trim()||'';
   const role = document.getElementById('batchOwnerRole')?.value.trim()||'';
-  const email = document.getElementById('batchOwnerEmail')?.value.trim()||'';
   if (!name) { showToast('Please enter an owner name first.', true); return; }
-  if (!isValidOwnerEmail(email)) {
-    showToast('Enter a valid work email — control owners need it to sign up and claim their controls.', true);
-    return;
-  }
+  var email = '';
+  var people = window._s4People || [];
+  var match = people.find(function(p) { return (p.name || '').trim() === name; });
+  if (match) email = match.email || '';
   const selected = (state.policySelectedControls||{})[fam]||[];
   const cidList = selected.filter(function(cid) {
-    return overwrite || !isControlOwnerInviteReady((state.controlOwners || {})[cid]);
+    return overwrite || !hasRealControlOwner((state.controlOwners || {})[cid]);
   });
   if (!cidList.length) { showToast('No matching controls to update.', true); return; }
   runBulkControlOwnerAssign(fam, cidList, { name: name, role: role, email: email }, overwrite, function(count) {
-    showToast('✅ ' + count + ' control' + (count !== 1 ? 's' : '') + ' assigned to ' + name + '.');
+    showToast('\u2705 ' + count + ' control' + (count !== 1 ? 's' : '') + ' assigned to ' + name + '.');
     renderPolicyStep4();
   });
 }
@@ -4458,7 +4445,6 @@ function openBulkAssignControlModal(fam) {
     + '<div style="padding:10px 20px;display:flex;flex-wrap:wrap;gap:10px;">'
     + '<div style="flex:1;min-width:140px;"><label class="form-label" style="font-size:10px;">Name *</label><input class="form-input" id="bulkModalName" style="font-size:12px;"></div>'
     + '<div style="flex:1;min-width:120px;"><label class="form-label" style="font-size:10px;">Role</label><input class="form-input" id="bulkModalRole" style="font-size:12px;"></div>'
-    + '<div style="flex:1;min-width:160px;"><label class="form-label" style="font-size:10px;">Email <span class="required">*</span></label><input class="form-input" id="bulkModalEmail" type="email" style="font-size:12px;" autocomplete="email"></div>'
     + '</div>'
     + '<div style="flex:1;overflow:auto;padding:0 20px 12px;">'
     + '<table class="control-table" style="width:100%;font-size:12px;"><thead><tr><th style="width:36px;"><input type="checkbox" id="bulkModalSelectAll" checked title="Select all"></th><th style="width:100px;">ID</th><th>Control</th><th style="width:140px;">Current</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
@@ -4482,18 +4468,16 @@ function bulkModalQuickFill(idx) {
   if (!p) return;
   var n = document.getElementById('bulkModalName'); if (n) n.value = p.name||'';
   var r = document.getElementById('bulkModalRole'); if (r) r.value = p.role||'';
-  var e = document.getElementById('bulkModalEmail'); if (e) e.value = p.email||'';
 }
 
 function applyBulkAssignFromModal(fam) {
   var name = (document.getElementById('bulkModalName')||{}).value.trim();
   if (!name) { showToast('Owner name is required.', true); return; }
   var role = (document.getElementById('bulkModalRole')||{}).value.trim();
-  var email = (document.getElementById('bulkModalEmail')||{}).value.trim();
-  if (!isValidOwnerEmail(email)) {
-    showToast('Enter a valid work email — control owners need it to sign up and claim their controls.', true);
-    return;
-  }
+  var email = '';
+  var people = window._bulkModalPeople || [];
+  var match = people.find(function(p) { return (p.name || '').trim() === name; });
+  if (match) email = match.email || '';
   var overwrite = !!(document.getElementById('bulkModalOverwrite')||{}).checked;
   var cids = [];
   document.querySelectorAll('#bulkAssignModalOverlay .bulk-assign-cb').forEach(function(cb) {
@@ -4511,26 +4495,18 @@ function applyBulkAssignFromModal(fam) {
 function showSubmitModal() {
   const fam = state._policyDomain;
   const selected = (state.policySelectedControls||{})[fam]||[];
-  const inviteReady = selected.filter(function(cid) {
-    return isControlOwnerInviteReady((state.controlOwners || {})[cid]);
+  const assigned = selected.filter(function(cid) {
+    return hasRealControlOwner((state.controlOwners || {})[cid]);
   }).length;
-  const missingEmail = selected.filter(function(cid) {
-    var co = (state.controlOwners || {})[cid] || {};
-    return (co.name || '').trim() && !isValidOwnerEmail(co.email);
-  }).length;
-  const unassigned = selected.length - inviteReady - missingEmail;
+  const unassigned = selected.length - assigned;
   const dp = state.domainPolicies?.[fam];
   const overlay = document.createElement('div');
   overlay.id = 'submitModalOverlay';
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:9999;display:flex;align-items:center;justify-content:center;';
   var ownerWarn = '';
-  if (inviteReady < selected.length) {
-    var parts = [];
-    if (missingEmail) parts.push(missingEmail + ' missing a work email');
-    if (unassigned) parts.push(unassigned + ' without an owner');
+  if (unassigned) {
     ownerWarn = '<div style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);border-radius:8px;padding:12px;margin-bottom:20px;font-size:12px;color:var(--amber);line-height:1.5;">'
-      + '\u26A0\uFE0F ' + parts.join(' · ')
-      + '. Control owners need a valid work email to sign up and design their controls. You can still submit, but assign emails before handoff.</div>';
+      + '\u26A0\uFE0F ' + unassigned + ' control' + (unassigned === 1 ? '' : 's') + ' still need an owner. You can still submit.</div>';
   }
   overlay.innerHTML =
     '<div style="background:white;border-radius:16px;padding:32px;width:480px;max-width:90vw;box-shadow:0 20px 60px rgba(0,0,0,0.2);">'
@@ -4541,7 +4517,7 @@ function showSubmitModal() {
     + '<div><div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Domain</div><div style="font-size:14px;font-weight:700;color:var(--navy);">' + (FAMILIES[fam]||fam) + '</div></div>'
     + '<div><div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Policy Title</div><div style="font-size:13px;font-weight:600;color:var(--navy);">' + escapeHTML(dp&&dp.title||'Untitled') + '</div></div>'
     + '<div><div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Controls</div><div style="font-size:14px;font-weight:700;color:var(--navy);">' + selected.length + ' in policy</div></div>'
-    + '<div><div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Ready for sign-up</div><div style="font-size:14px;font-weight:700;color:' + (inviteReady===selected.length?'var(--teal)':'var(--amber)') + ';">' + inviteReady + ' / ' + selected.length + '</div></div>'
+    + '<div><div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Owners assigned</div><div style="font-size:14px;font-weight:700;color:' + (assigned===selected.length?'var(--teal)':'var(--amber)') + ';">' + assigned + ' / ' + selected.length + '</div></div>'
     + '</div></div>'
     + ownerWarn
     + '<div style="display:flex;gap:12px;justify-content:flex-end;">'

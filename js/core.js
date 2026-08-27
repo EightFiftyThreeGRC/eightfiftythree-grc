@@ -1887,19 +1887,30 @@ function isKnownProgramUserEmail(email) {
   });
 }
 
+/** True when this name already belongs to someone on the program roster. */
+function isKnownProgramUserName(name) {
+  var n = String(name || '').trim().toLowerCase();
+  if (!n) return false;
+  if (String(state.programOwner || '').trim().toLowerCase() === n) return true;
+  if ((state.users || []).some(function(u) {
+    return String(u.name || '').trim().toLowerCase() === n;
+  })) return true;
+  var owners = state.domainOwners || {};
+  return Object.keys(owners).some(function(fam) {
+    var o = owners[fam];
+    return o && String(o.name || '').trim().toLowerCase() === n;
+  });
+}
+
 /** Status line for domain policy step 4 control-owner rows. */
 function getControlOwnerAssignStatus(co) {
-  if (!isControlOwnerInviteReady(co)) {
-    var ownerName = getOwnerDisplayName(co || {});
-    if (ownerName !== '—' && !isValidOwnerEmail((co || {}).email)) {
-      return { text: '⚠ Work email required for sign-up', color: '#b45309' };
-    }
-    return { text: 'Name and email required', color: 'var(--text-muted)' };
+  if (!hasRealControlOwner(co)) {
+    return { text: 'Name required', color: 'var(--text-muted)' };
   }
-  if (isKnownProgramUserEmail(co.email)) {
-    return { text: '✓ Assigned — on program roster', color: 'var(--teal)' };
+  if (isKnownProgramUserEmail(co.email) || isKnownProgramUserName(co.name)) {
+    return { text: '\u2713 Assigned \u2014 on program roster', color: 'var(--teal)' };
   }
-  return { text: '✓ Ready — new user can sign up with this email', color: 'var(--teal)' };
+  return { text: '\u2713 Assigned', color: 'var(--teal)' };
 }
 
 /** NIST XX-1 policy-and-procedures controls — covered by the Tier 1 ISP, not domain policy pickers. */
