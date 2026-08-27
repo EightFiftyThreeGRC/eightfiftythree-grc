@@ -190,10 +190,23 @@ function chipHTML(status) {
 // ============================================================
 // POLICY REVIEW CYCLE TRACKING
 // ============================================================
+function getPolicyReviewLifecycleStatus(policyKey) {
+  if (policyKey === 'ISP' && typeof getISPStatus === 'function') return getISPStatus();
+  return ((state.policyStatus || {})[policyKey] || {}).status || 'Not Started';
+}
+
+function policyHasCompletedReviewCycle(policyKey) {
+  var st = getPolicyReviewLifecycleStatus(policyKey);
+  return st === 'Approved' || st === 'Mapped';
+}
+
 // Returns { status:'current'|'approaching'|'overdue'|'unset', color, bg, border, label, daysUntil }
 function getReviewStatus(policyKey) {
+  var unset = { status:'unset', color:'#64748b', bg:'rgba(100,116,139,0.06)', border:'rgba(100,116,139,0.2)', label:'No review date set', daysUntil: null };
+  var notReviewed = { status:'unset', color:'#64748b', bg:'rgba(100,116,139,0.06)', border:'rgba(100,116,139,0.2)', label:'Not yet reviewed', daysUntil: null };
+  if (!policyHasCompletedReviewCycle(policyKey)) return notReviewed;
   var rc = (state.policyReviewCycle || {})[policyKey];
-  if (!rc || !rc.nextReviewDue) return { status:'unset', color:'#64748b', bg:'rgba(100,116,139,0.06)', border:'rgba(100,116,139,0.2)', label:'No review date set', daysUntil: null };
+  if (!rc || !rc.nextReviewDue) return unset;
   var today = new Date(); today.setHours(0,0,0,0);
   var due = new Date(rc.nextReviewDue + 'T00:00:00');
   var diff = Math.ceil((due - today) / 86400000);
@@ -261,11 +274,13 @@ function renderReviewCycleCard(policyKey, label, opts) {
   if (!state.policyReviewCycle[policyKey]) state.policyReviewCycle[policyKey] = {};
   var rc = state.policyReviewCycle[policyKey];
 
-  // Auto-populate sensible defaults the first time this card is rendered
-  var today = new Date().toISOString().slice(0, 10);
-  if (!rc.lastReviewed)   { rc.lastReviewed  = today; }
-  if (!rc.nextReviewDue)  { var d = new Date(rc.lastReviewed + 'T00:00:00'); d.setFullYear(d.getFullYear() + 1); rc.nextReviewDue = d.toISOString().slice(0, 10); }
-  if (!rc.approvalDate)   { rc.approvalDate  = today; }
+  // Next-review due is a planning date (first annual review). Do not pretend
+  // Last Reviewed / Approval Date happened today on a document that is still a draft.
+  if (!rc.nextReviewDue) {
+    var d = new Date();
+    d.setFullYear(d.getFullYear() + 1);
+    rc.nextReviewDue = d.toISOString().slice(0, 10);
+  }
 
   var ispSod = policyKey === 'ISP';
   var domainNeedsSeparate = !ispSod
