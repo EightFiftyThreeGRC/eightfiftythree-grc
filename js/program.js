@@ -1426,7 +1426,7 @@ function renderCISOStep2Baseline() {
 
   body.innerHTML = `
     ${cisoStepProgressHtml(2, 'Program')}
-    <div class="section-title">This program is structured around NIST CSF 2.0</div>
+    <div class="section-title">This program is built around NIST RMF, NIST CSF 2.0, and NIST SP 800-53.</div>
     <p class="program-structure-lead">This step sets program structure and the inherited common-control floor. You do not choose \u201cthe organization is Moderate.\u201d Low / Moderate / High is chosen later for each information system in Assets &amp; SSP.</p>
     ${renderCsfProgramStructureHtml()}
     <p class="program-structure-note">Govern is the ISP. Identify, Protect, Detect, Respond, and Recover are the domain policy packages. 800-53 controls implement those outcomes. RMF Prepare (SP 800-37 P-4) is organizationally-tailored control baselines and common controls \u2014 a tailoring and inheritance job, not an estate-wide Low / Moderate / High pick.</p>
