@@ -4247,21 +4247,24 @@
       color: var(--text-muted);
       margin-top: 4px;
     }
-    .csf-nest-wrap { display: flex; flex-direction: column; gap: 8px; }
+    .csf-nest-wrap { display: flex; flex-direction: column; gap: 8px; flex: 1 1 100%; min-width: 0; }
     .csf-nest-block { display: flex; flex-direction: column; gap: 6px; }
     .csf-nest-chips { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
     .csf-nest-head {
       display: flex;
-      align-items: baseline;
-      gap: 8px;
+      align-items: flex-start;
+      gap: 6px 8px;
       flex-wrap: wrap;
     }
+    .csf-nest-chips > .csf-nest-head { flex: 0 0 auto; }
     .csf-nest-head-name {
+      display: block;
+      flex-basis: 100%;
       font-size: 11px;
       color: var(--text-muted);
       font-weight: 500;
-      max-width: 520px;
-      line-height: 1.35;
+      line-height: 1.45;
+      max-width: none;
     }
     tr.csf-nest-row td {
       background: var(--ink-1);

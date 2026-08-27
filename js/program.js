@@ -2182,9 +2182,12 @@ function renderIspReqControlChipsHtml(req, oi) {
   var blocks = grouped.order.map(function(key) {
     var chips = (grouped.groups[key] || []).map(chip).join('');
     if (!chips) return '';
+    if (typeof renderCsfNestedControlGroupHtml === 'function') return renderCsfNestedControlGroupHtml(key, chips);
     return '<div class="csf-nest-block">'
-      + (typeof renderCsfSubcategoryHeadingHtml === 'function' ? renderCsfSubcategoryHeadingHtml(key) : '<div class="csf-nest-head">' + escapeHTML(key) + '</div>')
-      + '<div class="csf-nest-chips">' + chips + '</div></div>';
+      + (typeof renderCsfSubcategoryHeadingHtml === 'function' ? renderCsfSubcategoryHeadingHtml(key, { includeName: false }) : '<div class="csf-nest-head">' + escapeHTML(key) + '</div>')
+      + '<div class="csf-nest-chips">' + chips + '</div>'
+      + (typeof renderCsfSubcategoryNameHtml === 'function' ? renderCsfSubcategoryNameHtml(key) : '')
+      + '</div>';
   }).filter(Boolean);
   if (grouped.unmapped.length) {
     blocks.push('<div class="csf-nest-block csf-nest-block--unmapped"><div class="csf-nest-head"><span class="csf-tag csf-unmapped">Unmapped</span></div><div class="csf-nest-chips">' + grouped.unmapped.map(chip).join('') + '</div></div>');
@@ -2753,14 +2756,14 @@ function renderRequirementsSection(unmappedPM) {
       <div draggable="true" ondragstart="ispDragStart(event,'req',${oi})" ondragover="ispDragOver(event)" ondrop="ispDrop(event,'req',${oi})" ondragend="ispDragEnd(event)"
         style="border:1px solid ${borderColor};border-radius:10px;padding:18px 20px;margin-bottom:14px;background:#fafbfc;transition:background 0.15s;" data-req-idx="${oi}">
         ${staleBanner}
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-            <span style="cursor:grab;color:var(--text-muted);font-size:14px;" title="Drag to reorder">⠿</span>
-            <span style="font-size:12px;font-weight:800;color:var(--teal);background:rgba(13,148,136,0.1);padding:4px 12px;border-radius:12px;letter-spacing:0.3px;">${req.id}</span>
-            <div style="display:flex;flex-wrap:wrap;align-items:flex-start;gap:8px;">
-              ${renderIspReqControlChipsHtml(req, oi)}
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;gap:8px;">
+          <div style="flex:1;min-width:0;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
+              <span style="cursor:grab;color:var(--text-muted);font-size:14px;" title="Drag to reorder">⠿</span>
+              <span style="font-size:12px;font-weight:800;color:var(--teal);background:rgba(13,148,136,0.1);padding:4px 12px;border-radius:12px;letter-spacing:0.3px;">${req.id}</span>
               <button onclick="addReqControl(${oi})" style="background:none;border:1px dashed var(--border);border-radius:14px;padding:2px 8px;font-size:11px;color:var(--text-muted);cursor:pointer;">+ control</button>
             </div>
+            ${renderIspReqControlChipsHtml(req, oi)}
           </div>
           <div style="display:flex;gap:4px;align-items:center;flex-shrink:0;">
             ${upBtn}

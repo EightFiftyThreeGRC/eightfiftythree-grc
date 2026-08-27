@@ -3796,9 +3796,16 @@ function _renderDomainRequirements(fam, dp, selected) {
     }
     var nest = '';
     grouped.order.forEach(function(key) {
-      nest += '<div class="csf-nest-block">'
-        + (typeof renderCsfSubcategoryHeadingHtml === 'function' ? renderCsfSubcategoryHeadingHtml(key) : '<div class="csf-nest-head">' + escapeHTML(key) + '</div>')
-        + '<div class="csf-nest-chips">' + (grouped.groups[key] || []).map(chip).join('') + '</div></div>';
+      var chips = (grouped.groups[key] || []).map(chip).join('');
+      if (typeof renderCsfNestedControlGroupHtml === 'function') {
+        nest += renderCsfNestedControlGroupHtml(key, chips);
+      } else {
+        nest += '<div class="csf-nest-block">'
+          + (typeof renderCsfSubcategoryHeadingHtml === 'function' ? renderCsfSubcategoryHeadingHtml(key, { includeName: false }) : '<div class="csf-nest-head">' + escapeHTML(key) + '</div>')
+          + '<div class="csf-nest-chips">' + chips + '</div>'
+          + (typeof renderCsfSubcategoryNameHtml === 'function' ? renderCsfSubcategoryNameHtml(key) : '')
+          + '</div>';
+      }
     });
     if (grouped.unmapped.length) {
       nest += '<div class="csf-nest-block csf-nest-block--unmapped"><div class="csf-nest-head"><span class="csf-tag csf-unmapped">Unmapped</span></div><div class="csf-nest-chips">' + grouped.unmapped.map(chip).join('') + '</div></div>';

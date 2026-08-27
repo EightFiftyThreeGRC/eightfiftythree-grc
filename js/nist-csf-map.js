@@ -402,17 +402,44 @@ function groupCsfSubIdsByCategory(subIds) {
   return { order: order, groups: groups };
 }
 
-function renderCsfSubcategoryHeadingHtml(subOrCat) {
+function getCsfSubcategoryDisplayName(subOrCat) {
+  var id = String(subOrCat || '');
+  if (!id) return '';
+  if (typeof CSF_SUBCATEGORIES !== 'undefined' && CSF_SUBCATEGORIES[id]) return CSF_SUBCATEGORIES[id];
+  return getCsfCategoryLabel(id) || '';
+}
+
+function renderCsfSubcategoryHeadingHtml(subOrCat, opts) {
   if (typeof escapeHTML !== 'function') return '';
   var id = String(subOrCat || '');
   if (!id) return '';
+  opts = opts || {};
   var fn = id.split('.')[0] || '';
-  var name = (typeof CSF_SUBCATEGORIES !== 'undefined' && CSF_SUBCATEGORIES[id])
-    ? CSF_SUBCATEGORIES[id]
-    : getCsfCategoryLabel(id);
+  var includeName = opts.includeName !== false;
+  var name = includeName ? getCsfSubcategoryDisplayName(id) : '';
   return '<div class="csf-nest-head">'
     + '<span class="csf-tag csf-fn-' + escapeHTML(fn.toLowerCase()) + '">' + escapeHTML(id) + '</span>'
     + (name ? '<span class="csf-nest-head-name">' + escapeHTML(name) + '</span>' : '')
+    + '</div>';
+}
+
+function renderCsfSubcategoryNameHtml(subOrCat) {
+  if (typeof escapeHTML !== 'function') return '';
+  var name = getCsfSubcategoryDisplayName(subOrCat);
+  if (!name) return '';
+  return '<div class="csf-nest-head-name">' + escapeHTML(name) + '</div>';
+}
+
+/** Purple subcategory pill + 800-53 chips on one row; official sentence muted underneath. */
+function renderCsfNestedControlGroupHtml(key, chipsHtml) {
+  var heading = renderCsfSubcategoryHeadingHtml(key, { includeName: false })
+    || '<div class="csf-nest-head">' + (typeof escapeHTML === 'function' ? escapeHTML(key) : String(key || '')) + '</div>';
+  return '<div class="csf-nest-block">'
+    + '<div class="csf-nest-chips">'
+    + heading
+    + (chipsHtml || '')
+    + '</div>'
+    + renderCsfSubcategoryNameHtml(key)
     + '</div>';
 }
 
