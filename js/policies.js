@@ -2496,25 +2496,7 @@ function initDomainPolicy(fam) {
   const dd = DOMAIN_DEFAULTS[fam] || DOMAIN_DEFAULT_GENERIC;
   const owner = state.domainOwners[fam];
   const selected = (state.policySelectedControls||{})[fam]||[];
-
-  // Group controls by their base control number so enhancements share one requirement.
-  // E.g. AC-2, AC-2(1), AC-2(2) → one requirement; IA-8, IA-8(1), IA-8(4) → one requirement.
-  function getBaseCtrlId(cid) {
-    const m = cid.match(/^([A-Z]{2}-\d+)/);
-    return m ? m[1] : cid;
-  }
-  const groups = {};
-  const groupOrder = [];
-  selected.forEach(function(cid) {
-    const base = getBaseCtrlId(cid);
-    if (!groups[base]) { groups[base] = []; groupOrder.push(base); }
-    groups[base].push(cid);
-  });
-  const requirements = groupOrder.map(function(base, i) {
-    const cids = groups[base];
-    // One policy objective per base control number; cids includes the base and any selected enhancements.
-    return { id: fam+'-REQ-'+(i+1), controls: cids, text: generateDomainPolicyObjective(fam, cids) };
-  });
+  const requirements = buildDomainPolicyRequirementsFromCsf(fam, selected);
   state.domainPolicies[fam] = {
     title: getPolicyMergedTitle(fam), version: '1.0',
     effectiveDate: new Date().toISOString().slice(0,10),
@@ -2707,13 +2689,24 @@ function _migrateDomainPolicy(fam) {
     if (/^\s*a\.\s/.test(t) && t.indexOf('\n') > 0 && t.length > 120) return true;
     return false;
   }
-  if (dp.requirements && dp.requirements.length) {
+  if (dp.source !== 'mapped' && shouldRebuildDomainReqsAsCsf(dp)) {
+    dp.requirements = buildDomainPolicyRequirementsFromCsf(fam, (state.policySelectedControls || {})[fam] || []);
+    if (typeof markDirty === 'function') markDirty();
+  } else if (dp.requirements && dp.requirements.length) {
     dp.requirements.forEach(function(r) {
       if (!r.controls || !r.controls.length) return;
-      if (domainReqLooksLikeVerbatimNIST(r.text)) {
-        r.text = generateDomainPolicyObjective(fam, r.controls);
+      if (domainReqLooksLikeVerbatimNIST(r.text) || domainReqIsDefaultBoilerplate(r)) {
+        var sub = (r.csf && r.csf[0]) || (typeof getCsfPrimarySubcategory === 'function' ? getCsfPrimarySubcategory(r.controls[0]) : '');
+        r.text = (sub && typeof getDefaultCsfSubReqText === 'function')
+          ? getDefaultCsfSubReqText(state.orgName || 'the organization', sub, r.controls)
+          : generateDomainPolicyObjective(fam, r.controls);
+        if (sub) {
+          if (!r.csf) r.csf = [];
+          if (r.csf.indexOf(sub) < 0) r.csf.push(sub);
+        }
       }
     });
+    ensureDomainCsfSubRequirements(fam);
   }
 }
 
@@ -2725,23 +2718,74 @@ function renumberDomainReqs(fam) {
 function syncDomainPolicyRequirementsFromSelection(fam) {
   if (!state.domainPolicies || !state.domainPolicies[fam]) return;
   const dp = state.domainPolicies[fam];
-  function getBaseCtrlId2(cid) { const m = cid.match(/^([A-Z]{2}-\d+)/); return m ? m[1] : cid; }
+  if (dp.source === 'mapped') return;
   const selected = (state.policySelectedControls||{})[fam]||[];
   const mapped = (dp.requirements||[]).reduce(function(acc, r){ return acc.concat(r.controls||[]); }, []);
   const newCtls = selected.filter(function(cid){ return !mapped.includes(cid); });
-  if (!newCtls.length) return;
-  var groups2 = {}, order2 = [];
-  newCtls.forEach(function(cid) {
-    var base = getBaseCtrlId2(cid);
-    if (!groups2[base]) { groups2[base] = []; order2.push(base); }
-    groups2[base].push(cid);
-  });
   if (!dp.requirements) dp.requirements = [];
-  var n = dp.requirements.length;
-  order2.forEach(function(base, i) {
-    var cids = groups2[base];
-    dp.requirements.push({ id: fam+'-REQ-'+(n+i+1), controls: cids, text: generateDomainPolicyObjective(fam, cids) });
-  });
+  var org = state.orgName || 'the organization';
+  if (newCtls.length && typeof groupControlIdsForDomainCsfReqs === 'function') {
+    var pfn = (typeof getCsfPolicyFunctionForFamily === 'function') ? getCsfPolicyFunctionForFamily(fam) : '';
+    var preferred = {};
+    if (pfn && typeof getCsfSelectedSubIdsForFunction === 'function') {
+      getCsfSelectedSubIdsForFunction(pfn).forEach(function(id) { preferred[id] = true; });
+    }
+    (dp.requirements || []).forEach(function(r) {
+      (r.csf || []).forEach(function(id) { preferred[id] = true; });
+    });
+    var grouped = groupControlIdsForDomainCsfReqs(newCtls, preferred);
+    grouped.order.forEach(function(key) {
+      var cids = grouped.groups[key] || [];
+      var existing = typeof findReqForCsfSub === 'function' ? findReqForCsfSub(dp.requirements, key) : null;
+      if (existing) {
+        existing.controls = (existing.controls || []).concat(cids);
+        if (!existing.csf) existing.csf = [];
+        if (existing.csf.indexOf(key) < 0) existing.csf.push(key);
+        if (domainReqIsDefaultBoilerplate(existing) && typeof getDefaultCsfSubReqText === 'function') {
+          existing.text = getDefaultCsfSubReqText(org, key, existing.controls);
+        }
+        return;
+      }
+      var isSub = typeof CSF_SUBCATEGORIES !== 'undefined' && CSF_SUBCATEGORIES[key];
+      dp.requirements.push({
+        id: fam + '-REQ-' + (dp.requirements.length + 1),
+        controls: cids,
+        csf: [key],
+        text: (isSub && typeof getDefaultCsfSubReqText === 'function')
+          ? getDefaultCsfSubReqText(org, key, cids)
+          : generateDomainPolicyObjective(fam, cids)
+      });
+    });
+    (grouped.unmapped || []).forEach(function(cid) {
+      var base = (cid.match(/^([A-Z]{2}-\d+)/) || [])[1] || cid;
+      var existingUm = dp.requirements.find(function(r) {
+        return !(r.csf && r.csf.length) && (r.controls || []).some(function(id) {
+          return ((id.match(/^([A-Z]{2}-\d+)/) || [])[1] || id) === base;
+        });
+      });
+      if (existingUm) {
+        if ((existingUm.controls || []).indexOf(cid) < 0) existingUm.controls.push(cid);
+        if (domainReqIsDefaultBoilerplate(existingUm)) {
+          existingUm.text = generateDomainPolicyObjective(fam, existingUm.controls);
+        }
+        return;
+      }
+      dp.requirements.push({
+        id: fam + '-REQ-' + (dp.requirements.length + 1),
+        controls: [cid],
+        text: generateDomainPolicyObjective(fam, [cid])
+      });
+    });
+  } else if (newCtls.length) {
+    newCtls.forEach(function(cid) {
+      dp.requirements.push({
+        id: fam + '-REQ-' + (dp.requirements.length + 1),
+        controls: [cid],
+        text: generateDomainPolicyObjective(fam, [cid])
+      });
+    });
+  }
+  ensureDomainCsfSubRequirements(fam);
   renumberDomainReqs(fam);
 }
 
@@ -3527,6 +3571,96 @@ function compareNistControlIds(a, b) {
   return pa.raw.localeCompare(pb.raw);
 }
 
+function domainReqIsDefaultBoilerplate(r) {
+  if (!r) return true;
+  var t = String(r.text || '');
+  if (!t.trim()) return true;
+  if (/^Control objective \(/.test(t)) return true;
+  if (/Detailed NIST wording and enhancement-specific measures/.test(t)) return true;
+  if (/shall implement the selected CSF 2\.0 /.test(t)) return true;
+  if (r.purpose && String(r.purpose).indexOf('csf-gap-') === 0) return true;
+  if (/\[Assignment:|\[Selection:|\[FedRAMP Assignment:|\[Withdrawn:/i.test(t)) return true;
+  return false;
+}
+
+function shouldRebuildDomainReqsAsCsf(dp) {
+  if (!dp || dp.source === 'mapped') return false;
+  var reqs = dp.requirements || [];
+  if (!reqs.length) return true;
+  return reqs.every(domainReqIsDefaultBoilerplate);
+}
+
+function buildDomainPolicyRequirementsFromCsf(fam, selected, opts) {
+  opts = opts || {};
+  selected = (selected || []).slice().filter(Boolean);
+  var org = (state.orgName || 'the organization');
+  var skipSubs = opts.skipSubs || {};
+  var cover = {};
+  var pfn = (typeof getCsfPolicyFunctionForFamily === 'function') ? getCsfPolicyFunctionForFamily(fam) : '';
+  if (pfn && typeof getCsfSelectedSubIdsForFunction === 'function') {
+    getCsfSelectedSubIdsForFunction(pfn).forEach(function(id) { cover[id] = true; });
+  }
+  var grouped = (typeof groupControlIdsForDomainCsfReqs === 'function')
+    ? groupControlIdsForDomainCsfReqs(selected, cover)
+    : (typeof groupControlIdsByCsfSubcategory === 'function'
+      ? groupControlIdsByCsfSubcategory(selected)
+      : { order: [], groups: {}, unmapped: selected.slice() });
+  grouped.order.forEach(function(key) {
+    if (key) cover[key] = true;
+  });
+  Object.keys(skipSubs).forEach(function(id) { if (skipSubs[id]) delete cover[id]; });
+  var reqs = [];
+  Object.keys(cover).sort().forEach(function(sub) {
+    var cids = (grouped.groups[sub] || []).slice();
+    if (typeof compareNistControlIds === 'function') cids.sort(compareNistControlIds);
+    else cids.sort();
+    reqs.push({
+      id: fam + '-REQ-' + (reqs.length + 1),
+      controls: cids,
+      csf: [sub],
+      text: (typeof getDefaultCsfSubReqText === 'function')
+        ? getDefaultCsfSubReqText(org, sub, cids)
+        : generateDomainPolicyObjective(fam, cids)
+    });
+  });
+  (grouped.unmapped || []).forEach(function(cid) {
+    var base = (cid.match(/^([A-Z]{2}-\d+)/) || [])[1] || cid;
+    var existing = reqs.find(function(r) {
+      return !(r.csf && r.csf.length) && (r.controls || []).some(function(id) {
+        return ((id.match(/^([A-Z]{2}-\d+)/) || [])[1] || id) === base;
+      });
+    });
+    if (existing) {
+      if (existing.controls.indexOf(cid) < 0) existing.controls.push(cid);
+      existing.text = generateDomainPolicyObjective(fam, existing.controls);
+      return;
+    }
+    reqs.push({
+      id: fam + '-REQ-' + (reqs.length + 1),
+      controls: [cid],
+      text: generateDomainPolicyObjective(fam, [cid])
+    });
+  });
+  return reqs;
+}
+
+function ensureDomainCsfSubRequirements(fam) {
+  if (!state.domainPolicies || !state.domainPolicies[fam]) return 0;
+  var dp = state.domainPolicies[fam];
+  if (dp.source === 'mapped') return 0;
+  if (!dp.requirements) dp.requirements = [];
+  var pfn = (typeof getCsfPolicyFunctionForFamily === 'function') ? getCsfPolicyFunctionForFamily(fam) : '';
+  if (!pfn || typeof draftUnmappedCsfRequirements !== 'function') return 0;
+  var n = draftUnmappedCsfRequirements(pfn, dp.requirements, {
+    orgName: state.orgName || 'the organization',
+    idPrefix: fam + '-REQ-',
+    perSubcategory: true,
+    allowedControls: (state.policySelectedControls || {})[fam] || []
+  });
+  if (n && typeof renumberDomainReqs === 'function') renumberDomainReqs(fam);
+  return n;
+}
+
 // One plain-language sentence per control for domain policy objectives (never paste full NIST legal text).
 function ctrlObjectivePlainSentence(ctrl) {
   if (!ctrl) return '';
@@ -3769,7 +3903,7 @@ function _renderDomainRequirements(fam, dp, selected) {
     ? getMissingCsfSubIdsForFunction(pfn, dp.requirements || [])
     : [];
 
-  let html = '<div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;line-height:1.55;">Each row is a <strong>policy-level control objective</strong> in plain language. Mapped 800-53 controls are grouped under their CSF 2.0 subcategory. The control design wizard is where owners operationalize literal NIST text.</div>';
+  let html = '<div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;line-height:1.55;">Each row is a <strong>CSF 2.0 subcategory outcome</strong>. Mapped 800-53 controls implement that outcome. The control design wizard is where owners operationalize literal NIST text.</div>';
 
   if (missingCsf.length) {
     html += '<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px 12px;display:flex;gap:10px;align-items:center;margin-bottom:12px;font-size:12px;">'
@@ -3892,7 +4026,9 @@ function autoDraftUnmappedDomainCsf(fam) {
   if (!pfn || typeof draftUnmappedCsfRequirements !== 'function') return;
   var n = draftUnmappedCsfRequirements(pfn, dp.requirements, {
     orgName: (state.orgName || 'the organization'),
-    idPrefix: fam + '-REQ-'
+    idPrefix: fam + '-REQ-',
+    perSubcategory: true,
+    allowedControls: (state.policySelectedControls || {})[fam] || []
   });
   if (n && typeof renumberDomainReqs === 'function') renumberDomainReqs(fam);
   if (n && typeof markDirty === 'function') markDirty();
