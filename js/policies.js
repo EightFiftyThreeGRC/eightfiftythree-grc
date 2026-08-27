@@ -4539,10 +4539,10 @@ function confirmSubmitDomainPolicy() {
     if (!validateDomainApproverAssignment(fam, rc, false)) return;
   }
   var meta = getDomainPolicyApproverMeta(fam);
-  var reviewerName = meta.name || (state.programOwner || '').trim();
-  var reviewerRole = meta.role || (state.programOwnerTitle || '').trim();
-  var reviewerEmail = meta.email || (state.programOwnerEmail || '').trim();
   var useCustom = meta.useCustom;
+  var reviewerName = meta.name || (!useCustom ? (state.programOwner || '').trim() : '');
+  var reviewerRole = meta.role || (!useCustom ? (state.programOwnerTitle || '').trim() : '');
+  var reviewerEmail = meta.email || (!useCustom ? (state.programOwnerEmail || '').trim() : '');
   if (typeof domainPolicyApproverViolatesSeparationOfDuties === 'function'
       && domainPolicyApproverViolatesSeparationOfDuties(fam, reviewerEmail, reviewerName)) {
     if (typeof showToast === 'function') {
@@ -4563,7 +4563,7 @@ function confirmSubmitDomainPolicy() {
   document.getElementById('submitModalOverlay')?.remove();
   // Roster the approver so they appear in the role picker as a reviewable profile.
   try { if (typeof syncUsersFromState === 'function') syncUsersFromState(); } catch (e) { /* ignore */ }
-  if (useCustom && reviewerEmail) {
+  if (useCustom && reviewerName) {
     showToast('\u2705 Policy routed to ' + reviewerName + '. Switch to their profile to review it.');
   } else {
     showToast('\u2705 Policy submitted for review — routed to ' + (reviewerName || 'program owner') + '.');

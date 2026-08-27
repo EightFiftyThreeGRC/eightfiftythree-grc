@@ -390,19 +390,11 @@ function validateDomainApproverAssignment(fam, rc, silent) {
   var useCustom = !!rc._customApprover;
   var approverEmail = useCustom ? (rc.approverEmail || '').trim() : (state.programOwnerEmail || '').trim();
   var approverName = useCustom ? (rc.approvedBy || '').trim() : (state.programOwner || '').trim();
-  if (useCustom) {
-    if (typeof isValidOwnerEmail === 'function' && !isValidOwnerEmail(approverEmail)) {
-      if (!silent && typeof showToast === 'function') {
-        showToast('Enter a valid approver email so the roster shows who reviews this policy.', true);
-      }
-      return false;
+  if (useCustom && !approverName) {
+    if (!silent && typeof showToast === 'function') {
+      showToast('Enter the approver name in the Policy Review card.', true);
     }
-    if (!approverName) {
-      if (!silent && typeof showToast === 'function') {
-        showToast('Enter the approver name in the Policy Review card.', true);
-      }
-      return false;
-    }
+    return false;
   }
   if (domainPolicyApproverViolatesSeparationOfDuties(fam, approverEmail, approverName)) {
     if (!silent && typeof showToast === 'function') {
