@@ -3830,6 +3830,7 @@
     }
     .policy-set-chip.is-have { background: #f0fdf4; border-color: #86efac; }
     .policy-set-chip.is-need { background: #fffbeb; border-color: #fcd34d; }
+    .policy-set-chip-covers { display: inline-flex; align-items: center; gap: 4px; }
     .policy-set-empty { font-size: 13px; color: var(--text-muted); }
     .policy-set-cov-note {
       font-size: 12px;
@@ -4581,18 +4582,22 @@
     .pgb-panel-title { font-size: 15px; font-weight: 700; color: var(--navy); }
     .pgb-panel-sub { font-size: 13px; color: var(--text-muted); line-height: 1.5; max-width: 720px; margin-top: 4px; }
     .pgb-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-    .pgb-isp {
-      display: flex;
-      gap: 12px;
-      align-items: flex-start;
-      background: var(--purple-light);
-      border: 1px solid var(--hairline);
-      border-radius: 10px;
-      padding: 12px 14px;
-      margin-bottom: 14px;
-      font-size: 13px;
+    .pgb-card-isp {
+      margin-bottom: 12px;
+      border-color: #ddd4ee;
+      background: #faf8fd;
+    }
+    .pgb-card-isp .pgb-card-head { cursor: default; }
+    .pgb-chip-name {
+      font-size: 11px;
+      font-weight: 600;
       color: var(--ink-7);
-      line-height: 1.45;
+    }
+    .pgb-isp-hint {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin: 8px 0 0;
+      line-height: 1.4;
     }
     .pgb-board {
       display: grid;
@@ -4617,7 +4622,7 @@
       background: var(--accent-soft);
       box-shadow: 0 0 0 3px var(--accent-ring);
     }
-    .pgb-card-isp { margin-bottom: 0; }
+    .pmap-doc-list > .pgb-card-isp { margin-bottom: 0; }
     .pgb-card-empty { border-style: dashed; background: var(--ink-0); }
     .pgb-card-mapped { border-color: rgba(13, 148, 136, 0.35); }
     .pgb-card-head {
@@ -4641,6 +4646,7 @@
       background: var(--ink-1);
       color: var(--ink-7);
     }
+    .pgb-fn.csf-fn-gv { color: #5b4b8a; background: #f3f0f9; }
     .pgb-rename-wrap { display: block; margin: 0 0 8px; }
     .pgb-rename {
       width: 100%;
@@ -4663,6 +4669,7 @@
       cursor: grab;
     }
     .pgb-chip.is-dragging { opacity: 0.45; cursor: grabbing; }
+    .pgb-chip.pgb-chip-locked { cursor: default; background: #fff; }
     .pgb-chip-code { font-size: 12px; font-weight: 700; color: var(--navy); letter-spacing: 0.02em; }
     .pgb-menu-btn {
       font-size: 11px;

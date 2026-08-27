@@ -3252,7 +3252,10 @@ function renderUnifiedPolicySetCoverageHtml() {
     + '<div class="policy-set-cov-col">'
     + '<div class="policy-set-cov-h">Have</div>'
     + '<div class="policy-set-chip-row">'
-    + '<span class="policy-set-chip ' + (ispHave ? 'is-have' : 'is-need') + '">ISP \u00b7 ' + escapeHTML(ispLabel) + '</span>'
+    + '<span class="policy-set-chip ' + (ispHave ? 'is-have' : 'is-need') + '">'
+    + '<span>ISP (GV, PM) \u00b7 ' + escapeHTML(ispLabel) + '</span>'
+    + '<span class="policy-set-chip-covers" aria-label="Contains GV and PM">'
+    + '<span class="family-badge">GV</span><span class="family-badge">PM</span></span></span>'
     + have.map(function(h) { return chip(h, 'is-have'); }).join('')
     + (!have.length && ispHave ? '' : '')
     + '</div></div>'
@@ -3286,7 +3289,7 @@ function renderCISOStep4a() {
     ${cisoStepProgressHtml(6, 'Policy set')}
 
     <div class="section-title">Policy set</div>
-    <div class="section-subtitle">Everyone sees the same picture: what you already have versus what still needs a Function policy. Document structure first \u2014 the ISP (Govern) plus Function policy documents. Drag families between documents, or use Move and Merge. Then set urgency.</div>
+    <div class="section-subtitle">Everyone sees the same picture: what you already have versus what still needs a Function policy. Document structure first \u2014 the ISP (GV and PM) plus Function policy documents. Drag families between Function documents, or use Move and Merge. Then set urgency.</div>
 
     ${renderUnifiedPolicySetCoverageHtml()}
 

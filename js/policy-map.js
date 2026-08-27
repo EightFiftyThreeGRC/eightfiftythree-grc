@@ -1337,10 +1337,14 @@ function renderPolicyMapCoverageHtml() {
     + '<div class="pmap-cov-section">'
     + '<div class="pmap-cov-heading">Already mapped</div>'
     + '<div class="pgb-board pmap-doc-list">'
-    + '<div class="pgb-card pgb-card-isp pmap-isp-card"><div class="pgb-card-head"><div><div class="pgb-card-title">Govern \u2014 organization ISP</div>'
-    + '<div class="pmap-card-meta">' + ispMeta + '</div></div>' + ispChip + '</div>'
-    + (cov.ispMapped ? '' : '<div class="pmap-card-actions" style="margin-top:10px;"><button type="button" class="btn btn-secondary btn-sm" onclick="state.policyMapStep=5;policyMapRerender()">Claim Govern or mark a document as the ISP</button></div>')
-    + '</div>'
+    + (typeof renderPolicyBoardIspCardHtml === 'function'
+      ? renderPolicyBoardIspCardHtml({
+          extraClass: 'pmap-isp-card',
+          statusHtml: ispChip,
+          cardExtra: '<div class="pmap-card-meta">' + ispMeta + '</div>'
+            + (cov.ispMapped ? '' : '<div class="pmap-card-actions" style="margin-top:10px;"><button type="button" class="btn btn-secondary btn-sm" onclick="state.policyMapStep=5;policyMapRerender()">Claim Govern or mark a document as the ISP</button></div>')
+        })
+      : '<div class="pgb-card pgb-card-isp pmap-isp-card" data-pgb-locked="1"><div class="pgb-card-head"><div class="pgb-card-head-main"><div class="pgb-card-title">Information Security Policy</div></div>' + ispChip + '</div></div>')
     + mappedCards
     + '</div></div>'
     + '<hr class="pmap-cov-divider">'

@@ -207,7 +207,10 @@ function policyBoardMoveFamilyToSlot(fam, slot) {
   fam = String(fam || '').toUpperCase();
   slot = String(slot || '');
   if (!fam || fam === 'PM') return false;
-  if (slot === 'GV' || slot === 'fn:GV' || slot === 'PM' || slot === 'fn:PM') return false;
+  if (typeof policyBoardSlotIsLocked === 'function' ? policyBoardSlotIsLocked(slot)
+      : (slot === 'GV' || slot === 'fn:GV' || slot === 'PM' || slot === 'fn:PM' || String(slot).toUpperCase() === 'ISP')) {
+    return false;
+  }
   var families = policyBoardActiveFamilies();
   if (families.indexOf(fam) === -1) return false;
   var currentRoot = policyBoardMergeRoot(fam);
@@ -247,6 +250,7 @@ function policyBoardMergeDocs(srcMaster, dstMaster) {
   dstMaster = String(dstMaster || '').toUpperCase();
   if (!srcMaster || !dstMaster || srcMaster === dstMaster) return false;
   if (srcMaster === 'PM' || dstMaster === 'PM') return false;
+  if (typeof policyBoardSlotIsLocked === 'function' && (policyBoardSlotIsLocked(srcMaster) || policyBoardSlotIsLocked(dstMaster))) return false;
   var srcFams = policyBoardActiveFamilies().filter(function(f) {
     return policyBoardMergeRoot(f) === srcMaster;
   });
@@ -339,8 +343,14 @@ function policyBoardRerender() {
   }, 0);
 }
 
+function policyBoardSlotIsLocked(slot) {
+  var s = String(slot || '').toUpperCase();
+  return s === 'GV' || s === 'PM' || s === 'ISP' || s === 'FN:GV' || s === 'FN:PM';
+}
+
 function policyBoardApplyDrop(drag, slot) {
   if (!drag || !slot) return;
+  if (policyBoardSlotIsLocked(slot)) return;
   var ok = false;
   if (drag.kind === 'fam') ok = policyBoardMoveFamilyToSlot(drag.id, slot);
   else if (drag.kind === 'doc') {
@@ -505,8 +515,10 @@ function policyBoardEnsureDelegates() {
 
   document.addEventListener('dragover', function(ev) {
     if (!_policyBoardDrag) return;
+    if (ev.target.closest && ev.target.closest('[data-pgb-locked]')) return;
     var slotEl = ev.target.closest && ev.target.closest('[data-pgb-slot]');
-    if (!slotEl) return;
+    if (!slotEl || slotEl.getAttribute('data-pgb-locked')) return;
+    if (policyBoardSlotIsLocked(slotEl.getAttribute('data-pgb-slot'))) return;
     ev.preventDefault();
     try { ev.dataTransfer.dropEffect = 'move'; } catch (e) { /* ignore */ }
     policyBoardSetDropTarget(slotEl);
@@ -520,8 +532,14 @@ function policyBoardEnsureDelegates() {
   });
 
   document.addEventListener('drop', function(ev) {
+    if (ev.target.closest && ev.target.closest('[data-pgb-locked]')) {
+      ev.preventDefault();
+      _policyBoardDrag = null;
+      policyBoardClearDragUi();
+      return;
+    }
     var slotEl = ev.target.closest && ev.target.closest('[data-pgb-slot]');
-    if (!slotEl) return;
+    if (!slotEl || slotEl.getAttribute('data-pgb-locked')) return;
     ev.preventDefault();
     var drag = _policyBoardDrag;
     _policyBoardDrag = null;
@@ -592,6 +610,46 @@ function policyBoardEnsureDelegates() {
     if (!master) return;
     policyBoardRenameDoc(master, el.value);
   });
+}
+
+function renderPolicyBoardLockedChipHtml(code, name) {
+  var esc = typeof escapeHTML === 'function' ? escapeHTML : function(s) { return String(s || ''); };
+  return '<span class="pgb-chip pgb-chip-locked" title="' + esc(name) + ' lives in the Information Security Policy">'
+    + '<span class="pgb-chip-code">' + esc(code) + '</span>'
+    + '<span class="pgb-chip-name">' + esc(name) + '</span>'
+    + '</span>';
+}
+
+function renderPolicyBoardIspCardHtml(opts) {
+  opts = opts || {};
+  var esc = typeof escapeHTML === 'function' ? escapeHTML : function(s) { return String(s || ''); };
+  var gvName = policyBoardFnName('GV') || 'Govern';
+  var pmName = (typeof FAMILIES !== 'undefined' && FAMILIES.PM) ? FAMILIES.PM : 'Program Management';
+  var cats = (typeof getCsfCategoriesForFunction === 'function') ? getCsfCategoriesForFunction('GV') : [];
+  var catBits = cats.map(function(cat) {
+    return '<span class="csf-tag csf-fn-gv" title="' + esc(cat.name) + '">' + esc(cat.id) + '</span>';
+  }).join('');
+  var extraClass = opts.extraClass ? ' ' + opts.extraClass : '';
+  var extraHead = opts.statusHtml || '';
+  var extraBody = '';
+  if (typeof opts.cardExtra === 'function') extraBody = opts.cardExtra() || '';
+  else if (opts.cardExtra) extraBody = String(opts.cardExtra);
+  return '<div class="pgb-card pgb-card-isp' + extraClass + '" data-pgb-locked="1"'
+    + ' aria-label="Information Security Policy contains Govern and Program Management">'
+    + '<div class="pgb-card-head">'
+    + '<div class="pgb-card-head-main"><div class="pgb-card-title">Information Security Policy</div>'
+    + '<div class="pgb-fn-row"><span class="pgb-fn csf-fn-gv">GV ' + esc(gvName) + '</span></div>'
+    + (catBits ? '<div class="pgb-cat-row">' + catBits + '</div>' : '')
+    + '</div>'
+    + '<div class="pgb-card-head-actions">' + extraHead + '</div>'
+    + '</div>'
+    + extraBody
+    + '<div class="pgb-chips">'
+    + renderPolicyBoardLockedChipHtml('GV', gvName)
+    + renderPolicyBoardLockedChipHtml('PM', pmName)
+    + '</div>'
+    + '<p class="pgb-isp-hint">Families cannot be dropped here.</p>'
+    + '</div>';
 }
 
 function renderPolicyBoardChipHtml(fam, canMove) {
@@ -671,8 +729,7 @@ function renderPolicyBoardPanelHtml(opts) {
     + '</div><div class="pgb-actions">'
     + '<button type="button" class="btn btn-secondary btn-sm" data-pgb-reset>Reset to CSF defaults</button>'
     + '</div></div>'
-    + '<div class="pgb-isp" role="note"><span class="pgb-fn">GV Govern</span>'
-    + '<div><strong>Govern is the Information Security Policy.</strong> Program Management (PM) lives in the ISP \u2014 not as a domain card. Families cannot be dropped here.</div></div>'
+    + renderPolicyBoardIspCardHtml()
     + '<div class="pgb-board">' + cards + empty + '</div>'
     + '<div class="pgb-well" data-pgb-slot="standalone">'
     + '<div class="pgb-well-label">Standalone documents</div>'
