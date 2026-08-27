@@ -419,6 +419,33 @@ function groupControlIdsForDomainCsfReqs(ctrlIds, preferredSubs) {
   return { order: Object.keys(groups).sort(), groups: groups, unmapped: unmapped };
 }
 
+/** Place a control on a category that belongs to this Function (not a cross-Function leak). */
+function getCsfDomainReqCategoryForControl(ctrlId, fnId) {
+  var m = getCsfPrimaryMapping(ctrlId);
+  if (m && m.fn === fnId && m.cat) return m.cat;
+  var fam = String(ctrlId || '').split('-')[0];
+  var raw = NIST_CSF_FAMILY_DEFAULT[fam];
+  var def = raw ? parseCsfMapToken(raw) : null;
+  if (def && def.fn === fnId && def.cat) return def.cat;
+  return '';
+}
+
+function findDomainReqForCsfCategory(requirements, catId) {
+  var want = String(catId || '');
+  if (!want) return null;
+  var i;
+  for (i = 0; i < (requirements || []).length; i++) {
+    var req = requirements[i];
+    if (!req) continue;
+    if (req.purpose === ('csf-cat-' + want)) return req;
+    var csf = req.csf || [];
+    if (!csf.length) continue;
+    var allThis = csf.every(function(id) { return getCsfCategoryIdFromSub(id) === want; });
+    if (allThis) return req;
+  }
+  return null;
+}
+
 function groupCsfSubIdsByCategory(subIds) {
   var groups = {};
   (subIds || []).forEach(function(id) {
@@ -669,6 +696,38 @@ function getDefaultCsfGapReqText(orgNameVal, catId, subIds) {
     + ' outcomes (' + listed + '). Implementation shall be documented, reviewed on the policy cycle, and updated when requirements, threats, technology, or mission change. [NIST CSF 2.0: ' + listed + ']';
 }
 
+function getDefaultCsfCategoryReqText(orgNameVal, catId, subIds, cids) {
+  var org = orgNameVal || 'the organization';
+  var cat = CSF_CATEGORIES[catId];
+  var catName = cat ? cat.name : catId;
+  var subs = (subIds || []).slice().filter(Boolean);
+  var outcomes = [];
+  subs.forEach(function(id) {
+    var s = getCsfSubcategoryDisplayName(id) || '';
+    s = String(s).replace(/^The organization\s+/i, '').replace(/\s+$/, '');
+    if (!s) return;
+    s = s.charAt(0).toLowerCase() + s.slice(1);
+    s = s.replace(/[.!?]$/, '');
+    outcomes.push(s);
+  });
+  var body = org + ' shall implement CSF 2.0 ' + catName + ' (' + catId + ').';
+  if (outcomes.length === 1) {
+    body += ' In particular, ' + outcomes[0] + '.';
+  } else if (outcomes.length) {
+    body += ' Selected subcategory outcomes: ' + outcomes.join('; ') + '.';
+  }
+  var sorted = (cids || []).slice().filter(Boolean);
+  if (typeof compareNistControlIds === 'function') sorted.sort(compareNistControlIds);
+  else sorted.sort();
+  if (sorted.length) {
+    body += ' Mapped NIST SP 800-53 controls (' + sorted.join(', ')
+      + ') implement these outcomes; detailed control text is operationalized in the control design wizard.';
+  } else {
+    body += ' Implementation shall be documented, reviewed on the policy cycle, and updated when requirements, threats, technology, or mission change.';
+  }
+  return body + ' [NIST CSF 2.0: ' + (subs.join(', ') || catId) + ']';
+}
+
 /** Policy-language shall-statement for one CSF 2.0 subcategory (domain policies). */
 function getDefaultCsfSubReqText(orgNameVal, subId, cids) {
   var org = orgNameVal || 'the organization';
@@ -780,7 +839,8 @@ function draftUnmappedCsfRequirementsBySub(requirements, missing, opts) {
 /**
  * Draft requirements for selected CSF subs that no requirement covers.
  * Default (ISP): one row per Category.
- * opts.perSubcategory (domain policies): one row per subcategory.
+ * opts.domainCategory (domain policies): one row per Category, subcategory outcomes in the text.
+ * opts.perSubcategory: one row per subcategory (legacy).
  */
 function draftUnmappedCsfRequirements(fnId, requirements, opts) {
   opts = opts || {};
@@ -792,11 +852,20 @@ function draftUnmappedCsfRequirements(fnId, requirements, opts) {
   var listed = collectRequirementControlIds(requirements);
   var orgNameVal = opts.orgName || (typeof state !== 'undefined' && state && state.orgName) || 'the organization';
   var idPrefix = opts.idPrefix || 'IS-REQ-';
+  var restrict = Object.prototype.hasOwnProperty.call(opts, 'allowedControls');
+  var allowSet = null;
+  if (restrict) {
+    allowSet = {};
+    (opts.allowedControls || []).forEach(function(id) { if (id) allowSet[id] = true; });
+  }
+  var domainCat = !!opts.domainCategory;
   var created = 0;
   grouped.order.forEach(function(catId) {
     var subs = grouped.groups[catId] || [];
     if (!subs.length) return;
-    var existing = findReqForCsfCategory(requirements, catId);
+    var existing = domainCat
+      ? findDomainReqForCsfCategory(requirements, catId)
+      : findReqForCsfCategory(requirements, catId);
     if (existing) {
       if (!existing.csf) existing.csf = [];
       var seen = {};
@@ -812,14 +881,18 @@ function draftUnmappedCsfRequirements(fnId, requirements, opts) {
       return;
     }
     var controls = getOfficialControlsForCsfSubs(subs).filter(function(cid) {
-      return !listed[cid];
+      if (listed[cid]) return false;
+      if (allowSet && !allowSet[cid]) return false;
+      return true;
     });
     controls.forEach(function(cid) { listed[cid] = true; });
     var n = requirements.length + 1;
     requirements.push({
       id: idPrefix + n,
-      purpose: CSF_CAT_ISP_PURPOSE[catId] || ('csf-gap-' + catId),
-      text: getDefaultCsfGapReqText(orgNameVal, catId, subs),
+      purpose: domainCat ? ('csf-cat-' + catId) : (CSF_CAT_ISP_PURPOSE[catId] || ('csf-gap-' + catId)),
+      text: domainCat
+        ? getDefaultCsfCategoryReqText(orgNameVal, catId, subs, controls)
+        : getDefaultCsfGapReqText(orgNameVal, catId, subs),
       controls: controls,
       csf: subs.slice()
     });

@@ -2696,14 +2696,17 @@ function _migrateDomainPolicy(fam) {
     dp.requirements.forEach(function(r) {
       if (!r.controls || !r.controls.length) return;
       if (domainReqLooksLikeVerbatimNIST(r.text) || domainReqIsDefaultBoilerplate(r)) {
-        var sub = (r.csf && r.csf[0]) || (typeof getCsfPrimarySubcategory === 'function' ? getCsfPrimarySubcategory(r.controls[0]) : '');
-        r.text = (sub && typeof getDefaultCsfSubReqText === 'function')
-          ? getDefaultCsfSubReqText(state.orgName || 'the organization', sub, r.controls)
-          : generateDomainPolicyObjective(fam, r.controls);
-        if (sub) {
-          if (!r.csf) r.csf = [];
-          if (r.csf.indexOf(sub) < 0) r.csf.push(sub);
+        var pfnM = (typeof getCsfPolicyFunctionForFamily === 'function') ? getCsfPolicyFunctionForFamily(fam) : '';
+        var cat = (typeof getCsfDomainReqCategoryForControl === 'function')
+          ? getCsfDomainReqCategoryForControl((r.controls || [])[0], pfnM)
+          : '';
+        if (!cat && r.csf && r.csf[0] && typeof getCsfCategoryIdFromSub === 'function') {
+          cat = getCsfCategoryIdFromSub(r.csf[0]);
         }
+        r.text = (cat && typeof getDefaultCsfCategoryReqText === 'function')
+          ? getDefaultCsfCategoryReqText(state.orgName || 'the organization', cat, r.csf || [], r.controls)
+          : generateDomainPolicyObjective(fam, r.controls);
+        if (cat) r.purpose = r.purpose || ('csf-cat-' + cat);
       }
     });
     ensureDomainCsfSubRequirements(fam);
@@ -2724,60 +2727,39 @@ function syncDomainPolicyRequirementsFromSelection(fam) {
   const newCtls = selected.filter(function(cid){ return !mapped.includes(cid); });
   if (!dp.requirements) dp.requirements = [];
   var org = state.orgName || 'the organization';
-  if (newCtls.length && typeof groupControlIdsForDomainCsfReqs === 'function') {
-    var pfn = (typeof getCsfPolicyFunctionForFamily === 'function') ? getCsfPolicyFunctionForFamily(fam) : '';
-    var preferred = {};
-    if (pfn && typeof getCsfSelectedSubIdsForFunction === 'function') {
-      getCsfSelectedSubIdsForFunction(pfn).forEach(function(id) { preferred[id] = true; });
-    }
-    (dp.requirements || []).forEach(function(r) {
-      (r.csf || []).forEach(function(id) { preferred[id] = true; });
-    });
-    var grouped = groupControlIdsForDomainCsfReqs(newCtls, preferred);
-    grouped.order.forEach(function(key) {
-      var cids = grouped.groups[key] || [];
-      var existing = typeof findReqForCsfSub === 'function' ? findReqForCsfSub(dp.requirements, key) : null;
-      if (existing) {
-        existing.controls = (existing.controls || []).concat(cids);
-        if (!existing.csf) existing.csf = [];
-        if (existing.csf.indexOf(key) < 0) existing.csf.push(key);
-        if (domainReqIsDefaultBoilerplate(existing) && typeof getDefaultCsfSubReqText === 'function') {
-          existing.text = getDefaultCsfSubReqText(org, key, existing.controls);
-        }
-        return;
-      }
-      var isSub = typeof CSF_SUBCATEGORIES !== 'undefined' && CSF_SUBCATEGORIES[key];
-      dp.requirements.push({
-        id: fam + '-REQ-' + (dp.requirements.length + 1),
-        controls: cids,
-        csf: [key],
-        text: (isSub && typeof getDefaultCsfSubReqText === 'function')
-          ? getDefaultCsfSubReqText(org, key, cids)
-          : generateDomainPolicyObjective(fam, cids)
-      });
-    });
-    (grouped.unmapped || []).forEach(function(cid) {
-      var base = (cid.match(/^([A-Z]{2}-\d+)/) || [])[1] || cid;
-      var existingUm = dp.requirements.find(function(r) {
-        return !(r.csf && r.csf.length) && (r.controls || []).some(function(id) {
-          return ((id.match(/^([A-Z]{2}-\d+)/) || [])[1] || id) === base;
-        });
-      });
-      if (existingUm) {
-        if ((existingUm.controls || []).indexOf(cid) < 0) existingUm.controls.push(cid);
-        if (domainReqIsDefaultBoilerplate(existingUm)) {
-          existingUm.text = generateDomainPolicyObjective(fam, existingUm.controls);
-        }
-        return;
-      }
-      dp.requirements.push({
-        id: fam + '-REQ-' + (dp.requirements.length + 1),
-        controls: [cid],
-        text: generateDomainPolicyObjective(fam, [cid])
-      });
-    });
-  } else if (newCtls.length) {
+  var pfn = (typeof getCsfPolicyFunctionForFamily === 'function') ? getCsfPolicyFunctionForFamily(fam) : '';
+  if (newCtls.length) {
     newCtls.forEach(function(cid) {
+      var cat = (typeof getCsfDomainReqCategoryForControl === 'function')
+        ? getCsfDomainReqCategoryForControl(cid, pfn)
+        : '';
+      var existing = cat && typeof findDomainReqForCsfCategory === 'function'
+        ? findDomainReqForCsfCategory(dp.requirements, cat)
+        : null;
+      if (existing) {
+        if (!existing.controls) existing.controls = [];
+        if (existing.controls.indexOf(cid) < 0) existing.controls.push(cid);
+        var sub = (typeof getCsfPrimarySubcategory === 'function') ? getCsfPrimarySubcategory(cid) : '';
+        if (sub) {
+          if (!existing.csf) existing.csf = [];
+          if (existing.csf.indexOf(sub) < 0) existing.csf.push(sub);
+        }
+        if (domainReqIsDefaultBoilerplate(existing) && cat && typeof getDefaultCsfCategoryReqText === 'function') {
+          existing.text = getDefaultCsfCategoryReqText(org, cat, existing.csf, existing.controls);
+        }
+        return;
+      }
+      if (cat && typeof getDefaultCsfCategoryReqText === 'function') {
+        var subNew = (typeof getCsfPrimarySubcategory === 'function') ? getCsfPrimarySubcategory(cid) : '';
+        dp.requirements.push({
+          id: fam + '-REQ-' + (dp.requirements.length + 1),
+          purpose: 'csf-cat-' + cat,
+          controls: [cid],
+          csf: subNew ? [subNew] : [cat],
+          text: getDefaultCsfCategoryReqText(org, cat, subNew ? [subNew] : [], [cid])
+        });
+        return;
+      }
       dp.requirements.push({
         id: fam + '-REQ-' + (dp.requirements.length + 1),
         controls: [cid],
@@ -3578,15 +3560,33 @@ function domainReqIsDefaultBoilerplate(r) {
   if (/^Control objective \(/.test(t)) return true;
   if (/Detailed NIST wording and enhancement-specific measures/.test(t)) return true;
   if (/shall implement the selected CSF 2\.0 /.test(t)) return true;
+  if (/shall ensure /.test(t) && /\[NIST CSF 2\.0:/.test(t)) return true;
   if (r.purpose && String(r.purpose).indexOf('csf-gap-') === 0) return true;
   if (/\[Assignment:|\[Selection:|\[FedRAMP Assignment:|\[Withdrawn:/i.test(t)) return true;
   return false;
+}
+
+function domainReqLooksConsolidatedCsfCategory(r) {
+  if (!r) return false;
+  if (r.purpose && String(r.purpose).indexOf('csf-cat-') === 0) return true;
+  var csf = r.csf || [];
+  if (csf.length < 2) return false;
+  var cats = {};
+  csf.forEach(function(id) {
+    var c = typeof getCsfCategoryIdFromSub === 'function' ? getCsfCategoryIdFromSub(id) : '';
+    if (c) cats[c] = true;
+  });
+  return Object.keys(cats).length === 1;
 }
 
 function shouldRebuildDomainReqsAsCsf(dp) {
   if (!dp || dp.source === 'mapped') return false;
   var reqs = dp.requirements || [];
   if (!reqs.length) return true;
+  if (reqs.length <= 8 && reqs.every(domainReqLooksConsolidatedCsfCategory)) return false;
+  var boilerplateN = 0;
+  reqs.forEach(function(r) { if (domainReqIsDefaultBoilerplate(r)) boilerplateN++; });
+  if (reqs.length > 8 && boilerplateN >= Math.ceil(reqs.length * 0.8)) return true;
   return reqs.every(domainReqIsDefaultBoilerplate);
 }
 
@@ -3595,52 +3595,73 @@ function buildDomainPolicyRequirementsFromCsf(fam, selected, opts) {
   selected = (selected || []).slice().filter(Boolean);
   var org = (state.orgName || 'the organization');
   var skipSubs = opts.skipSubs || {};
-  var cover = {};
   var pfn = (typeof getCsfPolicyFunctionForFamily === 'function') ? getCsfPolicyFunctionForFamily(fam) : '';
+  var selectedSubs = [];
   if (pfn && typeof getCsfSelectedSubIdsForFunction === 'function') {
-    getCsfSelectedSubIdsForFunction(pfn).forEach(function(id) { cover[id] = true; });
+    selectedSubs = getCsfSelectedSubIdsForFunction(pfn).filter(function(id) { return !skipSubs[id]; });
   }
-  var grouped = (typeof groupControlIdsForDomainCsfReqs === 'function')
-    ? groupControlIdsForDomainCsfReqs(selected, cover)
-    : (typeof groupControlIdsByCsfSubcategory === 'function'
-      ? groupControlIdsByCsfSubcategory(selected)
-      : { order: [], groups: {}, unmapped: selected.slice() });
-  grouped.order.forEach(function(key) {
-    if (key) cover[key] = true;
+  var byCat = {};
+  function ensureCat(catId) {
+    if (!catId) return null;
+    if (!byCat[catId]) byCat[catId] = { subs: {}, controls: [] };
+    return byCat[catId];
+  }
+  selectedSubs.forEach(function(sub) {
+    var cat = typeof getCsfCategoryIdFromSub === 'function' ? getCsfCategoryIdFromSub(sub) : '';
+    if (!cat) return;
+    var meta = (typeof CSF_CATEGORIES !== 'undefined') ? CSF_CATEGORIES[cat] : null;
+    if (pfn && meta && meta.fn !== pfn) return;
+    var bucket = ensureCat(cat);
+    if (bucket) bucket.subs[sub] = true;
   });
-  Object.keys(skipSubs).forEach(function(id) { if (skipSubs[id]) delete cover[id]; });
+  selected.forEach(function(cid) {
+    var cat = (typeof getCsfDomainReqCategoryForControl === 'function')
+      ? getCsfDomainReqCategoryForControl(cid, pfn)
+      : '';
+    if (!cat) return;
+    var bucket = ensureCat(cat);
+    if (!bucket) return;
+    if (bucket.controls.indexOf(cid) < 0) bucket.controls.push(cid);
+    var sub = (typeof getCsfPrimarySubcategory === 'function') ? getCsfPrimarySubcategory(cid) : '';
+    if (sub && (typeof getCsfCategoryIdFromSub === 'function' ? getCsfCategoryIdFromSub(sub) : '') === cat) {
+      bucket.subs[sub] = true;
+    }
+  });
+  var catOrder = Object.keys(byCat).sort();
+  var placed = {};
+  catOrder.forEach(function(catId) {
+    (byCat[catId].controls || []).forEach(function(id) { placed[id] = true; });
+  });
+  var leftovers = selected.filter(function(cid) { return !placed[cid]; });
+  if (leftovers.length && catOrder.length) {
+    leftovers.forEach(function(cid) {
+      if (byCat[catOrder[0]].controls.indexOf(cid) < 0) byCat[catOrder[0]].controls.push(cid);
+    });
+  }
   var reqs = [];
-  Object.keys(cover).sort().forEach(function(sub) {
-    var cids = (grouped.groups[sub] || []).slice();
+  catOrder.forEach(function(catId) {
+    var bucket = byCat[catId];
+    var subs = Object.keys(bucket.subs).sort();
+    var cids = (bucket.controls || []).slice();
     if (typeof compareNistControlIds === 'function') cids.sort(compareNistControlIds);
     else cids.sort();
     reqs.push({
       id: fam + '-REQ-' + (reqs.length + 1),
+      purpose: 'csf-cat-' + catId,
       controls: cids,
-      csf: [sub],
-      text: (typeof getDefaultCsfSubReqText === 'function')
-        ? getDefaultCsfSubReqText(org, sub, cids)
+      csf: subs.length ? subs : [catId],
+      text: (typeof getDefaultCsfCategoryReqText === 'function')
+        ? getDefaultCsfCategoryReqText(org, catId, subs, cids)
         : generateDomainPolicyObjective(fam, cids)
     });
   });
-  (grouped.unmapped || []).forEach(function(cid) {
-    var base = (cid.match(/^([A-Z]{2}-\d+)/) || [])[1] || cid;
-    var existing = reqs.find(function(r) {
-      return !(r.csf && r.csf.length) && (r.controls || []).some(function(id) {
-        return ((id.match(/^([A-Z]{2}-\d+)/) || [])[1] || id) === base;
-      });
-    });
-    if (existing) {
-      if (existing.controls.indexOf(cid) < 0) existing.controls.push(cid);
-      existing.text = generateDomainPolicyObjective(fam, existing.controls);
-      return;
-    }
+  if (!reqs.length && leftovers.length) {
     reqs.push({
-      id: fam + '-REQ-' + (reqs.length + 1),
-      controls: [cid],
-      text: generateDomainPolicyObjective(fam, [cid])
+      id: fam + '-REQ-1',
+      controls: leftovers.slice(),
+      text: generateDomainPolicyObjective(fam, leftovers)
     });
-  });
+  }
   return reqs;
 }
 
@@ -3654,7 +3675,8 @@ function ensureDomainCsfSubRequirements(fam) {
   var n = draftUnmappedCsfRequirements(pfn, dp.requirements, {
     orgName: state.orgName || 'the organization',
     idPrefix: fam + '-REQ-',
-    perSubcategory: true,
+    perSubcategory: false,
+    domainCategory: true,
     allowedControls: (state.policySelectedControls || {})[fam] || []
   });
   if (n && typeof renumberDomainReqs === 'function') renumberDomainReqs(fam);
@@ -3903,7 +3925,7 @@ function _renderDomainRequirements(fam, dp, selected) {
     ? getMissingCsfSubIdsForFunction(pfn, dp.requirements || [])
     : [];
 
-  let html = '<div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;line-height:1.55;">Each row is a <strong>CSF 2.0 subcategory outcome</strong>. Mapped 800-53 controls implement that outcome. The control design wizard is where owners operationalize literal NIST text.</div>';
+  let html = '<div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;line-height:1.55;">Each row is a <strong>CSF 2.0 category</strong>. Selected subcategory outcomes are written into the requirement; mapped 800-53 controls implement them. The control design wizard is where owners operationalize literal NIST text.</div>';
 
   if (missingCsf.length) {
     html += '<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px 12px;display:flex;gap:10px;align-items:center;margin-bottom:12px;font-size:12px;">'
@@ -4027,7 +4049,8 @@ function autoDraftUnmappedDomainCsf(fam) {
   var n = draftUnmappedCsfRequirements(pfn, dp.requirements, {
     orgName: (state.orgName || 'the organization'),
     idPrefix: fam + '-REQ-',
-    perSubcategory: true,
+    perSubcategory: false,
+    domainCategory: true,
     allowedControls: (state.policySelectedControls || {})[fam] || []
   });
   if (n && typeof renumberDomainReqs === 'function') renumberDomainReqs(fam);
