@@ -644,25 +644,39 @@ function syncUsersFromState() {
       }
     });
   }
-  var issmByEmail = {};
+  // Domain owners are identified by NAME (the roster collects owner + title, not an
+  // email). Email is still honoured as the aggregation key when an older program
+  // carries one, so multi-domain owners keep collapsing into a single roster row.
+  var issmByKey = {};
   Object.keys(state.domainOwners || {}).forEach(function(fam) {
     var o = state.domainOwners[fam];
-    if (!o || !isValidOwnerEmail(o.email)) return;
-    var key = normalizeOwnerEmail(o.email);
-    if (key === cisoEmailKey) return;
-    if (o.name && o.name.trim().toLowerCase() === cisoNameKey && cisoNameKey) return;
-    if (!issmByEmail[key]) issmByEmail[key] = { name: (o.name || '').trim(), email: o.email.trim(), families: [] };
-    if (o.name && !issmByEmail[key].name) issmByEmail[key].name = o.name.trim();
-    if (!issmByEmail[key].families.includes(fam)) issmByEmail[key].families.push(fam);
+    if (!o) return;
+    var nm = String(o.name || '').trim();
+    if (!nm) return;
+    var hasEmail = isValidOwnerEmail(o.email);
+    var key = hasEmail ? normalizeOwnerEmail(o.email) : ('name:' + nm.toLowerCase());
+    if (hasEmail && key === cisoEmailKey) return;
+    if (cisoNameKey && nm.toLowerCase() === cisoNameKey) return;
+    if (!issmByKey[key]) {
+      issmByKey[key] = {
+        name: nm,
+        email: hasEmail ? String(o.email).trim() : '',
+        title: String(o.title || o.role || '').trim(),
+        families: []
+      };
+    }
+    if (!issmByKey[key].title) issmByKey[key].title = String(o.title || o.role || '').trim();
+    if (issmByKey[key].families.indexOf(fam) < 0) issmByKey[key].families.push(fam);
   });
-  Object.keys(issmByEmail).forEach(function(k) {
-    var d = issmByEmail[k];
+  Object.keys(issmByKey).forEach(function(k) {
+    var d = issmByKey[k];
     upsertUser({
       name: d.name,
       email: d.email,
       role: 'issm',
       families: d.families,
-      profileComplete: !!(d.name && d.name.trim()),
+      note: d.title,
+      profileComplete: !!d.name,
     });
   });
 

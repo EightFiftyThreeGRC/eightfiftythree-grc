@@ -152,12 +152,19 @@ function renderCISOTab() {
   updateCISOFinishBtn();
 }
 
+/** A domain counts as owned once it has a named owner. Title is captured alongside
+    the name but is not a gate; email is no longer collected here. */
+function hasNamedDomainOwner(fam) {
+  var o = (state.domainOwners || {})[fam] || {};
+  return !!String(o.name || '').trim();
+}
+
 function countUnassignedDomains() {
   if (!state.baseline) return 0;
   const families = getActiveFamilies().filter(f => f !== 'PM');
   const merges = state.policyMerges || {};
   const masters = families.filter(f => !merges[f]);
-  return masters.filter(fam => !isValidOwnerEmail((state.domainOwners[fam] || {}).email)).length;
+  return masters.filter(fam => !hasNamedDomainOwner(fam)).length;
 }
 
 function allOwnersAssigned() {
@@ -165,7 +172,7 @@ function allOwnersAssigned() {
   const families = getActiveFamilies().filter(f => f !== 'PM');
   const merges = state.policyMerges || {};
   const masters = families.filter(f => !merges[f]);
-  return masters.every(fam => isValidOwnerEmail((state.domainOwners[fam] || {}).email));
+  return masters.every(hasNamedDomainOwner);
 }
 
 function updateCISOFinishBtn() {
@@ -533,11 +540,11 @@ function cisoFinish() {
   const families = getActiveFamilies().filter(f => f !== 'PM');
   const merges = state.policyMerges || {};
   const masters = families.filter(f => !merges[f]);
-  const unassigned = masters.filter(f => !isValidOwnerEmail((state.domainOwners[f] || {}).email));
+  const unassigned = masters.filter(f => !hasNamedDomainOwner(f));
 
   if (unassigned.length > 0) {
     var ownerStepNo = getCisoSetupStepDisplay(CISO_WIZARD_STEPS, 'Assign Owners').step;
-    showToast('Assign an owner email for all ' + unassigned.length + ' domain(s) before finalizing. Use the program owner button in Step ' + ownerStepNo + '.', true);
+    showToast('Name an owner for all ' + unassigned.length + ' domain(s) before finalizing. Use the program owner button in Step ' + ownerStepNo + '.', true);
     return;
   }
   clearScopedUndoStack('program finalization');
@@ -1693,6 +1700,32 @@ const PM_STATEMENTS = {
 // CISO STEP 2 — PM CONTROLS
 // Program Management controls toggle + auto-draft statements.
 // ============================================================
+/** Sort control ids the way an operator reads them: PM-1, PM-2, ... PM-16, PM-16(1), PM-17. */
+function compareControlIdsNumerically(a, b) {
+  function parse(id) {
+    var m = /^([A-Z]{2})-(\d+)(?:\((\d+)\))?$/.exec(String(id || '').trim());
+    return m ? { fam: m[1], num: parseInt(m[2], 10), enh: m[3] ? parseInt(m[3], 10) : 0 }
+             : { fam: String(id || ''), num: 0, enh: 0 };
+  }
+  var x = parse(a), y = parse(b);
+  if (x.fam !== y.fam) return x.fam < y.fam ? -1 : 1;
+  if (x.num !== y.num) return x.num - y.num;
+  return x.enh - y.enh;
+}
+
+/**
+ * Control rows in plain numerical order. The CSF-subcategory grouping this
+ * replaced scattered PM-1..PM-32 across headings, which made the list hard to
+ * scan; each mapped row still shows the outcome it implements via its own note.
+ */
+function renderNumericControlRowsHtml(controls, renderRow) {
+  return (controls || []).filter(Boolean)
+    .slice()
+    .sort(function(a, b) { return compareControlIdsNumerically(a.id, b.id); })
+    .map(function(c) { return renderRow(c) || ''; })
+    .join('');
+}
+
 function renderCsfGroupedControlRowsHtml(controls, renderRow, opts) {
   opts = opts || {};
   var colspan = opts.colspan || 2;
@@ -1819,7 +1852,7 @@ function renderCISOStep2() {
     <div class="table-scroll" style="margin-bottom:20px;">
       <table class="control-table">
         <thead><tr><th style="width:120px;">Control ID</th><th>Control Name</th></tr></thead>
-        <tbody id="tbod-${Math.random().toString(36).slice(2,8)}">${renderCsfGroupedControlRowsHtml(coreControls, renderRow)}</tbody>
+        <tbody id="tbod-${Math.random().toString(36).slice(2,8)}">${renderNumericControlRowsHtml(coreControls, renderRow)}</tbody>
       </table>
     </div>
 
@@ -1828,7 +1861,7 @@ function renderCISOStep2() {
     <div class="table-scroll">
       <table class="control-table">
         <thead><tr><th style="width:120px;">Control ID</th><th>Control Name</th></tr></thead>
-        <tbody id="tbod-${Math.random().toString(36).slice(2,8)}">${renderCsfGroupedControlRowsHtml(privControls, renderRow)}</tbody>
+        <tbody id="tbod-${Math.random().toString(36).slice(2,8)}">${renderNumericControlRowsHtml(privControls, renderRow)}</tbody>
       </table>
     </div>` : ''}
 
@@ -2251,28 +2284,24 @@ function draftUnmappedPMRequirements(rerender) {
   });
   if (!unmapped.length) return 0;
   var orgNameVal = state.orgName || 'the organization';
-  var stmts = {
-    'PM-1': orgNameVal + ' shall develop, document, and disseminate an organization-wide information security program plan. [NIST 800-53: PM-1]',
-    'PM-2': orgNameVal + ' shall appoint a senior information security official with the mission and resources to coordinate the program. [NIST 800-53: PM-2]',
-    'PM-3': orgNameVal + ' shall include information security and privacy resources in capital planning and investment requests. [NIST 800-53: PM-3]',
-    'PM-4': orgNameVal + ' shall implement a process to ensure plans of action and milestones are developed and maintained. [NIST 800-53: PM-4]',
-    'PM-5': orgNameVal + ' shall develop and maintain an inventory of organizational information systems. [NIST 800-53: PM-5]',
-    'PM-6': orgNameVal + ' shall develop, monitor, and report on information security measures of performance. [NIST 800-53: PM-6]',
-    'PM-7': orgNameVal + ' shall develop an enterprise architecture with consideration for information security. [NIST 800-53: PM-7]',
-    'PM-8': orgNameVal + ' shall develop and implement a Critical Infrastructure Protection plan. [NIST 800-53: PM-8]',
-    'PM-9': orgNameVal + ' shall develop an enterprise-wide risk management strategy for information security. [NIST 800-53: PM-9]',
-    'PM-10': orgNameVal + ' shall ensure an adequate security authorization process is established for information systems. [NIST 800-53: PM-10]',
-    'PM-11': orgNameVal + ' shall define mission and business processes with consideration for information security and privacy. [NIST 800-53: PM-11]',
-    'PM-12': orgNameVal + ' shall implement an insider threat program. [NIST 800-53: PM-12]',
-    'PM-13': orgNameVal + ' shall establish an information security workforce development program. [NIST 800-53: PM-13]',
-    'PM-14': orgNameVal + ' shall periodically test plans of action and milestones. [NIST 800-53: PM-14]',
-    'PM-15': orgNameVal + ' shall establish contacts with security groups and associations. [NIST 800-53: PM-15]',
-    'PM-16': orgNameVal + ' shall implement a threat awareness program with cross-organization sharing. [NIST 800-53: PM-16]',
-    'PM-17': orgNameVal + ' shall authenticate information before taking protective action on security reports. [NIST 800-53: PM-17]'
-  };
+  // Requirement text comes from PM_STATEMENTS, the single source of truth also used
+  // by the PM Controls list. A second hand-maintained copy used to live here; it
+  // covered only PM-1..PM-17, so every control above that fell through to a
+  // content-free "shall implement PM-XX per NIST 800-53" stub.
+  function pmRequirementText(pmId) {
+    var stmt = (typeof PM_STATEMENTS !== 'undefined' && PM_STATEMENTS[pmId]) ? String(PM_STATEMENTS[pmId]).trim() : '';
+    if (!stmt) {
+      var ctrl = (typeof CONTROLS !== 'undefined') && CONTROLS.filter(function(c) { return c.id === pmId; })[0];
+      stmt = ctrl && ctrl.n ? ('establish and maintain ' + ctrl.n.toLowerCase()) : '';
+    }
+    if (!stmt) return '';
+    stmt = stmt.replace(/\.\s*$/, '');
+    if (!/^[A-Z]{2,}/.test(stmt)) stmt = stmt.charAt(0).toLowerCase() + stmt.slice(1);
+    return orgNameVal + ' shall ' + stmt + '. [NIST 800-53: ' + pmId + ']';
+  }
   unmapped.forEach(function(pmId) {
     var n = isp.requirements.length + 1;
-    isp.requirements.push({ id:'IS-REQ-' + n, text: stmts[pmId] || (orgNameVal + ' shall implement ' + pmId + ' per NIST 800-53 Rev. 5. [NIST 800-53: ' + pmId + ']'), controls:[pmId] });
+    isp.requirements.push({ id:'IS-REQ-' + n, text: pmRequirementText(pmId), controls:[pmId] });
   });
   renumberReqs();
   if (typeof markDirty === 'function') markDirty();
@@ -3411,14 +3440,14 @@ function applyProgramOwnerMetaIfMatchingEmail(fam) {
   return changed;
 }
 
-function ownerStepChipHtml(name, email, extraClass) {
+function ownerStepChipHtml(name, subtitle, extraClass) {
   var glyph = (typeof icon === 'function') ? icon('user', 16) : '';
   var cls = 'owner-step-chip' + (extraClass ? ' ' + extraClass : '');
   return '<div class="' + cls + '">'
     + (glyph ? '<span class="owner-step-chip-glyph" aria-hidden="true">' + glyph + '</span>' : '')
     + '<span class="owner-step-chip-text">'
     + '<span class="owner-step-chip-name">' + escapeHTML(name || '') + '</span>'
-    + (email ? '<span class="owner-step-chip-email">' + escapeHTML(email) + '</span>' : '')
+    + (subtitle ? '<span class="owner-step-chip-email">' + escapeHTML(subtitle) + '</span>' : '')
     + '</span></div>';
 }
 
@@ -3446,16 +3475,20 @@ function commitCisoOwnerEmail(fam) {
 
 function applyOwnerEmailToFamilies(famList, email, meta) {
   var em = (email || '').trim();
-  if (!isValidOwnerEmail(em)) return 0;
   meta = meta || {};
+  // The roster is keyed on a named owner now; an email is optional metadata that
+  // older programs may still carry. Seed as long as we have a name to write.
+  if (!String(meta.name || '').trim() && !isValidOwnerEmail(em)) return 0;
   var families = getActiveFamilies().filter(function(f) { return f !== 'PM'; });
   var merges = state.policyMerges || {};
   var count = 0;
   famList.forEach(function(fam) {
+    var seededRole = (meta.role || '').trim() || DOMAIN_SUGGESTED_ROLES[fam] || 'Security Manager';
     state.domainOwners[fam] = {
       email: em,
       name: (meta.name || '').trim(),
-      role: (meta.role || '').trim() || DOMAIN_SUGGESTED_ROLES[fam] || 'Security Manager'
+      title: seededRole,
+      role: seededRole
     };
     families.filter(function(f) { return merges[f] === fam; }).forEach(function(mf) {
       state.domainOwners[mf] = Object.assign({}, state.domainOwners[fam]);
@@ -3516,7 +3549,7 @@ function seedDomainOwnersFromProgramOwner() {
   var masters = getDomainOwnerMasters();
   if (!masters.length) return 0;
   var unassigned = masters.filter(function(fam) {
-    return !isValidOwnerEmail((state.domainOwners[fam] || {}).email);
+    return !hasNamedDomainOwner(fam);
   });
   state.domainOwnerDefaultApplied = true;
   if (!unassigned.length) {
@@ -3540,8 +3573,8 @@ function seedDomainOwnersFromProgramOwner() {
 function applyProgramOwnerToAllDomains() {
   var email = (state.programOwnerEmail || '').trim();
   var name = (state.programOwner || '').trim();
-  if (!name || !isValidOwnerEmail(email)) {
-    showToast('Add the program owner name and email in Step 1 first.', true);
+  if (!name) {
+    showToast('Add the program owner name in Step 1 first.', true);
     goToStep('ciso', 1);
     return;
   }
@@ -3700,13 +3733,13 @@ function renderCISOStep4b() {
         var identityHtml;
         if (showChip) {
           identityHtml = '<div class="owner-step-id owner-step-id--chip">'
-            + ownerStepChipHtml(ownerName, o.email)
+            + ownerStepChipHtml(ownerName, o.title || o.role || '')
             + '<button type="button" class="btn btn-secondary btn-sm owner-step-chip-edit" onclick="beginCisoOwnerRowEdit(\'' + fam + '\')">Change</button>'
             + '</div>';
         } else {
           identityHtml = '<div class="owner-step-id">'
             + '<input class="form-input owner-step-name" type="text" autocomplete="name" placeholder="Full name" value="' + escapeHTML(ownerName) + '" aria-label="Owner name for ' + fam + '" oninput="setDomainOwnerGroup(\'' + fam + '\',\'name\',this.value)">'
-            + '<input class="form-input owner-step-email' + (hasOwner ? ' owner-step-email--set' : '') + '" type="email" autocomplete="email" placeholder="owner@company.com" value="' + escapeHTML(o.email || '') + '" aria-label="Owner email for ' + fam + '" oninput="setDomainOwnerGroup(\'' + fam + '\',\'email\',this.value)" onchange="commitCisoOwnerEmail(\'' + fam + '\')">'
+            + '<input class="form-input owner-step-email' + (hasOwner ? ' owner-step-email--set' : '') + '" type="text" autocomplete="organization-title" placeholder="Title (e.g. Director of IT)" value="' + escapeHTML(o.title || o.role || '') + '" aria-label="Owner title for ' + fam + '" oninput="setDomainOwnerGroup(\'' + fam + '\',\'title\',this.value)" onchange="commitCisoOwnerEmail(\'' + fam + '\')">'
             + '</div>';
         }
         return `
@@ -3984,7 +4017,7 @@ function setDomainOwner(fam, field, value) {
   state.domainOwners[fam][field] = value;
   logFieldChange(path, prev, value);
   if (field === 'email') applyProgramOwnerMetaIfMatchingEmail(fam);
-  if (field === 'name' || field === 'email') {
+  if (field === 'name' || field === 'email' || field === 'title') {
     updateCISOFinishBtn();
     autoPopulateControlOwnersFromDomain(fam);
   }
