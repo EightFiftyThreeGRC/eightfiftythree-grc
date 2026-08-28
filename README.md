@@ -24,7 +24,7 @@ The application guides teams through a full governance workflow:
 - Control owner assignment and control implementation status
 - Asset and process mapping for SSP-style attestations
 - Risks & Issues workspace (triage queue, risk register, POA&M-compatible issues when PM-4 is selected)
-- Authorizing-Official decision capture (ATO / IATT / Denial) with conditions, expiry, residual-risk narrative, and digital signature
+- Authorizing-Official decision capture (ATO, ATO with conditions, IATT, Denial) with conditions, expiry, residual-risk narrative, and digital signature
 - Dashboard/reporting views, users/roles, snapshots, and JSON import/export
 
 ## Architecture
@@ -41,7 +41,7 @@ js/nist-control-text.js     verbatim NIST 800-53 control text lookup
 js/core.js                  STATE shape, defaults, persistence, audit/change log,
                             800-53 catalog + demo snapshots
 js/nist-csf-map.js          CSF 2.0 reference data + 1-1 800-53-to-CSF primary map
-js/csf-profile.js           derived CSF 2.0 Organizational Profile + CSV export
+js/csf-profile.js           derived CSF 2.0 Organizational Profile tab + CSV export
 js/program.js               program setup wizard
 js/policy-board.js          CSF Function / family grouping board
 js/policy-map.js            legacy policy-catalog mapping helpers
@@ -106,7 +106,7 @@ These are candidates, not commitments — prioritized by whether they make the t
 2. Walk the program setup wizard end to end (all 7 steps, Organization → Assign Owners).
 3. Reset the program and confirm it returns to a fresh state.
 4. Add roster users, then use the sidebar profile button to act as each one and confirm they see only the intended tabs.
-5. Open Framework alignment and confirm the CSF 2.0 Organizational Profile panel renders and exports CSV.
+5. Open CSF Profile (sidebar → Program) and confirm the profile renders, the outcome-detail toggle works, and Export CSV downloads 106 rows.
 
 ## Documentation
 

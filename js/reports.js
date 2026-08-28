@@ -171,8 +171,8 @@ function renderControlsInventory(body) {
     + '<div style="font-size:12px;color:var(--text-muted);">' + controls.length + ' controls in scope · click a row for read-only design detail</div>'
     + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
     + '<input type="text" id="ctrlInvSearch" placeholder="Search…" oninput="filterCtrlInvTable()" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;">'
-    + '<select id="ctrlInvFamFilter" onchange="filterCtrlInvTable()" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;"><option value="">All Families</option>' + families.map(function(f){ return '<option value="'+f+'">'+f+'</option>'; }).join('') + '</select>'
-    + '<select id="ctrlInvStatusFilter" onchange="filterCtrlInvTable()" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;"><option value="">All Statuses</option><option>Not Started</option><option>Planned</option><option>Implemented</option><option>Not Applicable</option></select>'
+    + '<select id="ctrlInvFamFilter" aria-label="Filter control inventory by family" onchange="filterCtrlInvTable()" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;"><option value="">All Families</option>' + families.map(function(f){ return '<option value="'+f+'">'+f+'</option>'; }).join('') + '</select>'
+    + '<select id="ctrlInvStatusFilter" aria-label="Filter control inventory by status" onchange="filterCtrlInvTable()" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;"><option value="">All Statuses</option><option>Not Started</option><option>Planned</option><option>Implemented</option><option>Not Applicable</option></select>'
     + '</div></div>'
     + '<div class="table-scroll"><table class="control-table" id="ctrlInvTable"><thead><tr>'
     + '<th style="width:74px;">ID</th><th>Control Name</th><th style="width:56px;">Family</th><th>Owner</th><th>Associated Policy</th><th>Asset / Process Types</th><th style="width:74px;">Designed</th><th style="width:120px;">Impl. Status</th>'
@@ -599,7 +599,7 @@ function renderAssetTypesInventory(body) {
     + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">Adds an asset type under a category — appears in control design checkboxes.</div>'
     + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">'
     + '<input type="text" id="assetInvNewName" class="form-input" placeholder="Subtype name (e.g. OT Device)" style="font-size:12px;flex:1;min-width:140px;">'
-    + '<select id="assetInvNewGroup" class="form-select" style="font-size:12px;min-width:160px;">'
+    + '<select id="assetInvNewGroup" aria-label="Group for the new asset type" class="form-select" style="font-size:12px;min-width:160px;">'
     + groups.map(function(g) {
         var display = typeof getAssetCategoryDisplayLabel === 'function' ? getAssetCategoryDisplayLabel(g) : g;
         return '<option value="' + escapeHTML(g) + '">' + escapeHTML(display) + '</option>';
@@ -723,7 +723,7 @@ function renderProcessTypesInventory(body) {
     + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">Adds a process type under a category — appears in control design checkboxes.</div>'
     + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">'
     + '<input type="text" id="procInvNewName" class="form-input" placeholder="Subtype name" style="font-size:12px;flex:1;min-width:140px;">'
-    + '<select id="procInvNewGroup" class="form-select" style="font-size:12px;min-width:160px;">'
+    + '<select id="procInvNewGroup" aria-label="Category for the new process type" class="form-select" style="font-size:12px;min-width:160px;">'
     + categories.map(function(c) { return '<option value="' + escapeHTML(c.id) + '">' + escapeHTML(c.label) + '</option>'; }).join('')
     + '</select>'
     + '<button type="button" class="btn btn-primary btn-sm" onclick="invSubmitNewProcessTypeFromReports()">+ Add subtype</button>'

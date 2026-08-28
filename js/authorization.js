@@ -89,7 +89,11 @@ function atoCanDecide(boundary) {
 
 function atoDecisionDefaultExpiry(decision) {
   var d = new Date();
-  if (decision === 'IATT') d.setMonth(d.getMonth() + 6);
+  // IATT is a test authorization: DoDI 8510.01 wants the shortest period needed to
+  // finish testing, so default to 90 days rather than half a year. An ATO issued with
+  // conditions is time-boxed to the remediation window, so default to one year.
+  if (decision === 'IATT') d.setDate(d.getDate() + 90);
+  else if (decision === 'ATO-Conditions') d.setFullYear(d.getFullYear() + 1);
   else d.setFullYear(d.getFullYear() + 3);
   return d.toISOString().slice(0, 10);
 }
@@ -124,12 +128,13 @@ function openAtoDecisionModal(boundaryId) {
     + '<button type="button" class="btn btn-secondary btn-sm" onclick="closeAtoDecisionModal()" aria-label="Close">✕</button>'
     + '</div>'
     + '<div style="margin-top:14px;font-size:12px;font-weight:700;color:var(--text-muted);">Decision</div>'
-    + '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:6px;">'
+    + '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:6px;">'
     + '<label style="font-size:13px;font-weight:600;"><input type="radio" name="ato-modal-decision" value="ATO" ' + (d.decision === 'ATO' ? 'checked' : '') + '> ATO</label>'
+    + '<label style="font-size:13px;font-weight:600;"><input type="radio" name="ato-modal-decision" value="ATO-Conditions" ' + (d.decision === 'ATO-Conditions' ? 'checked' : '') + '> ATO with conditions</label>'
     + '<label style="font-size:13px;font-weight:600;"><input type="radio" name="ato-modal-decision" value="IATT" ' + (d.decision === 'IATT' ? 'checked' : '') + '> IATT</label>'
     + '<label style="font-size:13px;font-weight:600;"><input type="radio" name="ato-modal-decision" value="Denial" ' + (d.decision === 'Denial' ? 'checked' : '') + '> Denial</label>'
     + '</div>'
-    + '<div style="margin-top:12px;font-size:12px;font-weight:700;color:var(--text-muted);">Conditions <span style="font-weight:500;">(one per line, optional)</span></div>'
+    + '<div style="margin-top:12px;font-size:12px;font-weight:700;color:var(--text-muted);">Conditions <span style="font-weight:500;">(one per line \u2014 required for an ATO with conditions)</span></div>'
     + '<textarea id="atoModalConditions" class="form-input" rows="2" placeholder="e.g. Mitigate AC-2 finding within 30 days">' + escapeHTML(d.conditionsRaw || (Array.isArray(d.conditions) ? d.conditions.join('\n') : '')) + '</textarea>'
     + '<div style="margin-top:12px;font-size:12px;font-weight:700;color:var(--text-muted);">Expires</div>'
     + '<input id="atoModalExpires" class="form-input" type="date" style="max-width:220px;" value="' + escapeHTML(d.expiresAt || '') + '">'
@@ -170,8 +175,12 @@ function submitAtoDecisionFromModal(boundaryId) {
   var expiresAt = (document.getElementById('atoModalExpires') || {}).value || '';
   var narrative = (document.getElementById('atoModalNarrative') || {}).value || '';
   var signature = ((document.getElementById('atoModalSignature') || {}).value || '').trim();
-  if (!decision) { showToast('Select ATO, IATT, or Denial.', true); return; }
+  if (!decision) { showToast('Select an authorization decision.', true); return; }
   if (!signature) { showToast('Digital signature is required.', true); return; }
+  if (decision === 'ATO-Conditions' && !String(conditionsRaw).trim()) {
+    showToast('List at least one condition for an ATO with conditions.', true);
+    return;
+  }
   if (!expiresAt && decision !== 'Denial') expiresAt = atoDecisionDefaultExpiry(decision);
   var ids = state._currentPersonIds || [state.currentUserId];
   var conditions = String(conditionsRaw).split('\n').map(function(x) { return x.trim(); }).filter(Boolean);
@@ -187,8 +196,10 @@ function submitAtoDecisionFromModal(boundaryId) {
     decidedAt: new Date().toISOString()
   };
   state.atoDecisions[boundaryId] = record;
-  boundary.atoStatus = decision === 'ATO' ? 'ato-granted' : decision === 'IATT' ? 'iatt' : 'denied';
-  boundary.atoGrantedDate = (decision === 'ATO' || decision === 'IATT') ? new Date().toISOString().slice(0, 10) : '';
+  boundary.atoStatus = decision === 'ATO' ? 'ato-granted'
+    : decision === 'ATO-Conditions' ? 'ato-conditions'
+    : decision === 'IATT' ? 'iatt' : 'denied';
+  boundary.atoGrantedDate = (decision !== 'Denial') ? new Date().toISOString().slice(0, 10) : '';
   boundary.atoExpiresDate = expiresAt || '';
   boundary.conditions = conditions;
   if (typeof addAuditEntry === 'function') {
@@ -268,15 +279,18 @@ function renderAuthorizationStatusPanelHtml() {
   var rows = boundaries.map(function(b) {
     var status = b.atoStatus || 'pending';
     var label = status === 'ato-granted' ? 'ATO granted'
+      : status === 'ato-conditions' ? 'ATO with conditions'
       : status === 'iatt' ? 'IATT'
       : status === 'denied' ? 'Denied'
       : status === 'sar-submitted' ? 'SAR submitted'
       : 'Pending';
     var color = status === 'ato-granted' ? '#166534'
+      : status === 'ato-conditions' ? '#92400e'
       : status === 'iatt' ? '#92400e'
       : status === 'denied' ? '#991b1b'
       : '#475569';
     var bg = status === 'ato-granted' ? '#dcfce7'
+      : status === 'ato-conditions' ? '#fef3c7'
       : status === 'iatt' ? '#fef3c7'
       : status === 'denied' ? '#fee2e2'
       : '#f1f5f9';

@@ -85,7 +85,8 @@ function csfProfileStatusChipHtml(status) {
     + meta.bg + ';color:' + meta.fg + ';white-space:nowrap;">' + meta.label + '</span>';
 }
 
-function renderCsfProfilePanelHtml() {
+function renderCsfProfilePanelHtml(opts) {
+  opts = opts || {};
   if (typeof escapeHTML !== 'function') return '';
   var p = computeCsfOrganizationalProfile();
   var detail = !!state._csfProfileDetail;
@@ -131,10 +132,13 @@ function renderCsfProfilePanelHtml() {
 
   return '<div class="csf-panel csf-profile-panel">'
     + '<div class="csf-panel-head">'
-    + '<div><div class="csf-panel-title">NIST CSF 2.0 Organizational Profile</div>'
-    + '<div class="csf-panel-sub">Derived from the program — not a questionnaire.</div></div>'
+    + (opts.standalone
+      ? '<div><div class="csf-panel-title">Outcome coverage</div>'
+        + '<div class="csf-panel-sub">Target vs Current, by CSF Function and Category.</div></div>'
+      : '<div><div class="csf-panel-title">NIST CSF 2.0 Organizational Profile</div>'
+        + '<div class="csf-panel-sub">Derived from the program — not a questionnaire.</div></div>')
     + '<div style="display:flex;gap:8px;align-items:center;">'
-    + '<button type="button" class="btn btn-secondary btn-sm" onclick="state._csfProfileDetail=!state._csfProfileDetail;renderFrameworksTab()">'
+    + '<button type="button" class="btn btn-secondary btn-sm" onclick="state._csfProfileDetail=!state._csfProfileDetail;refreshCsfProfileView()">'
     + (detail ? 'Hide outcome detail' : 'Show outcome detail') + '</button>'
     + '<button type="button" class="btn btn-secondary btn-sm" onclick="exportCsfProfileCsv()">Export CSV</button>'
     + '</div></div>'
@@ -178,4 +182,18 @@ function exportCsfProfileCsv() {
   a.click();
   setTimeout(function() { document.body.removeChild(a); URL.revokeObjectURL(a.href); }, 0);
   if (typeof addAuditEntry === 'function') addAuditEntry('reports', 'csf-profile', 'Exported CSF 2.0 Organizational Profile CSV');
+}
+
+/** Render the standalone CSF Profile tab (sidebar: Program → CSF Profile). */
+function renderCsfProfileTab() {
+  var body = document.getElementById('csfprofile-body');
+  if (!body) return;
+  body.innerHTML = renderCsfProfilePanelHtml({ standalone: true });
+}
+
+/** Re-render whichever surface is currently showing the profile. */
+function refreshCsfProfileView() {
+  var panel = document.getElementById('tab-csfprofile');
+  if (panel && panel.classList.contains('active')) { renderCsfProfileTab(); return; }
+  if (typeof renderFrameworksTab === 'function') renderFrameworksTab();
 }

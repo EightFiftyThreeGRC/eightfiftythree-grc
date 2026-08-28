@@ -762,7 +762,7 @@ function resetApp() {
 // Tab IDs, showTab, role-view routing, CISO wizard shell
 // (step dispatch, toast, cisoFinish, sidebar badges).
 // ============================================================
-const TAB_IDS = ['home','ciso','policy','control','asset','frameworks','risk','reports','users'];
+const TAB_IDS = ['home','ciso','csfprofile','policy','control','asset','frameworks','risk','reports','users'];
 try { window.TAB_IDS = TAB_IDS; } catch (e) {}
 
 
@@ -933,10 +933,12 @@ function showTab(tabId) {
   if (tabId === 'policy')   renderPolicyTab();
   if (tabId === 'control')  renderControlTab();
   if (tabId === 'asset')    renderAssetTab();
+  if (tabId === 'csfprofile') { if (typeof renderCsfProfileTab === 'function') renderCsfProfileTab(); }
   if (tabId === 'frameworks') renderFrameworksTab();
   if (tabId === 'risk')     renderRiskTab();
   if (tabId === 'reports')    renderReports();
   if (tabId === 'users')    renderUsersTab();
+  applySetupGate(tabId);
   updateNotificationBadges();
   enhanceKeyboardAccessibility();
   if (typeof applySetupFocusMode === 'function') applySetupFocusMode();
@@ -970,6 +972,31 @@ function enhanceKeyboardAccessibility() {
 
 
 const currentStep = { ciso:1, policy:1, control:1, asset:1 };
+
+/**
+ * When a workspace step renders a "Setup Required" empty state, its step nav and
+ * footer buttons have nothing to navigate to — clicking Next just re-shows the same
+ * card under a higher step number. Hide that chrome until program setup is complete.
+ */
+// Empty-state headings that mean "program setup isn't far enough along to use this
+// workspace yet". Deliberately narrow: ordinary empty states ("No Controls Assigned",
+// "Not Yet Published") must NOT gate the wizard.
+var SETUP_GATE_TITLE_RE = /setup required|program not ready|program floor not ready/i;
+
+function applySetupGate(tabId) {
+  var panel = document.getElementById('tab-' + tabId);
+  if (!panel) return;
+  // Some workspaces render the gate card outside the .wizard-step wrapper, so scan the
+  // whole panel but only count headings the operator can actually see.
+  var gated = false;
+  panel.querySelectorAll('.es-title').forEach(function(t) {
+    if (gated || t.offsetParent === null) return;
+    if (SETUP_GATE_TITLE_RE.test(t.textContent || '')) gated = true;
+  });
+  panel.querySelectorAll('.wizard-step-footer, .step-nav').forEach(function(el) {
+    el.style.display = gated ? 'none' : '';
+  });
+}
 
 function goToStep(tabId, step) {
   const maxSteps = { ciso: (typeof CISO_WIZARD_STEPS === 'number' ? CISO_WIZARD_STEPS : 7), policy:4, control:4, asset:4 };
@@ -1022,6 +1049,7 @@ function goToStep(tabId, step) {
   }
   if (tabId==='policy') { renderPolicyWizardChrome(step); renderPolicyStep(step); }
   if (tabId==='control') renderControlStep(step);
+  setTimeout(function() { applySetupGate(tabId); }, 0);
   if (tabId==='asset') {
     renderAssetWizardChrome();
     renderAssetStep(step);

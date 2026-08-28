@@ -195,12 +195,47 @@ var REG_SUGGESTION_MAP = {
   'government:slg:justice_public_safety': { frameworks: ['iso27001', 'soc2'], laws: ['fisma'] }
 };
 
+// Placeholder citations for laws this program tracks but does not yet crosswalk at
+// control level. Laws with a real mapping live in FAMILY_LAW_CROSSWALKS instead and
+// must NOT appear here — the UI uses membership in this table to tell the operator a
+// lens is tracking-only.
 var GENERIC_LAW_REF = {
-  glba: 'Safeguards Rule §314.4',
   ferpa: 'FERPA §99.31',
-  sox: 'SOX ITGC',
   fisma: 'FISMA / NIST RMF',
   pci: 'PCI DSS'
+};
+
+// Real family-level crosswalks.
+//
+// SOX has no control catalog of its own — §404 routes through COSO/COBIT — so the
+// honest mapping is to the four IT general control domains auditors actually test
+// (Access to Programs and Data, Program Changes, Program Development, Computer
+// Operations) plus entity-level controls. GLBA cites the FTC Safeguards Rule,
+// 16 CFR §314.4, whose subsections are enumerable requirements.
+var SOX_ITGC = {
+  APD: 'ITGC: Access to Programs & Data',
+  CHG: 'ITGC: Program Changes',
+  DEV: 'ITGC: Program Development',
+  OPS: 'ITGC: Computer Operations',
+  ELC: 'Entity-Level Controls'
+};
+var FAMILY_LAW_CROSSWALKS = {
+  sox: {
+    AC: [SOX_ITGC.APD], AT: [SOX_ITGC.APD], AU: [SOX_ITGC.OPS], CA: [SOX_ITGC.OPS],
+    CM: [SOX_ITGC.CHG], CP: [SOX_ITGC.OPS], IA: [SOX_ITGC.APD], IR: [SOX_ITGC.OPS],
+    MA: [SOX_ITGC.OPS], MP: [SOX_ITGC.APD], PE: [SOX_ITGC.APD], PL: [SOX_ITGC.DEV],
+    PM: [SOX_ITGC.ELC], PS: [SOX_ITGC.APD], PT: [SOX_ITGC.APD], RA: [SOX_ITGC.ELC],
+    SA: [SOX_ITGC.DEV], SC: [SOX_ITGC.APD], SI: [SOX_ITGC.OPS], SR: [SOX_ITGC.DEV]
+  },
+  glba: {
+    AC: ['§314.4(c)(1)'], AT: ['§314.4(e)'], AU: ['§314.4(c)(8)'], CA: ['§314.4(d)'],
+    CM: ['§314.4(c)(7)'], CP: ['§314.4(g)'], IA: ['§314.4(c)(1)', '§314.4(c)(5)'],
+    IR: ['§314.4(g)'], MA: ['§314.4(c)(7)'], MP: ['§314.4(c)(6)'], PE: ['§314.4(c)(1)'],
+    PL: ['§314.4(b)'], PM: ['§314.4(a)', '§314.4(h)'], PS: ['§314.4(e)'],
+    PT: ['16 CFR 313 (Privacy Rule)'], RA: ['§314.4(b)'],
+    SA: ['§314.4(c)(4)', '§314.4(f)'], SC: ['§314.4(c)(3)'],
+    SI: ['§314.4(c)(8)', '§314.4(d)'], SR: ['§314.4(f)']
+  }
 };
 
 var FAMILY_LAW_REFS = {};
@@ -253,6 +288,11 @@ var CONTROL_FRAMEWORK_OVERRIDES = {
     FAMILY_LAW_REFS[fam] = { hipaa: (row.hipaa || []).slice() };
     Object.keys(COMPLIANCE_LAW_META).forEach(function(lawId) {
       if (lawId === 'hipaa') return;
+      var cw = FAMILY_LAW_CROSSWALKS[lawId];
+      if (cw) {
+        if (cw[fam]) FAMILY_LAW_REFS[fam][lawId] = cw[fam].slice();
+        return;
+      }
       if (GENERIC_LAW_REF[lawId]) FAMILY_LAW_REFS[fam][lawId] = [GENERIC_LAW_REF[lawId]];
     });
     delete row.hipaa;
@@ -262,6 +302,7 @@ var CONTROL_FRAMEWORK_OVERRIDES = {
     CONTROL_LAW_OVERRIDES[ctrlId] = { hipaa: (row.hipaa || []).slice() };
     Object.keys(COMPLIANCE_LAW_META).forEach(function(lawId) {
       if (lawId === 'hipaa') return;
+      if (FAMILY_LAW_CROSSWALKS[lawId]) return; // inherit the family crosswalk
       if (GENERIC_LAW_REF[lawId]) CONTROL_LAW_OVERRIDES[ctrlId][lawId] = [GENERIC_LAW_REF[lawId]];
     });
     delete row.hipaa;
@@ -919,14 +960,23 @@ function renderFrameworksTab() {
     + '<div class="fw-intro">'
     + '<p>Your NIST 800-53 program is always expressible as <strong>CSF 2.0</strong> outcomes (Govern, Identify, Protect, Detect, Respond, Recover). That mapping is inherent \u2014 not an optional overlay. Enable ISO 27001, SOC 2, or laws below when you need those additional lenses. Coverage updates as control owners mark implementation.</p>'
     + '</div>'
-    + (typeof renderCsfProfilePanelHtml === 'function' ? renderCsfProfilePanelHtml() : (typeof renderCsfCoverageStripHtml === 'function' ? renderCsfCoverageStripHtml('panel') : ''))
+    + (typeof renderCsfCoverageStripHtml === 'function' ? renderCsfCoverageStripHtml('panel') : '')
+    + (typeof renderCsfProfilePanelHtml === 'function'
+      ? '<div class="csf-profile-link" role="note" style="margin:12px 0 18px;padding:14px 16px;background:white;'
+        + 'border:1px solid var(--border);border-radius:12px;display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;">'
+        + '<div style="font-size:12.5px;line-height:1.6;color:var(--text-muted);max-width:640px;">'
+        + 'Your <strong>CSF 2.0 Organizational Profile</strong> \u2014 Target from what your policies commit to, '
+        + 'Current from live control status \u2014 has its own workspace.</div>'
+        + '<button type="button" class="btn btn-secondary btn-sm" onclick="showTab(\'csfprofile\')">Open CSF Profile \u2192</button>'
+        + '</div>'
+      : '')
     + '<div class="fw-coverage-grid">' + cards + '</div>'
     + '<p class="csf-disclaimer">Indicative alignment for scoping conversations \u2014 not a certified crosswalk, an attestation mapping, or legal advice.</p>'
     + (typeof renderComplianceLawCoverageCardsHtml === 'function' ? renderComplianceLawCoverageCardsHtml() : '')
     + '<div class="fw-map-panel">'
     + '<div class="fw-map-toolbar">'
-    + '<input class="form-input" placeholder="Search controls…" value="' + escapeHTML(state._frameworkSearch || '') + '" oninput="state._frameworkSearch=this.value;renderFrameworksTab();" style="max-width:280px;">'
-    + '<select class="form-select" style="max-width:200px;" onchange="state._frameworkFilter=this.value;renderFrameworksTab();">'
+    + '<input class="form-input" aria-label="Search controls" placeholder="Search controls…" value="' + escapeHTML(state._frameworkSearch || '') + '" oninput="state._frameworkSearch=this.value;renderFrameworksTab();" style="max-width:280px;">'
+    + '<select class="form-select" aria-label="Filter controls by framework" style="max-width:200px;" onchange="state._frameworkFilter=this.value;renderFrameworksTab();">'
     + '<option value="">All active frameworks</option>'
     + Object.keys(FRAMEWORK_META).map(function(fw) {
       return '<option value="' + fw + '"' + (filterFw === fw ? ' selected' : '') + '>' + escapeHTML(FRAMEWORK_META[fw].label) + ' only</option>';

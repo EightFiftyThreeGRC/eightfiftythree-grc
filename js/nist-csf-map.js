@@ -260,7 +260,7 @@ var NIST_CSF_MAP = {
   'RA-2': 'ID.AM:ID.AM-05', 'RA-6': 'DE.CM:DE.CM-02', 'RA-7': 'ID.RA:ID.RA-06',
   'RA-8': 'ID.RA:ID.RA-04', 'RA-9': 'ID.AM:ID.AM-05', 'RA-10': 'DE.AE:DE.AE-02',
   'SA-2': 'GV.RR:GV.RR-03', 'SA-4': 'GV.SC:GV.SC-05', 'SA-5': 'ID.AM:ID.AM-08',
-  'SA-8': 'PR.PS:PR.PS-06', 'SA-9': 'GV.SC:GV.SC-07', 'SA-10': 'PR.PS:PR.PS-06',
+  'SA-8': 'PR.PS:PR.PS-06', 'SA-9': 'ID.AM:ID.AM-04', 'SA-10': 'PR.PS:PR.PS-06',
   'SA-11': 'PR.PS:PR.PS-06', 'SA-15': 'PR.PS:PR.PS-06', 'SA-16': 'PR.AT:PR.AT-02',
   'SA-17': 'PR.PS:PR.PS-06', 'SA-20': 'PR.PS:PR.PS-06', 'SA-21': 'GV.SC:GV.SC-06',
   'SA-22': 'PR.PS:PR.PS-02', 'SA-23': 'PR.PS:PR.PS-06',
@@ -286,14 +286,38 @@ var NIST_CSF_MAP = {
   'SI-17': 'PR.IR:PR.IR-03', 'SI-18': 'GV.OC:GV.OC-03', 'SI-19': 'PR.DS:PR.DS-01',
   'SI-20': 'DE.CM:DE.CM-01', 'SI-21': 'ID.AM:ID.AM-08', 'SI-22': 'PR.IR:PR.IR-03',
   'SI-23': 'PR.DS:PR.DS-01',
-  // Enhancement-level tags (override parent inheritance) so Respond/Recover
-  // outcomes are reachable without breaking the one-primary-per-base-control rule.
-  'CP-2(3)': 'RC.RP:RC.RP-04', 'CP-9(1)': 'RC.RP:RC.RP-03', 'CP-10(2)': 'RC.RP:RC.RP-05',
-  'IR-4(1)': 'RS.MA:RS.MA-02',
+  // Enhancement-level tags. An enhancement normally inherits its parent's primary;
+  // these override that so CSF outcomes the parent cannot express on its own become
+  // reachable. The one-primary-per-BASE-control rule is untouched. Almost all sit in
+  // the same CSF category as their parent -- this is added granularity, not a new
+  // cross-Function claim. Most are Moderate/High controls, so they reach a program's
+  // profile through baseline elevation rather than the Low common-control floor.
+  // Respond -- IR-4 is RS.MA-01, IR-5 is RS.AN-07, IR-6 is RS.CO-02, IR-9 is RS.MI-01.
+  'IR-4(1)': 'RS.MA:RS.MA-02',   // Automated Incident Handling -> triage and validation
+  'IR-4(3)': 'RS.MA:RS.MA-05',   // Continuity of Operations -> recovery-initiation criteria
+  'IR-4(4)': 'RS.MA:RS.MA-03',   // Information Correlation -> categorize and prioritize
+  'IR-4(11)': 'RS.MA:RS.MA-04',  // Integrated IR Team -> escalation and elevation
+  'IR-4(12)': 'RS.AN:RS.AN-03',  // Forensic Analysis -> what happened and root cause
+  'IR-5(1)': 'RS.AN:RS.AN-06',   // Automated Tracking -> investigation record integrity
+  'IR-6(3)': 'RS.CO:RS.CO-03',   // Supply Chain Coordination -> sharing with stakeholders
+  'IR-9(3)': 'RS.MI:RS.MI-02',   // Post-spill Operations -> eradication
+  // Recover -- CP-10 is RC.RP-01; CP-2 and CP-9 sit elsewhere, but their recovery
+  // enhancements are genuinely Recover outcomes.
+  'CP-2(3)': 'RC.RP:RC.RP-04',   // Resume Mission Functions -> post-incident norms
+  'CP-9(1)': 'RC.RP:RC.RP-03',   // Backup Testing -> restoration-asset integrity verified
+  'CP-10(2)': 'RC.RP:RC.RP-05',  // Transaction Recovery -> restored-asset integrity
+  'CP-10(4)': 'RC.RP:RC.RP-02',  // Restore Within Time Period -> recovery actions performed
+  // Detect -- AU-6 is DE.AE-02, SI-4 is DE.CM-09, PM-16 is ID.RA-03.
+  'AU-6(3)': 'DE.AE:DE.AE-03',   // Correlate Audit Repositories -> multi-source correlation
+  'SI-4(5)': 'DE.AE:DE.AE-06',   // System-generated Alerts -> event info to authorized staff
+  'PM-16(1)': 'DE.AE:DE.AE-07',  // Automated Threat-intel Sharing -> CTI in analysis
+  // Identify -- RA-5 is ID.RA-01, SR-6 is GV.SC-07.
+  'RA-5(11)': 'ID.RA:ID.RA-08',  // Public Disclosure Program -> vulnerability disclosure
+  'SR-6(1)': 'ID.RA:ID.RA-10',   // Supplier Testing/Analysis -> pre-acquisition assessment
   // (base-control entries resume)
   'SR-2': 'GV.SC:GV.SC-01', 'SR-3': 'GV.SC:GV.SC-03', 'SR-4': 'ID.RA:ID.RA-09',
   'SR-5': 'GV.SC:GV.SC-05', 'SR-6': 'GV.SC:GV.SC-07', 'SR-7': 'GV.SC:GV.SC-09',
-  'SR-8': 'GV.SC:GV.SC-08', 'SR-9': 'GV.SC:GV.SC-09', 'SR-10': 'ID.RA:ID.RA-09',
+  'SR-8': 'GV.SC:GV.SC-08', 'SR-9': 'ID.RA:ID.RA-09', 'SR-10': 'ID.RA:ID.RA-09',
   'SR-11': 'ID.RA:ID.RA-09', 'SR-12': 'ID.AM:ID.AM-08',
 };
 

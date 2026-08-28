@@ -809,7 +809,7 @@ function renderUsersTab() {
         var n = counts[row.slug] || 0;
         var sq = "'" + row.slug + "'";
         var actions = readOnly ? '' :
-          ('<input id="roleLabelInput-' + _esc(row.slug) + '" value="' + _esc(row.label) + '" style="padding:5px 8px;border:1px solid #e2e8f0;border-radius:6px;font-size:12px;width:150px;" />'
+          ('<input id="roleLabelInput-' + _esc(row.slug) + '" aria-label="Display name for the ' + _esc(row.label) + ' role" value="' + _esc(row.label) + '" style="padding:5px 8px;border:1px solid #e2e8f0;border-radius:6px;font-size:12px;width:150px;" />'
            + ' <button type="button" class="btn btn-secondary btn-sm" onclick="setRoleLabel(' + sq + ')">Save</button>'
            + (row.isCustom
                ? ' <button type="button" onclick="removeCustomProgramRole(' + sq + ')" style="color:#b91c1c;border:1px solid #fca5a5;background:#fef2f2;border-radius:6px;padding:4px 8px;font-size:12px;cursor:pointer;">Delete</button>'
@@ -833,7 +833,7 @@ function renderUsersTab() {
     + '<div><label style="font-size:11px;font-weight:600;color:#475569;">Role id (slug)</label>'
     + '<input id="customRoleSlug" class="form-input" placeholder="auto from label if empty" style="width:100%;margin-top:4px;font-size:13px;" ' + (readOnly ? 'disabled ' : '') + '/></div>'
     + '<div><label style="font-size:11px;font-weight:600;color:#475569;">Tab access</label>'
-    + '<select id="customRoleTabs" class="form-select" style="width:100%;margin-top:4px;font-size:13px;" ' + (readOnly ? 'disabled ' : '') + '>'
+    + '<select id="customRoleTabs" aria-label="Workspace template for the new custom role" class="form-select" style="width:100%;margin-top:4px;font-size:13px;" ' + (readOnly ? 'disabled ' : '') + '>'
     + '<option value="assessor">Like Security Assessor (Testing + Reports)</option>'
     + '<option value="reports-only">Reports only</option>'
     + '</select></div>'
@@ -850,7 +850,7 @@ function renderUsersTab() {
     + '<div><label style="font-size:12px;font-weight:600;color:#475569;display:block;margin-bottom:4px;">Email</label>'
     + '<input id="newUserEmail" ' + (readOnly ? 'disabled ' : '') + 'placeholder="jane@agency.gov" style="width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;" /></div>'
     + '<div><label style="font-size:12px;font-weight:600;color:#475569;display:block;margin-bottom:4px;">Role *</label>'
-    + '<select id="newUserRole" ' + (readOnly ? 'disabled ' : '') + ' onchange="renderNewUserAssignments()" style="width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;background:white;">'
+    + '<select id="newUserRole" aria-label="Role for the new person" ' + (readOnly ? 'disabled ' : '') + ' onchange="renderNewUserAssignments()" style="width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;background:white;">'
     + buildProgramRoleSelectOptions('')
     + '</select></div>'
     + '</div>'

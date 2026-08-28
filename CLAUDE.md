@@ -23,8 +23,8 @@ This is the conceptual spine; do not "fix" the app back toward an 800-53-first s
 - **Identify, Protect, Detect, Respond, Recover are the five domain-policy packages.** `NIST_CSF_FAMILY_POLICY_FN` partitions the 19 non-PM 800-53 families into those Functions; `NIST_CSF_FUNCTION_POLICY_MASTER` names the master family per package (ID→RA, PR→AC, DE→AU, RS→IR, RC→CP). This is organizational packaging, not a claim about control-level crosswalks.
 - **Domain-policy requirements are drafted from CSF 2.0 subcategory outcomes** — one requirement row per CSF category, subcategory-ID chips, 800-53 controls nested under CSF headings (`buildDomainPolicyRequirementsFromCsf` in `js/policies.js`).
 - **800-53 stays as the implementation layer.** Program setup fixes the **SP 800-53B Low baseline as the inherited common-control floor** (149 controls). Explicit copy tells the operator they are NOT categorizing the organization: each system picks L/M/H later in Assets & SSP (`fismaMode` / 800-60 information types for federal-style programs; `assetCategorization`, `baseline-elevation.js` pulls additional controls without flipping the floor). This matches SP 800-37 Prepare P-4.
-- **Control-level CSF crosswalk** lives in `NIST_CSF_MAP` (`js/nist-csf-map.js`): a deliberate product rule of **one primary CSF 2.0 subcategory per 800-53 base control** (enhancements inherit the parent; all XX-1 policy-and-procedure controls → GV.PO-01). This is intentionally NOT the many-to-many official OLIR table — one primary keeps rollups and "Unmapped vs tagged" honest. As of 2026-08-27 every base control in the catalog carries a primary tag; judgment calls stay category-level tokens (e.g. `'DE.CM'`).
-- **CSF Organizational Profile is derived, not surveyed** (`js/csf-profile.js`, rendered at the top of the Framework alignment tab): Target Profile = outcomes committed to in the ISP and Function policies (`state.csfSelectedSubcats`; a Function whose outcomes were never curated falls back to "any outcome with in-scope mapped controls"); Current Profile = live implementation status of the controls mapped to each outcome. `exportCsfProfileCsv()` exports the 106-row profile.
+- **Control-level CSF crosswalk** lives in `NIST_CSF_MAP` (`js/nist-csf-map.js`): a deliberate product rule of **one primary CSF 2.0 subcategory per 800-53 base control** (enhancements inherit the parent; all XX-1 policy-and-procedure controls → GV.PO-01). This is intentionally NOT the many-to-many official OLIR table — one primary keeps rollups and "Unmapped vs tagged" honest. As of 2026-08-27 every base control in the catalog carries a primary tag; judgment calls stay category-level tokens (e.g. `'DE.CM'`). Selected **enhancements** also carry explicit tags that override parent inheritance, so Respond/Recover/Detect outcomes a parent cannot express become reachable — 88 of the 106 subcategories are now mapped. The rest are genuinely outside 800-53's expression (GV strategy outcomes, GV.PO-02 which lives in ISP review text, RC.CO communications).
+- **CSF Organizational Profile is derived, not surveyed** (`js/csf-profile.js`, its own `csfprofile` tab — sidebar Program → CSF Profile; Framework alignment links across to it): Target Profile = outcomes committed to in the ISP and Function policies (`state.csfSelectedSubcats`; a Function whose outcomes were never curated falls back to "any outcome with in-scope mapped controls"); Current Profile = live implementation status of the controls mapped to each outcome. `exportCsfProfileCsv()` exports the 106-row profile.
 
 ## Architecture
 
@@ -150,7 +150,7 @@ Controls
 Assets / SSP / Authorization
 - `assets`, `processes`, `assetCategorization`, `baselineElevationRecommendations`
 - `sspAttestations`, `sspSignoffs`, `sspInterconnections`; custom asset/process type registries + label overrides; `assetTypeRequests`; `assetMappings`
-- `authBoundaries`, `assessmentPlans`, `atoDecisions`
+- `authBoundaries`, `assessmentPlans`, `atoDecisions`. AO decisions are `ATO` / `ATO-Conditions` / `IATT` / `Denial` (SP 800-37 Rev 2 Task R-4); conditions are required for a conditional ATO, and default expiry is 3 years / 1 year / 90 days respectively.
 
 Risks & Issues
 - `risks[]`, `issues[]` (POA&M-compatible, CA-5), `riskTriageDismissals{}`; legacy `poamItems[]` migrates via `migratePoamItemsToIssues()`
@@ -186,7 +186,7 @@ Defined near the bottom of `js/core.js` (restore/load flow in `js/app.js`): `XMP
 
 ### Sidebar Navigation (from `app.html`)
 
-Tabs (`TAB_IDS` in js/app.js): `home, ciso, policy, control, asset, frameworks, risk, reports, users`. Command Center (`home`) is the post-setup dashboard; the program phase roadmap bar (Phase 1 governance · Phase 2 risks/issues · Phase 3 continuous monitoring [coming soon]) renders via `renderProgramPhaseBar()` in `js/hub.js`. Top-right toolbar: Save indicator, Save now, Export JSON, Import JSON, Snapshots, Reset. Sidebar top: profile button → role picker overlay (any rostered person, plus Admin mode).
+Tabs (`TAB_IDS` in js/app.js): `home, ciso, csfprofile, policy, control, asset, frameworks, risk, reports, users`. Command Center (`home`) is the post-setup dashboard; the program phase roadmap bar (Phase 1 governance · Phase 2 risks/issues · Phase 3 continuous monitoring [coming soon]) renders via `renderProgramPhaseBar()` in `js/hub.js`. Top-right toolbar: Save indicator, Save now, Export JSON, Import JSON, Snapshots, Reset. Sidebar top: profile button → role picker overlay (any rostered person, plus Admin mode).
 
 ### Program Setup Wizard (7 steps — `CISO_STEP_LABELS` in `js/program.js`)
 
@@ -207,7 +207,8 @@ Labels → renderers are looked up **by label** (`cisoStepIndexByLabel`) so renu
 - **Assets & SSP** (Asset Owner) — 4 steps: inventory → attestations → interconnections → review & sign-off; per-system categorization + baseline elevation; SSP submission records an "SSP Reviewer" (NOT the formal AO decision); per-control comments + **Raise issue** (→ `openRaiseIssueFromSspReview`)
 - **Risks & Issues** — triage queue (H1–H5 computed from Phase-1 signals) · risk register · issues. SoD: risk acceptance (program owner/AO), issue verification (≠ assignee)
 - **Authorization (AO Decision)** — AO Decision modal (`openAtoDecisionModal(boundaryId)`) from the Authorization status panel on the Reports dashboard; gated by `atoCanDecide`
-- **Framework alignment** — CSF 2.0 Organizational Profile (derived; CSV export) + framework/law coverage cards + control crosswalk table
+- **CSF Profile** (`csfprofile`) — the derived CSF 2.0 Organizational Profile: Target from ISP/Function-policy outcome commitments, Current from control status; outcome-detail toggle + CSV export
+- **Framework alignment** — CSF Function coverage strip, a link across to the CSF Profile, framework/law coverage cards, and the control crosswalk table. SOX and GLBA have real family-level crosswalks (`FAMILY_LAW_CROSSWALKS`: SOX → the four ITGC domains + entity-level; GLBA → 16 CFR §314.4 subsections). FERPA/FISMA/PCI remain tracking-only via `GENERIC_LAW_REF` and the UI says so.
 - **Reports & Dashboard** — program health, per-user dashboards, audit trail, review queues, Authorization status panel
 - **Users & roles** — registry, role assignment, custom role slugs (`customProgramRoles[]` via `getRoleTabs()`)
 
@@ -231,7 +232,8 @@ Labels → renderers are looked up **by label** (`cisoStepIndexByLabel`) so renu
 5. Sidebar badges and counts update after state changes
 6. Role-picker: impersonate each role; visible tabs must equal `ROLE_TABS` (assessor: home+risk+reports; AO: home+asset+risk+reports+users with the Authorization status panel on the dashboard); switch back to Admin mode
 7. Owner gating: clear a domain owner's email → the Finalise button disables and its label names how many domains still need an owner (calling cisoFinish() directly also toasts the count)
-8. CSF Profile panel (Framework alignment tab) renders, toggles outcome detail, and exports CSV
+8. CSF Profile tab renders, toggles outcome detail, and exports CSV; Framework alignment shows the coverage strip and its "Open CSF Profile" link
+9. A workspace opened before setup shows its empty state with the step nav and footer hidden (`applySetupGate` in js/app.js), not a clickable dead-end
 
 ## Work Style
 
