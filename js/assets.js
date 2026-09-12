@@ -3518,7 +3518,7 @@ function setSSPAttestation(assetId, controlId, field, value) {
   if (!state.sspAttestations[assetId][controlId]) state.sspAttestations[assetId][controlId] = {};
   var prev = state.sspAttestations[assetId][controlId][field];
   state.sspAttestations[assetId][controlId][field] = value;
-  state.sspAttestations[assetId][controlId].date = new Date().toISOString().slice(0,10);
+  state.sspAttestations[assetId][controlId].date = todayIso();
   logFieldChange('sspAttestations.' + assetId + '.' + controlId + '.' + field, prev, value);
   markDirty();
 }
@@ -3725,7 +3725,7 @@ function applySSPFieldBulkToSelected() {
       return;
     }
     targetAtt[st.field] = sourceValue;
-    targetAtt.date = new Date().toISOString().slice(0,10);
+    targetAtt.date = todayIso();
     applied++;
   });
 
@@ -3763,7 +3763,7 @@ function submitSSP() {
   if (!confirm('Submit the SSP for "' + asset.name + '" signed by ' + signer + '?\n\nThis will send it to ' + revName + ' for review.')) return;
   state.sspSignoffs[asset.id] = Object.assign({}, prevSign, {
     signedBy: signer,
-    signedDate: new Date().toISOString().slice(0,10),
+    signedDate: todayIso(),
     status: 'Submitted'
   });
   delete state.sspSignoffs[asset.id].aoReturnNotes;
@@ -3784,7 +3784,7 @@ function submitSSP() {
     assetId: asset.id,
     assetName: asset.name,
     submittedBy: signer,
-    date: new Date().toISOString().slice(0,10),
+    date: todayIso(),
     status: 'Pending',
     reviewerUserId: state.sspSignoffs[asset.id].reviewerUserId || '',
     reviewerName: state.sspSignoffs[asset.id].reviewerName || '',
@@ -4170,7 +4170,7 @@ function submitProcessSSP() {
   if (!confirm('Submit the Process SSP for "' + proc.name + '" signed by ' + signer + '?\n\nThis will send it to ' + revProcName + ' for review.')) return;
   state.sspSignoffs[proc.id] = Object.assign({}, prevProcSign, {
     signedBy: signer,
-    signedDate: new Date().toISOString().slice(0,10),
+    signedDate: todayIso(),
     status: 'Submitted'
   });
   delete state.sspSignoffs[proc.id].aoReturnNotes;
@@ -4191,7 +4191,7 @@ function submitProcessSSP() {
     assetName: proc.name,
     isProcessSsp: true,
     submittedBy: signer,
-    date: new Date().toISOString().slice(0,10),
+    date: todayIso(),
     status: 'Pending',
     reviewerUserId: state.sspSignoffs[proc.id].reviewerUserId || '',
     reviewerName: state.sspSignoffs[proc.id].reviewerName || '',

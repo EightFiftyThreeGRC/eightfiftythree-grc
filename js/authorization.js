@@ -95,7 +95,7 @@ function atoDecisionDefaultExpiry(decision) {
   if (decision === 'IATT') d.setDate(d.getDate() + 90);
   else if (decision === 'ATO-Conditions') d.setFullYear(d.getFullYear() + 1);
   else d.setFullYear(d.getFullYear() + 3);
-  return d.toISOString().slice(0, 10);
+  return isoFromDate(d);
 }
 
 // ---- AO Decision modal -----------------------------------------------------
@@ -199,7 +199,7 @@ function submitAtoDecisionFromModal(boundaryId) {
   boundary.atoStatus = decision === 'ATO' ? 'ato-granted'
     : decision === 'ATO-Conditions' ? 'ato-conditions'
     : decision === 'IATT' ? 'iatt' : 'denied';
-  boundary.atoGrantedDate = (decision !== 'Denial') ? new Date().toISOString().slice(0, 10) : '';
+  boundary.atoGrantedDate = (decision !== 'Denial') ? todayIso() : '';
   boundary.atoExpiresDate = expiresAt || '';
   boundary.conditions = conditions;
   if (typeof addAuditEntry === 'function') {

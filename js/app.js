@@ -197,7 +197,51 @@ function getPolicyReviewLifecycleStatus(policyKey) {
 
 function policyHasCompletedReviewCycle(policyKey) {
   var st = getPolicyReviewLifecycleStatus(policyKey);
-  return st === 'Approved' || st === 'Mapped';
+  if (st === 'Approved' || st === 'Mapped') return true;
+  // Filling in Last Reviewed AND Approval Date asserts the review happened. These
+  // fields used to drive nothing, so the badge stayed on "Not yet reviewed" no
+  // matter what was entered.
+  var rc = (state.policyReviewCycle || {})[policyKey] || {};
+  return !!(String(rc.lastReviewed || '').trim() && String(rc.approvalDate || '').trim());
+}
+
+/**
+ * The wizard tells the user the author cannot approve their own policy, then used to
+ * accept exactly that with no warning on blur or on Next. Detect it so the status
+ * badge and a toast can say so.
+ */
+function policyApproverSodViolation(policyKey) {
+  var rc = (state.policyReviewCycle || {})[policyKey] || {};
+  var name = String(rc.approvedBy || '').trim();
+  var email = String(rc.approverEmail || '').trim();
+  if (!name && !email) return false;
+  if (policyKey === 'ISP') {
+    return typeof ispApproverViolatesSeparationOfDuties === 'function'
+      ? ispApproverViolatesSeparationOfDuties(email, name) : false;
+  }
+  var owner = (state.domainOwners || {})[policyKey] || {};
+  var ownerName = String(owner.name || '').trim().toLowerCase();
+  var ownerEmail = String(owner.email || '').trim().toLowerCase();
+  if (ownerName && name.toLowerCase() === ownerName) return true;
+  if (ownerEmail && email.toLowerCase() === ownerEmail) return true;
+  return false;
+}
+
+/** Called when an approver name changes, so the violation is not silent. */
+function checkApproverSod(policyKey) {
+  if (!policyApproverSodViolation(policyKey)) return false;
+  var msg = policyKey === 'ISP' && typeof ispApproverSodMessage === 'function'
+    ? ispApproverSodMessage()
+    : 'This policy must be approved by someone other than its owner (segregation of duties).';
+  if (typeof showToast === 'function') showToast(msg, true);
+  return true;
+}
+
+/** An approval date with nobody named against it is an incomplete record. */
+function policyApprovalIsUnattributed(policyKey) {
+  var rc = (state.policyReviewCycle || {})[policyKey] || {};
+  var approver = String(rc.approvedBy || rc.approverName || '').trim();
+  return !!String(rc.approvalDate || '').trim() && !approver;
 }
 
 // Returns { status:'current'|'approaching'|'overdue'|'unset', color, bg, border, label, daysUntil }
@@ -205,10 +249,18 @@ function getReviewStatus(policyKey) {
   var unset = { status:'unset', color:'#64748b', bg:'rgba(100,116,139,0.06)', border:'rgba(100,116,139,0.2)', label:'No review date set', daysUntil: null };
   var notReviewed = { status:'unset', color:'#64748b', bg:'rgba(100,116,139,0.06)', border:'rgba(100,116,139,0.2)', label:'Not yet reviewed', daysUntil: null };
   if (!policyHasCompletedReviewCycle(policyKey)) return notReviewed;
+  if (policyApproverSodViolation(policyKey)) {
+    return { status:'attention', color:'#dc2626', bg:'rgba(220,38,38,0.06)', border:'rgba(220,38,38,0.3)',
+             label:'Approver owns this policy \u2014 segregation of duties', daysUntil: null };
+  }
+  if (policyApprovalIsUnattributed(policyKey)) {
+    return { status:'attention', color:'#d97706', bg:'rgba(217,119,6,0.06)', border:'rgba(217,119,6,0.3)',
+             label:'Approval date recorded with no approver named', daysUntil: null };
+  }
   var rc = (state.policyReviewCycle || {})[policyKey];
   if (!rc || !rc.nextReviewDue) return unset;
   var today = new Date(); today.setHours(0,0,0,0);
-  var due = new Date(rc.nextReviewDue + 'T00:00:00');
+  var due = parseDateOnly(rc.nextReviewDue);
   var diff = Math.ceil((due - today) / 86400000);
   if (diff < 0) return { status:'overdue', color:'#dc2626', bg:'rgba(220,38,38,0.06)', border:'rgba(220,38,38,0.3)', label:'Overdue by ' + Math.abs(diff) + ' day' + (Math.abs(diff)===1?'':'s'), daysUntil: diff };
   if (diff <= 60) return { status:'approaching', color:'#d97706', bg:'rgba(217,119,6,0.06)', border:'rgba(217,119,6,0.3)', label:'Due in ' + diff + ' day' + (diff===1?'':'s'), daysUntil: diff };
@@ -267,7 +319,34 @@ function toggleCustomApprover(policyKey, checkbox) {
   window.markDirty && window.markDirty();
 }
 
+var _reviewCycleCardArgs = {};
+
+/** Host id for a review-cycle card so approval edits can repaint its status badge. */
+function reviewCycleCardHostId(policyKey) {
+  return 'review-cycle-card-' + String(policyKey).replace(/[^A-Za-z0-9_-]/g, '_');
+}
+
+/**
+ * Repaint one review-cycle card in place. Entering an approver or an approval date
+ * changes the policy's review status, but the badge used to keep reading
+ * "Not yet reviewed" until something else forced a re-render.
+ */
+function refreshReviewCycleCard(policyKey) {
+  var host = document.getElementById(reviewCycleCardHostId(policyKey));
+  if (!host) return;
+  var args = _reviewCycleCardArgs[policyKey] || {};
+  host.innerHTML = renderReviewCycleCardInner(policyKey, args.label, args.opts);
+}
+
 function renderReviewCycleCard(policyKey, label, opts) {
+  _reviewCycleCardArgs[policyKey] = { label: label, opts: opts };
+  return (typeof programPeopleDatalistHtml === 'function' ? programPeopleDatalistHtml('program-people') : '')
+    + '<div id="' + reviewCycleCardHostId(policyKey) + '">'
+    + renderReviewCycleCardInner(policyKey, label, opts)
+    + '</div>';
+}
+
+function renderReviewCycleCardInner(policyKey, label, opts) {
   opts = opts || {};
   var compact = !!opts.compact;
   if (!state.policyReviewCycle) state.policyReviewCycle = {};
@@ -279,7 +358,7 @@ function renderReviewCycleCard(policyKey, label, opts) {
   if (!rc.nextReviewDue) {
     var d = new Date();
     d.setFullYear(d.getFullYear() + 1);
-    rc.nextReviewDue = d.toISOString().slice(0, 10);
+    rc.nextReviewDue = isoFromDate(d);
   }
 
   var ispSod = policyKey === 'ISP';
@@ -333,11 +412,11 @@ function renderReviewCycleCard(policyKey, label, opts) {
   var isCustom = !!rc._customApprover;
   var customFieldsHTML = compact
     ? '<div class="wiz-review-approver-fields">'
-      + '<input class="form-input" placeholder="Approver name" autocomplete="off" value="' + escapeHTML(rc.approvedBy||'') + '" oninput="state.policyReviewCycle[\'' + escKey + '\'].approvedBy=this.value; window.markDirty();">'
+      + '<input class="form-input" list="program-people" placeholder="Approver name" autocomplete="off" value="' + escapeHTML(rc.approvedBy||'') + '" oninput="state.policyReviewCycle[\'' + escKey + '\'].approvedBy=this.value; window.markDirty();" onchange="if(typeof checkApproverSod===\'function\')checkApproverSod(\'' + escKey + '\'); refreshReviewCycleCard(\'' + escKey + '\');">'
       + '<input class="form-input" placeholder="Role (e.g. CIO)" autocomplete="off" value="' + escapeHTML(rc.approverRole||'') + '" oninput="state.policyReviewCycle[\'' + escKey + '\'].approverRole=this.value; window.markDirty();">'
       + '</div>'
     : '<div style="display:flex;gap:4px;">'
-      + '<input class="form-input" style="font-size:12px;width:50%;" placeholder="Approver name" autocomplete="off" value="' + escapeHTML(rc.approvedBy||'') + '" oninput="state.policyReviewCycle[\'' + escKey + '\'].approvedBy=this.value; window.markDirty();">'
+      + '<input class="form-input" style="font-size:12px;width:50%;" list="program-people" placeholder="Approver name" autocomplete="off" value="' + escapeHTML(rc.approvedBy||'') + '" oninput="state.policyReviewCycle[\'' + escKey + '\'].approvedBy=this.value; window.markDirty();" onchange="if(typeof checkApproverSod===\'function\')checkApproverSod(\'' + escKey + '\'); refreshReviewCycleCard(\'' + escKey + '\');">'
       + '<input class="form-input" style="font-size:12px;width:50%;" placeholder="Role (e.g. CIO)" autocomplete="off" value="' + escapeHTML(rc.approverRole||'') + '" oninput="state.policyReviewCycle[\'' + escKey + '\'].approverRole=this.value; window.markDirty();">'
       + '</div>';
   var approverHTML = '';
@@ -369,11 +448,11 @@ function renderReviewCycleCard(policyKey, label, opts) {
   var fieldsHTML = '<div class="' + (compact ? 'wiz-review-grid' : '') + '" style="' + (compact ? '' : 'display:grid;grid-template-columns:1fr 1fr;gap:12px;') + '">'
     + '<div class="form-group" style="margin-bottom:0;">'
     + '<label class="form-label"' + (compact ? '' : ' style="font-size:11px;"') + '>Last Reviewed</label>'
-    + '<input class="form-input" type="date"' + (compact ? '' : ' style="font-size:12px;"') + ' value="' + (rc.lastReviewed||'') + '" oninput="state.policyReviewCycle[\'' + escKey + '\'].lastReviewed=this.value; autoSetNextReview(\'' + escKey + '\');; window.markDirty();">'
+    + '<input class="form-input" type="date"' + (compact ? '' : ' style="font-size:12px;"') + ' value="' + (rc.lastReviewed||'') + '" oninput="state.policyReviewCycle[\'' + escKey + '\'].lastReviewed=this.value; autoSetNextReview(\'' + escKey + '\'); window.markDirty();" onchange="refreshReviewCycleCard(\'' + escKey + '\')">'
     + '</div>'
     + '<div class="form-group" style="margin-bottom:0;">'
     + '<label class="form-label"' + (compact ? '' : ' style="font-size:11px;"') + '>Next Review Due</label>'
-    + '<input class="form-input" type="date"' + (compact ? '' : ' style="font-size:12px;border-color:' + rs.color + ';"') + ' value="' + (rc.nextReviewDue||'') + '" oninput="state.policyReviewCycle[\'' + escKey + '\'].nextReviewDue=this.value;; window.markDirty();">'
+    + '<input class="form-input" type="date"' + (compact ? '' : ' style="font-size:12px;border-color:' + rs.color + ';"') + ' value="' + (rc.nextReviewDue||'') + '" oninput="state.policyReviewCycle[\'' + escKey + '\'].nextReviewDue=this.value; state.policyReviewCycle[\'' + escKey + '\']._nextReviewManual=true; window.markDirty();" onchange="refreshReviewCycleCard(\'' + escKey + '\')">'
     + '</div>'
     + '<div class="form-group" style="margin-bottom:0;">'
     + '<label class="form-label"' + (compact ? '' : ' style="font-size:11px;"') + '>Approved By</label>'
@@ -381,7 +460,7 @@ function renderReviewCycleCard(policyKey, label, opts) {
     + '</div>'
     + '<div class="form-group" style="margin-bottom:0;">'
     + '<label class="form-label"' + (compact ? '' : ' style="font-size:11px;"') + '>Approval Date</label>'
-    + '<input class="form-input" type="date"' + (compact ? '' : ' style="font-size:12px;"') + ' value="' + (rc.approvalDate||'') + '" oninput="state.policyReviewCycle[\'' + escKey + '\'].approvalDate=this.value;; window.markDirty();">'
+    + '<input class="form-input" type="date"' + (compact ? '' : ' style="font-size:12px;"') + ' value="' + (rc.approvalDate||'') + '" oninput="state.policyReviewCycle[\'' + escKey + '\'].approvalDate=this.value; window.markDirty();" onchange="refreshReviewCycleCard(\'' + escKey + '\')">'
     + '</div>'
     + '</div>';
 
@@ -408,12 +487,15 @@ function renderReviewCycleCard(policyKey, label, opts) {
 
 function autoSetNextReview(policyKey) {
   var rc = state.policyReviewCycle[policyKey];
-  if (rc && rc.lastReviewed && !rc.nextReviewDue) {
-    // Default: 1 year from last review
-    var d = new Date(rc.lastReviewed + 'T00:00:00');
-    d.setFullYear(d.getFullYear() + 1);
-    rc.nextReviewDue = d.toISOString().slice(0, 10);
-  }
+  if (!rc || !rc.lastReviewed) return;
+  // Recompute whenever Last Reviewed moves. This used to fire only when
+  // nextReviewDue was empty, but setup seeds a planning default, so entering a
+  // review date never moved the due date. A hand-edited due date still wins.
+  if (rc._nextReviewManual) return;
+  var d = parseDateOnly(rc.lastReviewed);
+  if (isNaN(d.getTime())) return;
+  d.setFullYear(d.getFullYear() + 1);
+  rc.nextReviewDue = isoFromDate(d);
 }
 
 // ============================================================
@@ -611,7 +693,7 @@ function getControlsForAsset(assetId) {
 // Deadline tracking
 function daysOverdue(deadline) {
   if (!deadline) return 0;
-  const due = new Date(deadline);
+  const due = parseDateOnly(deadline);
   const now = new Date();
   const days = Math.floor((now - due) / (1000 * 60 * 60 * 24));
   return Math.max(0, days);

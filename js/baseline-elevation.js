@@ -235,7 +235,7 @@ function createBaselineElevationRecommendation(asset, targetLetter, baseKey, bas
     deltaControlIds: deltaIds,
     triggerAssetId: asset.id,
     triggerAssetName: asset.name || asset.id,
-    submittedDate: new Date().toISOString().slice(0, 10),
+    submittedDate: todayIso(),
     status: 'Pending',
     decisionDate: '',
     decisionBy: '',
@@ -357,7 +357,7 @@ function approveBaselineElevation(recId, decisionRationale) {
   });
 
   rec.status = 'Approved';
-  rec.decisionDate = new Date().toISOString().slice(0, 10);
+  rec.decisionDate = todayIso();
   rec.decisionBy = decBy;
   rec.decisionRationale = decisionRationale;
   state.controlReviewQueue = (state.controlReviewQueue || []).filter(function(q) {
@@ -377,7 +377,7 @@ function rejectBaselineElevation(recId, decisionRationale) {
   var act = state.currentUserId && (state.users || []).find(function(u) { return u.id === state.currentUserId; });
   var decBy = (act && act.name) || state.programOwner || 'CISO';
   rec.status = 'Rejected';
-  rec.decisionDate = new Date().toISOString().slice(0, 10);
+  rec.decisionDate = todayIso();
   rec.decisionBy = decBy;
   rec.decisionRationale = decisionRationale;
   state.controlReviewQueue = (state.controlReviewQueue || []).filter(function(q) {

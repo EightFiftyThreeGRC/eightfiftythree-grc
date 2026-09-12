@@ -1194,6 +1194,8 @@ const state = {
   domainDeadlines: {},           // { 'AC': 'YYYY-MM-DD' } per-domain deadline overrides
   domainCustomNames: {},         // { 'AC': 'Custom Policy Name' } user-defined policy titles
   _pmShowCsfMappedOnly: false,   // Step 5 PM table: hide PMs not mapped to selected CSF (and not selected)
+  _pmTablesExpanded: false,      // Step 4: PM control tables collapsed to a summary until opened
+  _csfOrientExpanded: {},        // Per-Function expand state for collapsible CSF outcome tables
   _policyDomain: null,           // currently active domain in Policy tab
   _policyWizardMode: false,      // true = wizard open, false = domain list
   _policyDocView: false,         // true = show read-only policy document viewer
@@ -1328,6 +1330,33 @@ const SNAPSHOTS_KEY = 'eightfiftythree-grc-snapshots';
     }
   } catch (e) { /* storage unavailable (private mode) — safe to ignore */ }
 })();
+
+// ---- Date-only helpers ----------------------------------------------------
+// Deadlines, review dates and "today" are calendar dates, not instants. Routing
+// them through UTC breaks them twice: new Date('2027-02-09') is UTC midnight, which
+// renders as Feb 8 anywhere west of Greenwich, and new Date().toISOString() rolls
+// over to tomorrow after ~19:00 US Eastern. Every date-only value goes through these.
+function isoFromDate(d) {
+  if (!(d instanceof Date) || isNaN(d.getTime())) return '';
+  var m = d.getMonth() + 1, day = d.getDate();
+  return d.getFullYear() + '-' + (m < 10 ? '0' : '') + m + '-' + (day < 10 ? '0' : '') + day;
+}
+function todayIso() { return isoFromDate(new Date()); }
+function isoPlusDays(days) { var d = new Date(); d.setDate(d.getDate() + (days || 0)); return isoFromDate(d); }
+/** 'YYYY-MM-DD' -> LOCAL midnight (never UTC). Other values fall through to Date. */
+function parseDateOnly(value) {
+  if (value instanceof Date) return value;
+  var str = String(value == null ? '' : value).trim();
+  if (!str) return new Date(NaN);
+  var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(str);
+  if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
+  return new Date(str);
+}
+function formatDateOnly(value, fmt) {
+  var d = parseDateOnly(value);
+  if (isNaN(d.getTime())) return String(value == null ? '' : value);
+  return d.toLocaleDateString(undefined, fmt || { month: 'short', day: 'numeric', year: 'numeric' });
+}
 
 function cloneStateValue(v) {
   return JSON.parse(JSON.stringify(v));
@@ -1489,7 +1518,7 @@ function migratePoamItemsToIssues() {
       verification: null,
       evidenceRef: String(p.evidenceRef || ''),
       riskId: '',
-      createdAt: p.createdDate || new Date().toISOString().slice(0, 10),
+      createdAt: p.createdDate || todayIso(),
       createdBy: actor,
       closedAt: p.closedDate || '',
       closedBy: ''
@@ -1818,6 +1847,79 @@ function normalizeOwnerEmail(email) {
 function isValidOwnerEmail(email) {
   var em = normalizeOwnerEmail(email);
   return em.length > 3 && em.indexOf('@') > 0 && em.indexOf('@') < em.length - 1;
+}
+
+/**
+ * Every person already named anywhere in the program, deduped by lower-cased name.
+ * People get entered once and then re-typed in later steps (custodian in the policy
+ * wizard, owner in Assign Owners, approver at review) — a typo there silently creates
+ * a second person. This is the single roster later fields suggest from.
+ * Returns [{ name, title, email }] sorted by name.
+ */
+function getProgramPeople() {
+  var byKey = {};
+  function add(name, title, email) {
+    name = String(name == null ? '' : name).trim();
+    if (!name) return;
+    if (typeof isSuggestedRoleBucketLabel === 'function' && isSuggestedRoleBucketLabel(name)) return;
+    if (name.indexOf('@') !== -1) return; // an email typed into a name field is not a person record
+    var key = name.toLowerCase();
+    var rec = byKey[key] || (byKey[key] = { name: name, title: '', email: '' });
+    if (!rec.title && title) rec.title = String(title).trim();
+    if (!rec.email && email) rec.email = String(email).trim();
+  }
+  if (typeof state === 'undefined') return [];
+  add(state.programOwner, state.programOwnerTitle, state.programOwnerEmail);
+  Object.keys(state.domainOwners || {}).forEach(function(fam) {
+    var o = state.domainOwners[fam] || {};
+    add(o.name, o.title || o.role, o.email);
+  });
+  Object.keys(state.policyCustodians || {}).forEach(function(fam) {
+    var list = state.policyCustodians[fam];
+    (Array.isArray(list) ? list : [list]).forEach(function(c) {
+      if (!c) return;
+      if (typeof c === 'string') add(c, '', '');
+      else add(c.name, c.title || c.role, c.email);
+    });
+  });
+  Object.keys(state.controlOwners || {}).forEach(function(id) {
+    var o = state.controlOwners[id] || {};
+    if (typeof o === 'string') add(o, '', '');
+    else add(o.name, o.title || o.role, o.email);
+  });
+  (state.users || []).forEach(function(u) {
+    if (u) add(u.name, u.title || u.role, u.email);
+  });
+  Object.keys(state.policyStatus || {}).forEach(function(fam) {
+    var ps = state.policyStatus[fam] || {};
+    add(ps.submittedTo, ps.submittedToRole, ps.submittedToEmail);
+    add(ps.approvedBy, '', '');
+  });
+  var rc = (state.policyReviewCycle || {}).ISP || {};
+  add(rc.approvedBy, '', '');
+  return Object.keys(byKey).map(function(k) { return byKey[k]; })
+    .sort(function(a, b) { return a.name.localeCompare(b.name); });
+}
+
+/** <datalist> of the program roster, for any name input. Renders nothing when empty. */
+function programPeopleDatalistHtml(listId) {
+  var people = getProgramPeople();
+  if (!people.length) return '';
+  return '<datalist id="' + (listId || 'program-people') + '">'
+    + people.map(function(p) {
+        var label = p.title ? p.name + ' — ' + p.title : p.name;
+        return '<option value="' + escapeHTML(p.name) + '" label="' + escapeHTML(label) + '"></option>';
+      }).join('')
+    + '</datalist>';
+}
+
+/** The roster record for a typed name, matched case-insensitively. */
+function findProgramPerson(name) {
+  var key = String(name == null ? '' : name).trim().toLowerCase();
+  if (!key) return null;
+  var hit = null;
+  getProgramPeople().forEach(function(p) { if (p.name.toLowerCase() === key) hit = p; });
+  return hit;
 }
 
 function getOwnerDisplayName(owner) {
@@ -2292,6 +2394,53 @@ function getActiveControls() {
     const inPrivacy = state.privacyOverlay && c.bl.includes('P');
     return inBaseline || inPrivacy;
   });
+}
+
+/**
+ * One source of truth for every control total the UI shows. Five screens used to
+ * quote five different numbers with no stated relationship, which is the first thing
+ * an auditor asks about. The relationship is:
+ *   floor   Low/Moderate/High baseline, excluding PM  (the inherited common-control floor)
+ * + privacy privacy-overlay controls, when the overlay is on
+ * = domain  controls spread across the five Function policies
+ * + pm      PM controls, which live in the ISP rather than a Function policy
+ * = total   everything in scope for the program
+ * `selected` is the subset actually pulled into policies; `mine` is what is assigned
+ * to the acting user. Those two are subsets, never totals.
+ */
+function getProgramControlCounts() {
+  var active = getActiveControls();
+  var pm = active.filter(function(c) { return c.f === 'PM'; }).length;
+  var domain = active.length - pm;
+  var floor = 0;
+  try {
+    floor = CONTROLS.filter(function(c) {
+      return c.f !== 'PM' && c.bl.indexOf(state.baseline) !== -1;
+    }).length;
+  } catch (e) { floor = domain; }
+  var selected = 0;
+  var sel = state.policySelectedControls || {};
+  Object.keys(sel).forEach(function(fam) { selected += (sel[fam] || []).length; });
+  var mine = 0;
+  try { mine = (typeof getScopedControls === 'function') ? getScopedControls().length : 0; } catch (e) { mine = 0; }
+  return {
+    floor: floor,
+    privacy: Math.max(0, domain - floor),
+    domain: domain,
+    pm: pm,
+    total: active.length,
+    selected: selected,
+    mine: mine
+  };
+}
+
+/** One-line reconciliation sentence, so a total is never shown bare. */
+function describeControlCounts() {
+  var n = getProgramControlCounts();
+  var parts = [n.floor + ' in the ' + (typeof baselineLabel === 'function' ? baselineLabel(state.baseline) : state.baseline) + ' common-control floor'];
+  if (n.privacy) parts.push(n.privacy + ' added by the privacy overlay');
+  parts.push(n.pm + ' PM controls in the ISP');
+  return parts.join(' · ') + ' = ' + n.total + ' in scope';
 }
 
 function getActiveFamilies() {

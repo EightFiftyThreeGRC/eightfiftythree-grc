@@ -370,7 +370,7 @@ function applyPolicyCatalogToProgram() {
   if (!state.policySelectedControls) state.policySelectedControls = {};
   if (!state.domainOwners) state.domainOwners = {};
 
-  var today = new Date().toISOString().slice(0, 10);
+  var today = todayIso();
   var locale = new Date().toLocaleDateString();
 
   if (cov.ispMapped) {

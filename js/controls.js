@@ -503,25 +503,18 @@ function renderControlStep1() {
   const now  = new Date();
   const soon = new Date(now.getTime() + 30*24*60*60*1000);
 
-  const totalDesigned = controls.filter(function(c) { return isControlDesigned(c.id); }).length;
-  const totalInProg = controls.filter(function(c) {
-    var st = (state.controlStatus[c.id] || {}).status;
-    return st === 'In Progress' || st === 'Planned';
-  }).length;
-  const totalNA = controls.filter(function(c) {
-    var st = (state.controlStatus[c.id] || {}).status;
-    return st === 'Not Applicable' || st === 'Inherited';
-  }).length;
-  const totalNotStarted = controls.filter(function(c) {
-    var st = (state.controlStatus[c.id] || {}).status || 'Not Started';
-    return st === 'Not Started';
-  }).length;
+  const _buckets = controls.map(function(c) { return getControlQueueBucket(c.id); });
+  const _count = function(b) { return _buckets.filter(function(x) { return x === b; }).length; };
+  const totalDesigned   = _count('designed');
+  const totalInProg     = _count('inprogress');
+  const totalNA         = _count('na');
+  const totalNotStarted = _count('notstarted');
   const pctDesigned = controls.length ? Math.round((totalDesigned / controls.length) * 100) : 0;
 
   const dueSoon = controls.filter(c => {
     const dd = (state.controlOwners||{})[c.id]?.dueDate;
     if (!dd) return false;
-    const d = new Date(dd);
+    const d = parseDateOnly(dd);
     return d >= now && d <= soon && (state.controlStatus[c.id]||{}).status !== 'Implemented';
   }).length;
 
@@ -547,7 +540,7 @@ function renderControlStep1() {
             <div style="font-size:18px;">${icon}</div>
           </div>
           <div style="font-size:28px;font-weight:800;color:${color};line-height:1.1;margin-top:4px;">${count}</div>
-          <div style="font-size:10px;color:${color};opacity:0.7;margin-top:2px;">of ${controls.length} controls</div>
+          <div style="font-size:10px;color:${color};opacity:0.7;margin-top:2px;">of ${controls.length} assigned to you</div>
         </div>`).join('')}
     </div>
 
@@ -1442,6 +1435,23 @@ function getControlPolicyReqs(ctrlId) {
     }
   });
   return hits;
+}
+
+/**
+ * Which queue bucket a control belongs in.
+ *
+ * Assigning an owner flips a control from 'Not Started' to 'Planned'
+ * (autoPopulateControlOwnersFromDomain), so on a freshly finalised program every
+ * owned control is 'Planned' while nothing has been designed. Counting 'Planned' as
+ * In Progress made the queue read "In Progress 44 / Not Started 0" next to rows that
+ * all said Design Done: No and a 0% bar. 'Planned' means queued, not started.
+ */
+function getControlQueueBucket(ctrlId) {
+  var st = (state.controlStatus[ctrlId] || {}).status || 'Not Started';
+  if (st === 'Not Applicable' || st === 'Inherited') return 'na';
+  if (isControlDesigned(ctrlId)) return 'designed';
+  if (st === 'In Progress') return 'inprogress';
+  return 'notstarted';
 }
 
 function isControlDesigned(ctrlId) {
@@ -4605,7 +4615,7 @@ function renderControlStep4() {
         <div style="background:${bg};border:1px solid ${color}22;border-radius:10px;padding:14px 16px;border-left:3px solid ${color};">
           <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:${color};">${label}</div>
           <div style="font-size:28px;font-weight:800;color:${color};line-height:1.1;margin-top:4px;">${count}</div>
-          <div style="font-size:10px;color:${color};opacity:0.7;margin-top:2px;">of ${controls.length} controls</div>
+          <div style="font-size:10px;color:${color};opacity:0.7;margin-top:2px;">of ${controls.length} assigned to you</div>
         </div>`).join('')}
     </div>
 

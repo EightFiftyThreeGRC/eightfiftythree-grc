@@ -1063,7 +1063,7 @@ function cisoApprovePolicy(fam) {
   state.policyStatus[fam] = {
     status: 'Approved',
     approvedBy: actorName || approverTitle,
-    approvedDate: new Date().toISOString().slice(0, 10),
+    approvedDate: todayIso(),
     notes: notes,
     submittedAt: prev.submittedAt || '',
     submittedTo: prev.submittedTo || '',
@@ -1074,7 +1074,7 @@ function cisoApprovePolicy(fam) {
   if (!state.domainPolicies) state.domainPolicies = {};
   if (!state.domainPolicies[fam]) state.domainPolicies[fam] = {};
   if (!state.domainPolicies[fam].revisionHistory) state.domainPolicies[fam].revisionHistory = [];
-  state.domainPolicies[fam].revisionHistory.push({ version: '1.0', date: new Date().toISOString().slice(0,10), author: actorName||approverTitle, changes: 'Approved by ' + (actorName||approverTitle) + '.' + (notes ? ' Notes: ' + notes : '') });
+  state.domainPolicies[fam].revisionHistory.push({ version: '1.0', date: todayIso(), author: actorName||approverTitle, changes: 'Approved by ' + (actorName||approverTitle) + '.' + (notes ? ' Notes: ' + notes : '') });
   markDirty();
   document.getElementById('cisoReviewOverlay')?.remove();
   showToast('✅ Policy approved — ' + getPolicyMergedTitle(fam));
@@ -1117,7 +1117,7 @@ function cisoReturnPolicy(fam) {
   state.policyStatus[fam] = {
     status: 'Returned',
     returnedForRevision: true,
-    returnedDate: new Date().toISOString().slice(0, 10),
+    returnedDate: todayIso(),
     returnedBy: retBy,
     notes: notes,
     submittedAt: prevR.submittedAt || '',
@@ -1128,7 +1128,7 @@ function cisoReturnPolicy(fam) {
   if (!state.domainPolicies) state.domainPolicies = {};
   if (!state.domainPolicies[fam]) state.domainPolicies[fam] = {};
   if (!state.domainPolicies[fam].revisionHistory) state.domainPolicies[fam].revisionHistory = [];
-  state.domainPolicies[fam].revisionHistory.push({ version: 'R', date: new Date().toISOString().slice(0,10), author: state.programOwner||(state.programOwnerTitle||'CISO'), changes: 'Returned for revision by ' + (state.programOwnerTitle||'CISO') + '. Notes: ' + notes });
+  state.domainPolicies[fam].revisionHistory.push({ version: 'R', date: todayIso(), author: state.programOwner||(state.programOwnerTitle||'CISO'), changes: 'Returned for revision by ' + (state.programOwnerTitle||'CISO') + '. Notes: ' + notes });
   markDirty();
   document.getElementById('cisoReviewOverlay')?.remove();
   showToast('↩ Policy returned to submitter — ' + getPolicyMergedTitle(fam));
@@ -1743,7 +1743,7 @@ function renderMyDashboard(controls, families) {
   var overdue = 0;
   scopedControls.forEach(function(c) {
     var co = (state.controlOwners||{})[c.id] || {};
-    if (co.dueDate && co.dueDate < new Date().toISOString().slice(0,10)) overdue++;
+    if (co.dueDate && co.dueDate < todayIso()) overdue++;
   });
 
   // Pending review count (SSP packages + control design queue)
@@ -1831,20 +1831,20 @@ function approveISP() {
   state.policyStatus.ISP = {
     status: 'Approved',
     approvedBy: approverName,
-    approvedDate: new Date().toISOString().slice(0,10),
-    approvedAt: new Date().toISOString().slice(0,10),
+    approvedDate: todayIso(),
+    approvedAt: todayIso(),
     notes: notes,
     submittedAt: prev.submittedAt || '',
     submittedTo: prev.submittedTo || rc.approvedBy || '',
     submittedToRole: prev.submittedToRole || rc.approverRole || '',
     submittedToEmail: prev.submittedToEmail || rc.approverEmail || ''
   };
-  rc.approvalDate = new Date().toISOString().slice(0,10);
-  rc.lastReviewed = new Date().toISOString().slice(0,10);
+  rc.approvalDate = todayIso();
+  rc.lastReviewed = todayIso();
   if (state.infoSecPolicy) {
     if (!state.infoSecPolicy.revisionHistory) state.infoSecPolicy.revisionHistory = [];
     var ver = '1.' + state.infoSecPolicy.revisionHistory.length;
-    state.infoSecPolicy.revisionHistory.push({ version: ver, date: new Date().toISOString().slice(0,10), author: approverName, changes: 'Approved.' + (notes ? ' Notes: ' + notes : '') });
+    state.infoSecPolicy.revisionHistory.push({ version: ver, date: todayIso(), author: approverName, changes: 'Approved.' + (notes ? ' Notes: ' + notes : '') });
   }
   try { addAuditEntry('policy', 'ISP', 'ISP approved by ' + approverName); } catch(e) {}
   if (typeof ensureIspTierControlOwners === 'function') ensureIspTierControlOwners();
@@ -1878,7 +1878,7 @@ function returnISPToEditor() {
     : (typeof getSessionActorName === 'function' ? getSessionActorName(rc.approvedBy || 'Approver') : (rc.approvedBy || 'Approver'));
   state.policyStatus.ISP = {
     status: 'Returned',
-    returnedDate: new Date().toISOString().slice(0,10),
+    returnedDate: todayIso(),
     returnedBy: returnedBy,
     notes: notes,
     submittedAt: prev.submittedAt || '',
@@ -1891,7 +1891,7 @@ function returnISPToEditor() {
     if (!state.infoSecPolicy.revisionHistory) state.infoSecPolicy.revisionHistory = [];
     state.infoSecPolicy.revisionHistory.push({
       version: 'R' + (state.infoSecPolicy.revisionHistory.length + 1),
-      date: new Date().toISOString().slice(0, 10),
+      date: todayIso(),
       author: returnedBy,
       changes: 'Returned for revision. Notes: ' + notes
     });
@@ -2042,7 +2042,7 @@ function aoApproveQueuedSsp(scopeId, isProcess, opts) {
   state.sspSignoffs[sid] = Object.assign({}, prev, {
     status: 'Approved',
     approvedBy: actor,
-    approvedDate: new Date().toISOString().slice(0, 10),
+    approvedDate: todayIso(),
     reviewerApprovalNotes: collected.overall || '',
     reviewerControlComments: Object.assign({}, collected.byControl)
   });
@@ -2099,7 +2099,7 @@ function aoReturnQueuedSsp(scopeId, isProcess, opts) {
   delete next.signedBy;
   delete next.signedDate;
   next.aoReturnNotes = String(notes).trim();
-  next.aoReturnedAt = new Date().toISOString().slice(0, 10);
+  next.aoReturnedAt = todayIso();
   next.aoReturnedBy = returnedBy || (isProcess ? 'Process SSP reviewer' : 'SSP reviewer');
   next.reviewerControlComments = Object.assign({}, collected.byControl);
   delete next.reviewerDraft;
@@ -2449,7 +2449,7 @@ function renderPolicyRoadmap(families) {
   const policies = families.filter(f => f !== 'PM').map(fam => {
     const status = (state.policyStatus[fam]||{}).status || 'Not Started';
     const deadline = state.domainDeadlines[fam] || deadlineFromPriority(fam);
-    const deadlineDate = new Date(deadline);
+    const deadlineDate = parseDateOnly(deadline);
     const progress = status === 'Approved' || status === 'Mapped' ? 100 : status === 'Under Review' ? 60 : status === 'Draft' ? 30 : 0;
     const isOverdue = deadlineDate < today && progress < 100;
     const title = getPolicyMergedTitle(fam);

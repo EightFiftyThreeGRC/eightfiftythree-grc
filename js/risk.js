@@ -66,7 +66,7 @@ function defaultIssueDueDate(severity) {
   var days = ISSUE_DUE_DAYS[severity] || 90;
   var d = new Date();
   d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
+  return isoFromDate(d);
 }
 
 function riskEscJs(str) {
@@ -175,7 +175,7 @@ function getCombinedOpenRiskIssueCount() {
 
 function getIssueOverdueCount() {
   ensureRiskState();
-  var today = new Date().toISOString().slice(0, 10);
+  var today = todayIso();
   return state.issues.filter(function(i) {
     return issueIsOpen(i) && i.dueDate && i.dueDate < today;
   }).length;
@@ -219,7 +219,7 @@ function triageKeyExists(key) {
 function getTriageSuggestions() {
   ensureRiskState();
   var out = [];
-  var today = new Date().toISOString().slice(0, 10);
+  var today = todayIso();
 
   function pushSuggestion(key, kind, title, desc, meta) {
     if (triageKeyExists(key)) return;
@@ -372,7 +372,7 @@ function addRisk(data) {
     acceptance: null,
     reviewBy: data.reviewBy || '',
     issueIds: [],
-    createdAt: new Date().toISOString().slice(0, 10),
+    createdAt: todayIso(),
     createdBy: actor,
     closedAt: '',
     closedBy: ''
@@ -413,7 +413,7 @@ function addIssue(data) {
     verification: null,
     evidenceRef: String(data.evidenceRef || ''),
     riskId: String(data.riskId || ''),
-    createdAt: new Date().toISOString().slice(0, 10),
+    createdAt: todayIso(),
     createdBy: actor,
     closedAt: '',
     closedBy: ''
@@ -445,7 +445,7 @@ function updateRiskField(id, field, value) {
   }
   item[field] = value;
   if (field === 'status' && value === 'Closed') {
-    item.closedAt = new Date().toISOString().slice(0, 10);
+    item.closedAt = todayIso();
     item.closedBy = typeof getSessionActorName === 'function' ? getSessionActorName('') : '';
   }
   logFieldChange('risks.' + id + '.' + field, prev, value);
@@ -571,7 +571,7 @@ function submitIssueVerification(issueId) {
     at: new Date().toISOString(),
     note: note
   };
-  issue.closedAt = new Date().toISOString().slice(0, 10);
+  issue.closedAt = todayIso();
   issue.closedBy = issue.verification.by;
   addAuditEntry('issue', issueId, 'Issue verified and closed.');
   markDirty();
@@ -727,7 +727,7 @@ function exportIssuesCsv() {
   var blob = new Blob([csv], { type: 'text/csv' });
   var a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'issues-export-' + new Date().toISOString().slice(0, 10) + '.csv';
+  a.download = 'issues-export-' + todayIso() + '.csv';
   a.click();
   URL.revokeObjectURL(a.href);
 }
@@ -782,7 +782,7 @@ function filterIssueItems() {
   ensureRiskState();
   var filter = state._issueFilter || 'open';
   var search = (state._issueSearch || '').toLowerCase();
-  var today = new Date().toISOString().slice(0, 10);
+  var today = todayIso();
   var scoped = !canSessionTriageRisk();
   var tokens = sessionIdentityTokens();
   return state.issues.filter(function(i) {
@@ -876,7 +876,7 @@ function renderRiskRegisterViewHtml() {
 
 function renderIssuesViewHtml() {
   var items = filterIssueItems();
-  var today = new Date().toISOString().slice(0, 10);
+  var today = todayIso();
   var filter = state._issueFilter || 'open';
   items.sort(function(a, b) {
     var sa = ISSUE_SEVERITIES.indexOf(a.severity);
@@ -987,7 +987,7 @@ function getSidebarScopedRisks() {
 }
 
 function getSidebarScopedIssues() {
-  var today = new Date().toISOString().slice(0, 10);
+  var today = todayIso();
   var items = filterIssueItems().filter(issueIsOpen);
   items.sort(function(a, b) {
     var sa = ISSUE_SEVERITIES.indexOf(a.severity);
@@ -1078,10 +1078,10 @@ function renderRiskPosturePanelHtml() {
     var exp = r.acceptance.expiresAt;
     var in30 = new Date();
     in30.setDate(in30.getDate() + 30);
-    return exp <= in30.toISOString().slice(0, 10) && r.status === 'Accepted';
+    return exp <= isoFromDate(in30) && r.status === 'Accepted';
   }).length;
   var topOverdue = state.issues.filter(function(i) {
-    return issueIsOpen(i) && i.dueDate && i.dueDate < new Date().toISOString().slice(0, 10);
+    return issueIsOpen(i) && i.dueDate && i.dueDate < todayIso();
   }).slice(0, 5);
   var list = topOverdue.map(function(i) {
     return '<li style="font-size:12px;margin:4px 0;">' + escapeHTML(i.severity) + ' — ' + escapeHTML(i.title) + ' (due ' + escapeHTML(i.dueDate) + ')</li>';
@@ -1106,7 +1106,7 @@ function renderRiskPosturePanelHtml() {
 
 function getRiskHubNextActions() {
   var actions = [];
-  var today = new Date().toISOString().slice(0, 10);
+  var today = todayIso();
   if (canSessionTriageRisk()) {
     var triage = getTriagePendingCount();
     if (triage > 0) {
@@ -1120,7 +1120,7 @@ function getRiskHubNextActions() {
     if (!mine) return;
     if (i.dueDate < today) {
       actions.push({ priority: 1, icon: '⚠️', label: 'Overdue: ' + i.title.slice(0, 40), desc: 'Due ' + i.dueDate, action: "state._riskView='issues';showTab('risk');" });
-    } else if (i.dueDate <= new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10)) {
+    } else if (i.dueDate <= isoPlusDays(7)) {
       actions.push({ priority: 3, icon: '📅', label: 'Due soon: ' + i.title.slice(0, 40), desc: 'Due ' + i.dueDate, action: "state._riskView='issues';showTab('risk');" });
     }
   });
@@ -1135,7 +1135,7 @@ function getRiskHubNextActions() {
     var exp = r.acceptance.expiresAt;
     var in30 = new Date();
     in30.setDate(in30.getDate() + 30);
-    if (exp > in30.toISOString().slice(0, 10)) return;
+    if (exp > isoFromDate(in30)) return;
     if (!canSessionAcceptRisk(r) && !canSessionTriageRisk()) return;
     actions.push({ priority: 1, icon: '⏳', label: 'Acceptance expiring: ' + r.title.slice(0, 36), desc: 'Expires ' + exp, action: "state._riskView='risks';showTab('risk');" });
   });

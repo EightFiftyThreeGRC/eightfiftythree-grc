@@ -43,7 +43,7 @@ function saveISPSuggestion() {
   if (!state.infoSecPolicySuggestions) state.infoSecPolicySuggestions = [];
   state.infoSecPolicySuggestions.push({
     id: 'isp_sugg_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
-    createdAt: new Date().toISOString().slice(0,10),
+    createdAt: todayIso(),
     suggestedBy: by || (state.programOwner || 'Policy contributor'),
     summary: summary,
     status: 'Proposed'
@@ -91,14 +91,14 @@ function promoteApprovedISPSuggestionsToReviewDraft() {
   var lines = approved.map(function(s, i) {
     return (i + 1) + '. [' + (s.createdAt || '—') + '] ' + (s.suggestedBy || '—') + '\n   ' + (s.summary || '').replace(/\n/g, '\n   ');
   });
-  var block = '── Seeded ' + new Date().toISOString().slice(0, 10) + ' ──\n' + lines.join('\n\n');
+  var block = '── Seeded ' + todayIso() + ' ──\n' + lines.join('\n\n');
   var prev = state.infoSecPolicyReviewDraft;
   var nextVer = 1;
   if (prev && prev.version != null) {
     var n = parseInt(String(prev.version), 10);
     nextVer = (isNaN(n) ? 0 : n) + 1;
   }
-  var createdAt = (prev && prev.createdAt) ? prev.createdAt : new Date().toISOString().slice(0, 10);
+  var createdAt = (prev && prev.createdAt) ? prev.createdAt : todayIso();
   var priorContent = (prev && prev.content) ? prev.content : '';
   var newContent = priorContent ? (priorContent + '\n\n' + block) : block;
   var priorIds = (prev && prev.promotedSuggestionIds) ? prev.promotedSuggestionIds.slice() : [];
@@ -106,7 +106,7 @@ function promoteApprovedISPSuggestionsToReviewDraft() {
   state.infoSecPolicyReviewDraft = {
     version: nextVer,
     createdAt: createdAt,
-    updatedAt: new Date().toISOString().slice(0, 10),
+    updatedAt: todayIso(),
     content: newContent,
     promotedSuggestionIds: priorIds.concat(approved.map(function(s){ return s.id; }))
   };
@@ -175,6 +175,20 @@ function allOwnersAssigned() {
   return masters.every(hasNamedDomainOwner);
 }
 
+/** Render the outstanding blocking issues above the finalize button. */
+function renderProgramSetupIssues() {
+  var host = document.getElementById('ciso-setup-issues');
+  if (!host) return;
+  var issues = (typeof collectProgramSetupIssues === 'function') ? collectProgramSetupIssues() : [];
+  if (!issues.length) { host.innerHTML = ''; host.style.display = 'none'; return; }
+  host.style.display = 'block';
+  host.innerHTML = '<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:12px 14px;margin-bottom:12px;">'
+    + '<div style="font-size:12px;font-weight:700;color:#991b1b;margin-bottom:6px;">Resolve before finalizing</div>'
+    + '<ul style="margin:0;padding-left:18px;font-size:12px;line-height:1.6;color:#991b1b;">'
+    + issues.map(function(t) { return '<li>' + escapeHTML(t) + '</li>'; }).join('')
+    + '</ul></div>';
+}
+
 function updateCISOFinishBtn() {
   const btn = document.getElementById('ciso-finalise-btn');
   if (!btn) return;
@@ -196,12 +210,17 @@ function updateCISOFinishBtn() {
     btn.style.display = 'none';
     return;
   }
-  // Assign Owners: show finalize when all owners assigned
+  // Assign Owners: show finalize when every blocking issue is resolved
   if (currentStep.ciso === cisoStepIndexByLabel('Assign Owners', CISO_WIZARD_STEPS)) {
     btn.style.display = '';
-    const ready = allOwnersAssigned();
+    var setupIssues = (typeof collectProgramSetupIssues === 'function') ? collectProgramSetupIssues() : [];
+    if (typeof renderProgramSetupIssues === 'function') renderProgramSetupIssues();
+    const ready = allOwnersAssigned() && !setupIssues.length;
     var missingN = (typeof countUnassignedDomains === 'function') ? countUnassignedDomains() : 0;
-    btn.innerHTML = ready ? '✓ Finalise Program Setup' : ('✓ Finalise Program Setup — ' + (missingN ? missingN + ' domain' + (missingN === 1 ? '' : 's') + ' still need an owner' : 'assign all owners first'));
+    var pendingLabel = missingN
+      ? (missingN + ' domain' + (missingN === 1 ? '' : 's') + ' still ' + (missingN === 1 ? 'needs' : 'need') + ' an owner')
+      : (setupIssues.length + ' issue' + (setupIssues.length === 1 ? '' : 's') + ' to resolve');
+    btn.innerHTML = ready ? '✓ Finalize Program Setup' : ('✓ Finalize Program Setup — ' + pendingLabel);
     btn.onclick = ready ? cisoFinish : null;
     btn.disabled = !ready;
     btn.style.background = ready ? '' : '#94a3b8';
@@ -213,7 +232,7 @@ function updateCISOFinishBtn() {
   // All other steps — show normally (not yet clickable but visible for orientation)
   btn.style.display = '';
   btn.disabled = false;
-  btn.innerHTML = '✓ Finalise Program Setup';
+  btn.innerHTML = '✓ Finalize Program Setup';
   btn.onclick = cisoFinish;
   btn.style.background = '';
   btn.style.opacity = '1';
@@ -478,7 +497,7 @@ function submitISPForApproval(silent, options) {
         }
         state.infoSecPolicy.revisionHistory.push({
           version: 'R' + (state.infoSecPolicy.revisionHistory.length + 1),
-          date: new Date().toISOString().slice(0, 10),
+          date: todayIso(),
           author: actor,
           changes: 'Revised and resubmitted for approver review.'
         });
@@ -488,7 +507,7 @@ function submitISPForApproval(silent, options) {
         submittedTo: approverName,
         submittedToRole: approverRole,
         submittedToEmail: approverEmail,
-        submittedAt: new Date().toISOString().slice(0, 10),
+        submittedAt: todayIso(),
         lastUpdated: new Date().toLocaleDateString(),
         version: (state.infoSecPolicy && state.infoSecPolicy.version) || '1.0'
       };
@@ -536,15 +555,43 @@ function showToast(msg, isError=false) {
   if (!isError) markDirty();
 }
 
-function cisoFinish() {
-  const families = getActiveFamilies().filter(f => f !== 'PM');
-  const merges = state.policyMerges || {};
-  const masters = families.filter(f => !merges[f]);
-  const unassigned = masters.filter(f => !hasNamedDomainOwner(f));
+/**
+ * Everything that must be true before a program can be finalised.
+ *
+ * For a GRC tool the validation IS the product — users are here because they do not
+ * know the rules. The wizard used to state a rule ("the author cannot approve their
+ * own policy") and then accept a violation silently, because the only SoD check ran
+ * on the Next button and was skipped by clicking a step circle.
+ */
+function collectProgramSetupIssues() {
+  var issues = [];
+  var families = getActiveFamilies().filter(function(f) { return f !== 'PM'; });
+  var merges = state.policyMerges || {};
+  var masters = families.filter(function(f) { return !merges[f]; });
+  var unowned = masters.filter(function(f) { return !hasNamedDomainOwner(f); });
+  if (unowned.length) {
+    issues.push(unowned.length + ' domain' + (unowned.length === 1 ? '' : 's') +
+      ' still ' + (unowned.length === 1 ? 'needs' : 'need') + ' an owner (' + unowned.join(', ') + ').');
+  }
+  if (typeof policyApproverSodViolation === 'function' && policyApproverSodViolation('ISP')) {
+    issues.push('The Information Security Policy approver is also its owner. Segregation of duties requires a different reviewer.');
+  }
+  if (typeof policyApprovalIsUnattributed === 'function' && policyApprovalIsUnattributed('ISP')) {
+    issues.push('The Information Security Policy has an approval date but nobody named as approver.');
+  }
+  masters.forEach(function(fam) {
+    if (typeof policyApproverSodViolation === 'function' && policyApproverSodViolation(fam)) {
+      issues.push(fam + ' policy is approved by its own owner. Assign a different reviewer.');
+    }
+  });
+  return issues;
+}
 
-  if (unassigned.length > 0) {
-    var ownerStepNo = getCisoSetupStepDisplay(CISO_WIZARD_STEPS, 'Assign Owners').step;
-    showToast('Name an owner for all ' + unassigned.length + ' domain(s) before finalizing. Use the program owner button in Step ' + ownerStepNo + '.', true);
+function cisoFinish() {
+  const issues = collectProgramSetupIssues();
+  if (issues.length) {
+    showToast(issues[0] + (issues.length > 1 ? ' (+' + (issues.length - 1) + ' more to resolve)' : ''), true);
+    if (typeof renderProgramSetupIssues === 'function') renderProgramSetupIssues();
     return;
   }
   clearScopedUndoStack('program finalization');
@@ -1436,7 +1483,7 @@ function renderCISOStep2Baseline() {
         <div class="pt-name">FISMA / CUI systems</div>
         <div class="pt-desc">Federal, FedRAMP, DoD RMF, or CUI systems categorize from 800-60 information types in Assets &amp; SSP.</div>
       </div>
-      <div class="toggle-switch ${isFisma?'on':''}"></div>
+      <button type="button" role="switch" aria-checked="${isFisma?'true':'false'}" aria-label="FISMA / CUI systems" class="toggle-switch ${isFisma?'on':''}" onclick="event.stopPropagation();toggleProgramFismaMode();"></button>
     </div>`;
 
   var advancedOpen = (floor !== 'L') ? ' open' : '';
@@ -1462,7 +1509,7 @@ function renderCISOStep2Baseline() {
         <div class="pt-name">Privacy overlay</div>
         <div class="pt-desc">Adds <strong>${privCount}</strong> PT / P-baseline controls plus PM-18\u2013PM-28 when systems process PII.</div>
       </div>
-      <div class="toggle-switch ${state.privacyOverlay?'on':''}"></div>
+      <button type="button" role="switch" aria-checked="${state.privacyOverlay?'true':'false'}" aria-label="Privacy overlay" class="toggle-switch ${state.privacyOverlay?'on':''}" onclick="event.stopPropagation();togglePrivacy();"></button>
     </div>
     <details class="common-floor-advanced"${advancedOpen}>
       <summary>Advanced: NIST SP 800-53B control baseline</summary>
@@ -1819,8 +1866,11 @@ function renderCISOStep2() {
   };
 
   var governHtml = (typeof renderCsfGovernOrientationHtml === 'function')
-    ? renderCsfGovernOrientationHtml({ showMappedPm: true })
+    ? renderCsfGovernOrientationHtml({ showMappedPm: true, collapsible: true, rerender: 'renderCISOStep2' })
     : '';
+
+  var pmSelectedCount = pmControls.filter(function(c) { return state.pmControls[c.id]; }).length;
+  var pmExpanded = !!state._pmTablesExpanded;
 
   body.innerHTML = `
     ${cisoStepProgressHtml(4, 'PM Controls')}
@@ -1831,6 +1881,12 @@ function renderCISOStep2() {
     <div class="section-title" style="font-size:16px;margin-top:8px;">Select Program Management (PM) Controls</div>
     <div class="section-subtitle">PM controls are the 800-53 implementations of the Govern outcomes above. Rows that implement a currently selected subcategory are highlighted. CORE PM-1, PM-2, and PM-9 stay on as the program foundation even if their mapped outcome is cleared.</div>
 
+    <div class="csf-collapse-bar">
+      <span class="csf-collapse-summary"><strong>${pmSelectedCount} of ${pmControls.length}</strong> PM controls selected${state.privacyOverlay ? ' · privacy overlay active' : ''} — the 800-53 implementation layer beneath the outcomes above</span>
+      <button type="button" class="btn btn-secondary btn-sm" aria-expanded="${pmExpanded ? 'true' : 'false'}" onclick="togglePmTables()">${pmExpanded ? 'Hide PM controls' : 'Review / change PM controls'}</button>
+    </div>
+
+    ${!pmExpanded ? '' : `
     <div class="info-alert">
       <div class="ia-icon">ℹ️</div>
       <div class="ia-text"><strong>PM-1, PM-2, and PM-9 are pre-selected</strong> as they form the foundation of any security program. Clearing a mapped CSF outcome will not uncheck these CORE controls. All other PM controls follow the CSF selection when they have an official map entry \u2014 you can still check extras. PM controls are organization-wide and apply regardless of impact level.${state.privacyOverlay ? ` <strong style="color:#6366f1;">Privacy overlay is active:</strong> PM-18 through PM-${state.baseline==='H'?'28':state.baseline==='M'?'25':'20(1)'} are also pre-selected — these support the privacy program plan, leadership, disclosures, and PII governance requirements appropriate for the ${state.baseline==='H'?'High':state.baseline==='M'?'Moderate':'Low'} common-control floor. Policy requirements for these controls are automatically added to your Tier 1 policy in Step ${cisoStepIndexByLabel('InfoSec Policy', 5)}.` : ''}</div>
@@ -1856,7 +1912,7 @@ function renderCISOStep2() {
       </table>
     </div>
 
-    ${state.privacyOverlay ? `
+    ${(state.privacyOverlay && privControls.length) ? `
     <strong style="font-size:14px; display:block; margin-bottom:12px;">Privacy PM Controls (Privacy Overlay)</strong>
     <div class="table-scroll">
       <table class="control-table">
@@ -1864,12 +1920,18 @@ function renderCISOStep2() {
         <tbody id="tbod-${Math.random().toString(36).slice(2,8)}">${renderNumericControlRowsHtml(privControls, renderRow)}</tbody>
       </table>
     </div>` : ''}
+    `}
 
     <div class="summary-box" style="margin-top:20px;">
       <h3>Program Management Summary</h3>
       <div class="summary-kv"><span class="sk">PM Controls Selected:</span><span class="sv">${Object.values(state.pmControls).filter(Boolean).length} of ${pmControls.length}</span></div>
     </div>
   `;
+}
+
+function togglePmTables() {
+  state._pmTablesExpanded = !state._pmTablesExpanded;
+  setTimeout(function() { renderCISOStep2(); }, 0);
 }
 
 function selectAllPM(val) {
@@ -2443,9 +2505,9 @@ function renderISPEditorBody(body, opts) {
     ];
     if (!state.infoSecPolicy.documents) {
       state.infoSecPolicy.documents = [
-        { title:'NIST SP 800-53B', desc:'Control Baselines for Information Systems and Organizations.' },
-        { title:'NIST SP 800-53 Rev. 5', desc:'Security and Privacy Controls for Information Systems and Organizations.' },
-        { title:'NIST SP 800-37 Rev. 2 (RMF)', desc:'Risk Management Framework.' },
+        { title:'NIST SP 800-53B', desc:'Control Baselines for Information Systems and Organizations.', url:'https://csrc.nist.gov/pubs/sp/800/53/b/upd1/final' },
+        { title:'NIST SP 800-53 Rev. 5', desc:'Security and Privacy Controls for Information Systems and Organizations.', url:'https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final' },
+        { title:'NIST SP 800-37 Rev. 2 (RMF)', desc:'Risk Management Framework.', url:'https://csrc.nist.gov/pubs/sp/800/37/r2/final' },
       ];
     }
   }
@@ -2887,7 +2949,7 @@ function renderDocumentsSection() {
 function renderRevisionHistorySection(si) {
   const isp = state.infoSecPolicy;
   if (!isp.revisionHistory) isp.revisionHistory = [
-    { version:'1.0', date:new Date().toISOString().slice(0,10), author:state.programOwner||'Program Owner', changes:'Initial policy draft.' }
+    { version:'1.0', date:todayIso(), author:state.programOwner||'Program Owner', changes:'Initial policy draft.' }
   ];
   const rows = isp.revisionHistory.map((r,ri)=>`
     <tr>
@@ -2919,7 +2981,7 @@ function renderRevisionHistorySection(si) {
 function addRevisionEntry() {
   if (!state.infoSecPolicy.revisionHistory) state.infoSecPolicy.revisionHistory = [];
   const ver = state.infoSecPolicy.revisionHistory.length;
-  state.infoSecPolicy.revisionHistory.push({ version:`1.${ver}`, date:new Date().toISOString().slice(0,10), author:state.programOwner||'', changes:'' });
+  state.infoSecPolicy.revisionHistory.push({ version:`1.${ver}`, date:todayIso(), author:state.programOwner||'', changes:'' });
   renderCISOStep3();
 }
 function removeRevisionEntry(i) { if(!confirm('Are you sure you want to delete this revision history entry? This cannot be undone.')) return; state.infoSecPolicy.revisionHistory.splice(i,1); renderCISOStep3(); }
@@ -3047,26 +3109,41 @@ function getPriority(fam) {
   return state.policyPriorities[fam] || PRIORITY_DEFAULTS[fam] || 'soon';
 }
 
+/**
+ * Re-render without throwing the reader back to the top. Setting five priorities in
+ * a row meant five scroll-backs, because each change re-rendered the whole step.
+ */
+function rerenderPreservingScroll(render, containerId) {
+  var y = (typeof window !== 'undefined') ? window.scrollY : 0;
+  var before = containerId ? document.getElementById(containerId) : null;
+  var tops = before ? Array.prototype.map.call(before.querySelectorAll('.table-scroll'), function(n) { return n.scrollTop; }) : [];
+  render();
+  var after = containerId ? document.getElementById(containerId) : null;
+  if (after) {
+    Array.prototype.forEach.call(after.querySelectorAll('.table-scroll'), function(n, i) {
+      if (tops[i] != null) n.scrollTop = tops[i];
+    });
+  }
+  if (typeof window !== 'undefined') window.scrollTo(0, y);
+}
+
 function setPolicyPriority(fam, tier) {
   var prev = state.policyPriorities[fam];
   state.policyPriorities[fam] = tier;
   logFieldChange('policyPriorities.' + fam, prev, tier);
   // Reset custom deadline so it recalculates from new tier
   delete state.domainDeadlines[fam];
-  renderCISOStep4a();
+  rerenderPreservingScroll(renderCISOStep4a, cisoStepBodyId('Policy set', CISO_WIZARD_STEPS - 1));
 }
 
 function deadlineFromPriority(fam) {
   if (state.domainDeadlines[fam]) return state.domainDeadlines[fam];
   const days = PRIORITY_TIERS[getPriority(fam)] || 90;
-  return new Date(Date.now() + days * 86400000).toISOString().slice(0,10);
+  return isoPlusDays(days);
 }
 
 function formatRoadmapDate(iso) {
-  if (!iso) return '';
-  var d = new Date(iso + 'T12:00:00');
-  if (isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  return iso ? formatDateOnly(iso) : '';
 }
 
 function renderPolicyPriorityRoadmapHTML(masters, merges, families, controls) {
@@ -3142,6 +3219,15 @@ function renderPolicyPriorityRoadmapHTML(masters, merges, families, controls) {
           </div>`;
         }).join('')}
       </div>
+      ${(typeof getProgramControlCounts === 'function' ? (function() {
+        var n = getProgramControlCounts();
+        return '<div class="priority-roadmap-reconcile" style="margin-top:10px;padding:8px 12px;background:var(--bg,#fafaf7);border:1px solid var(--border);border-radius:8px;font-size:11.5px;line-height:1.55;color:var(--text-muted);">'
+          + '<strong>' + n.domain + ' controls</strong> sit across these Function policies'
+          + (n.privacy ? ' (' + n.floor + ' from the common-control floor + ' + n.privacy + ' from the privacy overlay)' : '')
+          + '. The other <strong>' + n.pm + ' PM controls</strong> live in the Information Security Policy, not a Function policy \u2014 '
+          + n.domain + ' + ' + n.pm + ' = <strong>' + n.total + '</strong> in scope for the program.'
+          + '</div>';
+      })() : '')}
     </div>`;
 }
 
@@ -3157,10 +3243,13 @@ function ownerSummaryHTML(masters, families, merges) {
   const groups = {};
   masters.forEach(fam => {
     const o = state.domainOwners[fam] || {};
+    const name = (o.name || '').trim();
     const email = (o.email || '').trim();
-    if (!isValidOwnerEmail(email)) return;
-    const key = normalizeOwnerEmail(email);
-    if (!groups[key]) groups[key] = { name: getOwnerDisplayName(o), role: o.role || '', email: email, families: [] };
+    // The roster collects owner + title; email is optional legacy metadata. Group by
+    // email when one exists so multi-domain owners still collapse, otherwise by name.
+    if (!name && !isValidOwnerEmail(email)) return;
+    const key = isValidOwnerEmail(email) ? normalizeOwnerEmail(email) : ('name:' + name.toLowerCase());
+    if (!groups[key]) groups[key] = { name: getOwnerDisplayName(o), role: o.title || o.role || '', email: email, families: [] };
     groups[key].families.push(fam);
     families.filter(f => merges[f] === fam).forEach(mf => groups[key].families.push(mf));
   });
@@ -3500,6 +3589,24 @@ function setDomainOwnerGroup(fam, field, value) {
   });
 }
 
+/**
+ * Set a domain owner's name and, when the name matches someone already on the program
+ * roster, carry their title and email across instead of making the operator retype them.
+ */
+function setDomainOwnerName(fam, value) {
+  setDomainOwnerGroup(fam, 'name', value);
+  var person = (typeof findProgramPerson === 'function') ? findProgramPerson(value) : null;
+  if (!person) return;
+  var o = state.domainOwners[fam] || {};
+  var needsTitle = !String(o.title || o.role || '').trim();
+  var needsEmail = !String(o.email || '').trim();
+  if (person.title && needsTitle) setDomainOwnerGroup(fam, 'title', person.title);
+  if (person.email && needsEmail) setDomainOwnerGroup(fam, 'email', person.email);
+  if ((person.title && needsTitle) || (person.email && needsEmail)) {
+    setTimeout(function() { renderActiveCisoSetupStep(); }, 0);
+  }
+}
+
 function commitCisoOwnerEmail(fam) {
   var o = state.domainOwners[fam] || {};
   if (isSameOwnerEmail(o.email, state.programOwnerEmail) && (o.name || '').trim()) {
@@ -3746,6 +3853,7 @@ function renderCISOStep4b() {
       </div>`).join('')}
     </div>` : ''}
 
+    ${typeof programPeopleDatalistHtml === 'function' ? programPeopleDatalistHtml('program-people') : ''}
     <div class="owner-step-list-head">
       <span>Domain roster</span>
       <span class="owner-step-list-hint">Override owner or deadline per domain if needed</span>
@@ -3759,10 +3867,12 @@ function renderCISOStep4b() {
         const pm = PRIORITY_META[tier];
         const deadline = deadlineFromPriority(fam);
         const isCustomDeadline = !!state.domainDeadlines[fam];
-        const hasOwner = isValidOwnerEmail(o.email);
         const policyTitle = state.domainCustomNames[fam] || getPolicyMergedTitle(fam);
         const isPo = isSameOwnerEmail(o.email, programOwnerEmail);
         const ownerName = (o.name || '').trim() || (isPo ? programOwnerName : '');
+        // A domain counts as owned once a person is named — email is no longer
+        // collected on this step, so it cannot be the gate for the row status.
+        const hasOwner = !!ownerName;
         const editing = state._cisoOwnerEditFam === fam;
         const showChip = hasOwner && ownerName && !editing;
         var identityHtml;
@@ -3773,7 +3883,7 @@ function renderCISOStep4b() {
             + '</div>';
         } else {
           identityHtml = '<div class="owner-step-id">'
-            + '<input class="form-input owner-step-name" type="text" autocomplete="name" placeholder="Full name" value="' + escapeHTML(ownerName) + '" aria-label="Owner name for ' + fam + '" oninput="setDomainOwnerGroup(\'' + fam + '\',\'name\',this.value)">'
+            + '<input class="form-input owner-step-name" type="text" list="program-people" autocomplete="off" placeholder="Full name" value="' + escapeHTML(ownerName) + '" aria-label="Owner name for ' + fam + '" oninput="setDomainOwnerName(\'' + fam + '\',this.value)">'
             + '<input class="form-input owner-step-email' + (hasOwner ? ' owner-step-email--set' : '') + '" type="text" autocomplete="organization-title" placeholder="Title (e.g. Director of IT)" value="' + escapeHTML(o.title || o.role || '') + '" aria-label="Owner title for ' + fam + '" oninput="setDomainOwnerGroup(\'' + fam + '\',\'title\',this.value)" onchange="commitCisoOwnerEmail(\'' + fam + '\')">'
             + '</div>';
         }

@@ -372,7 +372,7 @@ function renderCustodianWorkspace(user) {
     });
   }
 
-  var today = new Date().toISOString().slice(0,10);
+  var today = todayIso();
   var slavesOf = {};
   getActiveFamilies().forEach(function(f){ if ((state.policyMerges||{})[f]) { var m=(state.policyMerges||{})[f]; if (!slavesOf[m]) slavesOf[m]=[]; slavesOf[m].push(f); } });
 
@@ -391,12 +391,12 @@ function renderCustodianWorkspace(user) {
     var reviewCycle = dp ? (dp.reviewCycle || 'Annual') : 'Annual';
     var owner = getDomainOwnerLabelOr(fam, 'Unassigned');
     var isOverdue = deadline && deadline < today;
-    var isDueSoon = deadline && !isOverdue && deadline <= new Date(Date.now() + 14*86400000).toISOString().slice(0,10);
+    var isDueSoon = deadline && !isOverdue && deadline <= isoPlusDays(14);
     var title = getPolicyMergedTitle(fam);
     var deadlineHTML = deadline
-      ? (isOverdue ? '<span style="color:#ef4444;font-weight:700;">⚠ Overdue — was due ' + new Date(deadline+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) + '</span>'
-         : isDueSoon ? '<span style="color:#f59e0b;font-weight:600;">Due soon: ' + new Date(deadline+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) + '</span>'
-         : '<span style="color:var(--text-muted);">Next review: ' + new Date(deadline+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) + '</span>')
+      ? (isOverdue ? '<span style="color:#ef4444;font-weight:700;">⚠ Overdue — was due ' + parseDateOnly(deadline).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) + '</span>'
+         : isDueSoon ? '<span style="color:#f59e0b;font-weight:600;">Due soon: ' + parseDateOnly(deadline).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) + '</span>'
+         : '<span style="color:var(--text-muted);">Next review: ' + parseDateOnly(deadline).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) + '</span>')
       : '<span style="color:var(--text-muted);">No review date set</span>';
     var borderColor = isOverdue ? '#ef4444' : 'rgba(13,148,136,0.3)';
     var bgColor     = isOverdue ? '#fef2f2' : 'rgba(13,148,136,0.02)';
@@ -583,7 +583,7 @@ function renderISSMWorkspace(user) {
     return;
   }
 
-  var today = new Date().toISOString().slice(0,10);
+  var today = todayIso();
   var allControls = getActiveControls();
 
   // Tally stats
@@ -612,7 +612,7 @@ function renderISSMWorkspace(user) {
     var ownerPct = selected.length ? Math.round(assignedOwners / selected.length * 100) : 0;
 
     var isOverdue = deadline && deadline < today;
-    var isDueSoon = deadline && !isOverdue && deadline <= new Date(Date.now() + 14*86400000).toISOString().slice(0,10);
+    var isDueSoon = deadline && !isOverdue && deadline <= isoPlusDays(14);
 
     if (status === 'Approved' || status === 'Under Review' || status === 'Mapped') submittedCount++;
     else draftCount++;
@@ -625,7 +625,7 @@ function renderISSMWorkspace(user) {
 
     var deadlineHTML = '';
     if (deadline) {
-      var d = new Date(deadline + 'T00:00:00');
+      var d = parseDateOnly(deadline);
       var dlabel = d.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
       if (isOverdue) deadlineHTML = '<span style="color:#ef4444;font-weight:700;">⚠ Overdue — was due ' + dlabel + '</span>';
       else if (isDueSoon) deadlineHTML = '<span style="color:#f59e0b;font-weight:600;">Due soon: ' + dlabel + '</span>';
@@ -663,7 +663,7 @@ function renderISSMWorkspace(user) {
       + (returnNotes
         ? '<div style="margin:6px 0 8px 0;padding:8px 10px;background:#fff7ed;border:1px solid #fdba74;border-radius:6px;font-size:11px;line-height:1.45;color:#9a3412;"><strong>Return notes:</strong> ' + _esc(returnNotes) + '</div>'
         : '')
-      + '<div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">' + selected.length + ' controls selected · ' + ctrlCount + ' in common-control floor</div>'
+      + '<div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">' + selected.length + ' of ' + ctrlCount + ' available controls selected into this policy</div>'
       + '<div style="font-size:11px;display:flex;align-items:center;">' + reviewStatusDot(fam) + '<span style="color:' + getReviewStatus(fam).color + ';">' + getReviewStatus(fam).label + '</span></div>'
       + ownerBar
       + (primary.handler
@@ -2060,7 +2060,8 @@ function renderPolicyStep1() {
     + '<div class="form-hint">' + (isCustodianRole
       ? 'You are the custodian for this policy. Verify your details are correct.'
       : 'Day-to-day maintenance, annual reviews, and exception tracking.') + '</div>'
-    + '<input class="form-input" id="custodianInput" placeholder="Full name \u2014 e.g. Jane Smith" value="' + escapeHTML(custodian.name||'') + '" oninput="setPolicyCustodian(\'' + escFam + '\', \'name\', this.value)">'
+    + (typeof programPeopleDatalistHtml === 'function' ? programPeopleDatalistHtml('program-people') : '')
+    + '<input class="form-input" id="custodianInput" list="program-people" autocomplete="off" placeholder="Full name \u2014 e.g. Jane Smith" value="' + escapeHTML(custodian.name||'') + '" oninput="setPolicyCustodianName(\'' + escFam + '\', this.value)">'
     + '<input class="form-input" placeholder="Title / Role \u2014 e.g. GRC Analyst" value="' + escapeHTML(custodian.role||'') + '" oninput="setPolicyCustodian(\'' + escFam + '\', \'role\', this.value)">'
     + '</div>'
     + renderReviewCycleCard(fam, mergedTitle, { compact: true })
@@ -2095,6 +2096,18 @@ function isReadOnlyPolicyView(fam) {
   // Custodians (without ISSM role) are always read-only
   if (personRoles.indexOf('custodian') !== -1) return true;
   return false;
+}
+
+/** Custodian name entry that reuses a person already on the program roster. */
+function setPolicyCustodianName(fam, value) {
+  setPolicyCustodian(fam, 'name', value);
+  var person = (typeof findProgramPerson === 'function') ? findProgramPerson(value) : null;
+  if (!person) return;
+  var c = getCustodian(fam);
+  var changed = false;
+  if (person.title && !String(c.role || '').trim()) { setPolicyCustodian(fam, 'role', person.title); changed = true; }
+  if (person.email && !String(c.email || '').trim()) { setPolicyCustodian(fam, 'email', person.email); changed = true; }
+  if (changed && typeof renderPolicyStep1 === 'function') setTimeout(function() { renderPolicyStep1(); }, 0);
 }
 
 function setPolicyCustodian(fam, field, value) {
@@ -2235,6 +2248,8 @@ function renderPolicyStep2() {
   var policyFnHtml = (typeof renderCsfPolicyOrientationHtml === 'function')
     ? renderCsfPolicyOrientationHtml(fam, {
         compact: true,
+        collapsible: true,
+        rerender: 'renderPolicyStep2',
         lead: 'CSF 2.0 outcomes this Function will cover. Checking an outcome does not auto-select 800-53 controls \u2014 pick those in the list below. Policy and Procedures (XX-1) live in the ISP.'
       })
     : '';
@@ -2499,7 +2514,7 @@ function initDomainPolicy(fam) {
   const requirements = buildDomainPolicyRequirementsFromCsf(fam, selected);
   state.domainPolicies[fam] = {
     title: getPolicyMergedTitle(fam), version: '1.0',
-    effectiveDate: new Date().toISOString().slice(0,10),
+    effectiveDate: todayIso(),
     reviewCycle: 'Annual', status: 'Draft',
     sections: [
       { type:'purpose',          title:'Purpose' },
@@ -4506,7 +4521,7 @@ function showSubmitModal() {
   var ownerWarn = '';
   if (unassigned) {
     ownerWarn = '<div style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);border-radius:8px;padding:12px;margin-bottom:20px;font-size:12px;color:var(--amber);line-height:1.5;">'
-      + '\u26A0\uFE0F ' + unassigned + ' control' + (unassigned === 1 ? '' : 's') + ' still need an owner. You can still submit.</div>';
+      + '\u26A0\uFE0F ' + unassigned + ' control' + (unassigned === 1 ? ' still needs' : 's still need') + ' an owner. You can still submit.</div>';
   }
   overlay.innerHTML =
     '<div style="background:white;border-radius:16px;padding:32px;width:480px;max-width:90vw;box-shadow:0 20px 60px rgba(0,0,0,0.2);">'
@@ -4553,7 +4568,7 @@ function confirmSubmitDomainPolicy() {
   state.policyStatus[fam].submittedTo = reviewerName || 'Designated approver';
   state.policyStatus[fam].submittedToRole = reviewerRole;
   state.policyStatus[fam].submittedToEmail = reviewerEmail;
-  state.policyStatus[fam].submittedAt = new Date().toISOString().slice(0, 10);
+  state.policyStatus[fam].submittedAt = todayIso();
   state.policyStatus[fam].status = 'Under Review';
   state.policyStatus[fam].lastUpdated = new Date().toLocaleDateString();
   state.policyStatus[fam].version = state.domainPolicies?.[fam]?.version||'1.0';

@@ -1418,6 +1418,10 @@
       position: relative;
       width: 44px;
       height: 24px;
+      padding: 0;
+      border: none;
+      appearance: none;
+      flex-shrink: 0;
       background-color: var(--ink-4);
       border-radius: var(--radius-md);
       cursor: pointer;
@@ -4229,6 +4233,24 @@
       justify-content: flex-end;
       margin: 0 0 8px;
     }
+    .csf-collapse-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      padding: 10px 14px;
+      margin: 0 0 14px;
+      background: var(--ink-1, #f8fafc);
+      border: 1px solid var(--hairline, #e2e8f0);
+      border-radius: 8px;
+    }
+    .csf-collapse-summary {
+      font-size: 13px;
+      color: var(--ink-7, #334155);
+      line-height: 1.45;
+    }
+    .csf-collapse-summary strong { font-weight: 700; }
     .csf-sub-count {
       font-size: 12px;
       color: var(--text-muted);

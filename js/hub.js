@@ -162,7 +162,7 @@ function renderOnboardingHome() {
  */
 function getNextActions(limit) {
   var actions = [];
-  var today = new Date().toISOString().slice(0, 10);
+  var today = todayIso();
 
   if (!state.cisoComplete) {
     var p = getSetupProgressSummary();
@@ -638,7 +638,7 @@ function getJourneyStages() {
       title: 'Design your control implementations',
       why: 'A control is not implemented until somebody writes down how. That narrative is what an assessor tests against and what every SSP attestation points back to.',
       meta: ctrls.length
-        ? designed + ' of ' + ctrls.length + ' in-scope controls documented'
+        ? designed + ' of ' + ctrls.length + ' in-scope controls documented (includes PM)'
         : 'No controls assigned to you yet',
       cta: 'Open the control workspace',
       action: 'goToControlWorkspace()',
@@ -657,7 +657,7 @@ function getJourneyStages() {
       title: 'Attest and submit your SSP packages',
       why: 'Attestation puts an accountable name against each control for one specific system. It is the evidence a reviewer actually reads, and the input to any authorization decision.',
       meta: scopes.length
-        ? submitted + ' of ' + scopes.length + ' packages submitted for review'
+        ? submitted + ' of ' + scopes.length + ' SSP packages submitted \u2014 one per registered system and process'
         : 'Register a system first',
       cta: 'Open Assets & SSP',
       action: 'goToAssetWorkspace()',

@@ -1114,6 +1114,22 @@ function renderCsfExplicitTagsHtml(ctrlId) {
   return '<span class="csf-tag-group">' + chips + '</span>';
 }
 
+/** Per-Function expand state for the collapsible outcome tables. */
+function isCsfOrientExpanded(fn) {
+  if (typeof state === 'undefined') return false;
+  if (!state._csfOrientExpanded) state._csfOrientExpanded = {};
+  return !!state._csfOrientExpanded[String(fn || '').toUpperCase()];
+}
+
+function toggleCsfOrientExpanded(fn, rerenderFnName) {
+  if (typeof state === 'undefined') return;
+  if (!state._csfOrientExpanded) state._csfOrientExpanded = {};
+  var key = String(fn || '').toUpperCase();
+  state._csfOrientExpanded[key] = !state._csfOrientExpanded[key];
+  var cb = rerenderFnName && typeof window[rerenderFnName] === 'function' ? window[rerenderFnName] : null;
+  setTimeout(function() { if (cb) cb(); }, 0);
+}
+
 function renderCsfFunctionOrientationHtml(fnId, opts) {
   opts = opts || {};
   if (typeof escapeHTML !== 'function') return '';
@@ -1179,9 +1195,28 @@ function renderCsfFunctionOrientationHtml(fnId, opts) {
     return head + body;
   }).join('');
   var cls = 'csf-fn-orient csf-fn-' + fn.toLowerCase() + (fn === 'GV' ? ' csf-gv-orient' : '') + (compact ? ' csf-fn-orient--compact' : '');
-  return '<div class="' + cls + '" role="region" aria-label="NIST CSF 2.0 ' + escapeHTML(meta.name) + ' outcomes">'
+  var head = '<div class="' + cls + '" role="region" aria-label="NIST CSF 2.0 ' + escapeHTML(meta.name) + ' outcomes">'
     + '<div class="csf-gv-orient-kicker">NIST CSF 2.0 \u00b7 ' + escapeHTML(meta.name) + ' (' + fn + ')</div>'
-    + '<p class="csf-gv-orient-lead">' + escapeHTML(lead) + '</p>'
+    + '<p class="csf-gv-orient-lead">' + escapeHTML(lead) + '</p>';
+
+  // Collapsible: a 31-row outcome table is a wall on first view. Show the decision
+  // as a one-line summary and let the operator open the full list to change it.
+  if (opts.collapsible) {
+    var expanded = isCsfOrientExpanded(fn);
+    var cb = String(opts.rerender || '').replace(/[^A-Za-z0-9_$]/g, '');
+    var toggleAttr = cb ? "toggleCsfOrientExpanded('" + escAttr(fn) + "', '" + cb + "')" : "toggleCsfOrientExpanded('" + escAttr(fn) + "')";
+    head += '<div class="csf-collapse-bar">'
+      + '<span class="csf-collapse-summary"><strong>' + selectedCount + ' of ' + allIds.length + '</strong> '
+      + escapeHTML(meta.name) + ' outcomes selected'
+      + (selectedCount === allIds.length ? ' \u2014 full Function coverage' : ' \u2014 ' + (allIds.length - selectedCount) + ' out of scope')
+      + '</span>'
+      + '<button type="button" class="btn btn-secondary btn-sm" aria-expanded="' + (expanded ? 'true' : 'false') + '" onclick="' + toggleAttr + '">'
+      + (expanded ? 'Hide outcomes' : 'Review / change outcomes') + '</button>'
+      + '</div>';
+    if (!expanded) return head + '</div>';
+  }
+
+  return head
     + '<div class="csf-sub-toolbar"><span class="csf-sub-count">' + selectedCount + ' of ' + allIds.length + ' selected</span></div>'
     + '<div class="table-scroll">'
     + '<table class="control-table csf-sub-table">'
