@@ -198,7 +198,7 @@ Labels → renderers are looked up **by label** (`cisoStepIndexByLabel`) so renu
 4. **PM Controls** (`renderCISOStep2`) — PM control selection + GV subcategory curation (selectable outcome list)
 5. **InfoSec Policy** (`renderCISOStep3`) — build the org-level ISP; requirements carry CSF tags; GV coverage consolidated; approval routes through a named reviewer (self-approval blocked)
 6. **Policy set** (`renderCISOStep4a`) — the five Function policy packages; merge/move families via the shared policy board
-7. **Assign Owners** (`renderCISOStep4b`) — assign owners per policy package/domain; the only finalize guard is in `cisoFinish` (every unmerged domain needs a valid owner email)
+7. **Assign Owners** (`renderCISOStep4b`) — assign owners per policy package/domain. Finalize is gated by `collectProgramSetupIssues()` (js/program.js), the single source for blocking setup problems: an unowned unmerged domain, an ISP or domain policy whose approver is also its owner (SoD), and an approval date with nobody named as approver. The issue list renders into `#ciso-setup-issues` above the finalize button via `renderProgramSetupIssues()`, sets the button label, and `cisoFinish()` refuses while any issue stands. A domain counts as owned once a **name** is present (`hasNamedDomainOwner`) — email is no longer collected on this step
 
 ### Role-Based Workspaces
 
@@ -221,6 +221,10 @@ Labels → renderers are looked up **by label** (`cisoStepIndexByLabel`) so renu
 - **Reset:** `resetApp()` → `resetStateToDefaults()` copies `STATE_DEFAULTS`; keys must exist in the literal.
 - **Snapshot restore:** routes through `openSnapshotRestoreConfirm` (auto-backup + counts diff + explicit acknowledgement).
 - **Import validation:** `importProgramFromFile` → `validateProgramShape(saved)`; auto-snapshots before applying.
+- **Date-only values are date-only.** Never build an ISO date with `toISOString()` (it is UTC and rolls over in the evening east of Greenwich) and never parse `'YYYY-MM-DD'` with bare `new Date()` (UTC midnight renders as the previous day locally). Use the canonical helpers in js/core.js: `todayIso()`, `isoFromDate(d)`, `isoPlusDays(n)`, `parseDateOnly(v)`, `formatDateOnly(v, fmt)`.
+- **Control counts are five different numbers** — `getProgramControlCounts()` / `describeControlCounts()` in js/core.js return `{floor, privacy, domain, pm, total, selected, mine}`. Label every count on screen with which one it is; an unlabeled "181" next to an unlabeled "218" reads as a bug.
+- **One person, one record.** `getProgramPeople()` (js/core.js) gathers everyone named anywhere — program owner, domain owners, custodians, control owners, users, approvers — deduped by name. `programPeopleDatalistHtml()` + `list="program-people"` puts them behind every name field, and `findProgramPerson()` carries title/email across so a later step never asks the operator to retype a person. Add new name inputs to this roster rather than collecting a fresh person.
+- **Generated text is saved into state.** Fixing a generator does not fix programs already on disk — pair it with a repair pass hooked into `normalizeStateShape()` (see `repairBoilerplatePmRequirements`).
 - **OneDrive mount staleness:** bash mounts of this folder have historically served stale copies; if syntax errors look impossible, re-check from the Windows side or wait for sync.
 
 ## Validation Before Shipping
@@ -231,7 +235,7 @@ Labels → renderers are looked up **by label** (`cisoStepIndexByLabel`) so renu
 4. Snapshots modal → load each XMPL snapshot, then Reset and confirm no ghost state
 5. Sidebar badges and counts update after state changes
 6. Role-picker: impersonate each role; visible tabs must equal `ROLE_TABS` (assessor: home+risk+reports; AO: home+asset+risk+reports+users with the Authorization status panel on the dashboard); switch back to Admin mode
-7. Owner gating: clear a domain owner's email → the Finalise button disables and its label names how many domains still need an owner (calling cisoFinish() directly also toasts the count)
+7. Setup gating: clear a domain owner's name, or set the ISP approver to the program owner → the Finalize button disables, the red "Resolve before finalizing" list appears above it, and `cisoFinish()` refuses with a toast
 8. CSF Profile tab renders, toggles outcome detail, and exports CSV; Framework alignment shows the coverage strip and its "Open CSF Profile" link
 9. A workspace opened before setup shows its empty state with the step nav and footer hidden (`applySetupGate` in js/app.js), not a clickable dead-end
 
