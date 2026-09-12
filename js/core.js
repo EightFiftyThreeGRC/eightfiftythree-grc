@@ -1359,6 +1359,8 @@ function normalizeStateShape() {
   ensurePmControlsAssignedToCiso();
   if (typeof migrateUnifiedSetupPath === 'function') migrateUnifiedSetupPath();
   migrateCisoWizardDropProfileStep();
+  // Rewrite requirement stubs an earlier build saved into the ISP (program.js).
+  if (typeof repairBoilerplatePmRequirements === 'function') repairBoilerplatePmRequirements();
 }
 
 function migrateCisoWizardDropProfileStep() {
@@ -2275,7 +2277,7 @@ function _updateSaveIndicator(saved) {
   var el = document.getElementById('saveIndicator');
   if (!el) return;
   if (saved) {
-    el.textContent = '✓ Saved';
+    el.textContent = '✓ Saved in browser';
     el.style.color = 'var(--teal)';
   } else {
     el.textContent = '… Saving';

@@ -2273,6 +2273,51 @@ function ensureISPPrivacyRoles() {
   });
 }
 
+/**
+ * Policy-voice requirement text for a control, derived from PM_STATEMENTS -- the
+ * same source the PM Controls list uses -- with the catalog name as a fallback.
+ */
+function pmRequirementStatement(orgNameVal, pmId) {
+  var org = orgNameVal || (typeof state !== 'undefined' && state.orgName) || 'the organization';
+  var stmt = (typeof PM_STATEMENTS !== 'undefined' && PM_STATEMENTS[pmId]) ? String(PM_STATEMENTS[pmId]).trim() : '';
+  if (!stmt) {
+    var ctrl = (typeof CONTROLS !== 'undefined') && CONTROLS.filter(function(c) { return c.id === pmId; })[0];
+    stmt = ctrl && ctrl.n ? ('establish and maintain ' + ctrl.n.toLowerCase()) : '';
+  }
+  if (!stmt) return '';
+  stmt = stmt.replace(/\.\s*$/, '');
+  if (!/^[A-Z]{2,}/.test(stmt)) stmt = stmt.charAt(0).toLowerCase() + stmt.slice(1);
+  return org + ' shall ' + stmt + '. [NIST 800-53: ' + pmId + ']';
+}
+
+// What an earlier build wrote whenever its hand-maintained statement table had no
+// entry for a control: "<org> shall implement PM-18 per NIST 800-53 Rev. 5."
+var ISP_BOILERPLATE_REQ_RE = /\bshall implement\s+([A-Z]{2}-\d+(?:\(\d+\))?)\s+per NIST\s*800-53\s*Rev\.?\s*5\b/i;
+
+/**
+ * Repair pass. Fixing the generator only helps requirements drafted from now on --
+ * the stub text was written into the program and is saved with it, so an existing
+ * ISP keeps displaying it. Rewrite any surviving stub from PM_STATEMENTS. Called
+ * from normalizeStateShape() so it runs on load, import and snapshot restore.
+ */
+function repairBoilerplatePmRequirements() {
+  if (typeof state === 'undefined') return 0;
+  var isp = state.infoSecPolicy;
+  if (!isp || !Array.isArray(isp.requirements)) return 0;
+  var org = state.orgName || 'the organization';
+  var fixed = 0;
+  isp.requirements.forEach(function(r) {
+    if (!r || !r.text) return;
+    var m = ISP_BOILERPLATE_REQ_RE.exec(String(r.text));
+    if (!m) return;
+    var ctrlId = ((r.controls || [])[0]) || m[1];
+    var better = pmRequirementStatement(org, ctrlId);
+    if (better && better !== r.text) { r.text = better; fixed++; }
+  });
+  if (fixed && typeof markDirty === 'function') markDirty();
+  return fixed;
+}
+
 function draftUnmappedPMRequirements(rerender) {
   var isp = state.infoSecPolicy;
   if (!isp || !isp.requirements) return 0;
@@ -2288,17 +2333,7 @@ function draftUnmappedPMRequirements(rerender) {
   // by the PM Controls list. A second hand-maintained copy used to live here; it
   // covered only PM-1..PM-17, so every control above that fell through to a
   // content-free "shall implement PM-XX per NIST 800-53" stub.
-  function pmRequirementText(pmId) {
-    var stmt = (typeof PM_STATEMENTS !== 'undefined' && PM_STATEMENTS[pmId]) ? String(PM_STATEMENTS[pmId]).trim() : '';
-    if (!stmt) {
-      var ctrl = (typeof CONTROLS !== 'undefined') && CONTROLS.filter(function(c) { return c.id === pmId; })[0];
-      stmt = ctrl && ctrl.n ? ('establish and maintain ' + ctrl.n.toLowerCase()) : '';
-    }
-    if (!stmt) return '';
-    stmt = stmt.replace(/\.\s*$/, '');
-    if (!/^[A-Z]{2,}/.test(stmt)) stmt = stmt.charAt(0).toLowerCase() + stmt.slice(1);
-    return orgNameVal + ' shall ' + stmt + '. [NIST 800-53: ' + pmId + ']';
-  }
+  function pmRequirementText(pmId) { return pmRequirementStatement(orgNameVal, pmId); }
   unmapped.forEach(function(pmId) {
     var n = isp.requirements.length + 1;
     isp.requirements.push({ id:'IS-REQ-' + n, text: pmRequirementText(pmId), controls:[pmId] });
